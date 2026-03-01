@@ -8,5 +8,5 @@ wheels/
 
 # Virtual environments
 .venv
-.lock
-.python-version
+*.lock
+*.python-version
