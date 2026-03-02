@@ -1,41 +1,10 @@
 import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
+from rules import RULES,validate_cell
 
 input_file = '測試資料.xlsx'
 output_file = f"validate_{input_file}"
-
-
-RULES = {
-    '申報醫院代碼': {'field': 'Reporting Hospital Code', 
-        'length': 10, 
-        'digit': True
-    },
-    '病歷號碼': {
-        'field': 'Medical Record Number', 
-        'length': 10, 
-        'digit': True, 
-        'SV': '9999999999'
-    }
-}
-
-# 驗證
-def validate_cell(val, rule):
-    if pd.isna(val):
-        val = ""
-    val = str(val).strip()
-
-    if 'SV' in rule and val == rule['SV']:
-        return True
-
-    if 'length' in rule and len(val) != rule['length']:
-        return False
-    
-    if 'digit' in rule and rule['digit'] and not val.isdigit():
-        return False
-        
-    return True
-
 
 df = pd.read_excel(input_file, dtype=str)
 
