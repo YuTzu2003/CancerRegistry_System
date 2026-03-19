@@ -1,9 +1,12 @@
 import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
-from rules import RULES,validate_cell
 
-input_file = '測試資料.xlsx'
+# 1. 根據模組化，分開引入設定與邏輯
+from rules import RULES
+from validate import validate_cell
+
+input_file = 'data.xlsx'
 output_file = f"validate_{input_file}"
 
 df = pd.read_excel(input_file, dtype=str)
