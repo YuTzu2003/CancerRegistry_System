@@ -1,8 +1,6 @@
 import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
-
-# 1. 根據模組化，分開引入設定與邏輯
 from rules import RULES
 from validate import validate_cell
 
