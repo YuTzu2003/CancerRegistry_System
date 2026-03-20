@@ -1,8 +1,8 @@
 import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
-from rules import RULES
-from validate import validate_cell
+from modules.rules import RULES
+from modules.validate import validate_cell
 
 input_file = 'data.xlsx'
 output_file = f"validate_{input_file}"
