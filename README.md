@@ -13,6 +13,11 @@ Restore Hospital_data.bak
 uv run field_mapping.py
 ```
 
+癌症資料抓取
+```bash
+uv run cancer_classify.py
+```
+
 資料清洗
 ```bash
 uv run mian.py
