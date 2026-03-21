@@ -9,7 +9,97 @@ CANCER_RULES = {
     '口咽癌': {
         'site_include': [(19,), (24,), (51,52), (90,99), (100,109), (142,), (148,)],
         'hist_exclude': [(9140,), (9590,9993)]
-    }
+    },
+    '下咽癌:': {
+        'site_include': [(12,), (13,), (140,)],
+        'hist_exclude': [(9140,), (9590,9993)]
+    },
+    '主唾液腺癌:': {
+        'site_include': [(7,), (8,)],
+        'hist_exclude': [(9140,), (9590,9993)]
+    },
+    '鼻咽癌:': {
+        'site_include': [(11,)],
+        'hist_exclude': [(9140,), (9590,9993)]
+    },
+    '食道癌:': {
+        'site_include': [(15,)],
+        'hist_exclude': [(9140,), (9590,9993)]
+    },
+    '胃癌:': {
+        'site_include': [(16,)],
+        'hist_exclude': [(9140,), (9590,9993)]
+    },
+    '結直腸癌:': {
+        'site_include': [(18,), (19,), (20,), (21,)],
+        'hist_exclude': [(9140,), (9590,9993)]
+    },
+    '結腸癌:': {
+        'site_include': [(18,)],
+        'hist_exclude': [(9140,), (9590,9993)]
+    },
+    '直腸癌:': {
+        'site_include': [(19,), (20,)],
+        'hist_exclude': [(9140,), (9590,9993)]
+    },
+    '肛門癌:': {
+        'site_include': [(21,)],
+        'hist_exclude': [(9140,), (9590,9993)]
+    },
+    '肝癌:': {
+        'site_include': [(22,)],
+        'hist_exclude': [(9140,), (9590,9993)]
+    },
+    '胰臟癌(長表)': {
+        'site_include': [(25,)],
+        'hist_exclude': [(9140,), (9590,9993)],
+        'didiag_min': 2022 
+    },
+    '胰臟癌(短表)': {
+        'site_include': [(25,)],
+        'hist_exclude': [(9140,), (9590,9993)],
+        'didiag_less_than': 2022
+    },
+    '喉癌:': {
+        'site_include': [(32,)],
+        'hist_exclude': [(9140,), (9590,9993)]
+    },
+    '肺癌:': {
+        'site_include': [(33,)],
+        'hist_exclude': [(9140,), (9590,9993)]
+    },
+    '乳癌:': {
+        'site_include': [(50,)],
+        'hist_exclude': [(9140,), (9590,9993)]
+    },
+    '子宮頸癌:': {
+        'site_include': [(53,)],
+        'hist_exclude': [(9140,), (9590,9993)]
+    },
+    '子宮體癌:': {
+        'site_include': [(54,)],
+        'hist_exclude': [(9140,), (9590,9993)]
+    },
+    '卵巢癌:': {
+        'site_include': [(56,)],
+        'hist_exclude': [(9140,), (9590,9993)]
+    },
+    '卵巢癌:': {
+        'site_include': [(56,)],
+        'hist_exclude': [(9140,), (9590,9993)]
+    },
+    '攝護腺癌:': {
+        'site_include': [(61,)],
+        'hist_exclude': [(9140,), (9590,9993)]
+    },
+    '膀胱癌:': {
+        'site_include': [(67,)],
+        'hist_exclude': [(9140,), (9590,9993)]
+    },
+    '血液腫瘤:': {
+        'site_include': [(0,80)],
+        'hist_exclude': [(9590,9993)]
+    },
 }
 
 def is_target_site(site_str, ranges):
@@ -50,6 +140,41 @@ def is_hist_excluded(hist_str, ranges):
         elif len(i) == 2 and i[0] <= num <= i[1]: 
             return True
     return False
+
+def is_hist_included(hist_str, ranges):
+    if not ranges:
+        return True
+        
+    if pd.isna(hist_str): 
+        return False
+    
+    digits = re.sub(r'[^0-9]', '', str(hist_str))
+    if not digits: 
+        return False
+    
+    num = int(digits)
+    for i in ranges:
+        if len(i) == 1 and num == i[0]: 
+            return True
+        elif len(i) == 2 and i[0] <= num <= i[1]: 
+            return True
+    return False
+
+def is_didiag_match(date_str, min_year=None, less_than_year=None):
+    if pd.isna(date_str):
+        return False if (min_year or less_than_year) else True
+    
+    year_str = str(date_str).strip()[:4]
+    if not year_str.isdigit():
+        return False
+        
+    year = int(year_str)
+    if min_year and year < min_year:
+        return False
+
+    if less_than_year and year >= less_than_year:
+        return False
+    return True
 
 if __name__ == "__main__":
     INPUT_FILE = 'data/20260318測試.xlsx'     
