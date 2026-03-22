@@ -194,8 +194,53 @@ if __name__ == "__main__":
 
     print(f"Result save to {OUTPUT_FILE}")
 
-    #規則三
-    DATE_RULES = [
+#規則二
+
+def validate_rule_002(didiag_val, is_long_form, actual_col_count):
+    errors = []
+    
+    if pd.isna(didiag_val):
+        errors.append("缺少最初診斷日期(didiag)，無法判定申報格式")
+        return errors
+        
+    date_str = str(didiag_val).strip()
+    if len(date_str) < 4 or not date_str[:4].isdigit():
+        errors.append(f"最初診斷日期({date_str})格式錯誤，無法擷取年份")
+        return errors
+        
+    year = int(date_str[:4])
+    expected_cols = None
+    form_type = "長表" if is_long_form else "短表"
+    
+    if not is_long_form:
+        if 2011 <= year <= 2017:
+            expected_cols = 42
+        elif 2018 <= year <= 2024:
+            expected_cols = 45
+        elif year >= 2025:
+            expected_cols = 50
+        else:
+            errors.append(f"最初診斷年份({year})不在{form_type}設定範圍內")
+            return errors
+    else: 
+        if 2011 <= year <= 2017:
+            expected_cols = 114
+        elif 2018 <= year <= 2024:
+            expected_cols = 115
+        elif year >= 2025:
+            expected_cols = 129
+        else:
+            errors.append(f"最初診斷年份({year})不在{form_type}設定範圍內")
+            return errors
+            
+    if actual_col_count != expected_cols:
+        errors.append(f"申報格式錯誤：{year}年{form_type}應為 {expected_cols} 個欄位，但實際為 {actual_col_count} 個欄位")
+        
+    return errors
+
+#規則三
+
+DATE_RULES = [
     ('didiag', '<=', 'dcont', '最初診斷日不可晚於首次診斷日'),
     ('didiag', '<=', 'dtrt_1st', '最初診斷日不可晚於首療開始日'),
     ('dcont', '<=', 'dtrt_1st', '首次診斷日不可晚於首療開始日'),
