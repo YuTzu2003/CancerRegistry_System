@@ -7,9 +7,13 @@ class DeidApp(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("醫療資料清洗系統")
-        self.geometry("1100x850")
+        self.geometry("1000x850")
         ctk.set_appearance_mode("dark")
         self.df = None
+        
+        current_path = os.path.dirname(os.path.realpath(__file__))
+        ico_path = os.path.join("data_cleaning.ico")
+        if os.path.exists(ico_path): self.iconbitmap(ico_path)
         self.setup_ui()
 
     def setup_ui(self):
