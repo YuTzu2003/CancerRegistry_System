@@ -43,5 +43,16 @@ def validate_cell(val, rule):
                 return False
         except ValueError:
             return False
-        
+
+    if 'pattern_range' in rule:
+        if isinstance(rule['pattern_range'], str):
+            conditions = [c.strip() for c in rule['pattern_range'].split(',')]
+            for condition in conditions:
+                if '-' in condition:
+                    start_val, end_val = condition.split('-', 1)
+                    if len(val) == len(start_val) and start_val <= val <= end_val:
+                        return True
+                elif val == condition:
+                    return True
+
     return True
