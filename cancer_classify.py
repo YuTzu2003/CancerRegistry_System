@@ -53,12 +53,12 @@ CANCER_RULES = {
     '胰臟癌(長表)': {
         'site_include': [(250,254),(257,259)],
         'hist_exclude': [(9140,), (9590,9993)],
-        'didiag_min': 2022 
+        'didiag_include': [(2022, None)]
     },
     '胰臟癌(短表)': {
         'site_include': [(250,254),(257,259)],
         'hist_exclude': [(9140,), (9590,9993)],
-        'didiag_less_than': 2022
+        'didiag_include': [(None, 2021)]
     },
     '喉癌': {
         'site_include': [(320,323),(328,329)],
@@ -94,10 +94,11 @@ CANCER_RULES = {
     },
     '血液腫瘤': {
         'site_include': [(0,809)],
-        'hist_exclude': [(0,9589),(9994,9999)]
+        'hist_include': [(9590,9993)]
     },
 }
 
+# site包含
 def is_target_site(site_str, ranges):
     if pd.isna(site_str): 
         return False
@@ -118,6 +119,7 @@ def is_target_site(site_str, ranges):
             return True
     return False
 
+# hist排除
 def is_hist_excluded(hist_str, ranges):
     if not ranges:
         return False
@@ -137,6 +139,7 @@ def is_hist_excluded(hist_str, ranges):
             return True
     return False
 
+# hist包含
 def is_hist_included(hist_str, ranges):
     if not ranges:
         return True
@@ -156,21 +159,29 @@ def is_hist_included(hist_str, ranges):
             return True
     return False
 
-def is_didiag_match(date_str, min_year=None, less_than_year=None):
-    if pd.isna(date_str):
-        return False if (min_year or less_than_year) else True
+# didiag包含
+def is_didiag_included(date_str, ranges):
+    if not ranges:
+        return True   
+         
+    if pd.isna(date_str): 
+        return False
     
     year_str = str(date_str).strip()[:4]
-    if not year_str.isdigit():
+    if not year_str.isdigit(): 
         return False
-        
-    year = int(year_str)
-    if min_year and year < min_year:
-        return False
-
-    if less_than_year and year >= less_than_year:
-        return False
-    return True
+    
+    num = int(year_str)
+    for i in ranges:
+        if len(i) == 1 and num == i[0]: 
+            return True
+        elif len(i) == 2:
+            start, end = i
+            pass_start = (start is None) or (num >= start)
+            pass_end = (end is None) or (num <= end)  
+            if pass_start and pass_end:
+                return True
+    return False
 
 if __name__ == "__main__":
     INPUT_FILE = 'data/20260318測試.xlsx'     
@@ -178,96 +189,106 @@ if __name__ == "__main__":
     OUTPUT_FILE = 'data/cancer_cls_results.xlsx'      
     COL_SITE = '原發部位'
     COL_HIST = '組織類型'
+    COL_DIDIAG = '最初診斷日'
 
     df = pd.read_excel(INPUT_FILE, sheet_name=TARGET_SHEET)
     with pd.ExcelWriter(OUTPUT_FILE, engine='openpyxl') as writer:
 
         for cancer_name, rules in CANCER_RULES.items():
-            site_ranges = rules['site_include']
-            hist_ranges = rules['hist_exclude']
+            site_ranges = rules.get('site_include', [])
+            hist_exclude_ranges = rules.get('hist_exclude', [])
+            hist_include_ranges = rules.get('hist_include', [])
+            year_ranges = rules.get('didiag_include', [])
             is_site_match = df[COL_SITE].apply(lambda x: is_target_site(x, site_ranges))
-            is_hist_exclude_match = df[COL_HIST].apply(lambda x: is_hist_excluded(x, hist_ranges))
-            df_filtered = df[is_site_match & (~is_hist_exclude_match)]
+            is_hist_exclude_match = df[COL_HIST].apply(lambda x: is_hist_excluded(x, hist_exclude_ranges))
+            is_hist_include_match = df[COL_HIST].apply(lambda x: is_hist_included(x, hist_include_ranges))
+            
+            if year_ranges:
+                is_year_match = df[COL_DIDIAG].apply(lambda x: is_didiag_included(x, year_ranges))
+            else:
+                is_year_match = pd.Series(True,index=df.index)
+
+            df_filtered = df[is_site_match & (~is_hist_exclude_match) & is_hist_include_match & is_year_match] 
             print(f"Cancer:[{cancer_name}] ,count:{len(df_filtered)}")
 
             df_filtered.to_excel(writer, sheet_name=cancer_name, index=False)
 
     print(f"Result save to {OUTPUT_FILE}")
 
-#規則二
+# #規則二
 
-def validate_rule_002(didiag_val, is_long_form, actual_col_count):
-    errors = []
+# def validate_rule_002(didiag_val, is_long_form, actual_col_count):
+#     errors = []
     
-    if pd.isna(didiag_val):
-        errors.append("缺少最初診斷日期(didiag)，無法判定申報格式")
-        return errors
+#     if pd.isna(didiag_val):
+#         errors.append("缺少最初診斷日期(didiag)，無法判定申報格式")
+#         return errors
         
-    date_str = str(didiag_val).strip()
-    if len(date_str) < 4 or not date_str[:4].isdigit():
-        errors.append(f"最初診斷日期({date_str})格式錯誤，無法擷取年份")
-        return errors
+#     date_str = str(didiag_val).strip()
+#     if len(date_str) < 4 or not date_str[:4].isdigit():
+#         errors.append(f"最初診斷日期({date_str})格式錯誤，無法擷取年份")
+#         return errors
         
-    year = int(date_str[:4])
-    expected_cols = None
-    form_type = "長表" if is_long_form else "短表"
+#     year = int(date_str[:4])
+#     expected_cols = None
+#     form_type = "長表" if is_long_form else "短表"
     
-    if not is_long_form:
-        if 2011 <= year <= 2017:
-            expected_cols = 42
-        elif 2018 <= year <= 2024:
-            expected_cols = 45
-        elif year >= 2025:
-            expected_cols = 50
-        else:
-            errors.append(f"最初診斷年份({year})不在{form_type}設定範圍內")
-            return errors
-    else: 
-        if 2011 <= year <= 2017:
-            expected_cols = 114
-        elif 2018 <= year <= 2024:
-            expected_cols = 115
-        elif year >= 2025:
-            expected_cols = 129
-        else:
-            errors.append(f"最初診斷年份({year})不在{form_type}設定範圍內")
-            return errors
+#     if not is_long_form:
+#         if 2011 <= year <= 2017:
+#             expected_cols = 42
+#         elif 2018 <= year <= 2024:
+#             expected_cols = 45
+#         elif year >= 2025:
+#             expected_cols = 50
+#         else:
+#             errors.append(f"最初診斷年份({year})不在{form_type}設定範圍內")
+#             return errors
+#     else: 
+#         if 2011 <= year <= 2017:
+#             expected_cols = 114
+#         elif 2018 <= year <= 2024:
+#             expected_cols = 115
+#         elif year >= 2025:
+#             expected_cols = 129
+#         else:
+#             errors.append(f"最初診斷年份({year})不在{form_type}設定範圍內")
+#             return errors
             
-    if actual_col_count != expected_cols:
-        errors.append(f"申報格式錯誤：{year}年{form_type}應為 {expected_cols} 個欄位，但實際為 {actual_col_count} 個欄位")
+#     if actual_col_count != expected_cols:
+#         errors.append(f"申報格式錯誤：{year}年{form_type}應為 {expected_cols} 個欄位，但實際為 {actual_col_count} 個欄位")
         
-    return errors
+#     return errors
 
-#規則三
+# #規則三
 
-DATE_RULES = [
-    ('didiag', '<=', 'dcont', '最初診斷日不可晚於首次診斷日'),
-    ('didiag', '<=', 'dtrt_1st', '最初診斷日不可晚於首療開始日'),
-    ('dcont', '<=', 'dtrt_1st', '首次診斷日不可晚於首療開始日'),
-    ('dtrt_1st', '<=', 'dop_1st', '首療開始日不可晚於首次手術日'),
-    ('dtrt_1st', '<=', 'dchem', '首療開始日不可晚於本院化療開始日'),
-    ('dtrt_1st', '<=', 'dop_mds', '首療開始日不可晚於原發最確切手術日'),
-    ('dtrt_1st', '<=', 'drt_1st', '首療開始日不可晚於放療開始日'),
-]
+# DATE_RULES = [
+#     ('didiag', '<=', 'dcont', '最初診斷日不可晚於首次診斷日'),
+#     ('didiag', '<=', 'dtrt_1st', '最初診斷日不可晚於首療開始日'),
+#     ('dcont', '<=', 'dtrt_1st', '首次診斷日不可晚於首療開始日'),
+#     ('dtrt_1st', '<=', 'dop_1st', '首療開始日不可晚於首次手術日'),
+#     ('dtrt_1st', '<=', 'dchem', '首療開始日不可晚於本院化療開始日'),
+#     ('dtrt_1st', '<=', 'dop_mds', '首療開始日不可晚於原發最確切手術日'),
+#     ('dtrt_1st', '<=', 'drt_1st', '首療開始日不可晚於放療開始日'),
+# ]
 
-def parse_cancer_date(date_val):
-    if pd.isna(date_val):
-        return None
-    date_str = str(date_val).strip()
+# def parse_cancer_date(date_val):
+#     if pd.isna(date_val):
+#         return None
+#     date_str = str(date_val).strip()
     
-    if len(date_str) == 8 and date_str.isdigit():
-        if date_str[6:8] == '99':
-            date_str = date_str[:6] + '15'
-    return date_str
+#     if len(date_str) == 8 and date_str.isdigit():
+#         if date_str[6:8] == '99':
+#             date_str = date_str[:6] + '15'
+#     return date_str
 
-def validate_date_rules(row):
-    errors = []
-    for d1_field, op, d2_field, error_msg in DATE_RULES:
-        if d1_field in row and d2_field in row:
-            d1_val = parse_cancer_date(row[d1_field])
-            d2_val = parse_cancer_date(row[d2_field])
+# def validate_date_rules(row):
+#     errors = []
+#     for d1_field, op, d2_field, error_msg in DATE_RULES:
+#         if d1_field in row and d2_field in row:
+#             d1_val = parse_cancer_date(row[d1_field])
+#             d2_val = parse_cancer_date(row[d2_field])
             
-            if d1_val and d2_val:
-                if op == '<=' and d1_val > d2_val:
-                    errors.append(error_msg)
-    return errors
+#             if d1_val and d2_val:
+#                 if op == '<=' and d1_val > d2_val:
+#                     errors.append(error_msg)
+#     return errors
