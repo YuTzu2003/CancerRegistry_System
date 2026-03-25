@@ -53,13 +53,10 @@ CANCER_RULES = {
     '胰臟癌(長表)': {
         'site_include': [(250,254),(257,259)],
         'hist_exclude': [(9140,), (9590,9993)],
-        'didiag_include': [(2022, None)]
+        'didiag_include': [(2022, None)],
+        'split_by_didiag': True
     },
-    '胰臟癌(短表)': {
-        'site_include': [(250,254),(257,259)],
-        'hist_exclude': [(9140,), (9590,9993)],
-        'didiag_include': [(None, 2021)]
-    },
+ 
     '喉癌': {
         'site_include': [(320,323),(328,329)],
         'hist_exclude': [(9140,), (9590,9993)]
@@ -214,6 +211,7 @@ if __name__ == "__main__":
             df_filtered.to_excel(writer, sheet_name=cancer_name, index=False)
 
     print(f"Result save to {OUTPUT_FILE}")
+
 
 # #規則二
 
