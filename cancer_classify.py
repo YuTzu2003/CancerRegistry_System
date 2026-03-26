@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import re
 
@@ -50,13 +51,12 @@ CANCER_RULES = {
         'site_include': [(220,221)],
         'hist_exclude': [(9140,), (9590,9993)]
     },
-    '胰臟癌(長表)': {
+    '胰臟癌': {
         'site_include': [(250,254),(257,259)],
         'hist_exclude': [(9140,), (9590,9993)],
         'didiag_include': [(2022, None)],
         'split_by_didiag': True
     },
- 
     '喉癌': {
         'site_include': [(320,323),(328,329)],
         'hist_exclude': [(9140,), (9590,9993)]
@@ -180,17 +180,9 @@ def is_didiag_included(date_str, ranges):
                 return True
     return False
 
-if __name__ == "__main__":
-    INPUT_FILE = 'data/20260318測試.xlsx'     
-    TARGET_SHEET = '1150318虛擬V1(給虎科)' 
-    OUTPUT_FILE = 'data/cancer_cls_results.xlsx'      
-    COL_SITE = '原發部位'
-    COL_HIST = '組織類型'
-    COL_DIDIAG = '最初診斷日'
-
-    df = pd.read_excel(INPUT_FILE, sheet_name=TARGET_SHEET)
+# 癌別分類
+def cancer_classify(df, OUTPUT_FILE, COL_SITE, COL_HIST, COL_DIDIAG):
     with pd.ExcelWriter(OUTPUT_FILE, engine='openpyxl') as writer:
-
         for cancer_name, rules in CANCER_RULES.items():
             site_ranges = rules.get('site_include', [])
             hist_exclude_ranges = rules.get('hist_exclude', [])
@@ -212,50 +204,72 @@ if __name__ == "__main__":
 
     print(f"Result save to {OUTPUT_FILE}")
 
-
-# #規則二
-
-# def validate_rule_002(didiag_val, is_long_form, actual_col_count):
-#     errors = []
-    
-#     if pd.isna(didiag_val):
-#         errors.append("缺少最初診斷日期(didiag)，無法判定申報格式")
-#         return errors
-        
-#     date_str = str(didiag_val).strip()
-#     if len(date_str) < 4 or not date_str[:4].isdigit():
-#         errors.append(f"最初診斷日期({date_str})格式錯誤，無法擷取年份")
-#         return errors
-        
-#     year = int(date_str[:4])
-#     expected_cols = None
-#     form_type = "長表" if is_long_form else "短表"
-    
-#     if not is_long_form:
-#         if 2011 <= year <= 2017:
-#             expected_cols = 42
-#         elif 2018 <= year <= 2024:
-#             expected_cols = 45
-#         elif year >= 2025:
-#             expected_cols = 50
-#         else:
-#             errors.append(f"最初診斷年份({year})不在{form_type}設定範圍內")
-#             return errors
-#     else: 
-#         if 2011 <= year <= 2017:
-#             expected_cols = 114
-#         elif 2018 <= year <= 2024:
-#             expected_cols = 115
-#         elif year >= 2025:
-#             expected_cols = 129
-#         else:
-#             errors.append(f"最初診斷年份({year})不在{form_type}設定範圍內")
-#             return errors
+# 年度長短表分類
+def rule_table_classify(df,OUTPUT_DIR,COL_SITE, COL_HIST, COL_DIDIAG):
+    df = df.copy()
+    def classify_row(row):
+        is_long = False
+        for _, rule in CANCER_RULES.items():
+            site_ok = is_target_site(row[COL_SITE], rule.get('site_include', []))
+            hist_ex = is_hist_excluded(row[COL_HIST], rule.get('hist_exclude', []))
+            hist_in = is_hist_included(row[COL_HIST], rule.get('hist_include', []))
+            date_ok = is_didiag_included(row[COL_DIDIAG], rule.get('didiag_include', []))
             
-#     if actual_col_count != expected_cols:
-#         errors.append(f"申報格式錯誤：{year}年{form_type}應為 {expected_cols} 個欄位，但實際為 {actual_col_count} 個欄位")
-        
-#     return errors
+            if site_ok and not hist_ex and hist_in and date_ok:
+                is_long = True
+                break
+
+        try:
+            year = int(str(row[COL_DIDIAG]).strip()[:4])
+        except:
+            return "ERROR_DATE"
+
+        # 短表
+        if not is_long: 
+            if 2011 <= year <= 2017: 
+                return "42"
+            elif 2018 <= year <= 2024: 
+                return "45"
+            elif year >= 2025: 
+                return "50"
+
+        # 長表
+        else: 
+            if 2011 <= year <= 2017: 
+                return "114"
+            elif 2018 <= year <= 2024: 
+                return "115"
+            elif year >= 2025: 
+                return "129"
+        return "other"
+
+    df['Rule_ID'] = df.apply(classify_row, axis=1)
+
+    if not os.path.exists(OUTPUT_DIR): 
+        os.makedirs(OUTPUT_DIR)
+
+    for rid in ["42", "45", "50", "114", "115", "129"]:
+        subset = df[df['Rule_ID'] == rid].copy()
+        if not subset.empty:
+            subset.drop(columns=['Rule_ID']).to_excel(f"{OUTPUT_DIR}/Rule_{rid}.xlsx", index=False)
+            print(f"Rule {rid}: count:{len(subset)}")
+        else:
+            print(f"Rule {rid}: no data")
+
+
+if __name__ == "__main__":
+    INPUT_FILE = 'data/20260318測試.xlsx'     
+    TARGET_SHEET = '1150318虛擬V1(給虎科)' 
+    OUTPUT_FILE_CLASSIFY = 'data/cancer_cls_results.xlsx'  
+    OUTPUT_DIR = 'data/output_rules'    
+    COL_SITE = '原發部位'
+    COL_HIST = '組織類型'
+    COL_DIDIAG = '最初診斷日'
+    
+    df = pd.read_excel(INPUT_FILE, sheet_name=TARGET_SHEET)
+    cancer_classify(df, OUTPUT_FILE_CLASSIFY, COL_SITE, COL_HIST, COL_DIDIAG) # 癌別分類
+    rule_table_classify(df, OUTPUT_DIR, COL_SITE, COL_HIST, COL_DIDIAG) # 年度長短表分類
+
 
 # #規則三
 
