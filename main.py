@@ -3,6 +3,7 @@ from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
 from modules.rules import RULES
 from modules.validate import validate_cell
+from field_mapping import field_mapping, detect_system
 
 input_file = 'data/20260318測試.xlsx'
 sheet_name = '1150318虛擬V1(給虎科)'
@@ -10,12 +11,23 @@ output_file = f"validate_{sheet_name}.xlsx"
 
 df = pd.read_excel(input_file, sheet_name=sheet_name, dtype=str)
 
+# system_name, _ = detect_system(df.columns)
+# print(f"The data for {system_name}")
+
+alias_mapping, _ = field_mapping('中文欄位名稱')
+
 # 錯誤紀錄
 error_mask = pd.DataFrame(False, index=df.index, columns=df.columns)
-for ch_name, rule in RULES.items():
-    en_field = rule.get('field')
-    if en_field and en_field in df.columns:
-        error_mask[en_field] = df[en_field].apply(lambda x: not validate_cell(x, rule))
+for col in df.columns:
+    clean_col = str(col).strip()
+    rule_name = alias_mapping.get(clean_col)
+
+    if rule_name and rule_name in RULES:
+        rule = RULES[rule_name]
+        error_mask[col] = df[col].apply(lambda x: not validate_cell(x, rule))
+    elif clean_col in RULES:
+        rule = RULES[clean_col]
+        error_mask[col] = df[col].apply(lambda x: not validate_cell(x, rule))
 
 
 # 將錯誤資料排到最上面
