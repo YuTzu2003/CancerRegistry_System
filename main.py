@@ -4,10 +4,11 @@ from openpyxl.styles import PatternFill
 from modules.rules import RULES
 from modules.validate import validate_cell
 
-input_file = 'data.xlsx'
-output_file = f"validate_{input_file}"
+input_file = 'data/20260318測試.xlsx'
+sheet_name = '1150318虛擬V1(給虎科)'
+output_file = f"validate_{sheet_name}.xlsx"
 
-df = pd.read_excel(input_file, dtype=str)
+df = pd.read_excel(input_file, sheet_name=sheet_name, dtype=str)
 
 # 錯誤紀錄
 error_mask = pd.DataFrame(False, index=df.index, columns=df.columns)

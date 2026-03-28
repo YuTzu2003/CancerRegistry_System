@@ -1,20 +1,21 @@
 import pandas as pd
 from modules.db import get_conn
 
-def field_mapping():
+def field_mapping(target_col):
     conn = get_conn()
     query = """SELECT * FROM [Hospital_data].[dbo].[FieldName]"""
     df_mapping = pd.read_sql(query, conn)
     conn.close()
 
     alias_dict = {}
-    AImodule_list = [] 
-    
-    for index, row in df_mapping.iterrows():
-        ai_module_name = str(row['雲醫癌AI模組']).strip() if pd.notna(row['雲醫癌AI模組']) else ""
-        if ai_module_name and ai_module_name not in AImodule_list:
-            AImodule_list.append(ai_module_name)
-        
+    output_field_list = []
+
+    for _, row in df_mapping.iterrows():
+        output_name = str(row[target_col]).strip() if pd.notna(row[target_col]) else ""
+
+        if output_name and output_name not in output_field_list:
+            output_field_list.append(output_name)
+
         aliases = [
             row['中文欄位名稱'], 
             row['英文欄位名稱'], 
@@ -22,14 +23,14 @@ def field_mapping():
             row['台大體系醫整庫欄位名稱'], 
             row['台灣癌症登記中心']
         ]
-        
+
         for alias in aliases:
             if pd.notna(alias):
                 clean_alias = str(alias).strip()
-                if clean_alias: 
-                    alias_dict[clean_alias] = ai_module_name
-                    
-    return alias_dict, AImodule_list
+                if clean_alias:
+                    alias_dict[clean_alias] = output_name
+
+    return alias_dict, output_field_list
 
 def process_data(excel_path, mapping_dict, AImodule_list, target_sheet=0):
 
@@ -51,12 +52,13 @@ def process_data(excel_path, mapping_dict, AImodule_list, target_sheet=0):
     df_final = df_transformed[AImodule_list]
     return df_final
 
-if __name__ == "__main__":
-    alias_mapping, all_ai_modules = field_mapping()
-    
+if __name__ == "__main__": 
     data_path = "data/20260318測試.xlsx"  
     sheet_name = "測1.1" 
-    df_output_data = process_data(data_path, alias_mapping, all_ai_modules, target_sheet=sheet_name)
+    target_column = "雲醫癌AI模組"
+
+    alias_mapping, all_fields = field_mapping(target_column)
+    df_output_data = process_data(data_path, alias_mapping, all_fields, target_sheet=sheet_name)
     
-    rename_result_path = "data/AImodules_name.xlsx"
+    rename_result_path = f"data/{target_column}_output.xlsx"
     df_output_data.to_excel(rename_result_path, index=False)
