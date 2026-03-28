@@ -1,6 +1,8 @@
 import os
 import pandas as pd
 import re
+from modules.db import get_conn
+from field_mapping import field_mapping,detect_system
 
 CANCER_RULES = {
     '口腔癌': {
@@ -204,9 +206,13 @@ def cancer_classify(df, OUTPUT_FILE, COL_SITE, COL_HIST, COL_DIDIAG):
 
     print(f"Result save to {OUTPUT_FILE}")
 
-# 年度長短表分類
-def rule_table_classify(df,OUTPUT_DIR,COL_SITE, COL_HIST, COL_DIDIAG):
-    df = df.copy()
+# 長短表分類
+def rule_table_classify(df, OUTPUT_DIR, COL_SITE, COL_HIST, COL_DIDIAG):
+    df_proc = df.copy()
+ 
+    system_name, _ = detect_system(df_proc.columns)
+    print(f"The data for {system_name}")
+
     def classify_row(row):
         is_long = False
         for _, rule in CANCER_RULES.items():
@@ -214,7 +220,7 @@ def rule_table_classify(df,OUTPUT_DIR,COL_SITE, COL_HIST, COL_DIDIAG):
             hist_ex = is_hist_excluded(row[COL_HIST], rule.get('hist_exclude', []))
             hist_in = is_hist_included(row[COL_HIST], rule.get('hist_include', []))
             date_ok = is_didiag_included(row[COL_DIDIAG], rule.get('didiag_include', []))
-            
+
             if site_ok and not hist_ex and hist_in and date_ok:
                 is_long = True
                 break
@@ -224,37 +230,64 @@ def rule_table_classify(df,OUTPUT_DIR,COL_SITE, COL_HIST, COL_DIDIAG):
         except:
             return "ERROR_DATE"
 
-        # 短表
-        if not is_long: 
-            if 2011 <= year <= 2017: 
+        if not is_long:
+            if 2011 <= year <= 2017:
                 return "42"
-            elif 2018 <= year <= 2024: 
+            elif 2018 <= year <= 2024:
                 return "45"
-            elif year >= 2025: 
+            elif year >= 2025:
                 return "50"
-
-        # 長表
-        else: 
-            if 2011 <= year <= 2017: 
+        else:
+            if 2011 <= year <= 2017:
                 return "114"
-            elif 2018 <= year <= 2024: 
+            elif 2018 <= year <= 2024:
                 return "115"
-            elif year >= 2025: 
+            elif year >= 2025:
                 return "129"
         return "other"
 
-    df['Rule_ID'] = df.apply(classify_row, axis=1)
-
-    if not os.path.exists(OUTPUT_DIR): 
+    df_proc['Rule_ID'] = df_proc.apply(classify_row, axis=1)
+    if not os.path.exists(OUTPUT_DIR):
         os.makedirs(OUTPUT_DIR)
 
-    for rid in ["42", "45", "50", "114", "115", "129"]:
-        subset = df[df['Rule_ID'] == rid].copy()
-        if not subset.empty:
-            subset.drop(columns=['Rule_ID']).to_excel(f"{OUTPUT_DIR}/Rule_{rid}.xlsx", index=False)
-            print(f"Rule {rid}: count:{len(subset)}")
-        else:
-            print(f"Rule {rid}: no data")
+    conn = get_conn()
+    try:
+        for rid in ["42", "45", "50", "114", "115", "129"]:
+            subset = df_proc[df_proc['Rule_ID'] == rid].copy()
+
+            if subset.empty:
+                print(f"Rule {rid}: no data")
+                continue
+
+            # ===== Dynamic mapping query =====
+            mapping_col = f"[{rid}欄位]"
+            query = f"""SELECT FieldName.[{system_name}] FROM [Hospital_data].[dbo].[Field_Mapping]
+                        INNER JOIN [Hospital_data].[dbo].[FieldName] ON Field_Mapping.序號 = FieldName.序號
+                        WHERE Field_Mapping.{mapping_col} = 1
+                    """
+
+            df_rule_map = pd.read_sql(query, conn)
+
+            if not df_rule_map.empty:
+                target_headers = (df_rule_map[system_name].dropna().astype(str).str.strip().tolist())
+                output_df = pd.DataFrame(index=subset.index, columns=target_headers)
+
+                for col in target_headers:
+                    if col in subset.columns:
+                        output_df[col] = subset[col]
+                    else:
+                        output_df[col] = ""
+
+                output_path = f"{OUTPUT_DIR}/Rule_{rid}.xlsx"
+                output_df.to_excel(output_path, index=False)
+                print(f"Rule {rid}: count:{len(subset)} (System: {system_name}, Fields: {len(target_headers)})")
+
+            else:
+                output_path = f"{OUTPUT_DIR}/Rule_{rid}.xlsx"
+                subset.drop(columns=['Rule_ID']).to_excel(output_path, index=False)
+                print(f"Rule {rid}: count:{len(subset)} (No mapping found, outputting all)")
+    finally:
+        conn.close()
 
 
 if __name__ == "__main__":

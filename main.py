@@ -3,7 +3,7 @@ from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
 from modules.rules import RULES
 from modules.validate import validate_cell
-from field_mapping import field_mapping, detect_system
+from field_mapping import field_mapping,detect_system
 
 input_file = 'data/20260318測試.xlsx'
 sheet_name = '1150318虛擬V1(給虎科)'
