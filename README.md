@@ -20,5 +20,5 @@ uv run cancer_classify.py
 
 資料清洗
 ```bash
-uv run mian.py
+uv run clean.py
 ```
