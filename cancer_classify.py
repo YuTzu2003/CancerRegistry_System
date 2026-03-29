@@ -302,38 +302,3 @@ if __name__ == "__main__":
     df = pd.read_excel(INPUT_FILE, sheet_name=TARGET_SHEET)
     cancer_classify(df, OUTPUT_FILE_CLASSIFY, COL_SITE, COL_HIST, COL_DIDIAG) # 癌別分類
     rule_table_classify(df, OUTPUT_DIR, COL_SITE, COL_HIST, COL_DIDIAG) # 年度長短表分類
-
-
-# #規則三
-
-# DATE_RULES = [
-#     ('didiag', '<=', 'dcont', '最初診斷日不可晚於首次診斷日'),
-#     ('didiag', '<=', 'dtrt_1st', '最初診斷日不可晚於首療開始日'),
-#     ('dcont', '<=', 'dtrt_1st', '首次診斷日不可晚於首療開始日'),
-#     ('dtrt_1st', '<=', 'dop_1st', '首療開始日不可晚於首次手術日'),
-#     ('dtrt_1st', '<=', 'dchem', '首療開始日不可晚於本院化療開始日'),
-#     ('dtrt_1st', '<=', 'dop_mds', '首療開始日不可晚於原發最確切手術日'),
-#     ('dtrt_1st', '<=', 'drt_1st', '首療開始日不可晚於放療開始日'),
-# ]
-
-# def parse_cancer_date(date_val):
-#     if pd.isna(date_val):
-#         return None
-#     date_str = str(date_val).strip()
-    
-#     if len(date_str) == 8 and date_str.isdigit():
-#         if date_str[6:8] == '99':
-#             date_str = date_str[:6] + '15'
-#     return date_str
-
-# def validate_date_rules(row):
-#     errors = []
-#     for d1_field, op, d2_field, error_msg in DATE_RULES:
-#         if d1_field in row and d2_field in row:
-#             d1_val = parse_cancer_date(row[d1_field])
-#             d2_val = parse_cancer_date(row[d2_field])
-            
-#             if d1_val and d2_val:
-#                 if op == '<=' and d1_val > d2_val:
-#                     errors.append(error_msg)
-#     return errors

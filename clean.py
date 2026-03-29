@@ -2,51 +2,50 @@ import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
 from modules.rules import RULES
-from modules.validate import validate_cell
+from modules.validate import check_error_type, validate_cell
 from field_mapping import field_mapping
 
 def cleanValidate(input_file, sheet_name, output_file):
-    """
-    執行資料清洗與驗證，並標記錯誤。
-    """
     df = pd.read_excel(input_file, sheet_name=sheet_name, dtype=str)
     alias_mapping, _ = field_mapping('中文欄位名稱')
-
-    # 錯誤紀錄
-    error_mask = pd.DataFrame(False, index=df.index, columns=df.columns)
+    error_mask = pd.DataFrame("", index=df.index, columns=df.columns) 
+    
     for col in df.columns:
         clean_col = str(col).strip()
         rule_name = alias_mapping.get(clean_col)
 
         if rule_name and rule_name in RULES:
             rule = RULES[rule_name]
-            error_mask[col] = df[col].apply(lambda x: not validate_cell(x, rule))
+            error_mask[col] = df[col].apply(lambda x: check_error_type(x, rule))
         elif clean_col in RULES:
             rule = RULES[clean_col]
-            error_mask[col] = df[col].apply(lambda x: not validate_cell(x, rule))
+            error_mask[col] = df[col].apply(lambda x: check_error_type(x, rule))
 
+    df['_has_error'] = (error_mask != "").any(axis=1)
+    
     # 將錯誤資料排到最上面
-    df['_has_error'] = error_mask.any(axis=1)
     sorted_df = df.sort_values(by='_has_error', ascending=False, kind='mergesort')
     sorted_mask = error_mask.loc[sorted_df.index]
     sorted_df = sorted_df.drop(columns=['_has_error'])
     sorted_df.to_excel(output_file, index=False, engine='openpyxl')
 
-    # 錯誤標記 (黃底)
+    # 錯誤標記
     wb = load_workbook(output_file)
     ws = wb.active
-    fill = PatternFill(start_color='FFFF00', end_color='FFFF00', fill_type='solid')
+    fill_missing = PatternFill("solid", fgColor="FFE153")# 黃底=遺漏
+    fill_format = PatternFill("solid", fgColor="FF9797") # 紅底=格式錯
+    
     for r_idx in range(len(sorted_df)):
         for c_idx in range(len(sorted_df.columns)):
-            if sorted_mask.iloc[r_idx, c_idx]:
-                ws.cell(row=r_idx + 2, column=c_idx + 1).fill = fill
+            err_type = sorted_mask.iloc[r_idx, c_idx]
+            if err_type == "missing":
+                ws.cell(row=r_idx + 2, column=c_idx + 1).fill = fill_missing
+            elif err_type == "format":
+                ws.cell(row=r_idx + 2, column=c_idx + 1).fill = fill_format
 
     wb.save(output_file)
-    error_count = error_mask.any(axis=1).sum()
+    error_count = (error_mask != "").any(axis=1).sum()
 
-    # print(f"error count: {error_count}")
-    # print(f"save file: {output_file}")
-    
     return error_count, alias_mapping
 
 if __name__ == "__main__": 
