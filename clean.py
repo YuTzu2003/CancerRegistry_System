@@ -44,9 +44,26 @@ def cleanValidate(input_file, sheet_name, output_file):
                 ws.cell(row=r_idx + 2, column=c_idx + 1).fill = fill_format
 
     wb.save(output_file)
-    error_count = (error_mask != "").any(axis=1).sum()
+    
+    total_count = len(df)
+    error_mask_bool = (error_mask != "")
+    error_count = error_mask_bool.any(axis=1).sum()
+    accuracy = (total_count - error_count) / total_count if total_count > 0 else 0
+    
+    # 計算錯誤類別比率
+    missing_count = (error_mask == "missing").sum().sum()
+    format_count = (error_mask == "format").sum().sum()
+    
+    stats = {
+        'total': total_count,
+        'errors': error_count,
+        'accuracy': accuracy,
+        'missing': missing_count,
+        'format': format_count,
+        'error_details': error_mask # 傳回完整的錯誤遮罩供後續顯示使用
+    }
 
-    return error_count, alias_mapping
+    return stats, alias_mapping, sorted_df, sorted_mask
 
 if __name__ == "__main__": 
     input_file = 'data/20260318測試.xlsx'
