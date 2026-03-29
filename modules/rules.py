@@ -10,8 +10,7 @@ RULES = {
     '病歷號碼': {
         'ID':'1.2',
         'field': 'Medical Record Number', 
-        'length': 10, 
-        'digit': True, 
+        'max_length': 10, 
         'SV': '9999999999',
         'description': '記錄個案於申報醫院之病歷號碼。',
         'purpose': '用來辨識個案及作為調閱病歷之依據；亦可作為辨識個案是否有多重原發腫瘤之依據。'
@@ -61,7 +60,7 @@ RULES = {
     '診斷年齡': {
         'ID':'2.1',
         'field': 'Age at Diagnosis',
-        'length': 3,
+        'max_length': 3,
         'digit': True,
         'SV': '999',       
         'range': [0, 120],
@@ -125,7 +124,7 @@ RULES = {
     '原發部位':{
         'ID':'2.6',
         'field': 'Primary Site',
-        'length': 5,
+        'max_length': 5,
         'pattern_range': 'C000-C809',
         'description': '確認癌症原發部位。',
         'purpose': '原發部位是分期及決定治療方針之依據；同時也影響其預後及病程。'
@@ -142,7 +141,7 @@ RULES = {
     '組織型態':{
         'ID':'2.8',
         'field': 'Histology',
-        'length':5,
+        'max_length':5,
         'digit': True,
         'range': [0, 9999],
         'description': '原發腫瘤細胞於顯微鏡下之結構。',
@@ -232,7 +231,7 @@ RULES = {
         'length': 2,
         'digit': True,
         'range': [0, 90],
-        'choices': ['95', '96', '97', '98', '99'],
+        'SV': ['95', '96', '97', '98', '99'],
         'description': '記錄經由病理醫師檢驗的區域淋巴結總數。',
         'purpose': '本欄位可用以評估病理報告品質、手術廣泛程度，及治療品質之測量指標。'
     },
@@ -242,7 +241,7 @@ RULES = {
         'length': 2,
         'digit': True,
         'range': [0, 90],
-        'choices': ['95', '97', '98', '99'],
+        'SV': ['95', '97', '98', '99'],
         'description': '記錄經由病理醫師檢驗呈陽性的區域淋巴結總數。',
         'purpose': '本欄位可用以評估病理報告品質、手術廣泛程度，及治療品質之測量指標。'
     },
@@ -300,7 +299,7 @@ RULES = {
     '臨床期別組合':{
         'ID':'3.7',
         'field': 'Clinical Stage Group',
-        'length': 3,
+        'max_length': 3,
         'pattern_range': '0, 0A, 0IS, 1, 1A, 1A1, 1A2, 1A3, 1B, 1B1, 1B2, 1B3, 1C, 1E, 1S, 2, 2A, 2A1, 2A2, 2B, 2C, 2E, 2BU, 3, 3A, 3A1, 3A2, 3B, 3C, 3C1, 3C2, 4, 4A, 4A1, 4A2, 4B, 4C, OC, 888, 999, BBB',
         'description': '基於臨床 T、N 和 M 來決定疾病於解剖部位上的侵犯程度。',
         'purpose': 'TNM 分期系統可用以評估癌症治療及控制的趨勢。醫師則用以進行預後的推估、治療的規劃、新療法的評估、結果的分析、追蹤的策劃和早期偵測結果的評定。'
@@ -350,7 +349,7 @@ RULES = {
     '病理期別組合':{
         'ID':'3.13',
         'field': 'Pathologic Stage Group',
-        'length': 3,
+        'max_length': 3,
         'pattern_range': '0, 0A, 0IS, 1, 1A, 1A1, 1A2, 1A3, 1B, 1B1, 1B2, 1B3, 1C, 1E, 1S, 2, 2A, 2A1, 2A2, 2B, 2C, 3, 3A, 3A1, 3A2, 3B, 3C, 3C1, 3C2, 3D, 4, 4A, 4A1, 4A2, 4B, 4C, OC, 888, 999, BBB',
         'description': '基於病理 T、N 和 M 來決定疾病於解剖上的侵犯程度。',
         'purpose': 'TNM 分期系統可用以評估癌症治療及控制的趨勢。醫師則用以進行預後的推估、治療的規劃、新療法的評估、結果的分析、追蹤的策劃和早期偵測結果的評定。'
@@ -373,21 +372,19 @@ RULES = {
         'description': '記錄 AJCC 病理期別組合之判讀者。',
         'purpose': '用來評估 AJCC 分期的正確性和完整性，並可作為品質管理和改善研究的基礎。'
     },
-    'AJCC 癌症分期版本與章節':{
-        'ID':'3.16',
+    'AJCC 癌症分期版本與章節': {
         'field': 'The Edition and Chapter of AJCC Cancer Staging',
         'length': 5,
-        'pattern_range': '00000, 05888, 06888, 07888, 88888, 99999',
+        'SV': '88888,99999',
+        'pattern_range': '00000,05888,06888,07888',
         'regex': r'^(08\d{3}|V9\d{3})$',
-        'description': '記錄判定個案癌症期別所使用之 AJCC 癌症分期手冊的版本與章節。',
-        'purpose': 'AJCC 分期及 T、N、M 組成之編碼及規則會隨時間演進而改變，以利個案分析之用。'
     },
     '其他分期系統':{
         'ID':'3.17',
         'field': 'Other Staging System',
-        'length': 2,
+        'max_length': 2,
         'digit': True,
-        'choices': ['0', '1', '2', '6', '7', '9' '11', '12', '13', '20', '21', '22'],
+        'choices': ['00', '01', '02', '06', '07', '09', '11', '12', '13', '20', '21', '22'],
         'description': '若非 AJCC 癌症分期系統，可選擇下列其他分期系統摘錄。',
         'purpose': '對癌症進行分期，有利於治療計畫、預後評估及存活分析。'
     },
@@ -403,8 +400,8 @@ RULES = {
     '其他分期系統期別(臨床分期)':{
         'ID':'3.19',
         'field': 'Clinical Other Staging System',
-        'length': 4,
-        'pattern_range': '0, 1, 1A, 1A1, 1A2, 1B, 1B1, 1B2, 1B3, 1C, 1C1, 1C2, 1C3, 2, 2A, 2A1, 2A2, 2B, 2C, 3, 3A, 3A1, 3A11, 3A12, 3A2, 3B, 3C, 3CR, 3CP, 3C1, 3C1R, 3C1P, 3C2, 3C2R, 3C2P, 4, 4A, 4B, 8888, 9999, A, B, C, D, L, E, X',
+        'max_length': 4,
+        'choices': ['0000', '1', '1A', '1A1', '1A2', '1B', '1B1', '1B2', '1B3', '1C', '1C1', '1C2', '1C3','2', '2A', '2A1', '2A2', '2B', '2C','3', '3A', '3A1', '3A11', '3A12', '3A2', '3B', '3C', '3CR', '3CP', '3C1', '3C1R', '3C1P','3C2', '3C2R', '3C2P','4', '4A', '4B','8888', '9999','A', 'B', 'C', 'D', 'L', 'E', 'X'],
         'description': '若非 AJCC 癌症分期系統，可選擇下列其他分期系統摘錄。',
         'purpose': '對癌症進行分期，有利於治療計畫、預後評估及存活分析。'
     },
