@@ -322,5 +322,3 @@ if __name__ == "__main__":
 
     cancer_classify(df, OUTPUT_FILE_CLASSIFY, COL_SITE, COL_HIST, COL_DIDIAG) # 癌別分類
     rule_table_classify(df, OUTPUT_DIR, COL_SITE, COL_HIST, COL_DIDIAG) # 年度長短表分類
-
-print(df.columns)
