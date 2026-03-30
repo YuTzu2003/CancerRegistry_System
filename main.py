@@ -23,12 +23,13 @@ errors = stats['errors']
 accuracy_pct = stats['accuracy']*100 
 missing = stats['missing']
 format_err = stats['format']
+date_err = stats['dateformat']
 
 print("================ Validate Report ================")
 print(f"Records: {total}")
 print(f"Error Count: {errors}")
 print(f"Accuracy Rate: {accuracy_pct}%")
-print(f"Error Breakdown: Missing {missing} fields / Format Errors {format_err} fields")
+print(f"Error Breakdown: Missing {missing} / Format Errors {format_err} / Date Logic Errors {date_err}")
 print(f"Auditor: {Auditor}")
 print(f"Validate Date: {datetime.now()}")
 print(f"Validate file to '{VALIDATE_OUTPUT}'")

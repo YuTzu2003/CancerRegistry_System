@@ -91,7 +91,15 @@ def parse_cancer_date(date_val):
     return date_str
 
 
-def validate_date_rules(row):
+def validate_date_rules(row, alias_mapping):
+    std_row = {}
+    std_to_orig = {}  
+    for col_name, val in row.items():
+        clean_col = str(col_name).strip()
+        std_name = alias_mapping.get(clean_col, clean_col)
+        std_row[std_name] = val
+        std_to_orig[std_name] = col_name
+
     DATE_RULES = [
         ('最初診斷日期', '<=', '首次就診日期', '最初診斷日期不可晚於首次就診日期'),
         ('最初診斷日期', '<=', '首次療程開始日期', '最初診斷日期不可晚於首次療程開始日期'),
@@ -105,16 +113,15 @@ def validate_date_rules(row):
     errors = []
     error_fields = set()
     for d1_field, op, d2_field, error_msg in DATE_RULES:
-        if d1_field in row and d2_field in row:
-
-            d1_val = parse_cancer_date(row[d1_field])
-            d2_val = parse_cancer_date(row[d2_field])
+        if d1_field in std_row and d2_field in std_row:
+            d1_val = parse_cancer_date(std_row[d1_field])
+            d2_val = parse_cancer_date(std_row[d2_field])
 
             if d1_val and d2_val:
                 if op == '<=' and d1_val > d2_val:
                     errors.append(error_msg)
-                    error_fields.add(d1_field)
-                    error_fields.add(d2_field)
+                    error_fields.add(std_to_orig[d1_field])
+                    error_fields.add(std_to_orig[d2_field])
 
     return list(error_fields), errors
 
@@ -127,19 +134,3 @@ def check_error_type(val, rule):
         return "missing"
     else:
         return "format"
-    
-
-if __name__ == '__main__': 
-    alias_mapping, all_fields = field_mapping(target_column)
-    df = process_data(INPUT_FILE, alias_mapping, all_fields, target_sheet=TARGET_SHEET)    
-    print(df.columns) 
-
-    df['日期錯誤'] = df.apply(validate_date_rules, axis=1)
-    df_error = df[df['日期錯誤'].apply(lambda x: len(x) > 0)]
-    for idx, row in df_error.iterrows():
-        print(f"第{idx}筆錯誤: {row['日期錯誤']}")
-    df_error.to_excel("data/date_error_details.xlsx", index=False)
-
-    COL_SITE = 'site'
-    COL_HIST = 'hist'
-    COL_DIDIAG = 'didiag'
