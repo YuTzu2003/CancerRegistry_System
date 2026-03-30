@@ -2,7 +2,7 @@ import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
 from modules.rules import RULES
-from modules.validate import check_error_type, validate_cell
+from modules.validate import check_error_type, validate_cell, validate_date_rules
 from field_mapping import field_mapping
 
 def cleanValidate(input_file, sheet_name, output_file):
@@ -21,6 +21,13 @@ def cleanValidate(input_file, sheet_name, output_file):
             rule = RULES[clean_col]
             error_mask[col] = df[col].apply(lambda x: check_error_type(x, rule))
 
+    for idx, row in df.iterrows():
+        bad_cols, msgs = validate_date_rules(row, alias_mapping)
+        if bad_cols:
+            for col in bad_cols:
+                if col in error_mask.columns and error_mask.at[idx, col] == "":
+                    error_mask.at[idx, col] = "dateformat"
+
     df['_has_error'] = (error_mask != "").any(axis=1)
     
     # 將錯誤資料排到最上面
@@ -32,8 +39,9 @@ def cleanValidate(input_file, sheet_name, output_file):
     # 錯誤標記
     wb = load_workbook(output_file)
     ws = wb.active
-    fill_missing = PatternFill("solid", fgColor="FFE153")# 黃底=遺漏
-    fill_format = PatternFill("solid", fgColor="FF9797") # 紅底=格式錯
+    fill_missing = PatternFill("solid", fgColor="FFE153")    # 黃底=遺漏
+    fill_format = PatternFill("solid", fgColor="FF9797")     # 紅底=格式錯
+    fill_dateformat = PatternFill("solid", fgColor="00FFFF") # 藍底=日期邏輯錯
     
     for r_idx in range(len(sorted_df)):
         for c_idx in range(len(sorted_df.columns)):
@@ -42,6 +50,8 @@ def cleanValidate(input_file, sheet_name, output_file):
                 ws.cell(row=r_idx + 2, column=c_idx + 1).fill = fill_missing
             elif err_type == "format":
                 ws.cell(row=r_idx + 2, column=c_idx + 1).fill = fill_format
+            elif err_type == "dateformat": 
+                ws.cell(row=r_idx + 2, column=c_idx + 1).fill = fill_dateformat
 
     wb.save(output_file)
     
@@ -53,6 +63,7 @@ def cleanValidate(input_file, sheet_name, output_file):
 
     missing_count = (error_mask == "missing").sum().sum()
     format_count = (error_mask == "format").sum().sum()
+    dateformat_count = (error_mask == "dateformat").sum().sum()
     
     stats = {
         'total': total_count,
@@ -60,6 +71,7 @@ def cleanValidate(input_file, sheet_name, output_file):
         'accuracy': accuracy,
         'missing': missing_count,
         'format': format_count,
+        'dateformat': dateformat_count,
         'error_details': error_mask
     }
 
