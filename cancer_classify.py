@@ -99,6 +99,10 @@ CANCER_RULES = {
     },
 }
 
+COL_SITE = '原發部位'
+COL_HIST = '組織類型'
+COL_DIDIAG = '最初診斷日'
+
 # site包含
 def is_target_site(site_str, ranges):
     if pd.isna(site_str): 
@@ -185,13 +189,14 @@ def is_didiag_included(date_str, ranges):
     return False
 
 # 癌別分類
-def cancer_classify(df, OUTPUT_FILE, COL_SITE, COL_HIST, COL_DIDIAG):
+def cancer_classify(df, OUTPUT_FILE, alias_dict=None, output_field_list=None):
     with pd.ExcelWriter(OUTPUT_FILE, engine='openpyxl') as writer:
         for cancer_name, rules in CANCER_RULES.items():
             site_ranges = rules.get('site_include', [])
             hist_exclude_ranges = rules.get('hist_exclude', [])
             hist_include_ranges = rules.get('hist_include', [])
             year_ranges = rules.get('didiag_include', [])
+            
             is_site_match = df[COL_SITE].apply(lambda x: is_target_site(x, site_ranges))
             is_hist_exclude_match = df[COL_HIST].apply(lambda x: is_hist_excluded(x, hist_exclude_ranges))
             is_hist_include_match = df[COL_HIST].apply(lambda x: is_hist_included(x, hist_include_ranges))
@@ -199,22 +204,25 @@ def cancer_classify(df, OUTPUT_FILE, COL_SITE, COL_HIST, COL_DIDIAG):
             if year_ranges:
                 is_year_match = df[COL_DIDIAG].apply(lambda x: is_didiag_included(x, year_ranges))
             else:
-                is_year_match = pd.Series(True,index=df.index)
+                is_year_match = pd.Series(True, index=df.index)
 
-            df_filtered = df[is_site_match & (~is_hist_exclude_match) & is_hist_include_match & is_year_match] 
+            df_filtered = df[is_site_match & (~is_hist_exclude_match) & is_hist_include_match & is_year_match].copy()
+
+            if alias_dict and not df_filtered.empty:
+                df_filtered = df_filtered.rename(columns=alias_dict)
+                if output_field_list:
+                    valid_cols = [c for c in output_field_list if c in df_filtered.columns]
+                    df_filtered = df_filtered[valid_cols]
+
             print(f"Cancer:[{cancer_name}] ,count:{len(df_filtered)}")
-
             df_filtered.to_excel(writer, sheet_name=cancer_name, index=False)
 
     print(f"Result save to {OUTPUT_FILE}")
 
 # 長短表分類
-def rule_table_classify(df, OUTPUT_DIR, COL_SITE, COL_HIST, COL_DIDIAG):
+def rule_table_classify(df, OUTPUT_DIR):
     df_proc = df.copy()
- 
-    system_name, _ = detect_system(df_proc.columns)
-    print(f"The data for {system_name}")
-
+    result_dict = {} 
     def classify_row(row):
         is_long = False
         for _, rule in CANCER_RULES.items():
@@ -248,7 +256,12 @@ def rule_table_classify(df, OUTPUT_DIR, COL_SITE, COL_HIST, COL_DIDIAG):
                 return "129"
         return "other"
 
+  
     df_proc['Rule_ID'] = df_proc.apply(classify_row, axis=1)
+    
+    system_name, _ = detect_system(df_proc.columns)
+    print(f"The data for {system_name}")
+
     if not os.path.exists(OUTPUT_DIR):
         os.makedirs(OUTPUT_DIR)
 
@@ -266,30 +279,33 @@ def rule_table_classify(df, OUTPUT_DIR, COL_SITE, COL_HIST, COL_DIDIAG):
             query = f"""SELECT FieldName.[{system_name}] FROM [Hospital_data].[dbo].[Field_Mapping]
                         INNER JOIN [Hospital_data].[dbo].[FieldName] ON Field_Mapping.序號 = FieldName.序號
                         WHERE Field_Mapping.{mapping_col} = 1
-                    """
+                    """ 
 
             df_rule_map = pd.read_sql(query, conn)
 
             if not df_rule_map.empty:
-                target_headers = (df_rule_map[system_name].dropna().astype(str).str.strip().tolist())
-                output_df = pd.DataFrame(index=subset.index, columns=target_headers)
-
-                for col in target_headers:
-                    if col in subset.columns:
-                        output_df[col] = subset[col]
-                    else:
-                        output_df[col] = ""
-
+                target_headers = df_rule_map[system_name].dropna().astype(str).str.strip().tolist()
+                essential_cols = [COL_SITE, COL_HIST, COL_DIDIAG]
+                all_needed_headers = list(set(target_headers + essential_cols))
+                available_cols = [c for c in all_needed_headers if c in subset.columns]
+                output_df = subset[available_cols].copy()
                 output_path = f"{OUTPUT_DIR}/Rule_{rid}.xlsx"
                 output_df.to_excel(output_path, index=False)
-                print(f"Rule {rid}: count:{len(subset)} (System: {system_name}, Fields: {len(target_headers)})")
+                result_dict[rid] = output_df             
+                print(f"Rule {rid}: count:{len(subset)} (Fields: {len(target_headers)})")
 
             else:
+
                 output_path = f"{OUTPUT_DIR}/Rule_{rid}.xlsx"
-                subset.drop(columns=['Rule_ID']).to_excel(output_path, index=False)
+                output_df = subset.drop(columns=['Rule_ID'])
+                output_df.to_excel(output_path, index=False)
+                result_dict[rid] = output_df
                 print(f"Rule {rid}: count:{len(subset)} (No mapping found, outputting all)")
+                
     finally:
         conn.close()
+
+    return result_dict
 
 
 if __name__ == "__main__":
@@ -297,10 +313,8 @@ if __name__ == "__main__":
     TARGET_SHEET = '1150318虛擬V1(給虎科)' 
     OUTPUT_FILE_CLASSIFY = 'data/cancer_cls_results.xlsx'  
     OUTPUT_DIR = 'data/output_rules'    
-    COL_SITE = '原發部位'
-    COL_HIST = '組織類型'
-    COL_DIDIAG = '最初診斷日'
+ 
     
     df = pd.read_excel(INPUT_FILE, sheet_name=TARGET_SHEET)
-    cancer_classify(df, OUTPUT_FILE_CLASSIFY, COL_SITE, COL_HIST, COL_DIDIAG) # 癌別分類
-    rule_table_classify(df, OUTPUT_DIR, COL_SITE, COL_HIST, COL_DIDIAG) # 年度長短表分類
+    cancer_classify(df, OUTPUT_FILE_CLASSIFY) # 癌別分類
+    rule_table_classify(df, OUTPUT_DIR) # 年度長短表分類
