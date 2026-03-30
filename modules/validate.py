@@ -8,33 +8,44 @@ def validate_cell(val, rule):
         val = ""
     val = str(val).strip()
 
+    # 日期標準化
+    if 'is_date' in rule:
+        if isinstance(val, pd.Timestamp):
+            val = val.strftime('%Y%m%d')
+        else:
+            val = re.sub(r'[-/]', '', val)
+
     if 'SV' in rule:
-        if isinstance(rule['SV'], list) and val in rule['SV']:
-            return True
-        elif val == rule['SV']:
+        sv_list = rule['SV']
+        if isinstance(sv_list, str):
+            sv_list = [v.strip() for v in sv_list.split(',')]
+        if val in sv_list:
             return True
 
     if 'length' in rule and len(val) != rule['length']:
         return False
-    
+
     if 'digit' in rule and rule['digit'] and not val.isdigit():
         return False
-    
+
     if 'max_length' in rule and len(val) > rule['max_length']:
         return False
-    
+
     if 'regex' in rule and not re.match(rule['regex'], val):
         return False
 
     if 'choices' in rule and val not in rule['choices']:
         return False
-    
+
     if 'is_date' in rule:
+        check_val = val
+        if len(check_val) == 8 and check_val.endswith('99'):
+            check_val = check_val[:-2] + '15'
         try:
-            datetime.strptime(val, rule['is_date'])
+            datetime.strptime(check_val, '%Y%m%d')
         except ValueError:
             return False
-        
+
     if 'range' in rule:
         try:
             num_val = int(val)
@@ -100,3 +111,13 @@ def validate_date_rules(row):
                     errors.append(error_msg)
 
     return errors
+
+def check_error_type(val, rule):
+    is_valid = validate_cell(val, rule)
+    if is_valid:
+        return ""  
+    
+    if pd.isna(val) or str(val).strip() == "" or str(val).strip().lower() == "nan":
+        return "missing"
+    else:
+        return "format"
