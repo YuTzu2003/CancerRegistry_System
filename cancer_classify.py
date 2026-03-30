@@ -293,32 +293,14 @@ def rule_table_classify(df, OUTPUT_DIR, COL_SITE, COL_HIST, COL_DIDIAG):
 
 
 if __name__ == "__main__":
-    
-    target_column = "雲醫癌AI模組"
-
     INPUT_FILE = 'data/20260318測試.xlsx'     
     TARGET_SHEET = '1150318虛擬V1(給虎科)' 
     OUTPUT_FILE_CLASSIFY = 'data/cancer_cls_results.xlsx'  
     OUTPUT_DIR = 'data/output_rules'    
-    #COL_SITE = '原發部位'
-    #COL_HIST = '組織類型'
-    #COL_DIDIAG = '最初診斷日'
+    COL_SITE = '原發部位'
+    COL_HIST = '組織類型'
+    COL_DIDIAG = '最初診斷日'
     
-
-    alias_mapping, all_fields = field_mapping(target_column)
-    df = process_data(INPUT_FILE, alias_mapping, all_fields, target_sheet=TARGET_SHEET)    
-    print(df.columns) 
-
-    df['日期錯誤'] = df.apply(validate_date_rules, axis=1)
-    df_error = df[df['日期錯誤'].apply(lambda x: len(x) > 0)]
-    for idx, row in df_error.iterrows():
-        print(f"第{idx}筆錯誤: {row['日期錯誤']}")
-    df_error.to_excel("data/date_error_details.xlsx", index=False)
-
-    COL_SITE = 'site'
-    COL_HIST = 'hist'
-    COL_DIDIAG = 'didiag'
-
-
+    df = pd.read_excel(INPUT_FILE, sheet_name=TARGET_SHEET)
     cancer_classify(df, OUTPUT_FILE_CLASSIFY, COL_SITE, COL_HIST, COL_DIDIAG) # 癌別分類
     rule_table_classify(df, OUTPUT_DIR, COL_SITE, COL_HIST, COL_DIDIAG) # 年度長短表分類

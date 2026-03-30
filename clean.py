@@ -50,7 +50,7 @@ def cleanValidate(input_file, sheet_name, output_file):
     error_count = error_mask_bool.any(axis=1).sum()
     accuracy = (total_count - error_count) / total_count if total_count > 0 else 0
     
-    # 計算錯誤類別比率
+
     missing_count = (error_mask == "missing").sum().sum()
     format_count = (error_mask == "format").sum().sum()
     
@@ -60,7 +60,7 @@ def cleanValidate(input_file, sheet_name, output_file):
         'accuracy': accuracy,
         'missing': missing_count,
         'format': format_count,
-        'error_details': error_mask # 傳回完整的錯誤遮罩供後續顯示使用
+        'error_details': error_mask
     }
 
     return stats, alias_mapping, sorted_df, sorted_mask
