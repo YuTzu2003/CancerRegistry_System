@@ -1,5 +1,5 @@
 import pandas as pd
-from field_mapping import detect_system
+from field_mapping import detect_system, field_mapping, process_data
 from cancer_classify import cancer_classify, rule_table_classify
 from clean import cleanValidate
 from datetime import datetime
@@ -15,6 +15,7 @@ Auditor = "TEST"
 df = pd.read_excel(INPUT_FILE, sheet_name=SHEET_NAME, dtype=str)
 system_name, _ = detect_system(df.columns)
 print(f"The data for {system_name}")
+alias_dict, _ = field_mapping('中文欄位名稱')
 
 # 資料清洗
 stats, alias_mapping, sorted_df, sorted_mask = cleanValidate(INPUT_FILE, SHEET_NAME, VALIDATE_OUTPUT)
@@ -33,5 +34,8 @@ print(f"Error Breakdown: Missing {missing} / Format Errors {format_err} / Date L
 print(f"Auditor: {Auditor}")
 print(f"Validate Date: {datetime.now()}")
 print(f"Validate file to '{VALIDATE_OUTPUT}'")
+
+# 分長短表(年度+癌別)
+rule_dfs = rule_table_classify(sorted_df, RULES_OUTPUT_DIR)
 
 # 待寫
