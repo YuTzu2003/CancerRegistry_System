@@ -27,9 +27,9 @@ format_err = stats['format']
 print("================ Validate Report ================")
 print(f"Records: {total}")
 print(f"Error Count: {errors}")
-print(f"Accuracy Rate: {accuracy_pct:.2f}%")
+print(f"Accuracy Rate: {accuracy_pct}%")
 print(f"Error Breakdown: Missing {missing} fields / Format Errors {format_err} fields")
-print("Auditor: {Auditor}")
+print(f"Auditor: {Auditor}")
 print(f"Validate Date: {datetime.now()}")
 print(f"Validate file to '{VALIDATE_OUTPUT}'")
 
