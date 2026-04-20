@@ -34,8 +34,3 @@ print(f"Error Breakdown: Missing {missing} / Format Errors {format_err} / Date L
 print(f"Auditor: {Auditor}")
 print(f"Validate Date: {datetime.now()}")
 print(f"Validate file to '{VALIDATE_OUTPUT}'")
-
-# 分長短表(年度+癌別)
-rule_dfs = rule_table_classify(sorted_df, RULES_OUTPUT_DIR)
-
-# 待寫
