@@ -22,3 +22,8 @@ uv run cancer_classify.py
 ```bash
 uv run clean.py
 ```
+
+Flask
+```bash
+uv run app.py # flask run
+```
