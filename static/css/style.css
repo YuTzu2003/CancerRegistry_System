@@ -416,15 +416,6 @@ table.table-flat tbody tr:hover { background: #fafbfd; }
 table.table-flat.centered th,
 table.table-flat.centered td { text-align: center; }
 
-.badge-soft {
-  display: inline-flex; align-items: center; gap: 4px;
-  padding: 4px 9px;
-  border-radius: var(--radius-sm);
-  background: var(--blue-100);
-  color: var(--blue-700);
-  font-weight: 600;
-  letter-spacing: .4px;
-}
 .badge-soft.cyan { background: var(--accent-soft); color: var(--accent-strong); }
 .badge-soft.gray { background: var(--gray-100); color: var(--gray-700); }
 .badge-soft.red  { background: var(--danger-soft); color: var(--danger); }
