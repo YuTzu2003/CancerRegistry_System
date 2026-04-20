@@ -316,5 +316,6 @@ if __name__ == "__main__":
  
     
     df = pd.read_excel(INPUT_FILE, sheet_name=TARGET_SHEET)
-    cancer_classify(df, OUTPUT_FILE_CLASSIFY) # 癌別分類
     rule_table_classify(df, OUTPUT_DIR) # 年度長短表分類
+    cancer_classify(df, OUTPUT_FILE_CLASSIFY) # 癌別分類
+   
