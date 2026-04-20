@@ -1,7 +1,8 @@
+import os
 import pandas as pd
 from modules.field_mapping import detect_system, field_mapping, process_data
 from modules.cancer_classify import cancer_classify, rule_table_classify
-from modules.clean import cleanValidate
+from clean import cleanValidate
 from datetime import datetime
 
 INPUT_FILE = 'data/20260318測試.xlsx' 
@@ -12,7 +13,15 @@ CANCER_OUTPUT = f"data/cancer_classified_{SHEET_NAME}.xlsx"
 RULES_OUTPUT_DIR = f"data/output_rules_{SHEET_NAME}"
 Auditor = "TEST"
 
-df = pd.read_excel(INPUT_FILE, sheet_name=SHEET_NAME, dtype=str)
+file_ext = os.path.splitext(INPUT_FILE)[1].lower()
+if file_ext == '.csv':
+    try:
+        df = pd.read_csv(INPUT_FILE, dtype=str, encoding='utf-8-sig')
+    except UnicodeDecodeError:
+        df = pd.read_csv(INPUT_FILE, dtype=str, encoding='cp950')
+else:
+    df = pd.read_excel(INPUT_FILE, sheet_name=SHEET_NAME, dtype=str)
+
 system_name, _ = detect_system(df.columns)
 print(f"The data for {system_name}")
 alias_dict, _ = field_mapping('中文欄位名稱')
@@ -20,16 +29,16 @@ alias_dict, _ = field_mapping('中文欄位名稱')
 # 資料清洗
 stats, alias_mapping, sorted_df, sorted_mask = cleanValidate(INPUT_FILE, SHEET_NAME, VALIDATE_OUTPUT)
 total = stats['total']
-errors = stats['errors']
-accuracy_pct = stats['accuracy']*100 
-missing = stats['missing']
-format_err = stats['format']
-date_err = stats['dateformat']
+errors = stats['error_rows']
+accuracy_pct = stats['overall_accuracy']*100 
+missing = stats['missing_rows']
+format_err = stats['format_rows']
+date_err = stats['logic_rows']
 
 print("================ Validate Report ================")
 print(f"Records: {total}")
 print(f"Error Count: {errors}")
-print(f"Accuracy Rate: {accuracy_pct}%")
+print(f"Accuracy Rate: {accuracy_pct:.2f}%")
 print(f"Error Breakdown: Missing {missing} / Format Errors {format_err} / Date Logic Errors {date_err}")
 print(f"Auditor: {Auditor}")
 print(f"Validate Date: {datetime.now()}")

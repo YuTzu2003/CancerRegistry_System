@@ -41,9 +41,9 @@
             data-name="{{ f.name }}"
             data-version="{{ f.version }}"
             data-updated="{{ f.updated or '' }}">
-          <td class="fmt-name"><strong>{{ f.name }}</strong></td>
+          <td class="fmt-name"><strong>{{ f.name }} 欄位</strong></td>
           <td class="fmt-version">
-            <span class="badge-soft cyan">{{ f.version }}</span>
+            <span class="badge bg-success fs-7">{{ f.version }}</span>
           </td>
           <td class="fmt-updated">{{ f.updated or '—' }}</td>
           <td>
@@ -161,7 +161,7 @@
       <h2><span class="dot"></span> 清洗個案清單明細</h2>
       <div class="d-flex align-items-center gap-2">
         <span class="hint">顯示每筆個案的錯誤欄位與原因</span>
-        <button class="btn btn-sm" type="button" id="btnDownloadIssues" disabled>
+        <button class="btn btn-sm" type="button" id="btnDownloadIssues">
           <i class="bi bi-file-earmark-excel"></i> 下載 XLSX
         </button>
       </div>
@@ -196,7 +196,7 @@
       <h2><span class="dot"></span> 清洗結果分析</h2>
       <div class="d-flex align-items-center gap-2">
         <span class="hint">依資料欄位與格式統計錯誤分布</span>
-        <button class="btn btn-sm" type="button" id="btnDownloadAnalysis" disabled>
+        <button class="btn btn-sm" type="button" id="btnDownloadAnalysis">
           <i class="bi bi-file-earmark-excel"></i> 下載 XLSX
         </button>
       </div>
@@ -325,8 +325,8 @@
     </div>
 
     <div class="d-flex justify-content-end gap-2 mt-3 pt-3" style="border-top:1px solid var(--border);">
-      <button class="btn" type="button" id="btnPreviewOutput" disabled><i class="bi bi-eye"></i> 預覽</button>
-      <button class="btn btn-accent" type="button" id="btnExportXlsx" disabled>
+      <button class="btn" type="button" id="btnPreviewOutput"><i class="bi bi-eye"></i> 預覽</button>
+      <button class="btn btn-accent" type="button" id="btnExportXlsx">
         <i class="bi bi-file-earmark-excel"></i> 匯出 XLSX
       </button>
     </div>
@@ -347,16 +347,16 @@
         <input type="hidden" id="fmtId" />
         <div class="form-field">
           <label>資料格式</label>
-          <input type="text" class="form-control" id="fmtName" placeholder="例：42欄位" required />
+          <input type="text" class="form-control" id="fmtName" placeholder="例：42欄位" required/>
         </div>
         <div class="form-grid mt-3">
           <div class="form-field">
             <label>適用版本</label>
-            <input type="text" class="form-control" id="fmtVersion" placeholder="例：2018 v7" required />
+            <input type="text" class="form-control" id="fmtVersion" placeholder="例：2018 v7" required/>
           </div>
           <div class="form-field">
             <label>修訂日期</label>
-            <input type="text" class="form-control" id="fmtUpdated" placeholder="例：2025/12/04" />
+            <input type="text" class="form-control" id="fmtUpdated" placeholder="例：2025/12/04" required/>
           </div>
         </div>
       </form>

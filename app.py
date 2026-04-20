@@ -3,10 +3,9 @@ import os
 import json
 import uuid
 from werkzeug.utils import secure_filename
+from modules.db import get_conn 
 
 app = Flask(__name__)
-app.secret_key = "cancer-registry-cleansing-module-secret"
-
 # ---- Config ---------------------------------------------------------------
 BASE_DIR = os.path.dirname(__file__)
 UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
@@ -20,17 +19,16 @@ os.makedirs(DATA_FOLDER, exist_ok=True)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 app.config["MAX_CONTENT_LENGTH"] = 32 * 1024 * 1024  # 32MB
 
-NAV_ITEMS = [
-    {"endpoint": "dashboard",     "title": "首頁總覽",    "icon": "bi-house-door"},
-    {"endpoint": "data_cleaning", "title": "資料清洗模組", "icon": "bi-funnel"},
-    {"endpoint": "reports",       "title": "申報紀錄",    "icon": "bi-file-earmark-text"},
-    {"endpoint": "analytics",     "title": "統計分析",    "icon": "bi-bar-chart"},
-    {"endpoint": "settings",      "title": "系統設定",    "icon": "bi-gear"},
-]
-
 
 @app.context_processor
 def inject_nav():
+    NAV_ITEMS = [
+        {"endpoint": "dashboard",     "title": "首頁總覽",    "icon": "bi-house-door"},
+        {"endpoint": "data_cleaning", "title": "資料清洗模組", "icon": "bi-funnel"},
+        {"endpoint": "reports",       "title": "申報紀錄",    "icon": "bi-file-earmark-text"},
+        {"endpoint": "analytics",     "title": "統計分析",    "icon": "bi-bar-chart"},
+        {"endpoint": "settings",      "title": "系統設定",    "icon": "bi-gear"},
+    ]
     return {"nav_items": NAV_ITEMS}
 
 
@@ -39,28 +37,20 @@ def allowed_file(filename: str) -> bool:
 
 
 # ---- Reference formats (JSON-backed CRUD) ---------------------------------
-DEFAULT_FORMATS = [
-    {"id": "fmt-42",  "name": "42欄位",  "version": "2011 v7", "updated": "2017/12/04"},
-    {"id": "fmt-45",  "name": "45欄位",  "version": "2018 v7", "updated": "2024/12/20"},
-    {"id": "fmt-50",  "name": "50欄位",  "version": "2025 v1", "updated": "2025/12/04"},
-    {"id": "fmt-114", "name": "114欄位", "version": "2011 v7", "updated": "2017/12/04"},
-    {"id": "fmt-115", "name": "115欄位", "version": "2018 v7", "updated": "2024/12/20"},
-    {"id": "fmt-129", "name": "129欄位", "version": "2025 v1", "updated": "2025/12/04"},
-]
-
-
-def load_formats():
-    if not os.path.exists(FORMATS_PATH):
-        with open(FORMATS_PATH, "w", encoding="utf-8") as f:
-            json.dump(DEFAULT_FORMATS, f, ensure_ascii=False, indent=2)
-        return list(DEFAULT_FORMATS)
-    with open(FORMATS_PATH, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-
-def save_formats(items):
-    with open(FORMATS_PATH, "w", encoding="utf-8") as f:
-        json.dump(items, f, ensure_ascii=False, indent=2)
+def formats_info():
+    formats = []
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute("SELECT [FmtID], [FmtName], [Version], [Revision_date] FROM [DataFormat] ORDER BY FmtName ASC")
+    rows = cursor.fetchall()
+    for row in rows:
+        formats.append({
+            "id": str(row.FmtID),
+            "name": str(row.FmtName),
+            "version": str(row.Version),
+            "updated": str(row.Revision_date)
+        })
+    return formats
 
 
 # ---- Pages ----------------------------------------------------------------
@@ -71,7 +61,7 @@ def dashboard():
 
 @app.route("/clean")
 def data_cleaning():
-    formats = load_formats()
+    formats = formats_info()
     return render_template(
         "clean.html",
         active="data_cleaning",
@@ -95,52 +85,36 @@ def settings():
 
 
 # ---- API: Reference format CRUD -------------------------------------------
-@app.route("/api/formats", methods=["GET"])
-def api_formats_list():
-    return jsonify(load_formats())
+# ---- API: Reference format CRUD -------------------------------------------
 
+@app.route("/api/formats", defaults={"fmt_id": None}, methods=["POST"])
+@app.route("/api/formats/<fmt_id>", methods=["PUT", "DELETE"])
+def manage_format(fmt_id):
+    conn = get_conn()
+    cursor = conn.cursor()
+    if request.method == "POST":
+        data = request.json
+        name = data.get("name", "").strip()
+        version = data.get("version", "").strip()
+        updated = data.get("updated", "").strip()
+        cursor.execute("""INSERT INTO [DataFormat] ([FmtName], [Version], [Revision_date]) VALUES (?, ?, ?)""", (name, version, updated))
+        conn.commit()
+        return jsonify({"ok": True, "message": "新增成功"})
 
-@app.route("/api/formats", methods=["POST"])
-def api_formats_create():
-    payload = request.get_json(silent=True) or {}
-    new_item = {
-        "id": f"fmt-{uuid.uuid4().hex[:8]}",
-        "name": (payload.get("name") or "").strip() or "未命名格式",
-        "version": (payload.get("version") or "").strip() or "v1.0",
-        "updated": (payload.get("updated") or "").strip(),
-    }
-    items = load_formats()
-    items.append(new_item)
-    save_formats(items)
-    return jsonify(new_item), 201
+    elif request.method == "PUT":
+        data = request.json
+        name = data.get("name", "").strip()
+        version = data.get("version", "").strip()
+        updated = data.get("updated", "").strip()
+        cursor.execute("""UPDATE [DataFormat] SET [FmtName] = ?, [Version] = ?, [Revision_date] = ? WHERE [FmtID] = ?""", (name, version, updated, fmt_id))
+        conn.commit()
+        return jsonify({"ok": True, "message": "更新成功"})
 
+    elif request.method == "DELETE":
+        cursor.execute("DELETE FROM [DataFormat] WHERE [FmtID] = ?", (fmt_id,))
+        conn.commit()
+        return jsonify({"ok": True, "message": "刪除成功"})
 
-@app.route("/api/formats/<fmt_id>", methods=["PUT"])
-def api_formats_update(fmt_id):
-    payload = request.get_json(silent=True) or {}
-    items = load_formats()
-    updated = None
-    for it in items:
-        if it["id"] == fmt_id:
-            it["name"] = (payload.get("name") or it["name"]).strip()
-            it["version"] = (payload.get("version") or it["version"]).strip()
-            it["updated"] = (payload.get("updated") or it.get("updated", "")).strip()
-            updated = it
-            break
-    if not updated:
-        return jsonify({"error": "not found"}), 404
-    save_formats(items)
-    return jsonify(updated)
-
-
-@app.route("/api/formats/<fmt_id>", methods=["DELETE"])
-def api_formats_delete(fmt_id):
-    items = load_formats()
-    new_items = [x for x in items if x["id"] != fmt_id]
-    if len(new_items) == len(items):
-        return jsonify({"error": "not found"}), 404
-    save_formats(new_items)
-    return jsonify({"ok": True})
 
 
 # ---- API: Cleaning pipeline (mock, UI-ready placeholders) ------------------
@@ -167,7 +141,7 @@ def api_clean():
     file.save(save_path)
     size_kb = round(os.path.getsize(save_path) / 1024, 2)
 
-    formats = load_formats()
+    formats = formats_info()
     fmt = next((f for f in formats if f["id"] == format_id), None)
 
     # Placeholder cleaning output. Keep the shape stable for the UI layer.

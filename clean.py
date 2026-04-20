@@ -1,12 +1,27 @@
 import pandas as pd
+import os
 from openpyxl import load_workbook,Workbook
 from openpyxl.styles import PatternFill,Font,Alignment
-from modules.clean.rules import RULES
+from modules.clean.fmt_42 import RULES as RULES_42
+from modules.clean.fmt_45 import RULES as RULES_45
+from modules.clean.fmt_50 import RULES as RULES_50
+from modules.clean.fmt_114 import RULES as RULES_114
+from modules.clean.fmt_115 import RULES as RULES_115
+from modules.clean.fmt_129 import RULES as RULES_129
 from modules.clean.validate import check_error_type,validate_date_rules
 from modules.field_mapping import field_mapping
 from datetime import datetime
 
-def get_annotation(row_errors):
+FORMAT_RULES_MAP = {
+    "fmt_42": RULES_42,
+    "fmt_45": RULES_45,
+    "fmt_50": RULES_50,
+    "fmt_114": RULES_114,
+    "fmt_115": RULES_115,
+    "fmt_129": RULES_129,
+}
+
+def annotation(row_errors):
     codes = []
     if (row_errors == "missing").any():
         codes.append("A:遺漏值")
@@ -19,8 +34,22 @@ def get_annotation(row_errors):
         return "D:完全正確的資訊"
     return " ".join(codes)
 
-def cleanValidate(input_file, sheet_name, output_file):
-    df = pd.read_excel(input_file, sheet_name=sheet_name, dtype=str)
+def cleanValidate(input_file,output_file,fmt,version,Revision_Date):
+    rules = FORMAT_RULES_MAP[fmt]
+    file_ext = os.path.splitext(input_file)[1].lower()
+    
+    if file_ext == '.csv':
+        try:
+            df = pd.read_csv(input_file, dtype=str, encoding='utf-8-sig')
+        except UnicodeDecodeError:
+            df = pd.read_csv(input_file, dtype=str, encoding='cp950')
+        sheet_name = os.path.splitext(os.path.basename(input_file))[0]
+
+    else:
+        df = pd.read_excel(input_file,dtype=str)
+        xl = pd.ExcelFile(input_file)
+        sheet_name = xl.sheet_names[0]
+
     alias_mapping, _ = field_mapping('中文欄位名稱')
     error_mask = pd.DataFrame("", index=df.index, columns=df.columns) 
     
@@ -28,11 +57,12 @@ def cleanValidate(input_file, sheet_name, output_file):
         clean_col = str(col).strip()
         rule_name = alias_mapping.get(clean_col)
 
-        if rule_name and rule_name in RULES:
-            rule = RULES[rule_name]
+        # 改用動態選擇的 selected_rules 進行判斷
+        if rule_name and rule_name in rules:
+            rule = rules[rule_name]
             error_mask[col] = df[col].apply(lambda x: check_error_type(x, rule))
-        elif clean_col in RULES:
-            rule = RULES[clean_col]
+        elif clean_col in rules:
+            rule = rules[clean_col]
             error_mask[col] = df[col].apply(lambda x: check_error_type(x, rule))
 
     for idx, row in df.iterrows():
@@ -43,7 +73,7 @@ def cleanValidate(input_file, sheet_name, output_file):
                     error_mask.at[idx, col] = "dateformat"
 
     df['_has_error'] = (error_mask != "").any(axis=1)
-    df['錯誤註記說明(A:遺漏值 B:格式不符 C:邏輯錯誤 D:完全正確)'] = error_mask.apply(get_annotation, axis=1)
+    df['錯誤註記說明(A:遺漏值 B:格式不符 C:邏輯錯誤 D:完全正確)'] = error_mask.apply(annotation, axis=1)
     
     # 將錯誤資料排到最上面
     sorted_df = df.sort_values(by='_has_error', ascending=False, kind='mergesort')
@@ -78,7 +108,7 @@ def cleanValidate(input_file, sheet_name, output_file):
     completeness = (total_count-missing_rows)/total_count
     correctness = (total_count-format_rows)/total_count
     consistency = (total_count-logic_rows)/total_count
-    quality_score = (completeness*0.2)+(correctness*0.5)+(consistency*0.3)*100
+    quality_score = (completeness*0.2+correctness*0.5+consistency*0.3)*100
     
     error_mask_bool = (error_mask != "")
     error_count = error_mask_bool.any(axis=1).sum()
@@ -117,7 +147,7 @@ def cleanValidate(input_file, sheet_name, output_file):
     
     report_data = [
         ["匯入日期：", datetime.now().strftime("%Y/%m/%d")],
-        ["資料格式："],
+        ["資料格式：", f"{fmt}({version}：{Revision_Date})"],
         [],
         ["資料總件數：",stats['total'],"件"],
         [],
@@ -158,10 +188,13 @@ def cleanValidate(input_file, sheet_name, output_file):
     return stats, alias_mapping, sorted_df, sorted_mask
 
 if __name__ == "__main__": 
-    input_file = 'data/20260318測試.xlsx'
+    input_file = 'data/HSP_TEST.xlsx'
     sheet_name = '1150318虛擬V1(給虎科)'
     output_file = f"Validate_{sheet_name}.xlsx"
-    stats, _, _, _ = cleanValidate(input_file, sheet_name, output_file)
+    fmt = "fmt_42"
+    version = "2025v1"
+    Revision_Date = "2017/12/04"
+    stats, _, _, _ = cleanValidate(input_file,f"{fmt}_data.xlsx",fmt,version,Revision_Date)
     
     # print(f"資料清理與驗證報告 ({sheet_name})")
     # print(f"資料總件數: {stats['total']}")

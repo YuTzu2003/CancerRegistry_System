@@ -1,10 +1,6 @@
-/* ============================================================
-   資料清洗模組 - 前端互動
-   ============================================================ */
 (function () {
   'use strict';
 
-  // ---------- Helpers ----------
   const $  = (sel, ctx = document) => ctx.querySelector(sel);
   const $$ = (sel, ctx = document) => Array.from(ctx.querySelectorAll(sel));
 
@@ -30,83 +26,110 @@
   }
 
   // ---------- Format CRUD ----------
-  const modal    = $('#formatModal');
-  const modalTitle = $('#modalTitle');
-  const fmtForm  = $('#formatForm');
-  const fields   = {
-    id: $('#fmtId'),
-    name: $('#fmtName'),
-    version: $('#fmtVersion'),
-    updated: $('#fmtUpdated'),
-  };
+document.addEventListener('DOMContentLoaded', () => {
+  const modal = document.getElementById('formatModal');
+  const btnAdd = document.getElementById('btnAddFormat');
+  const btnSave = document.getElementById('btnSaveFormat');
+  const closeBtns = document.querySelectorAll('[data-close]');
 
-  function openModal(title, data) {
-    modalTitle.textContent = title;
-    fields.id.value      = data?.id || '';
-    fields.name.value    = data?.name || '';
-    fields.version.value = data?.version || '';
-    fields.updated.value = data?.updated || '';
-    modal.hidden = false;
-    // Focus the first field for quick entry
-    setTimeout(() => fields.name.focus(), 30);
-  }
-  function closeModal() { modal.hidden = true; }
+  // 表單輸入框
+  const fmtIdInput = document.getElementById('fmtId');
+  const fmtNameInput = document.getElementById('fmtName');
+  const fmtVersionInput = document.getElementById('fmtVersion');
+  const fmtUpdatedInput = document.getElementById('fmtUpdated');
+  const openModal = () => modal.removeAttribute('hidden');
+  const closeModal = () => modal.setAttribute('hidden', '');
+  closeBtns.forEach(btn => btn.addEventListener('click', closeModal));
 
-  $('#btnAddFormat')?.addEventListener('click', () => openModal('新增參考資料格式', null));
-  modal.addEventListener('click', (e) => {
-    if (e.target.matches('[data-close]') || e.target === modal) closeModal();
+  // 新增
+  btnAdd.addEventListener('click', () => {
+    document.getElementById('modalTitle').textContent = '新增參考資料格式';
+    fmtIdInput.value = '';
+    fmtNameInput.value = '';
+    fmtVersionInput.value = '';
+    fmtUpdatedInput.value = '';
+    openModal();
   });
 
-  // Table delegation: edit + delete
-  $('#formatsTable tbody').addEventListener('click', async (e) => {
-    const btn = e.target.closest('button[data-action]');
+  const table = document.getElementById('formatsTable');
+  table.addEventListener('click', async (e) => {
+    const btn = e.target.closest('button');
     if (!btn) return;
-    const tr = btn.closest('tr');
-    const id = tr.dataset.id;
+
     const action = btn.dataset.action;
+    const tr = btn.closest('tr');
+    if (!tr) return;
+    const id = tr.dataset.id;
+    const name = tr.dataset.name;
+    const version = tr.dataset.version;
+    const updated = tr.dataset.updated;
 
     if (action === 'edit') {
-      openModal('編輯參考資料格式', {
-        id,
-        name:    tr.dataset.name,
-        version: tr.dataset.version,
-        updated: tr.dataset.updated,
-      });
-    } else if (action === 'delete') {
-      if (!confirm(`確定要刪除格式「${tr.dataset.name}」？`)) return;
-      try {
-        await fetchJSON(`/api/formats/${id}`, { method: 'DELETE' });
-        location.reload();
-      } catch (err) {
-        alert('刪除失敗：' + err.message);
+      document.getElementById('modalTitle').textContent = '編輯參考資料格式';
+      fmtIdInput.value = id;
+      fmtNameInput.value = name;
+      fmtVersionInput.value = version;
+      fmtUpdatedInput.value = updated;
+      openModal();
+    } 
+
+    else if (action === 'delete') {
+      if (confirm(`確定要刪除「${name}」嗎？`)) {
+        try {
+          const res = await fetch(`/api/formats/${id}`, {
+            method: 'DELETE',
+          });
+          const data = await res.json();
+          if (data.ok) {
+            alert('刪除成功');
+            location.reload(); 
+          } 
+          else {
+            alert(data.message || '刪除失敗');
+          }
+        } catch (err) {
+          console.error('Error:', err);
+          alert('Connect faild');
+        }
       }
     }
   });
 
-  $('#btnSaveFormat')?.addEventListener('click', async () => {
-    if (!fmtForm.reportValidity()) return;
-    const payload = {
-      name:    fields.name.value,
-      version: fields.version.value,
-      updated: fields.updated.value,
-    };
+  // 儲存
+  btnSave.addEventListener('click', async () => {
+    const id = fmtIdInput.value;
+    const payload = {name:fmtNameInput.value, version:fmtVersionInput.value, updated:fmtUpdatedInput.value};
+    const isEdit = id !== '';
+    const url = isEdit ? `/api/formats/${id}` : '/api/formats';
+    const method = isEdit ? 'PUT' : 'POST';
+
+    if (!payload.name || !payload.version) {
+      alert('資料須填寫完畢！');
+      return;
+    }
+
     try {
-      if (fields.id.value) {
-        await fetchJSON(`/api/formats/${fields.id.value}`, {
-          method: 'PUT',
-          body: JSON.stringify(payload),
-        });
-      } else {
-        await fetchJSON('/api/formats', {
-          method: 'POST',
-          body: JSON.stringify(payload),
-        });
+      const res = await fetch(url, {
+        method: method,
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+      });
+      
+      const data = await res.json();
+      if (data.ok) {
+        alert(isEdit ? '更新成功' : '新增成功');
+        closeModal();
+        location.reload();
+      } 
+      else {
+        alert(data.message || '儲存失敗');
       }
-      location.reload();
     } catch (err) {
-      alert('儲存失敗：' + err.message);
+      console.error('Error:', err);
+      alert('Connect faild');
     }
   });
+});
 
   // ---------- File input + drag & drop ----------
   const fileInput  = $('#fileInput');
