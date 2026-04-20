@@ -20,7 +20,6 @@ os.makedirs(DATA_FOLDER, exist_ok=True)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 app.config["MAX_CONTENT_LENGTH"] = 32 * 1024 * 1024  # 32MB
 
-# ---- Sidebar --------------------------------------------------------------
 NAV_ITEMS = [
     {"endpoint": "dashboard",     "title": "首頁總覽",    "icon": "bi-house-door"},
     {"endpoint": "data_cleaning", "title": "資料清洗模組", "icon": "bi-funnel"},
