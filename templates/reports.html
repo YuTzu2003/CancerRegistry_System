@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}申報紀錄｜癌症登記平台{% endblock %}
+{% block page_title %}申報紀錄{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>申報紀錄</h1>
+    <p class="lead">檢視歷次申報批次、格式版本與狀態。</p>
+  </div>
+</div>
+
+<section class="card-flat">
+  <div class="section-head">
+    <h2><span class="dot"></span> 近期申報紀錄</h2>
+    <span class="hint">依申報日期排序</span>
+  </div>
+  <div class="table-wrap">
+    <table class="table-flat">
+      <thead>
+        <tr>
+          <th>申報編號</th>
+          <th>申報日期</th>
+          <th>資料格式</th>
+          <th style="text-align:right;">筆數</th>
+          <th>狀態</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>SUB-2025-003</td>
+          <td>2025/03/12</td>
+          <td>癌登長表（2024 v1.2）</td>
+          <td style="text-align:right;">3,214</td>
+          <td><span class="badge-soft green">已完成</span></td>
+        </tr>
+        <tr>
+          <td>SUB-2024-012</td>
+          <td>2024/12/15</td>
+          <td>癌登長表（2024 v1.2）</td>
+          <td style="text-align:right;">2,980</td>
+          <td><span class="badge-soft green">已完成</span></td>
+        </tr>
+        <tr>
+          <td>SUB-2024-011</td>
+          <td>2024/09/20</td>
+          <td>癌登短表（2024 v1.0）</td>
+          <td style="text-align:right;">2,746</td>
+          <td><span class="badge-soft amber">審核中</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

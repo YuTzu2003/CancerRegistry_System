@@ -2,9 +2,9 @@ import os
 import pandas as pd
 import re
 from modules.db import get_conn
-from field_mapping import field_mapping,detect_system
-from modules.validate import validate_date_rules
-from field_mapping import field_mapping, process_data
+from modules.field_mapping import field_mapping,detect_system
+from modules.clean.validate import validate_date_rules
+from modules.field_mapping import field_mapping, process_data
 
 CANCER_RULES = {
     '口腔癌': {

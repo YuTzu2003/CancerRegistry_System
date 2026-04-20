@@ -1,0 +1,379 @@
+{% extends "base.html" %}
+{% block title %}癌症登記資料清洗模組｜癌症登記平台{% endblock %}
+{% block page_title %}癌症登記資料清洗模組{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>癌症登記資料清洗模組</h1>
+    <p class="lead">
+      依據《醫療機構提報癌症防治資料作業辦法》，醫療機構須定期提報癌症個案資料，以建立全國癌症登記資料庫，支援防治政策與臨床分析。
+      本模組旨在建立標準化資料檢核與清洗機制，提升癌登資料之完整性與正確性。並支援不同年度之癌症登記申報格式，依版本套用對應檢核規則：
+    </p>
+  </div>
+</div>
+
+<!-- ===================== 參考資料格式 (簡化顯示 + CRUD) ===================== -->
+<section class="card-flat">
+  <div class="section-head">
+    <h2><span class="dot"></span> 登記申報格式</h2>
+    <div class="d-flex align-items-center gap-2">
+      <span class="hint">可新增、修改、刪除作為本次清洗依據的格式</span>
+      <button class="btn btn-primary btn-sm" type="button" id="btnAddFormat">
+        <i class="bi bi-plus-lg"></i> 新增格式
+      </button>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table class="table-flat centered" id="formatsTable">
+      <thead>
+        <tr>
+          <th>資料格式</th>
+          <th>適用版本</th>
+          <th>修訂日期</th>
+          <th style="width: 170px;">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for f in formats %}
+        <tr data-id="{{ f.id }}"
+            data-name="{{ f.name }}"
+            data-version="{{ f.version }}"
+            data-updated="{{ f.updated or '' }}">
+          <td class="fmt-name"><strong>{{ f.name }}</strong></td>
+          <td class="fmt-version">
+            <span class="badge-soft cyan">{{ f.version }}</span>
+          </td>
+          <td class="fmt-updated">{{ f.updated or '—' }}</td>
+          <td>
+            <button class="btn btn-sm btn-ghost" type="button" data-action="edit">編輯</button>
+            <button class="btn btn-sm btn-danger" type="button" data-action="delete">刪除</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ===================== 進度步驟（滑動時固定在頂端） ===================== -->
+<div class="stepper-sticky">
+  <div class="stepper" id="stepper">
+    <div class="step active" data-step="1">
+      <div class="step-index">1</div>
+      <div class="step-label">
+        <span class="t">上傳資料</span>
+        <span class="s">選擇格式與檔案</span>
+      </div>
+    </div>
+    <div class="step-sep"></div>
+    <div class="step" data-step="2">
+      <div class="step-index">2</div>
+      <div class="step-label">
+        <span class="t">執行清洗</span>
+        <span class="s">格式檢核與比對</span>
+      </div>
+    </div>
+    <div class="step-sep"></div>
+    <div class="step" data-step="3">
+      <div class="step-index">3</div>
+      <div class="step-label">
+        <span class="t">檢視結果</span>
+        <span class="s">明細與分析</span>
+      </div>
+    </div>
+    <div class="step-sep"></div>
+    <div class="step" data-step="4">
+      <div class="step-index">4</div>
+      <div class="step-label">
+        <span class="t">輸出欄位</span>
+        <span class="s">選擇命名與匯出</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== Step 1: 上傳 ===================== -->
+<section class="card-flat" id="uploadPanel">
+  <div class="section-head">
+    <h2><span class="dot"></span> 資料上傳與檢核</h2>
+    <span class="hint">支援 CSV / XLS / XLSX，檔案上限 32MB</span>
+  </div>
+  <div class="section-body">
+    <form id="cleanForm" novalidate>
+      <div class="form-grid">
+        <div class="form-field">
+          <label for="formatSelect">參考資料格式</label>
+          <select id="formatSelect" name="format_id" class="form-select" required>
+            <option value="">請選擇格式</option>
+            {% for f in formats %}
+              <option value="{{ f.id }}">{{ f.name }}（{{ f.version }}）</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-field">
+          <label>上傳檔案</label>
+          <label class="uploader" id="dropZone" for="fileInput">
+            <div class="ico"><i class="bi bi-cloud-arrow-up"></i></div>
+            <div><strong>拖曳檔案至此</strong>，或點擊選擇</div>
+            <div class="hint">CSV、Excel（xls / xlsx）</div>
+            <input id="fileInput" name="data_file" type="file" accept=".csv,.xls,.xlsx" required />
+          </label>
+          <div id="fileChosen" class="file-chosen" hidden>
+            <i class="bi bi-file-earmark-spreadsheet"></i>
+            <span id="fileName">尚未選擇檔案</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="d-flex justify-content-end gap-2 mt-3 pt-3" style="border-top:1px solid var(--border);">
+        <button type="reset" class="btn"><i class="bi bi-arrow-counterclockwise"></i> 重置</button>
+        <button type="submit" class="btn btn-primary" id="btnStartClean">
+          <i class="bi bi-funnel"></i> 開始清洗
+        </button>
+      </div>
+    </form>
+  </div>
+</section>
+
+<!-- ===================== KPI 摘要（移除警告筆數） ===================== -->
+<div class="kpi-grid kpi-grid-3" id="kpiGrid">
+  <div class="kpi">
+    <div class="label">總筆數</div>
+    <div class="value blue" id="kpiTotal">—</div>
+  </div>
+  <div class="kpi green">
+    <div class="label">通過筆數</div>
+    <div class="value" id="kpiPassed" style="color: var(--success);">—</div>
+  </div>
+  <div class="kpi red">
+    <div class="label">錯誤筆數</div>
+    <div class="value red" id="kpiError">—</div>
+  </div>
+</div>
+
+<!-- ===================== Step 3: 結果（明細 + 分析） ===================== -->
+<div class="grid-2">
+  <!-- 清洗個案清單明細 -->
+  <section class="card-flat">
+    <div class="section-head">
+      <h2><span class="dot"></span> 清洗個案清單明細</h2>
+      <div class="d-flex align-items-center gap-2">
+        <span class="hint">顯示每筆個案的錯誤欄位與原因</span>
+        <button class="btn btn-sm" type="button" id="btnDownloadIssues" disabled>
+          <i class="bi bi-file-earmark-excel"></i> 下載 XLSX
+        </button>
+      </div>
+    </div>
+    <div class="section-body">
+      <div id="issuesTableWrap" class="table-wrap" hidden>
+        <table class="table-flat" id="issuesTable">
+          <thead>
+            <tr>
+              <th style="width: 60px;">#</th>
+              <th>個案編號</th>
+              <th>欄位</th>
+              <th>錯誤類型</th>
+              <th>原始值</th>
+              <th>建議</th>
+            </tr>
+          </thead>
+          <tbody id="issuesBody"></tbody>
+        </table>
+      </div>
+      <div id="issuesEmpty" class="placeholder-box">
+        <i class="bi bi-list-check"></i>
+        <div class="lg">尚未有清洗明細</div>
+        <div>完成上傳並執行清洗後，此處會列出每筆錯誤個案、欄位與原因。</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 清洗結果分析 -->
+  <section class="card-flat">
+    <div class="section-head">
+      <h2><span class="dot"></span> 清洗結果分析</h2>
+      <div class="d-flex align-items-center gap-2">
+        <span class="hint">依資料欄位與格式統計錯誤分布</span>
+        <button class="btn btn-sm" type="button" id="btnDownloadAnalysis" disabled>
+          <i class="bi bi-file-earmark-excel"></i> 下載 XLSX
+        </button>
+      </div>
+    </div>
+    <div class="section-body">
+      <div id="analysisContent" hidden>
+        <div style="font-size:13px; font-weight:600; color: var(--gray-700); margin-bottom: 6px;">依欄位統計</div>
+        <div class="table-wrap">
+          <table class="table-flat" id="analysisByField">
+            <thead>
+              <tr>
+                <th>欄位名稱</th>
+                <th>格式</th>
+                <th style="width: 100px; text-align:right;">錯誤數</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <div style="font-size:13px; font-weight:600; color: var(--gray-700); margin: 16px 0 6px;">依錯誤類型統計</div>
+        <div class="table-wrap">
+          <table class="table-flat" id="analysisByType">
+            <thead>
+              <tr>
+                <th>錯誤類型</th>
+                <th style="width: 100px; text-align:right;">次數</th>
+                <th style="width: 100px; text-align:right;">佔比</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="analysisEmpty" class="placeholder-box">
+        <i class="bi bi-bar-chart"></i>
+        <div class="lg">尚未有分析結果</div>
+        <div>清洗完成後，此區會顯示資料欄位與格式對應的錯誤分布。</div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ===================== Step 4: 輸出欄位命名 ===================== -->
+<section class="card-flat">
+  <div class="section-head">
+    <h2><span class="dot"></span> 輸出欄位與命名</h2>
+    <span class="hint">勾選要輸出的欄位，並可設定輸出檔名及命名規則</span>
+  </div>
+  <div class="section-body">
+    <div class="form-field" style="margin-bottom: 18px;">
+      <label>輸出檔案名稱</label>
+      <input type="text" class="form-control" id="outputFileName"
+             placeholder="例：CR_LongForm_2025Q1" style="max-width: 480px;" />
+    </div>
+
+    <div style="margin-bottom: 18px;">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <div style="font-size: 13px; font-weight: 600; color: var(--gray-700);">
+          欄位命名方案
+          <span class="hint" style="font-weight: 400; margin-left: 6px;">選擇輸出 XLSX 欄位標頭採用的命名來源</span>
+        </div>
+      </div>
+      <div class="naming-grid" id="namingScheme">
+        <label class="naming-chip selected">
+          <input type="radio" name="nameScheme" value="chinese" checked />
+          <span class="nc-mark"></span>
+          <span class="nc-body">
+            <span class="nc-title">中文欄位名稱</span>
+            <span class="nc-desc">以繁體中文呈現，適合一般申報使用</span>
+          </span>
+        </label>
+        <label class="naming-chip">
+          <input type="radio" name="nameScheme" value="english" />
+          <span class="nc-mark"></span>
+          <span class="nc-body">
+            <span class="nc-title">英文欄位名稱</span>
+            <span class="nc-desc">英文代碼，適合資料交換與系統串接</span>
+          </span>
+        </label>
+        <label class="naming-chip">
+          <input type="radio" name="nameScheme" value="ntu_yunlin" />
+          <span class="nc-mark"></span>
+          <span class="nc-body">
+            <span class="nc-title">台大雲林欄位名稱</span>
+            <span class="nc-desc">對應台大雲林分院系統欄位</span>
+          </span>
+        </label>
+        <label class="naming-chip">
+          <input type="radio" name="nameScheme" value="ntu_hospital" />
+          <span class="nc-mark"></span>
+          <span class="nc-body">
+            <span class="nc-title">台大體系醫整庫欄位</span>
+            <span class="nc-desc">對應台大醫療體系醫整庫命名</span>
+          </span>
+        </label>
+        <label class="naming-chip">
+          <input type="radio" name="nameScheme" value="tw_cancer_registry" />
+          <span class="nc-mark"></span>
+          <span class="nc-body">
+            <span class="nc-title">台灣癌症登記中心</span>
+            <span class="nc-desc">符合癌症登記中心申報欄位</span>
+          </span>
+        </label>
+        <label class="naming-chip">
+          <input type="radio" name="nameScheme" value="yunmed_cancer_ai" />
+          <span class="nc-mark"></span>
+          <span class="nc-body">
+            <span class="nc-title">雲醫癌 AI 模組</span>
+            <span class="nc-desc">對應雲端醫療癌症 AI 模組欄位</span>
+          </span>
+        </label>
+      </div>
+    </div>
+
+    <div>
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <div style="font-size: 13px; font-weight: 600; color: var(--gray-700);">
+          欄位選擇
+          <span class="hint" style="font-weight: 400; margin-left: 6px;">勾選要匯入 XLSX 的指定欄位</span>
+        </div>
+        <div class="d-flex gap-2">
+          <button class="btn btn-sm" type="button" id="btnSelectAll"><i class="bi bi-check-all"></i> 全選</button>
+          <button class="btn btn-sm btn-ghost" type="button" id="btnClearAll"><i class="bi bi-x-lg"></i> 清除</button>
+        </div>
+      </div>
+      <div class="field-chiplist" id="outputFieldList">
+        <span class="field-chip disabled"><i class="bi bi-asterisk"></i> 尚未載入欄位，清洗完成後自動帶入</span>
+      </div>
+    </div>
+
+    <div class="d-flex justify-content-end gap-2 mt-3 pt-3" style="border-top:1px solid var(--border);">
+      <button class="btn" type="button" id="btnPreviewOutput" disabled><i class="bi bi-eye"></i> 預覽</button>
+      <button class="btn btn-accent" type="button" id="btnExportXlsx" disabled>
+        <i class="bi bi-file-earmark-excel"></i> 匯出 XLSX
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== Modal: 新增 / 編輯 格式（精簡為三欄） ===================== -->
+<div class="modal-backdrop-custom" id="formatModal" hidden>
+  <div class="modal-box">
+    <header>
+      <h3 id="modalTitle">新增參考資料格式</h3>
+      <button class="close-btn" type="button" data-close aria-label="關閉">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </header>
+    <div class="body">
+      <form id="formatForm" novalidate>
+        <input type="hidden" id="fmtId" />
+        <div class="form-field">
+          <label>資料格式</label>
+          <input type="text" class="form-control" id="fmtName" placeholder="例：42欄位" required />
+        </div>
+        <div class="form-grid mt-3">
+          <div class="form-field">
+            <label>適用版本</label>
+            <input type="text" class="form-control" id="fmtVersion" placeholder="例：2018 v7" required />
+          </div>
+          <div class="form-field">
+            <label>修訂日期</label>
+            <input type="text" class="form-control" id="fmtUpdated" placeholder="例：2025/12/04" />
+          </div>
+        </div>
+      </form>
+    </div>
+    <footer>
+      <button class="btn" type="button" data-close>取消</button>
+      <button class="btn btn-primary" type="button" id="btnSaveFormat">
+        <i class="bi bi-check-lg"></i> 儲存
+      </button>
+    </footer>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/data_cleaning.js') }}"></script>
+{% endblock %}

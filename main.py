@@ -1,6 +1,6 @@
 import pandas as pd
-from field_mapping import detect_system, field_mapping, process_data
-from cancer_classify import cancer_classify, rule_table_classify
+from modules.field_mapping import detect_system, field_mapping, process_data
+from modules.cancer_classify import cancer_classify, rule_table_classify
 from clean import cleanValidate
 from datetime import datetime
 
