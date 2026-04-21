@@ -131,7 +131,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-  // ---------- File input + drag & drop ----------
+// ---------- File input + drag & drop ----------
 const fileInput  = $('#fileInput');
 const fileChosen = $('#fileChosen');
 const fileName   = $('#fileName');
@@ -205,15 +205,12 @@ $('#cleanForm').addEventListener('submit', async (e) => {
   formData.append('data_file', file);
 
   try {
-    // 🔥 確認 API 路徑（重點修正）
     const response = await fetch('/api/cleanJob', {
       method: 'POST',
       body: formData
     });
 
-    // 🔥 防止 HTML 爆炸 JSON
     const text = await response.text();
-
     let result;
     try {
       result = JSON.parse(text);

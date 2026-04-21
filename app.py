@@ -7,10 +7,7 @@ from modules.db import get_conn
 from modules.clean import cleanValidate
 
 app = Flask(__name__)
-# ---- Config ---------------------------------------------------------------
 BASE_DIR = os.path.dirname(__file__)
-# UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
-# DATA_FOLDER = os.path.join(BASE_DIR, "data")
 app.secret_key = "your_secret_key"
 Jobs_FOLDER = 'static/Jobs'
 os.makedirs(Jobs_FOLDER, exist_ok=True)
@@ -112,56 +109,7 @@ def formatTool(fmt_id):
         return jsonify({"ok": True, "message": "刪除成功"})
 
 
-
-# @app.route("/api/cleanJob", methods=["POST"])
-# def api_clean():
-#     format_id = request.form.get("format_id")
-#     uploaded_file = request.files.get("data_file")
-
-#     if not format_id or not uploaded_file or uploaded_file.filename == '':
-#         return jsonify({"ok": False, "error": "參數錯誤或未選擇檔案"}), 400
-
-#     conn = get_conn()
-#     cursor = conn.cursor()
-#     cursor.execute("SELECT [FmtName], [Version], [Revision_date] FROM [DataFormat] WHERE [FmtID] = ?", (format_id,))
-#     fmt_row = cursor.fetchone()
-    
-#     fmt, version, revision_date = fmt_row[0], fmt_row[1], fmt_row[2]
-#     safe_filename = secure_filename(uploaded_file.filename)
-#     input_path = os.path.join(Jobs_FOLDER, safe_filename)
-#     uploaded_file.save(input_path)
-#     output_path = os.path.join(Jobs_FOLDER, f"fmt{fmt}_{safe_filename}.xlsx")
-
-#     stats, alias_mapping, sorted_df, sorted_mask = cleanValidate(
-#         input_file=input_path,
-#         output_file=output_path,
-#         fmt=f"fmt_{fmt}",
-#         version=version,
-#         Revision_Date=revision_date
-#     )
-
-#     # 5. 將結果整理成前端 UI 需要的 JSON 格式
-#     return jsonify({
-#         "ok": True,
-#         "message": "資料清洗完成！",
-#         "stats": {
-#             "total": int(stats['total']),
-#             "passed": int(stats['total'] - stats['error_rows']),
-#             "error": int(stats['error_rows']),
-#             "dqi": float(stats['quality_score'])
-#         },
-#         # 這裡把檔案名稱也傳給前端，方便後續實作「下載報表」功能
-#         "files": {
-#             "cleaned_data": output_path,
-#             "report": f"Report_{os.path.splitext(safe_filename)[0]}.xlsx"
-#         }
-#     })
-import os
-import uuid
-from flask import request, jsonify
-from werkzeug.utils import secure_filename
-from datetime import datetime
-
+# ---------------------- clean ---------------------------------------------
 @app.route("/api/cleanJob", methods=["POST"])
 def api_clean():
     user_id = session.get("id")
@@ -181,20 +129,24 @@ def api_clean():
     try:
         conn = get_conn()
         cursor = conn.cursor()
+
         cursor.execute("SELECT [FmtName], [Version], [Revision_date] FROM [DataFormat] WHERE [FmtID] = ?", (format_id,))
-        fmt_row = cursor.fetchone()
-        
+        fmt_row = cursor.fetchone()      
         fmt_name, version, revision_date = fmt_row[0], fmt_row[1], fmt_row[2]
         filename = secure_filename(uploaded_file.filename)
+        base_name, _ = os.path.splitext(filename) 
         path = f"{project_folder}/{filename}"
         uploaded_file.save(path)
-        output_filename = f"fmt{fmt_name}_{filename}.xlsx"
-        output_path = f"{project_folder}, {output_filename}"
+        
+        output_filename = f"fmt{fmt_name}_{base_name}_clean.xlsx"
+        output_path = f"{project_folder}/{output_filename}"
 
-        stats, alias_mapping, sorted_df, sorted_mask = cleanValidate(path, output_path, f"fmt_{fmt_name}", version, revision_date)
+        report_filename = f"Report_{base_name}.xlsx"
+        report_path = f"{project_folder}/{report_filename}"
 
+        stats, alias_mapping, sorted_df, sorted_mask = cleanValidate(path, output_path, report_path, f"fmt_{fmt_name}", version, revision_date)
         sql = """INSERT INTO Job ([JobID],[UserID],[FileName],[TotalCount],[CompletenessScore],[CorrectScore],[ConsistencyScore],[DQI],[Path]) VALUES (?,?,?,?,?,?,?,?,?)"""
-        cursor.execute(sql, (JobID, user_id, filename, int(stats['total']), float(stats['completeness']), float(stats['correctness']), float(stats['consistency']), float(stats['quality_score']),path))
+        cursor.execute(sql, (JobID, user_id, filename, int(stats['total']), float(stats['completeness']), float(stats['correctness']), float(stats['consistency']), float(stats['quality_score']), project_folder))
         conn.commit()
 
         return jsonify({
@@ -210,12 +162,12 @@ def api_clean():
             "files": {
                 "project_dir": JobID,
                 "cleaned_data": output_filename,
-                "report": f"Report_{os.path.splitext(filename)[0]}.xlsx"
+                "report": report_filename 
             }
         })
-
+    
     except Exception as e:
-        print(f"清洗專案 {JobID} 發生錯誤: {str(e)}")
         return jsonify({"ok": False, "error": f"系統處理失敗: {str(e)}"}), 500
+    
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
