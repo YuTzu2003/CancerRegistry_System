@@ -132,69 +132,108 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
   // ---------- File input + drag & drop ----------
-  const fileInput  = $('#fileInput');
-  const fileChosen = $('#fileChosen');
-  const fileName   = $('#fileName');
-  const dropZone   = $('#dropZone');
+const fileInput  = $('#fileInput');
+const fileChosen = $('#fileChosen');
+const fileName   = $('#fileName');
+const dropZone   = $('#dropZone');
 
-  function updateFilePreview() {
-    const f = fileInput.files?.[0];
-    if (f) {
-      fileName.textContent = `${f.name} · ${(f.size / 1024).toFixed(1)} KB`;
-      fileChosen.hidden = false;
-    } else {
-      fileChosen.hidden = true;
-    }
+function updateFilePreview() {
+  const f = fileInput.files?.[0];
+
+  if (f) {
+    fileName.textContent = `${f.name} · ${(f.size / 1024).toFixed(1)} KB`;
+    fileChosen.hidden = false;
+  } else {
+    fileChosen.hidden = true;
   }
-  fileInput.addEventListener('change', updateFilePreview);
+}
 
-  ['dragenter', 'dragover'].forEach((evt) =>
-    dropZone.addEventListener(evt, (e) => {
-      e.preventDefault();
-      dropZone.classList.add('dragover');
-    })
-  );
-  ['dragleave', 'drop'].forEach((evt) =>
-    dropZone.addEventListener(evt, (e) => {
-      e.preventDefault();
-      dropZone.classList.remove('dragover');
-    })
-  );
-  dropZone.addEventListener('drop', (e) => {
-    const f = e.dataTransfer?.files?.[0];
-    if (f) {
-      const dt = new DataTransfer();
-      dt.items.add(f);
-      fileInput.files = dt.files;
-      updateFilePreview();
-    }
-  });
+fileInput.addEventListener('change', updateFilePreview);
 
-  // ---------- Submit cleaning ----------
-  $('#cleanForm').addEventListener('submit', async (e) => {
+// ---------- Drag & Drop ----------
+['dragenter', 'dragover'].forEach(evt =>
+  dropZone.addEventListener(evt, e => {
     e.preventDefault();
-    const fmt  = $('#formatSelect').value;
-    const file = fileInput.files?.[0];
-    if (!fmt)  { alert('請選擇參考資料格式'); return; }
-    if (!file) { alert('請選擇上傳檔案');     return; }
+    dropZone.classList.add('dragover');
+  })
+);
 
-    setStep(2);
+['dragleave', 'drop'].forEach(evt =>
+  dropZone.addEventListener(evt, e => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+  })
+);
 
-    const fd = new FormData();
-    fd.append('format_id', fmt);
-    fd.append('data_file', file);
+dropZone.addEventListener('drop', e => {
+  const f = e.dataTransfer?.files?.[0];
 
+  if (f) {
+    const dt = new DataTransfer();
+    dt.items.add(f);
+    fileInput.files = dt.files;
+    updateFilePreview();
+  }
+});
+
+// ---------- Reset ----------
+$('#cleanForm').addEventListener('reset', () => {
+  setTimeout(updateFilePreview, 10);
+});
+
+// ---------- Submit ----------
+$('#cleanForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const formatId = $('#formatSelect').value;
+  const file = fileInput.files?.[0];
+
+  if (!formatId) {
+    alert('請選擇參考資料格式');
+    return;
+  }
+
+  if (!file) {
+    alert('請選擇上傳檔案');
+    return;
+  }
+
+  setStep(2);
+
+  const formData = new FormData();
+  formData.append('format_id', formatId);
+  formData.append('data_file', file);
+
+  try {
+    // 🔥 確認 API 路徑（重點修正）
+    const response = await fetch('/api/cleanJob', {
+      method: 'POST',
+      body: formData
+    });
+
+    // 🔥 防止 HTML 爆炸 JSON
+    const text = await response.text();
+
+    let result;
     try {
-      const res = await fetch('/api/clean', { method: 'POST', body: fd });
-      const data = await res.json();
-      if (!res.ok || !data.ok) throw new Error(data.error || '清洗失敗');
-      renderResult(data);
-      setStep(3);
-    } catch (err) {
-      alert(err.message);
-      setStep(1);
+      result = JSON.parse(text);
+    } catch (e) {
+      console.error("後端不是 JSON：", text);
+      throw new Error("伺服器回傳格式錯誤（可能 API 錯誤或後端 error）");
     }
-  });
+
+    if (!response.ok || !result.ok) {
+      throw new Error(result.message || result.error || '清洗失敗');
+    }
+
+    renderResult(result);
+    setStep(3);
+
+  } catch (error) {
+    alert(error.message);
+    setStep(1);
+  }
+});
 
   // ---------- Render results (placeholders) ----------
   function renderResult(data) {
