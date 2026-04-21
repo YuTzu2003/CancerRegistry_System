@@ -101,14 +101,14 @@
     <span class="hint">支援 CSV / XLS / XLSX</span>
   </div>
   <div class="section-body">
-    <form id="cleanForm" novalidate>
+    <form id="cleanForm" action="/api/cleanJob" method="POST" enctype="multipart/form-data" novalidate>
       <div class="form-grid">
         <div class="form-field">
           <label for="formatSelect">參考資料格式</label>
           <select id="formatSelect" name="format_id" class="form-select" required>
             <option value="">請選擇格式</option>
             {% for f in formats %}
-              <option value="{{ f.id }}">{{ f.name }}（{{ f.version }}）</option>
+              <option value="{{f.id}}">{{ f.name }}欄位（{{ f.version }}）</option>
             {% endfor %}
           </select>
         </div>

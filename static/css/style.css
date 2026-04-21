@@ -184,6 +184,32 @@ a {
   padding: 14px;
   border-top: 1px solid var(--gray-900);
 }
+.logout-action {
+  text-decoration: none; /* 移除超連結底線 */
+  transition: all 0.2s ease;
+}
+
+.logout-action .logout-icon {
+  margin-left: auto;
+  color: var(--gray-500);
+  font-size: 18px;
+  transition: color 0.2s ease;
+}
+
+/* 滑鼠移過去時的變化 */
+.logout-action:hover {
+  background: var(--accent-soft); /* 變成淺紅色背景 */
+}
+
+.logout-action:hover .user-avatar {
+  background: var(--accent); /* 頭像背景變紅色 */
+}
+
+.logout-action:hover .user-name,
+.logout-action:hover .user-role,
+.logout-action:hover .logout-icon {
+  color: var(--accent); /* 文字與圖示變紅色 */
+}
 .user-chip {
   display: flex; 
   align-items: center; gap: 10px;

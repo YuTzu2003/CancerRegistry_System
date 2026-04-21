@@ -2,13 +2,13 @@ import pandas as pd
 import os
 from openpyxl import load_workbook,Workbook
 from openpyxl.styles import PatternFill,Font,Alignment
-from modules.clean.fmt_42 import RULES as RULES_42
-from modules.clean.fmt_45 import RULES as RULES_45
-from modules.clean.fmt_50 import RULES as RULES_50
-from modules.clean.fmt_114 import RULES as RULES_114
-from modules.clean.fmt_115 import RULES as RULES_115
-from modules.clean.fmt_129 import RULES as RULES_129
-from modules.clean.validate import check_error_type,validate_date_rules
+from modules.clean_pipeline.fmt_42 import RULES as RULES_42
+from modules.clean_pipeline.fmt_45 import RULES as RULES_45
+from modules.clean_pipeline.fmt_50 import RULES as RULES_50
+from modules.clean_pipeline.fmt_114 import RULES as RULES_114
+from modules.clean_pipeline.fmt_115 import RULES as RULES_115
+from modules.clean_pipeline.fmt_129 import RULES as RULES_129
+from modules.clean_pipeline.validate import check_error_type,validate_date_rules
 from modules.field_mapping import field_mapping
 from datetime import datetime
 
@@ -56,8 +56,7 @@ def cleanValidate(input_file,output_file,fmt,version,Revision_Date):
     for col in df.columns:
         clean_col = str(col).strip()
         rule_name = alias_mapping.get(clean_col)
-
-        # 改用動態選擇的 selected_rules 進行判斷
+        
         if rule_name and rule_name in rules:
             rule = rules[rule_name]
             error_mask[col] = df[col].apply(lambda x: check_error_type(x, rule))
