@@ -34,7 +34,7 @@ def annotation(row_errors):
         return "D:完全正確的資訊"
     return " ".join(codes)
 
-def cleanValidate(input_file,output_file,fmt,version,Revision_Date):
+def cleanValidate(input_file,output_file,report_file,fmt,version,Revision_Date):
     rules = FORMAT_RULES_MAP[fmt]
     file_ext = os.path.splitext(input_file)[1].lower()
     
@@ -56,7 +56,7 @@ def cleanValidate(input_file,output_file,fmt,version,Revision_Date):
     for col in df.columns:
         clean_col = str(col).strip()
         rule_name = alias_mapping.get(clean_col)
-        
+
         if rule_name and rule_name in rules:
             rule = rules[rule_name]
             error_mask[col] = df[col].apply(lambda x: check_error_type(x, rule))
@@ -132,7 +132,7 @@ def cleanValidate(input_file,output_file,fmt,version,Revision_Date):
         'logic_cells': dateformat_cell_count
     }
 
-    report_file = f"Report_{sheet_name}.xlsx"
+    # report_file = f"Report_{sheet_name}.xlsx"
     wb_report = Workbook()
     ws_report = wb_report.active
     ws_report.title = "清洗結果"
@@ -193,7 +193,7 @@ if __name__ == "__main__":
     fmt = "fmt_42"
     version = "2025v1"
     Revision_Date = "2017/12/04"
-    stats, _, _, _ = cleanValidate(input_file,f"{fmt}_data.xlsx",fmt,version,Revision_Date)
+    stats, _, _, _ = cleanValidate(input_file,f"{fmt}_data.xlsx",f"{fmt}_Report.xlsx",fmt,version,Revision_Date)
     
     # print(f"資料清理與驗證報告 ({sheet_name})")
     # print(f"資料總件數: {stats['total']}")
