@@ -3,63 +3,59 @@
 <head>
   <meta charset="UTF-8">
   <title>Login - 癌症登記資料平台</title>
-  
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-  
   <link rel="stylesheet" href="/static/css/style.css">
   <link rel="stylesheet" href="/static/css/login.css">
 </head>
 
 <body>
-
-<div class="login-wrapper">
-  <div class="login-card">
-    
-    <div class="login-header">
-      <div class="login-logo">
-        <i class="bi bi-clipboard2-pulse"></i>
-      </div>
-      <h1 class="login-title">癌症登記資料平台</h1>
-      <p class="login-subtitle">請輸入您的員工帳號與密碼以登入系統</p>
-    </div>
-
-    {% if error %}
-      <div class="alert-flat alert-danger error-alert">
-        <i class="bi bi-exclamation-circle-fill"></i> {{ error }}
-      </div>
-    {% endif %}
-
-    <form method="POST">
-      
-      <div class="form-field">
-        <label>User ID</label>
-        <div class="input-with-icon">
-          <i class="bi bi-person text-muted"></i>
-          <input type="text" name="userid" class="form-control" placeholder="請輸入員工編號" required>
+  <div class="login-wrapper">
+    <div class="login-card">
+      <div class="login-header">
+        <div class="login-logo">
+          <i class="bi bi-clipboard2-pulse"></i>
         </div>
+        <h1 class="login-title">癌症登記資料平台</h1>
+        <p class="login-subtitle">請輸入您的員工帳號與密碼以登入系統</p>
       </div>
 
-      <div class="form-field">
-        <label>Password</label>
-        <div class="input-with-icon">
-          <i class="bi bi-lock text-muted"></i>
-          <input type="password" name="password" class="form-control" placeholder="請輸入密碼" required>
+      {% if error %}
+        <div class="alert-flat alert-danger error-alert">
+          <i class="bi bi-exclamation-circle-fill"></i> {{ error }}
         </div>
+      {% endif %}
+
+      <form method="POST">
+        
+        <div class="form-field">
+          <label>User ID</label>
+          <div class="input-with-icon">
+            <i class="bi bi-person text-muted"></i>
+            <input type="text" name="userid" class="form-control" placeholder="請輸入員工編號" required>
+          </div>
+        </div>
+
+        <div class="form-field">
+          <label>Password</label>
+          <div class="input-with-icon">
+            <i class="bi bi-lock text-muted"></i>
+            <input type="password" name="password" class="form-control" placeholder="請輸入密碼" required>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-dark btn-block login-btn">登入系統</button>
+      </form>
+
+      <div class="login-footer">
+        &copy; 2026 NFU. All rights reserved.
       </div>
 
-      <button type="submit" class="btn btn-dark btn-block login-btn">登入系統</button>
-    </form>
-
-    <div class="login-footer">
-      &copy; 2026 NFU. All rights reserved.
     </div>
-
   </div>
-</div>
 
 </body>
 </html>

@@ -6,7 +6,6 @@ from werkzeug.utils import secure_filename
 from modules.db import get_conn 
 from modules.clean import cleanValidate
 
-
 app = Flask(__name__)
 # ---- Config ---------------------------------------------------------------
 BASE_DIR = os.path.dirname(__file__)
@@ -72,6 +71,7 @@ def analytics():
 def settings():
     return render_template("settings.html", active="settings")
 
+# ---- format -------------------------------------------
 @app.route("/clean")
 def data_cleaning():
     formats = []
@@ -79,12 +79,10 @@ def data_cleaning():
     cursor = conn.cursor()
     cursor.execute("""SELECT [FmtID], [FmtName], [Version], [Revision_date] FROM [DataFormat] ORDER BY FmtName ASC""")
     rows = cursor.fetchall()
-
     for row in rows:
         formats.append({"id": str(row.FmtID), "name": str(row.FmtName), "version": str(row.Version), "updated": str(row.Revision_date)})
     return render_template("clean.html",active="data_cleaning",formats=formats)
 
-# ---- format CRUD -------------------------------------------
 @app.route("/api/formats", defaults={"fmt_id": None}, methods=["POST"])
 @app.route("/api/formats/<fmt_id>", methods=["PUT", "DELETE"])
 def formatTool(fmt_id):
@@ -166,64 +164,42 @@ from datetime import datetime
 
 @app.route("/api/cleanJob", methods=["POST"])
 def api_clean():
+    user_id = session.get("id")
+    if not user_id:
+        return jsonify({"ok": False, "error": "請先登入系統"}), 401
+
     format_id = request.form.get("format_id")
     uploaded_file = request.files.get("data_file")
 
     if not format_id or not uploaded_file or uploaded_file.filename == '':
-        return jsonify({"ok": False, "error": "參數錯誤或未選擇檔案"}), 400
+        return jsonify({"ok": False, "error": "未選擇檔案"}), 400
 
-    project_id = str(uuid.uuid4())
-    project_folder = f"{Jobs_FOLDER}/{project_id}"
+    JobID = str(uuid.uuid4())
+    project_folder = f"{Jobs_FOLDER}/{JobID}"
     os.makedirs(project_folder, exist_ok=True)
 
     try:
-        # 3. 查詢格式設定
         conn = get_conn()
         cursor = conn.cursor()
         cursor.execute("SELECT [FmtName], [Version], [Revision_date] FROM [DataFormat] WHERE [FmtID] = ?", (format_id,))
         fmt_row = cursor.fetchone()
         
         fmt_name, version, revision_date = fmt_row[0], fmt_row[1], fmt_row[2]
-        safe_filename = secure_filename(uploaded_file.filename)
-        input_path = os.path.join(project_folder, safe_filename)
-        uploaded_file.save(input_path)
-        output_filename = f"Cleaned_{safe_filename}"
-        output_path = os.path.join(project_folder, output_filename)
+        filename = secure_filename(uploaded_file.filename)
+        path = f"{project_folder}/{filename}"
+        uploaded_file.save(path)
+        output_filename = f"fmt{fmt_name}_{filename}.xlsx"
+        output_path = f"{project_folder}, {output_filename}"
 
-        # 6. 執行清洗函式
-        stats, alias_mapping, sorted_df, sorted_mask = cleanValidate(
-            input_file=input_path,
-            output_file=output_path,
-            fmt=f"fmt_{fmt_name}", # 配合你 FORMAT_RULES_MAP 的命名
-            version=version,
-            Revision_Date=revision_date
-        )
+        stats, alias_mapping, sorted_df, sorted_mask = cleanValidate(path, output_path, f"fmt_{fmt_name}", version, revision_date)
 
-        # 7. 將結果存入 MSSQL [CleaningProjects] 資料表
-        insert_sql = """
-            INSERT INTO [CleaningProjects] (
-                [ProjectID], [UserID], [FileName], [TotalCount], 
-                [Completeness], [Correctness], [Consistency], [DQI],
-                [InputPath], [OutputPath]
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """
-        cursor.execute(insert_sql, (
-            project_id, 
-            user_id, 
-            safe_filename, 
-            int(stats['total']),
-            float(stats['completeness']),
-            float(stats['correctness']),
-            float(stats['consistency']),
-            float(stats['quality_score']),
-            input_path,
-            output_path
-        ))
+        sql = """INSERT INTO Job ([JobID],[UserID],[FileName],[TotalCount],[CompletenessScore],[CorrectScore],[ConsistencyScore],[DQI],[Path]) VALUES (?,?,?,?,?,?,?,?,?)"""
+        cursor.execute(sql, (JobID, user_id, filename, int(stats['total']), float(stats['completeness']), float(stats['correctness']), float(stats['consistency']), float(stats['quality_score']),path))
         conn.commit()
 
         return jsonify({
             "ok": True,
-            "project_id": project_id,
+            "project_id": JobID,
             "message": "資料清洗並存檔完成！",
             "stats": {
                 "total": int(stats['total']),
@@ -232,14 +208,14 @@ def api_clean():
                 "dqi": float(stats['quality_score'])
             },
             "files": {
-                "project_dir": project_id,
+                "project_dir": JobID,
                 "cleaned_data": output_filename,
-                "report": f"Report_{os.path.splitext(safe_filename)[0]}.xlsx"
+                "report": f"Report_{os.path.splitext(filename)[0]}.xlsx"
             }
         })
 
     except Exception as e:
-        print(f"清洗專案 {project_id} 發生錯誤: {str(e)}")
+        print(f"清洗專案 {JobID} 發生錯誤: {str(e)}")
         return jsonify({"ok": False, "error": f"系統處理失敗: {str(e)}"}), 500
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
