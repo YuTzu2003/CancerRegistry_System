@@ -1,19 +1,17 @@
 import datetime
-
 from flask import Flask, render_template, request, redirect, send_file, session, url_for, flash, jsonify
 import os
-import json
 import uuid
 from werkzeug.utils import secure_filename
 from modules.db import get_conn 
 from modules.clean import cleanValidate
 import shutil
+
 app = Flask(__name__)
 BASE_DIR = os.path.dirname(__file__)
 app.secret_key = "your_secret_key"
 Jobs_FOLDER = 'static/Jobs'
 os.makedirs(Jobs_FOLDER, exist_ok=True)
-app.config["MAX_CONTENT_LENGTH"] = 32*1024*1024  #32MB
 def allowed_file(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in {"csv","xls","xlsx","txt"}
 
@@ -27,7 +25,6 @@ def inject_nav():
                 {"endpoint":"settings",      "title": "系統設定",    "icon": "bi-gear"},]
     return {"nav_items": NAV_ITEMS}
 
-# ---- Pages ----------------------------------------------------------------
 @app.route("/")
 def dashboard():
     return render_template("dashboard.html", active="dashboard")
@@ -218,18 +215,12 @@ def api_clean():
         report_path = f"{project_folder}/{report_filename}"
 
         stats, alias_mapping, sorted_df, sorted_mask = cleanValidate(path, output_path, report_path, f"fmt_{fmt_name}", version, revision_date)
-        
-        # 確保資料中沒有 NaN (JSON 不支援 NaN)
         sorted_df = sorted_df.fillna('')
-        
-        # --- 新增：處理傳送給前端的詳細資料 ---
-        # 1. 萃取前 100 筆錯誤明細
         issues = []
+
         # 找出有錯誤的行索引
         has_error_mask = sorted_mask.ne("").any(axis=1)
         error_indices = sorted_mask[has_error_mask].index[:100]
-        
-        # 嘗試找出 ID 欄位
         id_col = next((c for c in sorted_df.columns if "編號" in c or "ID" in c.upper()), sorted_df.columns[0])
         
         for idx in error_indices:
@@ -247,7 +238,7 @@ def api_clean():
                         "suggestion": "請補齊資料" if err == "missing" else "請檢查格式"
                     })
         
-        # 2. 統計分析資料
+        # 2. 統計分析
         by_field = []
         for col in sorted_mask.columns:
             err_count = (sorted_mask[col] != "").sum()
@@ -281,22 +272,35 @@ def api_clean():
                 "correctness": float(stats['correctness'])
             },
             "issues": issues,
-            "analysis": {
-                "by_field": by_field,
-                "by_type": by_type
-            },
+            "analysis": {"by_field": by_field,"by_type": by_type},
             "output_fields": output_fields,
-            "files": {
-                "project_dir": JobID,
-                "cleaned_data": output_filename,
-                "report": report_filename
-            }
+            "files": {"project_dir": JobID,"cleaned_data": output_filename,"report": report_filename}
         })
     
     except Exception as e:
-        import traceback
-        print(traceback.format_exc()) # 在終端機印出錯誤詳細資訊
         return jsonify({"ok": False, "error": f"系統處理失敗: {str(e)}"}), 500
+
+@app.route("/api/download/<file_type>/<job_id>")
+def download_file(file_type, job_id):
+
+    conn = get_conn()
+    cursor = conn.cursor()
     
+    cursor.execute("""SELECT Job.JobID, Job.Path, Job.FileName, DataFormat.FmtName FROM [Job] JOIN [DataFormat] ON Job.FmtID = DataFormat.FmtID WHERE Job.JobID=?""",(job_id,))
+    row = cursor.fetchone()
+    
+    project_path, original_filename, fmt_name = row
+    base_name, _ = os.path.splitext(original_filename)
+    
+    if file_type == "cleaned":
+        target_filename = f"fmt{fmt_name}_{base_name}_clean.xlsx"
+        
+    elif file_type == "report":
+        target_filename = f"Report_{base_name}.xlsx"
+        
+    file_path = f"{project_path}/{target_filename}"
+    conn.close()
+    return send_file(os.path.abspath(file_path), as_attachment=True)
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
