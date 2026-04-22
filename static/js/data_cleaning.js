@@ -182,20 +182,25 @@ $('#cleanForm').addEventListener('reset', () => {
 // ---------- Submit ----------
 $('#cleanForm').addEventListener('submit', async (e) => {
   e.preventDefault();
-
   const formatId = $('#formatSelect').value;
   const file = fileInput.files?.[0];
-
   if (!formatId) {
     alert('請選擇參考資料格式');
     return;
   }
-
   if (!file) {
     alert('請選擇上傳檔案');
     return;
   }
 
+  // ---------- loading -------
+  const loadingOverlay = document.getElementById('loadingOverlay');
+  const btnStart = document.getElementById('btnStartClean');
+  if (loadingOverlay) loadingOverlay.style.display = 'flex';
+  if (btnStart) {
+    btnStart.disabled = true;
+    btnStart.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>處理中...';
+  }
   setStep(2);
 
   const formData = new FormData();
@@ -213,24 +218,28 @@ $('#cleanForm').addEventListener('submit', async (e) => {
     try {
       result = JSON.parse(text);
     } catch (e) {
-      console.error("後端不是 JSON：", text);
       throw new Error("伺服器回傳格式錯誤（可能 API 錯誤或後端 error）");
     }
-
     if (!response.ok || !result.ok) {
       throw new Error(result.message || result.error || '清洗失敗');
     }
-
     renderResult(result);
     setStep(3);
 
   } catch (error) {
     alert(error.message);
     setStep(1);
+  } 
+  finally {
+    if (loadingOverlay) loadingOverlay.style.display = 'none';
+    if (btnStart) {
+      btnStart.disabled = false;
+      btnStart.innerHTML = '<i class="bi bi-funnel"></i> 開始清洗';
+    }
   }
 });
 
-  // ---------- Render results (placeholders) ----------
+
   function renderResult(data) {
     // Show simple alert in the container
     const alertContainer = $('#cleaningAlertContainer');
