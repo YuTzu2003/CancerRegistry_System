@@ -60,7 +60,27 @@ def logout():
 
 @app.route("/history")
 def history():
-    return render_template("history.html", active="history")
+    conn = get_conn()
+    cursor = conn.cursor()
+    sql = """
+        SELECT Job.JobID,Job.UserID,DataFormat.FmtName,DataFormat.Version,Job.DQI,Job.CreatedAt,Job.TotalCount 
+        FROM DataFormat RIGHT  JOIN Job ON DataFormat.FmtID = Job.FmtID
+        ORDER BY Job.CreatedAt DESC
+    """
+    cursor.execute(sql)
+    rows = cursor.fetchall()
+    history_data = []
+    for row in rows:
+        history_data.append({
+            "JobID": row.JobID,
+            "UserID": row.UserID,
+            "FmtName": row.FmtName,
+            "Version": row.Version,
+            "DQI": f"{row.DQI:.2f}%",
+            "CreatedAt": row.CreatedAt.strftime("%Y/%m/%d") if row.CreatedAt else "—",
+            "TotalCount": row.TotalCount
+        })
+    return render_template("history.html", active="history", history=history_data)
 
 @app.route("/analytics")
 def analytics():
