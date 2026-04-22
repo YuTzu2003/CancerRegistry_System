@@ -218,6 +218,52 @@ def api_clean():
         report_path = f"{project_folder}/{report_filename}"
 
         stats, alias_mapping, sorted_df, sorted_mask = cleanValidate(path, output_path, report_path, f"fmt_{fmt_name}", version, revision_date)
+        
+        # 確保資料中沒有 NaN (JSON 不支援 NaN)
+        sorted_df = sorted_df.fillna('')
+        
+        # --- 新增：處理傳送給前端的詳細資料 ---
+        # 1. 萃取前 100 筆錯誤明細
+        issues = []
+        # 找出有錯誤的行索引
+        has_error_mask = sorted_mask.ne("").any(axis=1)
+        error_indices = sorted_mask[has_error_mask].index[:100]
+        
+        # 嘗試找出 ID 欄位
+        id_col = next((c for c in sorted_df.columns if "編號" in c or "ID" in c.upper()), sorted_df.columns[0])
+        
+        for idx in error_indices:
+            row_data = sorted_df.loc[idx]
+            row_mask = sorted_mask.loc[idx]
+            for col in sorted_mask.columns:
+                err = row_mask[col]
+                if err:
+                    issues.append({
+                        "case_id": str(row_data[id_col]),
+                        "field": str(col),
+                        "level": "error",
+                        "type": "遺漏值" if err == "missing" else ("格式錯誤" if err == "format" else "邏輯錯誤"),
+                        "value": str(row_data[col]),
+                        "suggestion": "請補齊資料" if err == "missing" else "請檢查格式"
+                    })
+        
+        # 2. 統計分析資料
+        by_field = []
+        for col in sorted_mask.columns:
+            err_count = (sorted_mask[col] != "").sum()
+            if err_count > 0:
+                by_field.append({"name": str(col), "format": "檢核規則", "errors": int(err_count)})
+        
+        total_cells = max(1, int(stats['total']) * len(sorted_mask.columns))
+        by_type = [
+            {"type": "遺漏值 (Missing)", "count": int(stats.get('missing_cells', 0)), "ratio": f"{(int(stats.get('missing_cells', 0))/total_cells):.1%}"},
+            {"type": "格式錯誤 (Format)", "count": int(stats.get('format_cells', 0)), "ratio": f"{(int(stats.get('format_cells', 0))/total_cells):.1%}"},
+            {"type": "邏輯錯誤 (Logic)", "count": int(stats.get('logic_cells', 0)), "ratio": f"{(int(stats.get('logic_cells', 0))/total_cells):.1%}"}
+        ]
+
+        # 3. 輸出欄位
+        output_fields = [{"key": str(col), "label": str(col)} for col in sorted_df.columns if not str(col).startswith('_')]
+
         sql = """INSERT INTO Job ([JobID],[UserID],[FmtID],[FileName],[TotalCount],[CompletenessScore],[CorrectScore],[ConsistencyScore],[DQI],[Path]) VALUES (?,?,?,?,?,?,?,?,?,?)"""
         cursor.execute(sql,(JobID, user_id, format_id, filename, int(stats['total']), float(stats['completeness']), float(stats['correctness']), float(stats['consistency']), float(stats['quality_score']), project_folder))
         conn.commit()
@@ -226,12 +272,31 @@ def api_clean():
             "ok": True,
             "project_id": JobID,
             "message": "資料清洗並存檔完成！",
-            "stats": {"total":int(stats['total']),"passed":int(stats['total']-stats['error_rows']), "error":int(stats['error_rows']), "dqi":float(stats['quality_score'])},
-            "files": {"project_dir":JobID, "cleaned_data":output_filename, "report":report_filename }
+            "stats": {
+                "total": int(stats['total']),
+                "passed": int(stats['total'] - stats['error_rows']),
+                "error": int(stats['error_rows']),
+                "dqi": float(stats['quality_score']),
+                "completeness": float(stats['completeness']),
+                "correctness": float(stats['correctness'])
+            },
+            "issues": issues,
+            "analysis": {
+                "by_field": by_field,
+                "by_type": by_type
+            },
+            "output_fields": output_fields,
+            "files": {
+                "project_dir": JobID,
+                "cleaned_data": output_filename,
+                "report": report_filename
+            }
         })
     
     except Exception as e:
-        return jsonify({"ok": False, "error": f"{str(e)}"}), 500
+        import traceback
+        print(traceback.format_exc()) # 在終端機印出錯誤詳細資訊
+        return jsonify({"ok": False, "error": f"系統處理失敗: {str(e)}"}), 500
     
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
