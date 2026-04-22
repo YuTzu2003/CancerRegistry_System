@@ -35,10 +35,10 @@
           <td style="color:red;font-weight: bold;">{{item.DQI}}</td>
           <td>
             <div class="d-flex justify-content-center gap-2">
-              <a href="/history/{{ item.job_id }}" class="btn btn-outline-primary btn-sm d-flex align-items-center gap-1">
+              <button type="button" class="btn btn-outline-primary btn-sm d-flex align-items-center gap-1" onclick="openDetail('{{ item.JobID }}')">
                 <i class="bi bi-search"></i> 詳情
-              </a>
-              <form action="/history/delete/{{ item.job_id }}" method="POST" class="m-0" onsubmit="return confirm('確定要刪除這筆紀錄嗎？此動作無法復原。');">
+              </button>
+              <form action="/history/delete/{{ item.JobID }}" method="POST" class="m-0" onsubmit="return confirm('確定要刪除這筆紀錄嗎？此動作無法復原。');">
                 <button type="submit" class="btn btn-outline-danger btn-sm d-flex align-items-center gap-1">
                   <i class="bi bi-trash3"></i> 刪除
                 </button>
@@ -48,13 +48,68 @@
         </tr>
         {% else %}
         <tr>
-          <td colspan="6" style="text-align:center; padding: 30px; color: var(--gray-500);">
-            目前尚無任何審核紀錄。
-          </td>
+          <td colspan="6" style="text-align:center; padding: 30px; color: var(--gray-500);">目前尚無任何審核紀錄。</td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </section>
+
+
+<div class="modal fade" id="jobDetailModal" tabindex="-1" aria-labelledby="jobDetailModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-light">
+        <h5 class="modal-title fw-bold" id="jobDetailModalLabel">
+          <i class="bi bi-file-earmark-bar-graph text-primary me-2"></i>審核詳情
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-4">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <p class="text-muted mb-1 small">審核編號 (JobID)</p>
+            <p class="fw-bold" id="detail-jobId">-</p>
+          </div>
+          <div class="col-md-6">
+            <p class="text-muted mb-1 small">審核日期</p>
+            <p class="fw-bold" id="detail-createdAt">-</p>
+          </div>
+          <div class="col-md-6">
+            <p class="text-muted mb-1 small">資料格式</p>
+            <p class="fw-bold text-primary" id="detail-fmtName">-</p>
+          </div>
+          <div class="col-md-6">
+            <p class="text-muted mb-1 small">資料總筆數</p>
+            <p class="fw-bold" id="detail-totalCount">-</p>
+          </div>
+          <hr class="my-3">
+          <div class="col-md-3 col-6">
+            <p class="text-muted mb-1 small">完整率</p>
+            <h5 class="text-success fw-bold" id="detail-compScore">-</h5>
+          </div>
+          <div class="col-md-3 col-6">
+            <p class="text-muted mb-1 small">正確率</p>
+            <h5 class="text-success fw-bold" id="detail-corrScore">-</h5>
+          </div>
+          <div class="col-md-3 col-6">
+            <p class="text-muted mb-1 small">一致率</p>
+            <h5 class="text-success fw-bold" id="detail-consScore">-</h5>
+          </div>
+          <div class="col-md-3 col-6">
+            <p class="text-muted mb-1 small">資料品質 (DQI)</p>
+            <h5 class="text-danger fw-bold" id="detail-dqi">-</h5>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer bg-light">
+        <button type="button" class="btn btn-outline-dark" data-bs-dismiss="modal"><i class="bi bi-cloud-download"></i>審核結果下載</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">關閉</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/history.js"></script>
 {% endblock %}

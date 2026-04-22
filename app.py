@@ -1,3 +1,5 @@
+import datetime
+
 from flask import Flask, render_template, request, redirect, session, url_for, flash, jsonify
 import os
 import json
@@ -5,7 +7,7 @@ import uuid
 from werkzeug.utils import secure_filename
 from modules.db import get_conn 
 from modules.clean import cleanValidate
-
+import shutil
 app = Flask(__name__)
 BASE_DIR = os.path.dirname(__file__)
 app.secret_key = "your_secret_key"
@@ -60,14 +62,13 @@ def logout():
 
 @app.route("/history")
 def history():
+    user_id = session.get("id")
     conn = get_conn()
     cursor = conn.cursor()
-    sql = """
-        SELECT Job.JobID,Job.UserID,DataFormat.FmtName,DataFormat.Version,Job.DQI,Job.CreatedAt,Job.TotalCount 
-        FROM DataFormat RIGHT  JOIN Job ON DataFormat.FmtID = Job.FmtID
-        ORDER BY Job.CreatedAt DESC
-    """
-    cursor.execute(sql)
+    cursor.execute("""  SELECT Job.JobID,Job.UserID,DataFormat.FmtName,DataFormat.Version,Job.DQI,Job.CreatedAt,Job.TotalCount 
+                        FROM DataFormat RIGHT  JOIN Job ON DataFormat.FmtID = Job.FmtID
+                        WHERE Job.UserID = ?
+                        ORDER BY Job.CreatedAt DESC """,(user_id,))
     rows = cursor.fetchall()
     history_data = []
     for row in rows:
@@ -81,6 +82,42 @@ def history():
             "TotalCount": row.TotalCount
         })
     return render_template("history.html", active="history", history=history_data)
+
+@app.route("/history/delete/<job_id>", methods=["POST"])
+def delete_history(job_id):
+    user_id = session.get("id")
+    conn = get_conn()
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT [Path] FROM [Job] WHERE [JobID]=? AND [UserID]=?", (job_id,user_id))
+    row = cursor.fetchone()
+    
+    if row and row[0]:
+        target_path = row[0]
+        if os.path.exists(target_path):
+            shutil.rmtree(target_path) 
+    cursor.execute("DELETE FROM [Job] WHERE [JobID] = ? AND [UserID] = ?", (job_id, user_id))
+    conn.commit()
+    
+    flash("紀錄已成功刪除", "success")
+    conn.close()  
+    return redirect("/history")
+
+@app.route("/history/detail/<job_id>", methods=["GET"])
+def detail_history(job_id):
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute(""" SELECT Job.JobID,DataFormat.FmtName,DataFormat.Version,Job.TotalCount,Job.CompletenessScore,Job.CorrectScore,Job.ConsistencyScore,Job.DQI,Job.Path,Job.CreatedAt
+                        FROM DataFormat RIGHT JOIN Job ON DataFormat.FmtID = Job.FmtID
+                        WHERE Job.JobID = ? """, (job_id,))
+    row = cursor.fetchone()
+    conn.close()
+    columns = [column[0] for column in cursor.description]
+    data = dict(zip(columns, row))
+    if data.get('CreatedAt'):
+        if isinstance(data['CreatedAt'], datetime.datetime):
+            data['CreatedAt'] = data['CreatedAt'].strftime("%Y/%m/%d %H:%M:%S")
+    return jsonify({"ok": True, "data": data})
 
 @app.route("/analytics")
 def analytics():

@@ -45,10 +45,14 @@ def cleanValidate(input_file,output_file,report_file,fmt,version,Revision_Date):
             df = pd.read_csv(input_file, dtype=str, encoding='cp950')
         sheet_name = os.path.splitext(os.path.basename(input_file))[0]
 
+    # else:
+    #     df = pd.read_excel(input_file,dtype=str)
+    #     xl = pd.ExcelFile(input_file)
+    #     sheet_name = xl.sheet_names[0]
     else:
         df = pd.read_excel(input_file,dtype=str)
-        xl = pd.ExcelFile(input_file)
-        sheet_name = xl.sheet_names[0]
+        with pd.ExcelFile(input_file) as xl:
+            sheet_name = xl.sheet_names[0]
 
     alias_mapping, _ = field_mapping('中文欄位名稱')
     error_mask = pd.DataFrame("", index=df.index, columns=df.columns) 
@@ -98,7 +102,8 @@ def cleanValidate(input_file,output_file,report_file,fmt,version,Revision_Date):
                 ws.cell(row=r_idx + 2, column=c_idx + 1).fill = fill_dateformat
 
     wb.save(output_file)
-    
+    wb.close()
+
     total_count = len(df)
     missing_rows = (error_mask == "missing").any(axis=1).sum()
     format_rows = (error_mask == "format").any(axis=1).sum()
@@ -183,6 +188,7 @@ def cleanValidate(input_file,output_file,report_file,fmt,version,Revision_Date):
     ws_report.column_dimensions['B'].width = 20
     ws_report.column_dimensions['C'].width = 10 
     wb_report.save(report_file)
+    wb_report.close()
     print(f"Data-Clean Report file: {report_file}")
     return stats, alias_mapping, sorted_df, sorted_mask
 
