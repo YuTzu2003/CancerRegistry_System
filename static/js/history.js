@@ -17,6 +17,10 @@ function openDetail(jobId) {
                 document.getElementById('detail-corrScore').innerText = data.CorrectScore ? (data.CorrectScore * 100).toFixed(2) + '%' : '-';
                 document.getElementById('detail-consScore').innerText = data.ConsistencyScore ? (data.ConsistencyScore * 100).toFixed(2) + '%' : '-';
                 document.getElementById('detail-dqi').innerText = data.DQI ? data.DQI.toFixed(2) + '%' : '-';
+                
+                // 設定下載連結
+                document.getElementById('btnDownloadLink').href = `/history/download/${jobId}`;
+                
                 const detailModal = new bootstrap.Modal(document.getElementById('jobDetailModal'));
                 detailModal.show();
             } 

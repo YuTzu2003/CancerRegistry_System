@@ -1,6 +1,6 @@
 import datetime
 
-from flask import Flask, render_template, request, redirect, session, url_for, flash, jsonify
+from flask import Flask, render_template, request, redirect, send_file, session, url_for, flash, jsonify
 import os
 import json
 import uuid
@@ -118,6 +118,21 @@ def detail_history(job_id):
         if isinstance(data['CreatedAt'], datetime.datetime):
             data['CreatedAt'] = data['CreatedAt'].strftime("%Y/%m/%d %H:%M:%S")
     return jsonify({"ok": True, "data": data})
+
+@app.route("/history/download/<job_id>")
+def download_project(job_id):
+    try:
+        conn = get_conn()
+        cursor = conn.cursor()
+        cursor.execute("SELECT [Path], [FileName] FROM [Job] WHERE [JobID] = ?", (job_id,))
+        row = cursor.fetchone()
+        project_path = row[0]
+        zip_temp_path = os.path.join(os.path.dirname(project_path), f"{job_id}.zip")
+        shutil.make_archive(zip_temp_path.replace('.zip', ''), 'zip', project_path)
+        return send_file(zip_temp_path, as_attachment=True, download_name=f"{job_id}.zip")
+
+    except Exception as e:
+        return {str(e)}, 500
 
 @app.route("/analytics")
 def analytics():
