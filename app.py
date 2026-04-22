@@ -20,7 +20,7 @@ def inject_nav():
     NAV_ITEMS = [
                 {"endpoint":"dashboard",     "title": "首頁總覽",    "icon": "bi-house-door"},
                 {"endpoint":"data_cleaning", "title": "資料清洗模組","icon": "bi-funnel"},
-                {"endpoint":"reports",       "title": "申報紀錄",    "icon": "bi-file-earmark-text"},
+                {"endpoint":"history",       "title": "資料審核紀錄",    "icon": "bi-file-earmark-text"},
                 {"endpoint":"analytics",     "title": "統計分析",    "icon": "bi-bar-chart"},
                 {"endpoint":"settings",      "title": "系統設定",    "icon": "bi-gear"},]
     return {"nav_items": NAV_ITEMS}
@@ -58,9 +58,10 @@ def logout():
     session.clear()
     return redirect("/")
 
-@app.route("/reports")
-def reports():
-    return render_template("reports.html", active="reports")
+@app.route("/history")
+def history():
+    return render_template("history.html", active="history")
+
 @app.route("/analytics")
 def analytics():
     return render_template("analytics.html", active="analytics")
@@ -145,29 +146,20 @@ def api_clean():
         report_path = f"{project_folder}/{report_filename}"
 
         stats, alias_mapping, sorted_df, sorted_mask = cleanValidate(path, output_path, report_path, f"fmt_{fmt_name}", version, revision_date)
-        sql = """INSERT INTO Job ([JobID],[UserID],[FileName],[TotalCount],[CompletenessScore],[CorrectScore],[ConsistencyScore],[DQI],[Path]) VALUES (?,?,?,?,?,?,?,?,?)"""
-        cursor.execute(sql, (JobID, user_id, filename, int(stats['total']), float(stats['completeness']), float(stats['correctness']), float(stats['consistency']), float(stats['quality_score']), project_folder))
+        sql = """INSERT INTO Job ([JobID],[UserID],[FmtID],[FileName],[TotalCount],[CompletenessScore],[CorrectScore],[ConsistencyScore],[DQI],[Path]) VALUES (?,?,?,?,?,?,?,?,?,?)"""
+        cursor.execute(sql,(JobID, user_id, format_id, filename, int(stats['total']), float(stats['completeness']), float(stats['correctness']), float(stats['consistency']), float(stats['quality_score']), project_folder))
         conn.commit()
 
         return jsonify({
             "ok": True,
             "project_id": JobID,
             "message": "資料清洗並存檔完成！",
-            "stats": {
-                "total": int(stats['total']),
-                "passed": int(stats['total'] - stats['error_rows']),
-                "error": int(stats['error_rows']),
-                "dqi": float(stats['quality_score'])
-            },
-            "files": {
-                "project_dir": JobID,
-                "cleaned_data": output_filename,
-                "report": report_filename 
-            }
+            "stats": {"total":int(stats['total']),"passed":int(stats['total']-stats['error_rows']), "error":int(stats['error_rows']), "dqi":float(stats['quality_score'])},
+            "files": {"project_dir":JobID, "cleaned_data":output_filename, "report":report_filename }
         })
     
     except Exception as e:
-        return jsonify({"ok": False, "error": f"系統處理失敗: {str(e)}"}), 500
+        return jsonify({"ok": False, "error": f"{str(e)}"}), 500
     
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)

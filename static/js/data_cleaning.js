@@ -234,11 +234,18 @@ $('#cleanForm').addEventListener('submit', async (e) => {
 
   // ---------- Render results (placeholders) ----------
   function renderResult(data) {
+    // Show simple alert in the container
+    const alertContainer = $('#cleaningAlertContainer');
+    if (alertContainer && data.ok) {
+      alertContainer.innerHTML = `<div class="alert alert-light border shadow-sm mt-3" role="alert">
+                                    <i class="bi bi-check-circle-fill text-success me-2"></i>資料清洗並存檔完成！
+                                  </div>`;}
+
     // KPI
-    const s = data.summary || {};
-    $('#kpiTotal').textContent  = (s.total_rows  ?? 0).toLocaleString();
-    $('#kpiPassed').textContent = (s.passed_rows ?? 0).toLocaleString();
-    $('#kpiError').textContent  = (s.error_rows  ?? 0).toLocaleString();
+    const s = data.stats || {};
+    $('#kpiTotal').textContent  = (s.total  ?? 0).toLocaleString();
+    $('#kpiPassed').textContent = (s.passed ?? 0).toLocaleString();
+    $('#kpiError').textContent  = (s.error  ?? 0).toLocaleString();
 
     // Issues table
     const issues = data.issues || [];
