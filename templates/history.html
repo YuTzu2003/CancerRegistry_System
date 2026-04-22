@@ -22,32 +22,37 @@
           <th>審核編號</th>
           <th>審核日期</th>
           <th>資料格式</th>
-          <th style="text-align:right;">筆數</th>
-          <th>狀態</th>
+          <th>資料品質</th>
+          <th class="text-center">操作</th>
         </tr>
       </thead>
       <tbody>
+        {% for item in history %}
         <tr>
-          <td>SUB-2025-003</td>
-          <td>2025/03/12</td>
-          <td>癌登長表（2024 v1.2）</td>
-          <td style="text-align:right;">3,214</td>
-          <td><span class="badge-soft green">已完成</span></td>
+          <td>{{item.JobID}}</td>
+          <td>{{item.CreatedAt}}</td>
+          <td>{{item.FmtName}}欄位({{item.Version}})</td>
+          <td style="color:red;font-weight: bold;">{{item.DQI}}</td>
+          <td>
+            <div class="d-flex justify-content-center gap-2">
+              <a href="/history/{{ item.job_id }}" class="btn btn-outline-primary btn-sm d-flex align-items-center gap-1">
+                <i class="bi bi-search"></i> 詳情
+              </a>
+              <form action="/history/delete/{{ item.job_id }}" method="POST" class="m-0" onsubmit="return confirm('確定要刪除這筆紀錄嗎？此動作無法復原。');">
+                <button type="submit" class="btn btn-outline-danger btn-sm d-flex align-items-center gap-1">
+                  <i class="bi bi-trash3"></i> 刪除
+                </button>
+              </form>
+            </div>
+          </td>
         </tr>
+        {% else %}
         <tr>
-          <td>SUB-2024-012</td>
-          <td>2024/12/15</td>
-          <td>癌登長表（2024 v1.2）</td>
-          <td style="text-align:right;">2,980</td>
-          <td><span class="badge-soft green">已完成</span></td>
+          <td colspan="6" style="text-align:center; padding: 30px; color: var(--gray-500);">
+            目前尚無任何審核紀錄。
+          </td>
         </tr>
-        <tr>
-          <td>SUB-2024-011</td>
-          <td>2024/09/20</td>
-          <td>癌登短表（2024 v1.0）</td>
-          <td style="text-align:right;">2,746</td>
-          <td><span class="badge-soft amber">審核中</span></td>
-        </tr>
+        {% endfor %}
       </tbody>
     </table>
   </div>
