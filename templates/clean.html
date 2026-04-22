@@ -154,71 +154,78 @@
   </div>
 </div>
 
-<!-- ===================== 結果（分析）===================== -->
 <div class="grid-2">
-  <!-- 清洗個案清單明細 -->
-  <section class="card-flat">
-    <div class="section-head">
-      <h2><span class="dot"></span> 清洗個案清單明細</h2>
-      <div class="d-flex align-items-center gap-2">
-        <span class="hint">顯示每筆個案的錯誤欄位與原因</span>
-        <button class="btn btn-sm" type="button" id="btnDownloadIssues">
-          <i class="bi bi-file-earmark-excel"></i> 下載 XLSX
+  <!-- 左側：欄位統計 -->
+  <div class="d-flex flex-column gap-3">
+    <!-- 依欄位統計 -->
+    <section class="card-flat" id="fieldAnalysisSection">
+      <div class="section-head">
+        <h2><span class="dot"></span>清洗個案清單明細</h2>
+        <div class="d-flex align-items-center gap-2">
+        <button class="btn btn-sm" type="button" id="btnDownloadAnalysis">
+          <i class="bi bi-file-earmark-excel"></i> 下載報告
         </button>
       </div>
-    </div>
-    <div class="section-body">
-      <div id="issuesTableWrap" class="table-wrap" hidden>
-        <table class="table-flat" id="issuesTable">
-          <thead>
-            <tr>
-              <th style="width: 60px;">#</th>
-              <th>個案編號</th>
-              <th>欄位</th>
-              <th>錯誤類型</th>
-              <th>原始值</th>
-              <th>建議</th>
-            </tr>
-          </thead>
-          <tbody id="issuesBody"></tbody>
-        </table>
       </div>
-      <div id="issuesEmpty" class="placeholder-box">
-        <i class="bi bi-list-check"></i>
-        <div class="lg">尚未有清洗明細</div>
-        <div>完成上傳並執行清洗後，此處會列出每筆錯誤個案、欄位與原因。</div>
+      <div class="section-body">
+        <div id="fieldAnalysisContent" hidden>
+          <div class="table-wrap" style="max-height: 450px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px;">
+            <table class="table-flat" id="analysisByField" style="margin-bottom: 0;">
+              <thead style="position: sticky; top: 0; z-index: 10; background: var(--card-bg); box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1);">
+                <tr>
+                  <th>欄位名稱</th>
+                  <th>檢核規則</th>
+                  <th style="width: 100px; text-align:right;">錯誤數</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+        <div id="fieldAnalysisEmpty" class="placeholder-box">
+          <i class="bi bi-bar-chart-steps"></i>
+          <div class="lg">尚未有欄位統計</div>
+          <div>完成上傳並執行清洗後，此處會列出每個欄位的錯誤分佈。</div>
+        </div>
       </div>
-    </div>
-  </section>
+    </section>
+  </div>
 
-  <!-- 清洗結果分析 -->
+  <!-- 右側：品質分析 -->
   <section class="card-flat">
     <div class="section-head">
-      <h2><span class="dot"></span> 清洗結果分析</h2>
+      <h2><span class="dot"></span>清洗結果分析</h2>
       <div class="d-flex align-items-center gap-2">
-        <span class="hint">依資料欄位與格式統計錯誤分布</span>
         <button class="btn btn-sm" type="button" id="btnDownloadAnalysis">
-          <i class="bi bi-file-earmark-excel"></i> 下載 XLSX
+          <i class="bi bi-file-earmark-excel"></i> 下載報告
         </button>
       </div>
     </div>
     <div class="section-body">
       <div id="analysisContent" hidden>
-        <div style="font-size:13px; font-weight:600; color: var(--gray-700); margin-bottom: 6px;">依欄位統計</div>
-        <div class="table-wrap">
-          <table class="table-flat" id="analysisByField">
-            <thead>
-              <tr>
-                <th>欄位名稱</th>
-                <th>格式</th>
-                <th style="width: 100px; text-align:right;">錯誤數</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
+        <!-- 品質指標摘要 -->
+        <div class="row g-2 mb-4">
+          <div class="col-6">
+            <div class="p-2 border rounded text-center bg-light">
+              <div class="small text-muted">資料完整率 (A)</div>
+              <div class="h5 fw-bold mb-0 text-primary" id="stat-completeness">-</div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="p-2 border rounded text-center bg-light">
+              <div class="small text-muted">資料正確率 (B)</div>
+              <div class="h5 fw-bold mb-0 text-success" id="stat-correctness">-</div>
+            </div>
+          </div>
+          <div class="col-12">
+            <div class="p-3 border rounded text-center bg-primary bg-opacity-10 border-primary border-opacity-25">
+              <div class="small text-primary fw-bold">數據質量總分 (DQI)</div>
+              <div class="h3 fw-bold mb-0 text-primary" id="stat-dqi">-</div>
+            </div>
+          </div>
         </div>
 
-        <div style="font-size:13px; font-weight:600; color: var(--gray-700); margin: 16px 0 6px;">依錯誤類型統計</div>
+        <div style="font-size:13px; font-weight:600; color: var(--gray-700); margin-bottom: 6px;">依錯誤類型統計</div>
         <div class="table-wrap">
           <table class="table-flat" id="analysisByType">
             <thead>
@@ -234,9 +241,9 @@
       </div>
 
       <div id="analysisEmpty" class="placeholder-box">
-        <i class="bi bi-bar-chart"></i>
+        <i class="bi bi-pie-chart"></i>
         <div class="lg">尚未有分析結果</div>
-        <div>清洗完成後，此區會顯示資料欄位與格式對應的錯誤分布。</div>
+        <div>完成上傳並執行清洗後，此處會列出統計分析。</div>
       </div>
     </div>
   </section>

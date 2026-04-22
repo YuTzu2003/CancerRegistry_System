@@ -1,9 +1,7 @@
 (function () {
   'use strict';
-
   const $  = (sel, ctx = document) => ctx.querySelector(sel);
   const $$ = (sel, ctx = document) => Array.from(ctx.querySelectorAll(sel));
-
   async function fetchJSON(url, options = {}) {
     const res = await fetch(url, {
       headers: { 'Content-Type': 'application/json' },
@@ -247,41 +245,40 @@ $('#cleanForm').addEventListener('submit', async (e) => {
     $('#kpiPassed').textContent = (s.passed ?? 0).toLocaleString();
     $('#kpiError').textContent  = (s.error  ?? 0).toLocaleString();
 
-    // Issues table
-    const issues = data.issues || [];
-    const issuesWrap = $('#issuesTableWrap');
-    const issuesEmpty = $('#issuesEmpty');
-    const tbody = $('#issuesBody');
-    if (issues.length) {
-      tbody.innerHTML = issues.map((row, idx) => `
-        <tr>
-          <td>${idx + 1}</td>
-          <td>${row.case_id ?? '—'}</td>
-          <td>${row.field ?? '—'}</td>
-          <td><span class="badge-soft ${row.level === 'error' ? 'red' : 'amber'}">${row.type ?? '—'}</span></td>
-          <td><code>${row.value ?? ''}</code></td>
-          <td>${row.suggestion ?? '—'}</td>
-        </tr>`).join('');
-      issuesWrap.hidden = false;
-      issuesEmpty.hidden = true;
-    } else {
-      issuesWrap.hidden = true;
-      issuesEmpty.hidden = false;
-    }
-
     // Analysis
     const analysis = data.analysis || {};
     const byField = analysis.by_field || [];
     const byType  = analysis.by_type  || [];
-    if (byField.length || byType.length) {
-      $('#analysisContent').hidden = false;
-      $('#analysisEmpty').hidden = true;
+
+    // --- Field Analysis (Left side) ---
+    const fieldWrap = $('#fieldAnalysisContent');
+    const fieldEmpty = $('#fieldAnalysisEmpty');
+    if (byField.length) {
+      fieldWrap.hidden = false;
+      fieldEmpty.hidden = true;
       $('#analysisByField tbody').innerHTML = byField.map((r) => `
         <tr>
           <td>${r.name}</td>
           <td><span class="badge-soft gray">${r.format || '—'}</span></td>
           <td style="text-align:right;">${r.errors ?? 0}</td>
         </tr>`).join('');
+    } else {
+      fieldWrap.hidden = true;
+      fieldEmpty.hidden = false;
+    }
+
+    // --- Quality & Type Statistics (Right side) ---
+    if (byField.length || byType.length) {
+      $('#analysisContent').hidden = false;
+      $('#analysisEmpty').hidden = true;
+      
+      // Update new Quality Metrics
+      const stats = data.stats || {};
+      $('#stat-completeness').textContent = ((stats.completeness || 0) * 100).toFixed(1) + '%';
+      $('#stat-correctness').textContent = ((stats.correctness || 0) * 100).toFixed(1) + '%';
+      $('#stat-dqi').textContent = (stats.dqi || 0).toFixed(2) + '%';
+
+      // Update Type Table
       $('#analysisByType tbody').innerHTML = byType.map((r) => `
         <tr>
           <td>${r.type}</td>
