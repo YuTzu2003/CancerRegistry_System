@@ -61,7 +61,7 @@
                         <th>單位 / 位置</th>
                         <th>權限角色</th>
                         <th>上次登入時間</th>
-                        <th class="text-end" >管理操作</th>
+                        <th class="text-center">管理操作</th>
                     </tr>
                 </thead>
                 <tbody id="userTableBody">
@@ -88,8 +88,8 @@
                         </td>
                         <td><span class="text-secondary">{{ u.Last_login or '無登入紀錄' }}</span></td>
                         
-                        <td class="text-end" style="padding-right: 24px;">
-                            <div class="d-flex justify-content-end gap-2">
+                        <td class="text-center">
+                            <div class="d-flex justify-content-center gap-2">
                                 <button class="btn btn-outline-primary btn-edit-user" data-user='{{ u|tojson|safe }}'><i class="bi bi-pencil-square"></i> 編輯</button>
                                 <form action="/member/delete/{{u.ID}}" method="POST" onsubmit="return confirm('確定要刪除使用者「{{ u.Name }}」嗎？')">
                                     <button type="submit" class="btn btn-outline-danger"><i class="bi bi-trash3"></i>刪除</button>
