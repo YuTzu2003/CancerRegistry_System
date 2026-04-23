@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% block title %}帳號權限管理｜癌症登記平台{% endblock %}
+{% block page_title %}帳號權限管理{% endblock %}
+
+{% block extra_head %}
+<style>
+    .search-wrapper {
+        position: relative;
+        max-width: 400px;
+    }
+    .search-wrapper .bi-search {
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--gray-400);
+    }
+    .search-wrapper .form-control {
+        padding-left: 38px;
+    }
+    .user-main-info {
+        display: flex;
+        flex-direction: column;
+    }
+    .user-main-info .u-name {
+        font-weight: 600;
+        color: var(--gray-900);
+    }
+    .user-main-info .u-id {
+        font-size: 0.85rem;
+        color: var(--gray-500);
+    }
+    .badge {
+        font-size: 0.8rem;
+        font-weight: 400;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="animate-fade-in">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+        <div class="search-wrapper flex-grow-1">
+            <i class="bi bi-search"></i>
+            <input type="text" id="userSearch" class="form-control" placeholder="快速搜尋姓名或帳號..." onkeyup="filterUsers()">
+        </div>
+        <button class="btn btn-primary d-flex align-items-center gap-2" onclick="prepareAddUser()">
+            <i class="bi bi-person-plus-fill"></i> 新增管理帳號
+        </button>
+    </div>
+    <div class="card-flat">
+        <div class="section-head">
+            <h2><span class="dot"></span> 使用者列表</h2>
+            <span class="hint">共 {{ users|length }} 位使用者</span>
+        </div>
+        <div class="table-wrap">
+            <table class="table-flat" id="userTable">
+                <thead>
+                    <tr>
+                        <th style="padding-left: 24px;">基本資訊</th>                  
+                        <th>單位 / 位置</th>
+                        <th>權限角色</th>
+                        <th>上次登入時間</th>
+                        <th class="text-end" >管理操作</th>
+                    </tr>
+                </thead>
+                <tbody id="userTableBody">
+                    {% for u in users %}
+                    <tr class="user-row" data-search="{{ u.Name.lower() }} {{ u.UserID.lower() }}">
+                        <td style="padding-left: 24px;">
+                            <div class="user-main-info">
+                                <span class="u-name">{{ u.Name }}</span>
+                                <span class="u-id">@{{ u.UserID }}</span>
+                            </div>
+                        </td>
+                       
+                        <td><span class="text-secondary">{{ u.Location or '—' }}</span></td>
+                         <td>
+                            {% if u.Position == 'Admin' %}
+                            <span class="badge text-bg-danger fw-normal">Admin</span>
+                            {% elif u.Position == 'Doctor' %}
+                            <span class="badge text-bg-primary fw-normal">Doctor</span>
+                            {% elif u.Position == 'Ctr' %}
+                            <span class="badge text-bg-warning fw-normal">Ctr</span>
+                            {% else %}
+                            <span class="badge text-bg-secondary fw-normal">{{ u.Position }}</span>
+                            {% endif %}
+                        </td>
+                        <td><span class="text-secondary">{{ u.Last_login or '無登入紀錄' }}</span></td>
+                        
+                        <td class="text-end" style="padding-right: 24px;">
+                            <div class="d-flex justify-content-end gap-2">
+                                <button class="btn btn-outline-primary btn-edit-user" data-user='{{ u|tojson|safe }}'><i class="bi bi-pencil-square"></i> 編輯</button>
+                                <form action="/member/delete/{{u.ID}}" method="POST" onsubmit="return confirm('確定要刪除使用者「{{ u.Name }}」嗎？')">
+                                    <button type="submit" class="btn btn-outline-danger"><i class="bi bi-trash3"></i>刪除</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <div id="noData" class="placeholder-box m-4" style="display: none;">
+            <i class="bi bi-person-exclamation"></i>
+            <div class="lg">找不到符合條件的使用者</div>
+            <p>請嘗試更換關鍵字重新搜尋</p>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="userModal" tabindex="-1" aria-labelledby="modalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      
+      <form id="userForm" action="/member/tool" method="POST">
+        <div class="modal-header bg-light">
+          <h5 class="modal-title fw-bold" id="modalTitle">新增管理帳號</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        
+        <div class="modal-body p-4">
+          <input type="hidden" id="formId" name="id">
+
+          <div class="mb-3">
+            <label for="formUserID" class="form-label fw-bold">帳號(UserID) <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="formUserID" name="UserID" placeholder="請輸入登入帳號" required>
+          </div>
+
+          <div class="mb-3">
+            <label for="formPassword" class="form-label fw-bold">密碼(Password) <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="formPassword" name="Password" placeholder="請輸入密碼" required>
+          </div>
+
+          <div class="mb-3">
+            <label for="formName" class="form-label fw-bold">姓名(Name) <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="formName" name="Name" placeholder="請輸入使用者姓名" required>
+          </div>
+
+          <div class="row g-3 mb-2">
+            <div class="col-md-6">
+              <label for="formPosition" class="form-label fw-bold">角色/職稱</label>
+              <select class="form-select" id="formPosition" name="Position">
+                <option value="Admin">Admin (管理員)</option>
+                <option value="Doctor">Doctor (醫師)</option>
+                <option value="Ctr">Ctr (癌登師)</option>
+                <option value="User" selected>User (一般使用者)</option>                
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label for="formLocation" class="form-label fw-bold">單位/位置</label>
+              <input type="text" class="form-control" id="formLocation" name="Location" placeholder="例：資訊室">
+            </div>
+          </div>
+          
+        </div>
+        
+        <div class="modal-footer bg-light">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-primary">儲存設定</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/member.js"></script>
+{% endblock %}

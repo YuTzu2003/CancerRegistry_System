@@ -274,16 +274,18 @@ def rule_table_classify(df, OUTPUT_DIR):
                 print(f"Rule {rid}: no data")
                 continue
 
-            # ===== Dynamic mapping query =====
             mapping_col = f"[{rid}欄位]"
             query = f"""SELECT FieldName.[{system_name}] FROM [Hospital_data].[dbo].[Field_Mapping]
                         INNER JOIN [Hospital_data].[dbo].[FieldName] ON Field_Mapping.序號 = FieldName.序號
                         WHERE Field_Mapping.{mapping_col} = 1
-                    """ 
+                    """
+            cursor = conn.cursor()
+            cursor.execute(query)
+            rows = cursor.fetchall()
+            columns = [column[0] for column in cursor.description]
+            df_rule_map = pd.DataFrame.from_records(rows, columns=columns)
 
-            df_rule_map = pd.read_sql(query, conn)
-
-            if not df_rule_map.empty:
+            if not df_rule_map.empty:                
                 target_headers = df_rule_map[system_name].dropna().astype(str).str.strip().tolist()
                 essential_cols = [COL_SITE, COL_HIST, COL_DIDIAG]
                 all_needed_headers = list(set(target_headers + essential_cols))
@@ -295,16 +297,13 @@ def rule_table_classify(df, OUTPUT_DIR):
                 print(f"Rule {rid}: count:{len(subset)} (Fields: {len(target_headers)})")
 
             else:
-
                 output_path = f"{OUTPUT_DIR}/Rule_{rid}.xlsx"
                 output_df = subset.drop(columns=['Rule_ID'])
                 output_df.to_excel(output_path, index=False)
                 result_dict[rid] = output_df
-                print(f"Rule {rid}: count:{len(subset)} (No mapping found, outputting all)")
-                
+                print(f"Rule {rid}: count:{len(subset)} (No mapping found, outputting all)")         
     finally:
         conn.close()
-
     return result_dict
 
 
