@@ -98,6 +98,32 @@
     } 
     else { fileChosen.hidden = true; }
   }
+  // ---------- 重置 ----------
+  function resetUI() {
+    currentJobId = null;
+    setStep(1);
+
+    if ($('#kpiTotal')) $('#kpiTotal').textContent = '—';
+    if ($('#kpiPassed')) $('#kpiPassed').textContent = '—';
+    if ($('#kpiError')) $('#kpiError').textContent = '—';
+    if ($('#fieldAnalysisContent')) $('#fieldAnalysisContent').hidden = true;
+    if ($('#fieldAnalysisEmpty')) $('#fieldAnalysisEmpty').hidden = false;
+    if ($('#analysisContent')) $('#analysisContent').hidden = true;
+    if ($('#analysisEmpty')) $('#analysisEmpty').hidden = false;
+    if ($('#cleaningAlertContainer')) $('#cleaningAlertContainer').innerHTML = '';
+
+    const list = $('#outputFieldList');
+    if (list) {
+      list.innerHTML = '<span class="field-chip disabled"><i class="bi bi-asterisk"></i> 尚未載入欄位，清洗完成後自動帶入</span>';
+    }
+  
+    if ($('#analysisByField tbody')) $('#analysisByField tbody').innerHTML = '';
+    if ($('#analysisByType tbody')) $('#analysisByType tbody').innerHTML = '';
+    if ($('#stat-completeness')) $('#stat-completeness').textContent = '-';
+    if ($('#stat-correctness')) $('#stat-correctness').textContent = '-';
+    if ($('#stat-dqi')) $('#stat-dqi').textContent = '-';
+  }
+
   if (fileInput) fileInput.addEventListener('change', updateFilePreview);
 
   if (dropZone) {
@@ -109,7 +135,10 @@
     });
   }
 
-  $('#cleanForm')?.addEventListener('reset', () => setTimeout(updateFilePreview, 10));
+  $('#cleanForm')?.addEventListener('reset', () => {
+    resetUI();
+    setTimeout(updateFilePreview, 10);
+  });
 
   // ---------- 表單提交與Loading控制 ----------
   $('#cleanForm')?.addEventListener('submit', async (e) => {
