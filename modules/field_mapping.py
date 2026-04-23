@@ -7,7 +7,12 @@ def detect_system(excel_columns):
 
     columns_sql = ', '.join(f'[{s}]' for s in systems)
     query = f"SELECT {columns_sql} FROM [Hospital_data].[dbo].[FieldName]"
-    df_mapping = pd.read_sql(query, conn)
+    
+    cursor = conn.cursor()
+    cursor.execute(query)
+    rows = cursor.fetchall()
+    columns = [column[0] for column in cursor.description]
+    df_mapping = pd.DataFrame.from_records(rows, columns=columns)
     conn.close()
 
     excel_cols_set = set(str(col).strip() for col in excel_columns)
@@ -26,14 +31,20 @@ def detect_system(excel_columns):
 def field_mapping(target_col):
     conn = get_conn()
     query = """SELECT * FROM [Hospital_data].[dbo].[FieldName]"""
-    df_mapping = pd.read_sql(query, conn)
+    
+    cursor = conn.cursor()
+    cursor.execute(query)
+    rows = cursor.fetchall()
+    columns = [column[0] for column in cursor.description]
+    df_mapping = pd.DataFrame.from_records(rows, columns=columns)
     conn.close()
 
     alias_dict = {}
     output_field_list = []
 
     for _, row in df_mapping.iterrows():
-        output_name = str(row[target_col]).strip() if pd.notna(row[target_col]) else ""
+        val = row[target_col]
+        output_name = str(val).strip() if pd.notna(val) else ""
 
         if output_name and output_name not in output_field_list:
             output_field_list.append(output_name)
