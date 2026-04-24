@@ -8,6 +8,18 @@ from modules.clean import cleanValidate
 import shutil
 from functools import wraps
 import zipfile
+import logging
+import sys
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s | %(levelname)s | %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
+werkzeug_logger = logging.getLogger('werkzeug')
+werkzeug_logger.handlers = []
+werkzeug_logger.propagate = True
 
 app = Flask(__name__)
 BASE_DIR = os.path.dirname(__file__)
@@ -34,7 +46,6 @@ def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if "id" not in session:
-            flash("請先登入系統", "warning")
             return redirect(url_for("login"))
         return f(*args, **kwargs)
     return decorated_function
@@ -66,6 +77,7 @@ def login():
         cursor.execute("SELECT [ID], [UserID], [Password], [Name], [Position], [Location] FROM [dbo].[Users] WHERE UserID = ? AND Password = ?", (user_id, password))
         user = cursor.fetchone()
         if user:
+            logging.info(f"使用者 {user_id} 登入成功")
             session["id"] = str(user.ID)
             session["userid"] = user.UserID
             session["name"] = user.Name
