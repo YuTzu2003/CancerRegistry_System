@@ -23,6 +23,16 @@
         <p class="login-subtitle">請輸入您的員工帳號與密碼以登入系統</p>
       </div>
 
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, msg in messages %}
+            <div class="alert-flat alert-{{ category }} error-alert mb-3">
+              <i class="bi {% if category == 'success' %}bi-check-circle-fill{% else %}bi-exclamation-circle-fill{% endif %}"></i> {{ msg }}
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
       {% if error %}
         <div class="alert-flat alert-danger error-alert">
           <i class="bi bi-exclamation-circle-fill"></i> {{ error }}
