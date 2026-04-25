@@ -8,6 +8,7 @@
 
   const isMobile = () => window.matchMedia("(max-width: 768px)").matches;
 
+  // Sidebar toggle
   toggle.addEventListener("click", function () {
     if (isMobile()) {
       sidebar.classList.toggle("open");
