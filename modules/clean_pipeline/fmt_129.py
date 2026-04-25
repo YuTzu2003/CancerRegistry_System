@@ -26,9 +26,9 @@ RULES = {
         'ID':'1.4',
         'field': 'ID Number',
         'length': 10,
-        'regex': r'^[A-Za-z]\d{9}$',
+        'regex': r'^[A-Za-z][1289]\d{8}$',
         'description': '記錄個案的身分證統一編號。',
-        'purpose': '可作為各癌症部位性別比例及預後之比較。個案若有多重原發，其病歷紀錄上的性別都應相同。' 
+        'purpose': '用來辨識個案。' 
     },
     '性別': {
         'ID':'1.5',
@@ -37,7 +37,7 @@ RULES = {
         'digit': True,
         'choices': ['1', '2', '3', '4', '9'],
         'description': '確認個案的性別。',
-        'purpose': '用來辨識個案。'
+        'purpose': '可作為各癌症部位性別比例及預後之比較。個案若有多重原發，其病歷紀錄上的性別都應相同。'
     },
     '出生日期': {
         'ID':'1.6',
@@ -53,7 +53,7 @@ RULES = {
         'field': 'Residence Code',
         'length':4,
         'digit': True,
-        'range': [0, 9999],
+        'range': [100, 9999],
         'description': '記錄個案在診斷為癌症時之戶籍地代碼。',
         'purpose': '為個案流行病學之地域資料，並可作為癌症群聚或環境因素研究分析。'
     },
@@ -101,7 +101,7 @@ RULES = {
         'digit': True,     
         'range': [0, 9],
         'description': '記錄此個案在申報時的治療狀態。',
-        'purpose': '此欄位用於確保個案分類欄位 2.3 的正確性，並協助記錄個案未於申報醫院接受首次療程的原因，供申報醫院改善流失管理及作為公衛行政資源調整依據。'
+        'purpose': '此欄位用於確保個案分類欄位 2.3 的正確性，並協助記錄個案未於申報醫院接受首次療程的原因，供申報醫院改善流失管理及作為公衛行政資源調整依據。  '
     },
     '首次就診日期': {
         'ID':'2.4',
@@ -110,7 +110,7 @@ RULES = {
         'SV': ['00000000', '99999999'],  
         'is_date': '%Y%m%d',
         'description': '個案因此癌症至申報醫院門診或住院之最早日期。',
-        'purpose': '可用來計算個案首次就診至進行癌症登記之時間間隔；也可用來計算首次就診至治療之時間差距，以監控癌症照護品質。'
+        'purpose': '可用來計算個案首次就診至進行癌症登記之時間間隔；也可用來計算首次就診至治療之時間差距，以監控癌症照護品質。  '
     },
     '最初診斷日期':{
         'ID':'2.5',
@@ -142,8 +142,8 @@ RULES = {
         'ID':'2.8',
         'field': 'Histology',
         'max_length':5,
-        'digit': True,
-        'range': [0, 9999],
+        #'digit': True,
+        'range': [8000, 99999],
         'description': '原發腫瘤細胞於顯微鏡下之結構。',
         'purpose': '作為分期及決定治療方針之根據；同時也影響其預後及病程。'
     },
@@ -156,14 +156,6 @@ RULES = {
         'description': '記錄病理診斷中的性態碼。',
         'purpose': '病理醫師常使用 0、1、2、3、6、9 等碼來描述腫瘤性態；若性態碼為 2、3、6 或 9（或已轉為 3），需申報至癌症登記中心，以便統計、監測。'
     },
-    '分級/分化':{
-        'ID':'2.10',
-        'field': 'Grade/Differentiation',
-        'length': 1,
-        'pattern_range': '1-9, B',
-        'description': '描述腫瘤和正常組織的相似程度。Well differentiated (Grade I)和正常組織最相似；Undifferentiated (Grade IV)和正常組織差異最大。',
-        'purpose': '與個案的預後有關。'
-    },
     '臨床分級/分化':{
         'ID':'2.10.1',
         'field': 'Grade Clinical',
@@ -173,6 +165,7 @@ RULES = {
         'purpose': '與個案的預後有關。分級/分化可用以評估癌症嚴重程度；分級/分化及細胞型態對於許多癌症而言是重要的預後因子。分級/分化對於某些癌症更是判定期別的依據之一。'
     },
     '病理分級/分化':{
+        'ID':'2.10.2',
         'field': 'Grade Pathological',
         'length': 1,
         'pattern_range': '1-5, 8-9, A-E, H, L-M, S, X',
@@ -278,7 +271,7 @@ RULES = {
         'length': 4,
         'pattern_range': 'X, 0, A, IS, ISU, ISD, ISDC, ISPA, ISLA, 1M, 1, 1A, 1A1, 1A2, 1B, 1B1, 1B2 , 1B3, 1C, 1C1, 1C2, 1C3, 1D, 2, 2A, 2A1, 2A2, 2B, 2C, 2D, 3, 3A, 3B, 3C, 3D, 3E, 4, 4A, 4B, 4C, 4D, 4E, 8888, 9999',
         'description': '指原發腫瘤大小或侵犯程度。',
-        'purpose': '作為 TNM 分期依據資料，該分期系統可用以評估癌症治療及控制的趨勢。醫師則用以進行預後的推估、治療的規劃、新療法的評估、結果的分析、追蹤的策劃和早期偵測結結果的評定。'
+        'purpose': '作為 TNM 分期依據資料，該分期系統可用以評估癌症治療及控制的趨勢。醫師則用以進行預後的推估、治療的規劃、新療法的評估、結果的分析、追蹤的策劃和早期偵測結果的評定。'
     },
     '臨床 N':{
         'ID':'3.5',
@@ -313,15 +306,6 @@ RULES = {
         'description': '指 AJCC 臨床分期字根/字首的描述符號。',
         'purpose': '為辨別特殊個案，在統計資料中需分別統計。字根或字首僅是附加於原分期，不會改變分期。'
     },
-    '臨床期別判讀者':{
-        'ID':'3.9',
-        'field': '',
-        'length': 1,
-        'digit': True,
-        'range': [0, 8],
-        'description': '記錄 AJCC 臨床期別之判讀者。',
-        'purpose': '用來評估臨床 AJCC 分期的正確性和完整性，並可作為品質管理和改善研究的基礎。'
-    },
     '病理 T':{
         'ID':'3.10',
         'field': 'Pathologic T',
@@ -350,7 +334,7 @@ RULES = {
         'ID':'3.13',
         'field': 'Pathologic Stage Group',
         'max_length': 3,
-        'pattern_range': '0, 0A, 0IS, 1, 1A, 1A1, 1A2, 1A3, 1B, 1B1, 1B2, 1B3, 1C, 1E, 1S, 2, 2A, 2A1, 2A2, 2B, 2C, 3, 3A, 3A1, 3A2, 3B, 3C, 3C1, 3C2, 3D, 4, 4A, 4A1, 4A2, 4B, 4C, OC, 888, 999, BBB',
+        'pattern_range': '0, 0A, 0IS, 1, 1A, 1A1, 1A2, 1A3, 1B, 1B1, 1B2, 1B3, 1C, 1S, 2, 2A, 2A1, 2A2, 2B, 2C, 3, 3A, 3A1, 3A2, 3B, 3C, 3C1, 3C2, 3D, 4, 4A, 4A1, 4A2, 4B, 4C, OC, 888, 999, BBB',
         'description': '基於病理 T、N 和 M 來決定疾病於解剖上的侵犯程度。',
         'purpose': 'TNM 分期系統可用以評估癌症治療及控制的趨勢。醫師則用以進行預後的推估、治療的規劃、新療法的評估、結果的分析、追蹤的策劃和早期偵測結果的評定。'
     },
@@ -363,21 +347,15 @@ RULES = {
         'description': '指 AJCC 病理分期字根/字首的描述符號。',
         'purpose': '是為了辨別出特殊的個案，而這些特殊個案在全國統計資料中，需分別統計。這些字根或是字首僅是附加在原來的分期中，並不會因此而改變分期。'
     },
-    '病理期別判讀者':{
-        'ID':'3.15',
-        'field': '',
-        'length': 1,
-        'digit': True,
-        'range': [0, 8],
-        'description': '記錄 AJCC 病理期別組合之判讀者。',
-        'purpose': '用來評估 AJCC 分期的正確性和完整性，並可作為品質管理和改善研究的基礎。'
-    },
     'AJCC 癌症分期版本與章節': {
+        'ID':'3.16',
         'field': 'The Edition and Chapter of AJCC Cancer Staging',
         'length': 5,
         'SV': '88888,99999',
         'pattern_range': '00000,05888,06888,07888',
         'regex': r'^(08\d{3}|V9\d{3})$',
+        'description': '記錄判定個案癌症期別所使用之 AJCC 癌症分期手冊的版本與章節。',
+        'purpose': 'AJCC 分期及 T、N、M 組成之編碼及規則會隨時間演進而改變，以利個案分析之用。'
     },
     '其他分期系統':{
         'ID':'3.17',
@@ -388,31 +366,13 @@ RULES = {
         'description': '若非 AJCC 癌症分期系統，可選擇下列其他分期系統摘錄。',
         'purpose': '對癌症進行分期，有利於治療計畫、預後評估及存活分析。'
     },
-    '其他分期系統版本':{
-        'ID':'3.18',
-        'field': '',
-        'length': 4,
-        'SV': ['0000', '8888'],  
-        'is_date': '%Y',
-        'description': '版本以西元年或其他方式表示。',
-        'purpose': '略。'
-    },
     '其他分期系統期別(臨床分期)':{
         'ID':'3.19',
         'field': 'Clinical Other Staging System',
         'max_length': 4,
-        'choices': ['0000', '1', '1A', '1A1', '1A2', '1B', '1B1', '1B2', '1B3', '1C', '1C1', '1C2', '1C3','2', '2A', '2A1', '2A2', '2B', '2C','3', '3A', '3A1', '3A11', '3A12', '3A2', '3B', '3C', '3CR', '3CP', '3C1', '3C1R', '3C1P','3C2', '3C2R', '3C2P','4', '4A', '4B','8888', '9999','A', 'B', 'C', 'D', 'L', 'E', 'X'],
+        'choices': ['0', '1', '1A', '1A1', '1A2', '1B', '1B1', '1B2', '1B3', '1C', '1C1', '1C2', '1C3','2', '2A', '2A1', '2A2', '2B', '2C','3', '3A', '3A1', '3A11', '3A12', '3A2', '3B', '3C', '3CR', '3CP', '3C1', '3C1R', '3C1P','3C2', '3C2R', '3C2P','4', '4A', '4B','8888', '9999','A', 'B', 'C', 'D', 'L', 'E', 'X'],
         'description': '若非 AJCC 癌症分期系統，可選擇下列其他分期系統摘錄。',
         'purpose': '對癌症進行分期，有利於治療計畫、預後評估及存活分析。'
-    },
-    '其他分期系統期別(臨床)判讀者':{
-        'ID':'3.20',
-        'field': '',
-        'length': 1,
-        'digit': True,
-        'range': [0, 8],
-        'description': '記錄其他分期系統之臨床分期判讀者。',
-        'purpose': '評估其他臨床分期系統分期的正確性和完整性，並可作為品質管理和改善研究的基礎。'
     },
     '其他分期系統期別(病理分期)':{
         'ID':'3.21',
@@ -421,15 +381,6 @@ RULES = {
         'pattern_range': '0, 1, 1A, 1A1, 1A2, 1A3, 1B, 1B1, 1B2, 1B3, 1C, 1C1, 1C2, 1C3, 2, 2A, 2A1, 2A2, 2B, 2C, 3, 3A, 3A1, 3A11, 3A12, 3A2, 3B, 3B1, 3B2, 3C, 3C1, 3C11, 3C12, 3C2, 3C21, 3C22, 4, 4A, 4B, 4C, 8888, 9999, A, B1, B2, B3, C1, C2, C3, D',
         'description': '若非 AJCC 癌症分期系統，可選擇下列其他分期系統摘錄。',
         'purpose': '對癌症進行分期，有利於治療計畫、預後評估及存活分析。'
-    },
-    '其他分期系統期別(病理分期)判讀者':{
-        'ID':'3.22',
-        'field': '',
-        'length': 1,
-        'digit': True,
-        'range': [0, 8],
-        'description': '記錄其他分期系統之病理分期判讀者。',
-        'purpose': '評估其他病理分期系統分期的正確性和完整性，並可作為品質管理和改善研究的基礎。'
     },
     '首次療程開始日期':{
         'ID':'4.1',
@@ -463,27 +414,27 @@ RULES = {
         'field': 'Surgical Procedure of Primary Site at Other Facility',
         'max_length': 3,
         'digit': True,
-        'pattern_range': '00, 10-80, 90, 98, 99, 000, 100-800, 900, 980, 990',
+        'pattern_range': '000, 100-800, 900, 980, 990',
         'description': '記錄個案於外院對原發部位所進行的外科手術方式。',
         'purpose': '用來比較不同治療方式的效果。'
     },
     '申報醫院原發部位手術方式':{
         'ID':'4.1.4',
-        'field': 'Surgical Procedure of Primary Site at this Facility',
+        'field': 'Surgical Procedure of Primary Site at This Facility',
         'max_length': 3,
         'digit': True,
-        'pattern_range': '00, 10-80, 90, 98, 99, 000, 100-800, 900, 980, 990',
+        'pattern_range': '000, 100-800, 900, 980, 990',
         'description': '記錄在申報醫院對原發部位所進行的手術方式。',
         'purpose': '用來比較不同治療方式的效果。'
     },
     '微創手術':{
         'ID':'4.1.4.1',
-        'field': 'Minimally invasive surgery',
+        'field': 'Minimally Invasive Surgery',
         'length': 1,
         'digit': True,
         'choices': ['0', '1', '2', '3', '4', '8', '9'],
         'description': '記錄原發部位於申報醫院採用微創 (Minimally Invasive Surgery) 或機械臂 (Robotic Surgery) 手術的狀況。',
-        'purpose': '追蹤應用微創及機械臂方式執行手術及使用傳統開放式手術之差異，以監測微創及機械 臂手術的方式與趨勢。'
+        'purpose': '追蹤應用微創及機械臂方式執行手術及使用傳統開放式手術之差異，以監測微創及機械臂手術的方式與趨勢。'
     },
     '原發部位手術邊緣':{
         'ID':'4.1.5',
@@ -512,7 +463,7 @@ RULES = {
     },
     '申報醫院區域淋巴結手術範圍':{
         'ID':'4.1.7',
-        'field': 'Scope of Regional Lymph Node Surgery at this Facility',
+        'field': 'Scope of Regional Lymph Node Surgery at This Facility',
         'length': 1,
         'digit': True,
         'choices': ['0', '1', '2', '3', '4', '5', '6', '7', '9'],
@@ -529,8 +480,8 @@ RULES = {
         'purpose': '利於評估腫瘤侵犯的範圍。'
     },
     '申報醫院其他部位手術方式':{
-        'ID':'.9',
-        'field': 'Surgical Procedure/Other Site at this Facility',
+        'ID':'4.1.9',
+        'field': 'Surgical Procedure/Other Site at This Facility',
         'length': 1,
         'digit': True,
         'choices': ['0', '1', '2', '3', '4', '5', '9'],
@@ -593,21 +544,12 @@ RULES = {
     },
     '區域治療與全身性治療順序':{
         'ID':'4.2.1.6',
-        'field': 'Sequence of Loco regional Therapy and Systemic Therapy',
+        'field': 'Sequence of Locoregional Therapy and Systemic Therapy',
         'max_length': 2,
         'range': [0, 7],
         'SV': '-9,-8,-7,-1',
         'description': '記錄在任何醫療機構的首次療程中，針對原發部位的手術或放射治療，與全身性治療的時間順序關係。',
         'purpose': '區域治療與全身性治療的時間順序關係可能無法由相關日期直接計算得知。此項目提供經判斷後更直接正確的時間順序關係。'
-    },
-    '放射治療機構':{
-        'ID':'4.2.1.7',
-        'field': 'Institute of RT',
-        'length': 1,
-        'digit': True,
-        'choices': ['0', '1', '9'],
-        'description': '記錄在申報醫院的首次療程中，進行放射治療的相關情形。',
-        'purpose': '本欄位資料對於瞭解放射治療的轉介形式和評估對個案進行放射治療的場所其品質和結果，可以提供相當有用的資訊。'
     },
     '放射治療執行狀態':{
         'ID':'4.2.1.8',
@@ -658,7 +600,7 @@ RULES = {
         'digit': True,      
         'range': [0, 99],
         'description': '記錄在申報醫院的首次療程中，CTV_H 的放射治療次數 (fractions 或 sessions)。',
-        'purpose': '放射治療控制腫瘤效果的好壞與破壞正常組織毒性的高低，和標靶體積的大小、總劑量的高低、分次劑量(dose per fraction)的大小以及整個射線療程的長短相關。一般而言，分次劑量愈大，腫瘤控制效果愈好，但同時正常組織毒性愈高。計算 CTV_H 的平均放射分次劑量時，可用「最高放射劑量臨床標靶體積劑量」除以「最高放射劑量臨床標靶體積治療次數」。' 
+        'purpose': '放射治療控制腫瘤效果的好壞與破壞正常組織毒性的高低，和標靶體積的大小、總劑量的高低、分次劑量(dose per fraction)的大小，以及整個射線療程的長短相關。一般而言，分次劑量愈大，腫瘤控制效果愈好，但同時正常組織毒性愈高。計算 CTV_H 的平均放射分次劑量時，可用「最高放射劑量臨床標靶體積劑量」除以「最高放射劑量臨床標靶體積治療次數」。' 
     },
     '較低放射劑量臨床標靶體積':{
         'ID':'4.2.2.3.1',
@@ -746,8 +688,8 @@ RULES = {
         'digit': True,      
         'range': [0, 13],
         'SV': '20, 21, 30, 31, 99',
-        'description': '記錄原發腫瘤切除後，病理報告中的腫瘤細胞手術切緣的最近距離。',
-        'purpose': '作為治療品質監測與評估腫瘤復發或預後的影響。'
+        'description': '記錄個案在外院首次療程中，所給予化學治療相關情形。化學治療包括多種抗癌藥物，可干擾癌細胞中DNA的合成和分裂。',
+        'purpose': '全身性治療可為單一藥物或複合處方能包括給予個案一種或是多種的治療物質。本欄位可評估外院首次療程的化學治療。'
     },
     '申報醫院化學治療':{
         'ID':'4.3.3',
@@ -761,7 +703,7 @@ RULES = {
     },
     '申報醫院化學治療開始日期':{
         'ID':'4.3.4',
-        'field': 'Date of Chemotherapy Started at This Facility',
+        'field': 'Date of Chemotherapy Started at this Facility',
         'length': 8,
         'SV': ['00000000', '88888888', '99999999'],  
         'is_date': '%Y%m%d',
@@ -774,8 +716,8 @@ RULES = {
         'length': 2,
         'digit': True,      
         'choices': ['00', '01', '02', '03', '20', '21', '30', '31', '99'],
-        'description': '記錄原發腫瘤切除後，病理報告中的腫瘤細胞手術切緣的最近距離。',
-        'purpose': '作為治療品質監測與評估腫瘤復發或預後的影響。'
+        'description': '記載個案在外院首次療程中，所給予荷爾蒙/類固醇治療的相關情形。荷爾蒙/類固醇治療包括了很多種藥物，其作用為控制影響癌症的生長。',
+        'purpose': '全身性治療可能包括單一或複合藥物處方。本欄位可評估外院首次療程的荷爾蒙/類固醇治療。'
     },
     '申報醫院荷爾蒙/類固醇治療':{
         'ID':'4.3.6',
@@ -835,7 +777,7 @@ RULES = {
     },
     '申報醫院骨髓/幹細胞移植或內分泌處置開始日期':{
         'ID':'4.3.12',
-        'field': 'Date of Hematologic Transplant and Endocrine Procedure Started at This Facility',
+        'field': 'Date of Hematologic Transplant and Endocrine Procedures Started at This Facility',
         'length': 8,
         'SV': ['00000000', '88888888', '99999999'],  
         'is_date': '%Y%m%d',
@@ -901,7 +843,7 @@ RULES = {
         'ID':'5.1',
         'field': 'Date of First Recurrence or Cancer Status Follow-Up',
         'length': 8,
-        'SV': ['00000000', '88888888', '99999999'],  
+        'SV': ['00000000', '99999999'],  
         'is_date': '%Y%m%d',
         'description': '記錄此癌症首次復發或癌症狀態追蹤的日期。',
         'purpose': '評估首次治療的效果。'
@@ -919,7 +861,7 @@ RULES = {
         'ID':'5.3',
         'field': 'Date of Last Contact or Death',
         'length': 8,
-        'SV': ['00000000', '88888888', '99999999'],  
+        'SV': ['00000000', '99999999'],  
         'is_date': '%Y%m%d',
         'description': '記錄個案的最後聯絡日期或是死亡日期。',
         'purpose': '作為個案追蹤和治療結果研究之用。'
@@ -931,15 +873,6 @@ RULES = {
         'digit': True,
         'choices': ['0', '1'],
         'description': '記錄個案「最後聯絡或死亡日期」的存活狀態。',
-        'purpose': '作為個案追蹤和治療結果研究之用。'
-    },
-    '癌症狀態':{
-        'ID':'5.5',
-        'field': 'Cancer Status',
-        'length': 1,
-        'digit': True,
-        'choices': ['1', '2', '9'],
-        'description': '記錄個案於「最後聯絡或死亡日期」時候有無癌症存在。',
         'purpose': '作為個案追蹤和治療結果研究之用。'
     },
     '死亡原因':{
@@ -999,8 +932,8 @@ RULES = {
         'length': 3,
         'digit': True,
         'choices': ['000', '001', '002', '003', '004', '009', '999'],
-        'description': '記錄個案於「最後聯絡或死亡日期」時候有無癌症存在。',
-        'purpose': '作為個案追蹤和治療結果研究之用。'
+        'description': '記錄個案於最初診斷日前的喝酒行為。',
+        'purpose': '喝酒是致癌的危險因子。'
     },
     '首次治療前生活功能狀態評估': {
         'ID':'7.6',
