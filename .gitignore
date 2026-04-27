@@ -16,3 +16,5 @@ Jobs/
 *.csv
 *.pptx
 *.doc
+*.txt
+*.ipynb
