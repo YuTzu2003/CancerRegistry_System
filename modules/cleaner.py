@@ -151,7 +151,7 @@ def cleanValidate(input_file,output_file,report_file,fmt,version,Revision_Date):
     
     report_data = [
         ["匯入日期：", datetime.now().strftime("%Y/%m/%d")],
-        ["資料格式：", f"{fmt}({version}：{Revision_Date})"],
+        ["資料格式：", f"{fmt}欄位({version}：{Revision_Date} 修訂版)"],
         [],
         ["資料總件數：",stats['total'],"件"],
         [],
