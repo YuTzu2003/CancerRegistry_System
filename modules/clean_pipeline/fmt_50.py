@@ -2,7 +2,7 @@ RULES = {
     '申報醫院代碼': {
         'ID':'1.1',
         'field': 'Reporting Hospital Code', 
-        'length': 10, 
+        'max_length': 10, 
         'digit': True,
         'description': '確認申報醫院之醫事機構代碼。',
         'purpose': '確認申報醫院。'
@@ -144,7 +144,7 @@ RULES = {
         'field': 'Histology',
         'max_length':5,
         #'digit': True,
-        'range': [8000, 9993],
+        'range': [8000, 9999],
         'description': '原發腫瘤細胞於顯微鏡下之結構。',
         'purpose': '作為分期及決定治療方針之根據；同時也影響其預後及病程。'
     },
@@ -233,7 +233,7 @@ RULES = {
         'length': 2,
         'digit': True,      
         'range': [4, 13],
-        'SV': '0, 1, 20, 21, 30, 31, 88, 99',
+        'SV': '00, 01, 20, 21, 30, 31, 88, 99',
         'description': '記錄個案於申報醫院首次療程中，所給予化學治療相關情形。若個案未接受化學治療，則記錄未進行化學治療的原因。化學治療包括多種抗癌藥物，可干擾癌細胞中 DNA 的合成和分裂。',
         'purpose': '全身性治療可能包括單一或複合藥物處方。本欄位可評估首次療程的化學治療，及了解個案未接受化學治療的原因。'
     },
@@ -366,7 +366,7 @@ RULES = {
     '體重': {
         'ID':'7.2',
         'field': 'Weight',
-        'length': 3,
+        'max_length': 3,
         'digit': True,     
         'range': [0, 999],
         'description': '記錄個案於首次治療前的體重。',
@@ -375,7 +375,7 @@ RULES = {
     '吸菸行為': {
         'ID':'7.3',
         'field': 'Smoking Behavior',
-        'length': 6,
+        'max_length': 6,
         'digit': True,     
         'range': [0, 999999],
         'description': '記錄個案於最初診斷日前的吸菸行為。',
@@ -384,7 +384,7 @@ RULES = {
     '嚼檳榔行為': {
         'ID':'7.4',
         'field': 'Betel Nut Chewing Behavior',
-        'length': 6,
+        'max_length': 6,
         'digit': True,     
         'range': [0, 999999],
         'description': '記錄個案於最初診斷日前的嚼檳榔行為。',

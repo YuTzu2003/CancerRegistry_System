@@ -35,10 +35,44 @@ def validate_cell(val, rule):
     if 'max_length' in rule and len(val) > rule['max_length']:
         return False
 
-    if 'regex' in rule and not re.match(rule['regex'], val):
-        return False
+    has_content_rule = False
+    passed_content_rule = False
+    
+    if 'regex' in rule:
+        has_content_rule = True
+        if re.match(rule['regex'], val):
+            passed_content_rule = True
 
-    if 'choices' in rule and val not in rule['choices']:
+    if 'pattern_range' in rule and not passed_content_rule:
+        has_content_rule = True
+        conditions = [c.strip() for c in rule['pattern_range'].split(',')]
+        for condition in conditions:
+            if '-' in condition:
+                start_val, end_val = condition.split('-', 1)
+                if len(val) == len(start_val) and start_val <= val <= end_val:
+                    passed_content_rule = True
+                    break
+            elif val == condition:
+                passed_content_rule = True
+                break
+
+    if 'range' in rule and not passed_content_rule:
+        has_content_rule = True
+        try:
+            num_val = int(val)
+            min_val, max_val = rule['range']
+            if min_val <= num_val <= max_val:
+                passed_content_rule = True
+        except:
+            pass
+    
+    if 'choices' in rule and not passed_content_rule:
+        has_content_rule = True
+        if val in rule['choices']:
+            passed_content_rule = True
+
+
+    if has_content_rule and not passed_content_rule:
         return False
 
     if 'is_date' in rule:
@@ -50,45 +84,31 @@ def validate_cell(val, rule):
         except ValueError:
             return False
 
-    if 'range' in rule:
-        try:
-            num_val = int(val)
-            min_val, max_val = rule['range']
-            if not (min_val <= num_val <= max_val):
-                return False
-        except ValueError:
-            return False
-
-    if 'pattern_range' in rule:
-        if isinstance(rule['pattern_range'], str):
-            conditions = [c.strip() for c in rule['pattern_range'].split(',')]
-            for condition in conditions:
-                if '-' in condition:
-                    start_val, end_val = condition.split('-', 1)
-                    if len(val) == len(start_val) and start_val <= val <= end_val:
-                        return True
-                elif val == condition:
-                    return True
-
     return True
 
 #規則三
 def parse_cancer_date(date_val):
-    if pd.isna(date_val):
+    if pd.isna(date_val) or str(date_val).strip().lower() == 'nan':
         return None
 
-    date_str = str(date_val).strip()
+    date_str = str(date_val).strip().replace('/', '').replace('-', '')
+
+    if date_str.endswith('.0'):
+        date_str = date_str[:-2]
+
+    invalid_dates = ['00000000', '99999999', '88888888', '0', '0.0', '']
 
     # 忽略無效日期
-    if date_str == '0000/00/00':
+    if date_str in invalid_dates:
         return None
 
     if len(date_str) == 8 and date_str.isdigit():
         # 例：20220199 → 20220115
         if date_str[6:8] == '99':
             date_str = date_str[:6] + '15'
-
-    return date_str
+        return date_str
+    
+    return None
 
 
 def validate_date_rules(row, alias_mapping):
