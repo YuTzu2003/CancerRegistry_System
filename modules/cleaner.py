@@ -1,5 +1,6 @@
 import pandas as pd
 import os
+import re
 from openpyxl import load_workbook,Workbook
 from openpyxl.styles import PatternFill,Font,Alignment
 from modules.clean_pipeline.fmt_42 import RULES as RULES_42
@@ -56,16 +57,32 @@ def cleanValidate(input_file,output_file,report_file,fmt,version,Revision_Date):
 
     alias_mapping, _ = field_mapping('中文欄位名稱')
     error_mask = pd.DataFrame("", index=df.index, columns=df.columns) 
+
+    clean_alias_mapping = {re.sub(r'\s+', '', str(k)): v for k, v in alias_mapping.items()}
+    rules_normalized = {re.sub(r'\s+', '', str(k)): v for k, v in rules.items()}
     
     for col in df.columns:
-        clean_col = str(col).strip()
-        rule_name = alias_mapping.get(clean_col)
+        raw_col = str(col)
+        #clean_col = str(col).strip()
+        clean_col = re.sub(r'\s+', '', raw_col)
+        rule_name = clean_alias_mapping.get(clean_col)
+        #rule_name = alias_mapping.get(clean_col)
 
+        rule = None
         if rule_name and rule_name in rules:
             rule = rules[rule_name]
-            error_mask[col] = df[col].apply(lambda x: check_error_type(x, rule))
-        elif clean_col in rules:
-            rule = rules[clean_col]
+        elif clean_col in rules_normalized:
+            rule = rules_normalized[clean_col]
+
+        if rule:
+            fixed_len = rule.get('length')
+            if fixed_len:
+                df[col] = df[col].apply(
+                    lambda x: str(x).strip().zfill(fixed_len) 
+                    if pd.notnull(x) and str(x).strip() != "" 
+                    else x
+                )
+            
             error_mask[col] = df[col].apply(lambda x: check_error_type(x, rule))
 
     for idx, row in df.iterrows():
@@ -151,7 +168,7 @@ def cleanValidate(input_file,output_file,report_file,fmt,version,Revision_Date):
     
     report_data = [
         ["匯入日期：", datetime.now().strftime("%Y/%m/%d")],
-        ["資料格式：", f"{fmt}欄位({version}：{Revision_Date} 修訂版)"],
+        ["資料格式：", f"{fmt}({version}：{Revision_Date})"],
         [],
         ["資料總件數：",stats['total'],"件"],
         [],

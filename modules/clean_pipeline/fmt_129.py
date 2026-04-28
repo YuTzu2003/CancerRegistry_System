@@ -2,7 +2,7 @@ RULES = {
     '申報醫院代碼': {
         'ID':'1.1',
         'field': 'Reporting Hospital Code', 
-        'length': 10, 
+        'max_length': 10, 
         'digit': True,
         'description': '確認申報醫院之醫事機構代碼。',
         'purpose': '確認申報醫院。'
@@ -268,7 +268,7 @@ RULES = {
     '臨床 T':{
         'ID':'3.4',
         'field': 'Clinical T',
-        'length': 4,
+        'max_length': 4,
         'pattern_range': 'X, 0, A, IS, ISU, ISD, ISDC, ISPA, ISLA, 1M, 1, 1A, 1A1, 1A2, 1B, 1B1, 1B2 , 1B3, 1C, 1C1, 1C2, 1C3, 1D, 2, 2A, 2A1, 2A2, 2B, 2C, 2D, 3, 3A, 3B, 3C, 3D, 3E, 4, 4A, 4B, 4C, 4D, 4E, 8888, 9999',
         'description': '指原發腫瘤大小或侵犯程度。',
         'purpose': '作為 TNM 分期依據資料，該分期系統可用以評估癌症治療及控制的趨勢。醫師則用以進行預後的推估、治療的規劃、新療法的評估、結果的分析、追蹤的策劃和早期偵測結果的評定。'
@@ -276,7 +276,7 @@ RULES = {
     '臨床 N':{
         'ID':'3.5',
         'field': 'Clinical N',
-        'length': 3,
+        'max_length': 3,
         'pattern_range': 'X ,0 , 0A, 0B, 1M, 1, 1A, 1B, 1C, 2, 2M, 2A, 2B, 2C, 3, 3A, 3B, 3C, 888, 999',
         'description': '指是否有區域淋巴結的轉移和轉移的範圍。',
         'purpose': '作為 TNM 分期依據資料，可評估癌症治療及控制趨勢，醫師用以預後推估、治療規劃、新療法評估、結果分析、追蹤策劃及早期偵測結果評定。'
@@ -284,7 +284,7 @@ RULES = {
     '臨床 M':{
         'ID':'3.6',
         'field': 'Clinical M',
-        'length': 3,
+        'max_length': 3,
         'pattern_range': 'X, B, 0, 0B, 1, 1A, 1A0, 1A1, 1B, 1B0, 1B1, 1C, 1C0, 1C1, 1D, 1D0, 1D1, 1E, 888, 999',
         'description': '指是否有遠端轉移。',
         'purpose': '作為 TNM 分期依據資料，該分期系統可用以評估癌症治療及控制的趨勢。醫師則用以進行預後的推估、治療的規劃、新療法的評估、結果的分析、追蹤的策劃和早期偵測結果的評定。'
@@ -309,7 +309,7 @@ RULES = {
     '病理 T':{
         'ID':'3.10',
         'field': 'Pathologic T',
-        'length': 4,
+        'max_length': 4,
         'pattern_range': 'X, 0, A, IS, ISU, ISD, ISDC, ISPA, ISLA, 1M, 1, 1A, 1A1, 1A2, 1B, 1B1, 1B2, 1B3, 1C, 1C1, 1C2, 1C3, 1D, 2, 2A, 2A1, 2A2, 2B, 2C, 2D, 3, 3A, 3B, 3C, 3D, 4, 4A, 4B, 4C, 4D, 4E, 8888, 9999',
         'description': '指原發腫瘤大小或侵犯程度。',
         'purpose': '作為 TNM 分期依據資料，可用以評估癌症治療及控制的趨勢；醫師用以預後推估、治療規劃、新療法評估、結果分析、追蹤策劃與早期偵測結果評定。'
@@ -317,7 +317,7 @@ RULES = {
     '病理 N':{
         'ID':'3.11',
         'field': 'Pathologic N',
-        'length': 3,
+        'max_length': 3,
         'pattern_range': 'X, 0, 0A, 0B, 0C, 0D, 1, 1A, 1AS, 1B, 1C, 1M, 2M, 2, 2A, 2B, 2C, 3, 3A, 3B, 3C, 888, 999',
         'description': '指是否有區域淋巴結的轉移和轉移的範圍。',
         'purpose': '作為 TNM 分期依據資料，該分期系統可用以評估癌症治療及控制的趨勢。醫師則用以進行預後的推估、治療的規劃、新療法的評估、結果的分析、追蹤的策劃和早期偵測結果的評定。'
@@ -325,7 +325,7 @@ RULES = {
     '病理 M':{
         'ID':'3.12',
         'field': 'Pathologic M',
-        'length': 3,
+        'max_length': 3,
         'pattern_range': 'X, B, 0, 1, 1A, 1A0, 1A1, 1B, 1B0, 1B1, 1C, 1C0, 1C1, 1D, 1D0, 1D1, 1E, C, CA, CA0, CA1, CB, CB0, CB1, CC, CC0, CC1, CD, CD0, CD1, CE, 888, 999',
         'description': '指是否有遠端轉移。',
         'purpose': '做為 TNM 分期依據資料，該分期系統可用以評估癌症治療及控制的趨勢。醫師則用以進行預後的推估、治療的規劃、新療法的評估、結果的分析、追蹤的策劃和早期偵測結果的評定。'
@@ -360,7 +360,7 @@ RULES = {
     '其他分期系統':{
         'ID':'3.17',
         'field': 'Other Staging System',
-        'max_length': 2,
+        'length': 2,
         'digit': True,
         'choices': ['00', '01', '02', '06', '07', '09', '11', '12', '13', '20', '21', '22'],
         'description': '若非 AJCC 癌症分期系統，可選擇下列其他分期系統摘錄。',
@@ -412,7 +412,7 @@ RULES = {
     '外院原發部位手術方式':{
         'ID':'4.1.3',
         'field': 'Surgical Procedure of Primary Site at Other Facility',
-        'max_length': 3,
+        'length': 3,
         'digit': True,
         'pattern_range': '000, 100-800, 900, 980, 990',
         'description': '記錄個案於外院對原發部位所進行的外科手術方式。',
@@ -421,7 +421,7 @@ RULES = {
     '申報醫院原發部位手術方式':{
         'ID':'4.1.4',
         'field': 'Surgical Procedure of Primary Site at This Facility',
-        'max_length': 3,
+        'length': 3,
         'digit': True,
         'pattern_range': '000, 100-800, 900, 980, 990',
         'description': '記錄在申報醫院對原發部位所進行的手術方式。',
@@ -440,6 +440,7 @@ RULES = {
         'ID':'4.1.5',
         'field': 'Surgical Margins of The Primary Site',
         'length': 1,
+        'digit': True, 
         'pattern_range': '0-5, 7-9, A-F',
         'description': '記錄原發腫瘤切除後手術邊緣的最後狀態。',
         'purpose': '作為治療品質監測、分期或評估腫瘤復發預後因子等用途。'
@@ -501,6 +502,7 @@ RULES = {
         'ID':'4.2.1.1',
         'field': 'RT Target Summary',
         'max_length': 2,
+        'digit': True,
         'range': [0, 63],
         'SV': '-1, -9',
         'description': '記錄在申報醫院的首次療程中，進行放射治療之放射線標靶體積涵蓋的範圍 (局部原發腫瘤「T」、區域淋巴結「N」和遠端轉移「M」)。',
@@ -510,6 +512,7 @@ RULES = {
         'ID':'4.2.1.2',
         'field': 'RT Modality',
         'max_length': 3,
+        'digit': True,
         'range': [0, 127],
         'SV': '-1, -9',
         'description': '記錄在申報醫院的首次療程中，進行放射治療所使用的治療儀器或治療方式。',
@@ -537,6 +540,7 @@ RULES = {
         'ID':'4.2.1.5',
         'field': 'Sequence of Radiotherapy and Surgery',
         'max_length': 2,
+        'digit': True,
         'range': [0, 7],
         'SV': '-9,-8,-7,-6,-1',
         'description': '記錄在任何醫療機構的首次療程中，針對治療區域，放射治療及手術的時間順序關係。',
@@ -546,6 +550,7 @@ RULES = {
         'ID':'4.2.1.6',
         'field': 'Sequence of Locoregional Therapy and Systemic Therapy',
         'max_length': 2,
+        'digit': True,
         'range': [0, 7],
         'SV': '-9,-8,-7,-1',
         'description': '記錄在任何醫療機構的首次療程中，針對原發部位的手術或放射治療，與全身性治療的時間順序關係。',
@@ -565,6 +570,7 @@ RULES = {
         'ID':'4.2.2.1',
         'field': 'EBRT Technique',
         'max_length': 3,
+        'digit': True,
         'range': [0, 111],
         'SV': '-9,-1',
         'description': '記錄在申報醫院的首次療程中，進行體外放射治療所使用的技術。',
@@ -574,6 +580,7 @@ RULES = {
         'ID':'4.2.2.2.1',
         'field': 'Target of CTV_H',
         'max_length': 2,
+        'digit': True,
         'range': [0, 63],
         'SV': '-9,-1',
         'description': '記錄在申報醫院的首次療程中，利用放射線涵蓋之局部原發腫瘤 (T)、區域淋巴結 (N) 或遠端轉移 (M) 來區分並記錄體外射治療中接受最高劑量的目標區域之範圍。一般而言，此最高劑量區域也就是腫瘤負荷最重的區域。',
@@ -606,6 +613,7 @@ RULES = {
         'ID':'4.2.2.3.1',
         'field': 'Target of CTV_L',
         'max_length': 2,
+        'digit': True,
         'range': [0, 63],
         'SV': '-9,-1',
         'description': '記錄在申報醫院的首次療程中，利用放射線涵蓋之局部原發腫瘤 (T)，區域淋巴結 (N) 或遠端轉移 (M) 來區分並記錄體外射線治療中接受次高劑量的目標區域之範圍。',
@@ -633,6 +641,7 @@ RULES = {
         'ID':'4.2.3.1',
         'field': 'Other RT Modality',
         'max_length': 2,
+        'digit': True, 
         'choices': ['-9','-1','0', '2', '4', '8', '16', '32', '64'],
         'description': '記錄在申報醫院的首次療程中，進行放射治療所使用的特殊放射治療儀器或治療方式。',
         'purpose': '可作為治療結果分析之依據。'
@@ -641,6 +650,7 @@ RULES = {
         'ID':'4.2.3.2',
         'field': 'Other RT Technique',
         'max_length': 2,
+        'digit': True, 
         'choices': ['-9','-1','0', '1', '2', '3', '4', '5', '6', '7', '9', '10', '12', '17', '18', '20', '33', '34', '36', '65', '66', '68', '97', '98', '99'],
         'description': '記錄在申報醫院的首次療程中，進行特殊放射治療所使用的技術。',
         'purpose': '有助於分析治療技術與治療效果的關係。'
@@ -649,6 +659,7 @@ RULES = {
         'ID':'4.2.3.3.1',
         'field': 'Target of Other RT',
         'max_length': 2,
+        'digit': True, 
         'range': [0, 63],
         'SV': '-9,-1',
         'description': '記錄在申報醫院的首次療程中，利用放射線涵蓋局部原發腫瘤 (T)，區域淋巴結 (N) 或遠端轉移 (M) 來區分並記錄特殊放射治療的目標區域之範圍。',
@@ -952,7 +963,7 @@ RULES = {
         'description': '記錄個案有血緣關係之家庭成員中是否患有相同癌症的家族病史。',
         'purpose': '家族病史為致癌的危險因子之一。'
     },
-    '其他因子 8':{
+    '其他因子8':{
         'ID':'7.8',
         'field': 'Other Factor 8',
         'length': 3,
@@ -961,7 +972,7 @@ RULES = {
         'description': '記錄與癌症預後和治療決策相關之其他因子。',
         'purpose': '因應臨床實務需求及癌症診療品質提升。'
     },
-    '其他因子 9':{
+    '其他因子9':{
         'ID':'7.9',
         'field': 'Other Factor 9',
         'length': 3,
@@ -970,7 +981,7 @@ RULES = {
         'description': '記錄與癌症預後和治療決策相關之其他因子。',
         'purpose': '因應臨床實務需求及癌症診療品質提升。'
     },
-    '其他因子 10':{
+    '其他因子10':{
         'ID':'7.10',
         'field': 'Other Factor 10',
         'length': 3,
@@ -979,83 +990,83 @@ RULES = {
         'description': '記錄與癌症預後和治療決策相關之其他因子。',
         'purpose': '因應臨床實務需求及癌症診療品質提升。'
     },
-    '癌症部位特定因子 1':{
+    '癌症部位特定因子1':{
         'ID':'8.1',
         'field': 'Site-Specific Factor 1'
     },
-    '癌症部位特定因子 2':{
+    '癌症部位特定因子2':{
         'ID':'8.2',
         'field': 'Site-Specific Factor 2'
     },
-    '癌症部位特定因子 3':{
+    '癌症部位特定因子3':{
         'ID':'8.3',
         'field': 'Site-Specific Factor 3'
     },
-    '癌症部位特定因子 4':{
+    '癌症部位特定因子4':{
         'ID':'8.4',
         'field': 'Site-Specific Factor 4'
     },
-    '癌症部位特定因子 5':{
+    '癌症部位特定因子5':{
         'ID':'8.5',
         'field': 'Site-Specific Factor 5'
     },
-    '癌症部位特定因子 6':{
+    '癌症部位特定因子6':{
         'ID':'8.6',
         'field': 'Site-Specific Factor 6'
     },
-    '癌症部位特定因子 7':{
+    '癌症部位特定因子7':{
         'ID':'8.7',
         'field': 'Site-Specific Factor 7'
     },
-    '癌症部位特定因子 8':{
+    '癌症部位特定因子8':{
         'ID':'8.8',
         'field': 'Site-Specific Factor 8'
     },
-    '癌症部位特定因子 9':{
+    '癌症部位特定因子9':{
         'ID':'8.9',
         'field': 'Site-Specific Factor 9'
     },
-    '癌症部位特定因子 10':{
+    '癌症部位特定因子10':{
         'ID':'8.10',
         'field': 'Site-Specific Factor 10'
     },
-    '癌症部位特定因子 11':{
+    '癌症部位特定因子11':{
         'ID':'8.11',
         'field': 'Site-Specific Factor 11'
     },
-    '癌症部位特定因子 12':{
+    '癌症部位特定因子12':{
         'ID':'8.12',
         'field': 'Site-Specific Factor 12'
     },
-    '癌症部位特定因子 13':{
+    '癌症部位特定因子13':{
         'ID':'8.13',
         'field': 'Site-Specific Factor 13'
     },
-    '癌症部位特定因子 14':{
+    '癌症部位特定因子14':{
         'ID':'8.14',
         'field': 'Site-Specific Factor 14'
     },
-    '癌症部位特定因子 15':{
+    '癌症部位特定因子15':{
         'ID':'8.15',
         'field': 'Site-Specific Factor 15'
     },
-    '癌症部位特定因子 16':{
+    '癌症部位特定因子16':{
         'ID':'8.16',
         'field': 'Site-Specific Factor 16'
     },
-    '癌症部位特定因子 17':{
+    '癌症部位特定因子17':{
         'ID':'8.17',
         'field': 'Site-Specific Factor 17'
     },
-    '癌症部位特定因子 18':{
+    '癌症部位特定因子18':{
         'ID':'8.18',
         'field': 'Site-Specific Factor 18'
     },
-    '癌症部位特定因子 19':{
+    '癌症部位特定因子19':{
         'ID':'8.19',
         'field': 'Site-Specific Factor 19'
     },
-    '癌症部位特定因子 20':{
+    '癌症部位特定因子20':{
         'ID':'8.20',
         'field': 'Site-Specific Factor 20'
     },
