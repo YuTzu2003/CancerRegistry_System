@@ -193,6 +193,7 @@
         <div class="alert alert-light border shadow-sm mt-3" role="alert">
           <i class="bi bi-check-circle-fill text-success me-2"></i>資料清洗並存檔完成！
         </div>`;
+      if (window.autoHideAlerts) window.autoHideAlerts();
     }
 
     const s = data.stats || {};
