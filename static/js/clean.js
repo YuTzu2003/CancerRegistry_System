@@ -121,6 +121,7 @@
     if ($('#analysisByType tbody')) $('#analysisByType tbody').innerHTML = '';
     if ($('#stat-completeness')) $('#stat-completeness').textContent = '-';
     if ($('#stat-correctness')) $('#stat-correctness').textContent = '-';
+    if ($('#stat-consistency')) $('#stat-consistency').textContent = '-';
     if ($('#stat-dqi')) $('#stat-dqi').textContent = '-';
   }
 
@@ -223,13 +224,28 @@
       $('#analysisEmpty').hidden = true;
       $('#stat-completeness').textContent = ((s.completeness || 0) * 100).toFixed(1) + '%';
       $('#stat-correctness').textContent = ((s.correctness || 0) * 100).toFixed(1) + '%';
+      $('#stat-consistency').textContent = ((s.consistency || 0) * 100).toFixed(1) + '%';
       $('#stat-dqi').textContent = (s.dqi || 0).toFixed(2) + '%';
-      $('#analysisByType tbody').innerHTML = byType.map(r => `
-        <tr>
-          <td>${r.type}</td>
-          <td style="text-align:right;">${r.count ?? 0}</td>
-          <td style="text-align:right;">${r.ratio ?? '—'}</td>
-        </tr>`).join('');
+
+      $('#analysisByType tbody').innerHTML = byType.map(r => {
+        let bgClass = '';
+        if (r.type.startsWith('A:')) {
+            bgClass = 'bg-warning bg-opacity-10';
+        }
+        else if (r.type.startsWith('B:')) {
+            bgClass = 'bg-danger bg-opacity-10';
+        }
+        else if (r.type.startsWith('C:')) {
+            bgClass = 'bg-info bg-opacity-10';
+        }
+        
+        return `
+          <tr class="${bgClass} text-dark">
+            <td>${r.type}</td>
+            <td style="text-align:right;">${r.count ?? 0}</td>
+            <td style="text-align:right;">${r.ratio ?? '—'}</td>
+          </tr>`;
+      }).join('');
     }
 
     // 輸出欄位設定
