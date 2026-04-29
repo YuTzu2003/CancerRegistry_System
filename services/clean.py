@@ -98,7 +98,15 @@ def api_clean():
     return jsonify({
         "ok": True, 
         "project_id": JobID,
-        "stats": {"total":int(stats['total']), "passed":int(stats['total']-stats['error_rows']), "error":int(stats['error_rows']), "completeness":float(stats['completeness']), "correctness":float(stats['correctness']), "dqi":float(stats['quality_score'])},
+        "stats": {
+            "total": int(stats['total']), 
+            "passed": int(stats['total'] - stats['error_rows']), 
+            "error": int(stats['error_rows']), 
+            "completeness": float(stats['completeness']), 
+            "correctness": float(stats['correctness']), 
+            "consistency": float(stats['consistency']),
+            "dqi": float(stats['quality_score'])
+        },
         "analysis": {"by_field": by_field,"by_type": by_type},
         "output_fields": output_fields
     })
