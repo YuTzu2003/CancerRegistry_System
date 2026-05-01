@@ -102,7 +102,7 @@ RULES = {
         'digit': True,     
         'range': [0, 9],
         'description': '記錄此個案在申報時的治療狀態。',
-        'purpose': '此欄位用於確保個案分類欄位 2.3 的正確性，並協助記錄個案未於申報醫院接受首次療程的原因，供申報醫院改善流失管理及作為公衛行政資源調整依據。  '
+        'purpose': '此欄位用於確保個案分類欄位 2.3 的正確性，並協助記錄個案未於申報醫院接受首次療程的原因，供申報醫院改善流失管理及作為公衛行政資源調整依據。 '
     },
     '首次就診日期': {
         'ID':'2.4',
@@ -144,7 +144,7 @@ RULES = {
         'field': 'Histology',
         'max_length':5,
         #'digit': True,
-        'range': [8000, 99999],
+        'range': [8000, 9999],
         'description': '原發腫瘤細胞於顯微鏡下之結構。',
         'purpose': '作為分期及決定治療方針之根據；同時也影響其預後及病程。'
     },
@@ -170,7 +170,7 @@ RULES = {
         'field': 'Grade Pathological',
         'length': 1,
         'pattern_range': '1-5, 8-9, A-E, H, L-M, S, X',
-        'description': '收錄實質腫瘤於原發部位手術之後的分級/分化。分級/分化為腫瘤和正常組織的相似的程 度。Well differentiated (Grade I)和正常組織最相似；Undifferentiated (Grade IV)和正常組織差異最大。',
+        'description': '收錄實質腫瘤於原發部位手術之後的分級/分化。分級/分化為腫瘤和正常組織的相似的程度。Well differentiated (Grade I)和正常組織最相似；Undifferentiated (Grade IV)和正常組織差異最大。',
         'purpose': '與個案的預後有關。分級/分化可用以評估癌症嚴重程度；分級/分化及細胞型態對於許多癌症而言是重要的預後因子。分級/分化對於某些癌症更是判定病理期別的依據之一。'
     },
     '癌症確診方式':{
@@ -269,7 +269,7 @@ RULES = {
     '臨床 T':{
         'ID':'3.4',
         'field': 'Clinical T',
-        'length': 4,
+        'max_length': 4,
         'pattern_range': 'X, 0, A, IS, ISU, ISD, ISDC, ISPA, ISLA, 1M, 1, 1A, 1A1, 1A2, 1B, 1B1, 1B2 , 1B3, 1C, 1C1, 1C2, 1C3, 1D, 2, 2A, 2A1, 2A2, 2B, 2C, 2D, 3, 3A, 3B, 3C, 3D, 3E, 4, 4A, 4B, 4C, 4D, 4E, 8888, 9999',
         'description': '指原發腫瘤大小或侵犯程度。',
         'purpose': '作為 TNM 分期依據資料，該分期系統可用以評估癌症治療及控制的趨勢。醫師則用以進行預後的推估、治療的規劃、新療法的評估、結果的分析、追蹤的策劃和早期偵測結果的評定。'
@@ -277,7 +277,7 @@ RULES = {
     '臨床 N':{
         'ID':'3.5',
         'field': 'Clinical N',
-        'length': 3,
+        'max_length': 3,
         'pattern_range': 'X ,0 , 0A, 0B, 1M, 1, 1A, 1B, 1C, 2, 2M, 2A, 2B, 2C, 3, 3A, 3B, 3C, 888, 999',
         'description': '指是否有區域淋巴結的轉移和轉移的範圍。',
         'purpose': '作為 TNM 分期依據資料，可評估癌症治療及控制趨勢，醫師用以預後推估、治療規劃、新療法評估、結果分析、追蹤策劃及早期偵測結果評定。'
@@ -285,7 +285,7 @@ RULES = {
     '臨床 M':{
         'ID':'3.6',
         'field': 'Clinical M',
-        'length': 3,
+        'max_length': 3,
         'pattern_range': 'X, B, 0, 0B, 1, 1A, 1A0, 1A1, 1B, 1B0, 1B1, 1C, 1C0, 1C1, 1D, 1D0, 1D1, 1E, 888, 999',
         'description': '指是否有遠端轉移。',
         'purpose': '作為 TNM 分期依據資料，該分期系統可用以評估癌症治療及控制的趨勢。醫師則用以進行預後的推估、治療的規劃、新療法的評估、結果的分析、追蹤的策劃和早期偵測結果的評定。'
@@ -310,7 +310,7 @@ RULES = {
     '病理 T':{
         'ID':'3.10',
         'field': 'Pathologic T',
-        'length': 4,
+        'max_length': 4,
         'pattern_range': 'X, 0, A, IS, ISU, ISD, ISDC, ISPA, ISLA, 1M, 1, 1A, 1A1, 1A2, 1B, 1B1, 1B2, 1B3, 1C, 1C1, 1C2, 1C3, 1D, 2, 2A, 2A1, 2A2, 2B, 2C, 2D, 3, 3A, 3B, 3C, 3D, 4, 4A, 4B, 4C, 4D, 4E, 8888, 9999',
         'description': '指原發腫瘤大小或侵犯程度。',
         'purpose': '作為 TNM 分期依據資料，可用以評估癌症治療及控制的趨勢；醫師用以預後推估、治療規劃、新療法評估、結果分析、追蹤策劃與早期偵測結果評定。'
@@ -318,7 +318,7 @@ RULES = {
     '病理 N':{
         'ID':'3.11',
         'field': 'Pathologic N',
-        'length': 3,
+        'max_length': 3,
         'pattern_range': 'X, 0, 0A, 0B, 0C, 0D, 1, 1A, 1AS, 1B, 1C, 1M, 2M, 2, 2A, 2B, 2C, 3, 3A, 3B, 3C, 888, 999',
         'description': '指是否有區域淋巴結的轉移和轉移的範圍。',
         'purpose': '作為 TNM 分期依據資料，該分期系統可用以評估癌症治療及控制的趨勢。醫師則用以進行預後的推估、治療的規劃、新療法的評估、結果的分析、追蹤的策劃和早期偵測結果的評定。'
@@ -326,7 +326,7 @@ RULES = {
     '病理 M':{
         'ID':'3.12',
         'field': 'Pathologic M',
-        'length': 3,
+        'max_length': 3,
         'pattern_range': 'X, B, 0, 1, 1A, 1A0, 1A1, 1B, 1B0, 1B1, 1C, 1C0, 1C1, 1D, 1D0, 1D1, 1E, C, CA, CA0, CA1, CB, CB0, CB1, CC, CC0, CC1, CD, CD0, CD1, CE, 888, 999',
         'description': '指是否有遠端轉移。',
         'purpose': '做為 TNM 分期依據資料，該分期系統可用以評估癌症治療及控制的趨勢。醫師則用以進行預後的推估、治療的規劃、新療法的評估、結果的分析、追蹤的策劃和早期偵測結果的評定。'
@@ -415,7 +415,8 @@ RULES = {
         'field': 'Surgical Procedure of Primary Site at Other Facility',
         'max_length': 3,
         'digit': True,
-        'pattern_range': '000, 100-800, 900, 980, 990',
+        'SV':['00,90,98,99'],
+        'pattern_range': '10-80',
         'description': '記錄個案於外院對原發部位所進行的外科手術方式。',
         'purpose': '用來比較不同治療方式的效果。'
     },
@@ -424,7 +425,8 @@ RULES = {
         'field': 'Surgical Procedure of Primary Site at This Facility',
         'max_length': 3,
         'digit': True,
-        'pattern_range': '000, 100-800, 900, 980, 990',
+        'SV':['00,90,98,99'],
+        'pattern_range': '10-80',
         'description': '記錄在申報醫院對原發部位所進行的手術方式。',
         'purpose': '用來比較不同治療方式的效果。'
     },
@@ -531,7 +533,7 @@ RULES = {
         'length': 8,
         'SV': ['00000000', '88888888', '99999999'],  
         'is_date': '%Y%m%d',
-        'description': '記錄在申報醫院的首次療程中進行放射治療的結束日期。',
+        'description': '記錄在申報醫院的首次療程中，進行放射治療的結束日期。',
         'purpose': '整個放射治療療程長短是腫瘤控制及併發症的重要因素，此資訊可作為放療品質指標，並應用於評估維持不中斷持續放療之輔助療法成效。'
     },
     '放射治療與手術順序':{
@@ -541,7 +543,7 @@ RULES = {
         'range': [0, 7],
         'SV': '-9,-8,-7,-6,-1',
         'description': '記錄在任何醫療機構的首次療程中，針對治療區域，放射治療及手術的時間順序關係。',
-        'purpose': '放射治療及手術的時間順序關係可能無法由相關日期直接計算得知，提供更詳實的時間順序關係。'
+        'purpose': '放射治療及手術的時間順序關係可能無法由相關日期直接計算得知，此項目提供更詳實的時間順序關係。'
     },
     '區域治療與全身性治療順序':{
         'ID':'4.2.1.6',
@@ -744,7 +746,7 @@ RULES = {
         'length': 2,
         'digit': True,      
         'range': [0, 7],
-        'SV': '20, 21, 22, 23, 30, 31, 32, 33, 40, 41, 99',
+        'SV': '20, 21, 22, 23, 30, 31, 32, 33, 99',
         'description': '記載個案在外院首次療程中，所給予免疫治療的相關情形。免疫治療包括了生物或是化學物質，這些物質可以改變人體免疫系統或改變人體對腫瘤細胞的免疫反應。',
         'purpose': '全身性治療可能包括單一或複合藥物處方。這項資料乃評估外院首次治療中給予個案的免疫治療，以及照護的品質。'
     },
@@ -754,7 +756,7 @@ RULES = {
         'length': 2,
         'digit': True,      
         'range': [0, 7],
-        'SV': '20, 21, 22, 23, 30, 31, 32, 33, 40, 41, 82, 83, 85, 86, 87, 88, 99',
+        'SV': '20, 21, 22, 23, 30, 31, 32, 33, 82, 83, 85, 86, 87, 88, 99',
         'description': '記載申報醫院於首次療程中，所給予免疫治療的相關情形。若個案未接受免疫治療，需編碼其未接受的原因。',
         'purpose': '評估申報醫院首次療程中的免疫治療情形，並了解個案未接受免疫治療的原因。'
     },
@@ -876,14 +878,6 @@ RULES = {
         'description': '記錄個案「最後聯絡或死亡日期」的存活狀態。',
         'purpose': '作為個案追蹤和治療結果研究之用。'
     },
-    '死亡原因':{
-        'ID':'5.6',
-        'field': 'Cause of Death',
-        'max_length': 4,
-        'pattern_range': '0000, 7777, 7797, 7798, C000-C809, C97',
-        'description': '記錄個案的死因代碼。',
-        'purpose': '作為癌症存活率統計分析時的死因分類，以區分非癌症死亡個案。'
-    },
     '摘錄者': {
         'ID':'6.1',
         'field': 'Abstracted by', 
@@ -945,120 +939,102 @@ RULES = {
         'description': '記錄醫師於首次治療前最近一次評估個案的生活功能狀態。',
         'purpose': '本項目的資料可作為訂定個案治療計畫參考之用。'
     },
-    '同癌家族病史': {
-        'ID':'7.7',
-        'field': 'Family History of Same Cancer',
-        'length': 6,
-        'regex': r'^[019]{2}[0-9AX]{4}$',
-        'description': '記錄個案有血緣關係之家庭成員中是否患有相同癌症的家族病史。',
-        'purpose': '家族病史為致癌的危險因子之一。'
-    },
-    '其他因子8':{
-        'ID':'7.8',
-        'field': 'Other Factor 8',
-        'length': 3,
-        'digit': True,
-        'SV': '988',
-        'description': '記錄與癌症預後和治療決策相關之其他因子。',
-        'purpose': '因應臨床實務需求及癌症診療品質提升。'
-    },
-    '其他因子9':{
-        'ID':'7.9',
-        'field': 'Other Factor 9',
-        'length': 3,
-        'digit': True,
-        'SV': '988',
-        'description': '記錄與癌症預後和治療決策相關之其他因子。',
-        'purpose': '因應臨床實務需求及癌症診療品質提升。'
-    },
-    '其他因子10':{
-        'ID':'7.10',
-        'field': 'Other Factor 10',
-        'length': 3,
-        'digit': True,
-        'SV': '988',
-        'description': '記錄與癌症預後和治療決策相關之其他因子。',
-        'purpose': '因應臨床實務需求及癌症診療品質提升。'
-    },
     '癌症部位特定因子1':{
         'ID':'8.1',
-        'field': 'Site-Specific Factor 1'
+        'field': 'Site-Specific Factor 1',
+        'length': 3,
+        'digit': True,     
+        'range': [0, 999],
+        'description': '記錄與癌症預後和治療決策有關之癌症部位特定因子',
+        'purpose': '因應臨床實務需求及癌症診療品質提升。'
     },
     '癌症部位特定因子2':{
         'ID':'8.2',
-        'field': 'Site-Specific Factor 2'
+        'field': 'Site-Specific Factor 2',
+        'length': 3,
+        'digit': True,     
+        'range': [0, 999],
+        'description': '記錄與癌症預後和治療決策有關之癌症部位特定因子',
+        'purpose': '因應臨床實務需求及癌症診療品質提升。'
     },
     '癌症部位特定因子3':{
         'ID':'8.3',
-        'field': 'Site-Specific Factor 3'
+        'field': 'Site-Specific Factor 3',
+        'length': 3,
+        'digit': True,     
+        'range': [0, 999],
+        'description': '記錄與癌症預後和治療決策有關之癌症部位特定因子',
+        'purpose': '因應臨床實務需求及癌症診療品質提升。'
     },
     '癌症部位特定因子4':{
         'ID':'8.4',
-        'field': 'Site-Specific Factor 4'
+        'field': 'Site-Specific Factor 4',
+        'length': 3,
+        'digit': True,     
+        'range': [0, 999],
+        'description': '記錄與癌症預後和治療決策有關之癌症部位特定因子',
+        'purpose': '因應臨床實務需求及癌症診療品質提升。'
     },
     '癌症部位特定因子5':{
         'ID':'8.5',
-        'field': 'Site-Specific Factor 5'
+        'field': 'Site-Specific Factor 5',
+        'length': 3,
+        'digit': True,     
+        'range': [0, 999],
+        'description': '記錄與癌症預後和治療決策有關之癌症部位特定因子',
+        'purpose': '因應臨床實務需求及癌症診療品質提升。'
     },
     '癌症部位特定因子6':{
         'ID':'8.6',
-        'field': 'Site-Specific Factor 6'
+        'field': 'Site-Specific Factor 6',
+        'length': 3,
+        'digit': True,     
+        'range': [0, 999],
+        'description': '記錄與癌症預後和治療決策有關之癌症部位特定因子',
+        'purpose': '因應臨床實務需求及癌症診療品質提升。'
     },
     '癌症部位特定因子7':{
         'ID':'8.7',
-        'field': 'Site-Specific Factor 7'
+        'field': 'Site-Specific Factor 7',
+        'length': 3,
+        'digit': True,     
+        'range': [0, 999],
+        'description': '記錄與癌症預後和治療決策有關之癌症部位特定因子',
+        'purpose': '因應臨床實務需求及癌症診療品質提升。'
     },
     '癌症部位特定因子8':{
         'ID':'8.8',
-        'field': 'Site-Specific Factor 8'
+        'field': 'Site-Specific Factor 8',
+        'length': 3,
+        'digit': True,     
+        'range': [0, 999],
+        'description': '記錄與癌症預後和治療決策有關之癌症部位特定因子',
+        'purpose': '因應臨床實務需求及癌症診療品質提升。'
     },
     '癌症部位特定因子 9':{
         'ID':'8.9',
-        'field': 'Site-Specific Factor 9'
+        'field': 'Site-Specific Factor 9',
+        'length': 3,
+        'digit': True,     
+        'range': [0, 999],
+        'description': '記錄與癌症預後和治療決策有關之癌症部位特定因子',
+        'purpose': '因應臨床實務需求及癌症診療品質提升。'
     },
     '癌症部位特定因子10':{
         'ID':'8.10',
-        'field': 'Site-Specific Factor 10'
-    },
-    '癌症部位特定因子11':{
-        'ID':'8.11',
-        'field': 'Site-Specific Factor 11'
-    },
-    '癌症部位特定因子12':{
-        'ID':'8.12',
-        'field': 'Site-Specific Factor 12'
-    },
-    '癌症部位特定因子13':{
-        'ID':'8.13',
-        'field': 'Site-Specific Factor 13'
-    },
-    '癌症部位特定因子14':{
-        'ID':'8.14',
-        'field': 'Site-Specific Factor 14'
-    },
-    '癌症部位特定因子15':{
-        'ID':'8.15',
-        'field': 'Site-Specific Factor 15'
-    },
-    '癌症部位特定因子16':{
-        'ID':'8.16',
-        'field': 'Site-Specific Factor 16'
-    },
-    '癌症部位特定因子17':{
-        'ID':'8.17',
-        'field': 'Site-Specific Factor 17'
-    },
-    '癌症部位特定因子18':{
-        'ID':'8.18',
-        'field': 'Site-Specific Factor 18'
-    },
-    '癌症部位特定因子19':{
-        'ID':'8.19',
-        'field': 'Site-Specific Factor 19'
-    },
-    '癌症部位特定因子20':{
-        'ID':'8.20',
-        'field': 'Site-Specific Factor 20'
-    },
+        'field': 'Site-Specific Factor 10',
+        'length': 3,
+        'digit': True,     
+        'range': [0, 999],
+        'description': '記錄與癌症預後和治療決策有關之癌症部位特定因子',
+        'purpose': '因應臨床實務需求及癌症診療品質提升。'
+    }
 }
+
+# 執行計算
+print(f"目前定義的欄位總數：{len(RULES)}")
+
+# 如果想看 ID 清單檢查進度
+ids = [v['ID'] for v in RULES.values() if 'ID' in v]
+print(f"已完成的 ID：{ids}")
 
