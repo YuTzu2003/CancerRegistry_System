@@ -6,7 +6,7 @@ def detect_system(excel_columns):
     systems = ['中文欄位名稱','英文欄位名稱','台大雲林欄位名稱','台大體系醫整庫欄位名稱','台灣癌症登記中心','雲醫癌AI模組']
 
     columns_sql = ', '.join(f'[{s}]' for s in systems)
-    query = f"SELECT {columns_sql} FROM [Hospital_data].[dbo].[FieldName]"
+    query = f"SELECT {columns_sql} FROM [Hospital_data].[dbo].[CancerRegistry_FieldMap]"
     
     cursor = conn.cursor()
     cursor.execute(query)
@@ -30,7 +30,7 @@ def detect_system(excel_columns):
 
 def field_mapping(target_col):
     conn = get_conn()
-    query = """SELECT * FROM [Hospital_data].[dbo].[FieldName]"""
+    query = """SELECT * FROM [Hospital_data].[dbo].[CancerRegistry_FieldMap]"""
     
     cursor = conn.cursor()
     cursor.execute(query)
