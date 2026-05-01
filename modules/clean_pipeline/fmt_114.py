@@ -946,39 +946,84 @@ RULES = {
     },
     '癌症部位特定因子1':{
         'ID':'8.1',
-        'field': 'Site-Specific Factor 1'
+        'field': 'Site-Specific Factor 1',
+        'length': 3,
+        'digit': True,
+        'range': [0, 999],
+        'description': '記錄與癌症預後和治療決策有關之癌症部位特定因子。',
+        'purpose': '因應臨床實務需求及癌症診療品質提升。' 
     },
     '癌症部位特定因子2':{
         'ID':'8.2',
-        'field': 'Site-Specific Factor 2'
+        'field': 'Site-Specific Factor 2',
+        'length': 3,
+        'digit': True,
+        'range': [0, 999],
+        'description': '記錄與癌症預後和治療決策有關之癌症部位特定因子。',
+        'purpose': '因應臨床實務需求及癌症診療品質提升。'
     },
     '癌症部位特定因子3':{
         'ID':'8.3',
-        'field': 'Site-Specific Factor 3'
+        'field': 'Site-Specific Factor 3',
+        'length': 3,
+        'digit': True,
+        'range': [0, 999],
+        'description': '記錄與癌症預後和治療決策有關之癌症部位特定因子。',
+        'purpose': '因應臨床實務需求及癌症診療品質提升。'
     },
     '癌症部位特定因子4':{
         'ID':'8.4',
-        'field': 'Site-Specific Factor 4'
+        'field': 'Site-Specific Factor 4',
+        'length': 3,
+        'digit': True,
+        'range': [0, 999],
+        'description': '記錄與癌症預後和治療決策有關之癌症部位特定因子。',
+        'purpose': '因應臨床實務需求及癌症診療品質提升。'
     },
     '癌症部位特定因子5':{
         'ID':'8.5',
-        'field': 'Site-Specific Factor 5'
+        'field': 'Site-Specific Factor 5',
+        'length': 3,
+        'digit': True,
+        'range': [0, 999],
+        'description': '記錄與癌症預後和治療決策有關之癌症部位特定因子。',
+        'purpose': '因應臨床實務需求及癌症診療品質提升。'
     },
     '癌症部位特定因子6':{
         'ID':'8.6',
-        'field': 'Site-Specific Factor 6'
+        'field': 'Site-Specific Factor 6',
+        'length': 3,
+        'digit': True,
+        'range': [0, 999],
+        'description': '記錄與癌症預後和治療決策有關之癌症部位特定因子。',
+        'purpose': '因應臨床實務需求及癌症診療品質提升。'
     },
     '癌症部位特定因子7':{
         'ID':'8.7',
-        'field': 'Site-Specific Factor 7'
+        'field': 'Site-Specific Factor 7',
+        'length': 3,
+        'digit': True,
+        'range': [0, 999],
+        'description': '記錄與癌症預後和治療決策有關之癌症部位特定因子。',
+        'purpose': '因應臨床實務需求及癌症診療品質提升。'
     },
     '癌症部位特定因子8':{
         'ID':'8.8',
-        'field': 'Site-Specific Factor 8'
+        'field': 'Site-Specific Factor 8',
+        'length': 3,
+        'digit': True,
+        'range': [0, 999],
+        'description': '記錄與癌症預後和治療決策有關之癌症部位特定因子。',
+        'purpose': '因應臨床實務需求及癌症診療品質提升。'
     },
     '癌症部位特定因子9':{
         'ID':'8.9',
-        'field': 'Site-Specific Factor 9'
+        'field': 'Site-Specific Factor 9',
+        'length': 3,
+        'digit': True,
+        'range': [0, 999],
+        'description': '記錄與癌症預後和治療決策有關之癌症部位特定因子。',
+        'purpose': '因應臨床實務需求及癌症診療品質提升。'
     }
 }
 
