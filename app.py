@@ -38,6 +38,7 @@ def inject_nav():
     NAV_ITEMS = [
         {"endpoint":"clean.clean","title":"資料清洗模組","icon":"bi-funnel"},
         {"endpoint":"history.history","title":"資料審核紀錄","icon":"bi-file-earmark-text"},
+        {"endpoint":"dataGen","title":"虛擬資料生成","icon":"bi-database-add"},
         {"endpoint":"analytics","title":"統計分析","icon":"bi-bar-chart"},
         {"endpoint":"settings","title":"系統設定","icon":"bi-gear"},
     ]
@@ -51,6 +52,10 @@ def dashboard():
     return render_template("dashboard.html", active="dashboard")
 
 # ---- other ------------------------------------------
+@app.route("/dataGen")
+@login_required
+def dataGen(): return render_template("dataGen.html", active="dataGen")
+
 @app.route("/analytics")
 @login_required
 def analytics(): return render_template("analytics.html", active="analytics")
