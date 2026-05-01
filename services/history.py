@@ -64,15 +64,16 @@ def history_download_zip(job_id):
         cursor.execute("SELECT Path, FileName FROM Job WHERE JobID=?", (job_id,))
         row = cursor.fetchone()
         conn.close()
-        if not row or not row[0]: return jsonify({"ok": False, "error": "找不到該紀錄"}), 404
+        if not row or not row[0]: return jsonify({"ok": False, "error": "Not found"}), 404
         
         project_path = row[0]
         zip_path = os.path.join(project_path, f"Results_{job_id}.zip")
         with zipfile.ZipFile(zip_path, 'w') as zipf:
             for root, dirs, files in os.walk(project_path):
                 for file in files:
-                    if file.endswith('.xlsx'): 
-                        zipf.write(os.path.join(root, file), file)
+                    if file == f"Results_{job_id}.zip":
+                        continue
+                    zipf.write(os.path.join(root, file), file)
         
         return send_file(os.path.abspath(zip_path), as_attachment=True)
     except Exception as e: return jsonify({"ok": False, "error": str(e)}), 500

@@ -164,12 +164,23 @@
     try {
       const response = await fetch('/api/cleanJob', { method: 'POST', body: formData });
       const result = await response.json();
-      if (!response.ok || !result.ok) throw new Error(result.message || result.error || '清洗失敗');
+      
+      if (!response.ok || !result.ok) {
+        const errorMsg = result.message || result.error || '清洗失敗';
+        const alertContainer = $('#cleaningAlertContainer');
+        if (alertContainer) {
+          alertContainer.innerHTML = `
+            <div class="alert alert-danger border shadow-sm mt-3" role="alert">
+              <i class="bi bi-exclamation-triangle-fill me-2"></i>${errorMsg}
+            </div>`;
+        }
+        throw new Error(errorMsg);
+      }
       
       renderResult(result);
       setStep(3);
     } catch (error) { 
-      alert(error.message); 
+      // alert(error.message); 
       setStep(1); 
     } finally {
       if (loadingOverlay) loadingOverlay.style.display = 'none';
