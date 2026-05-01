@@ -3,6 +3,7 @@ import os
 import re
 from openpyxl import load_workbook,Workbook
 from openpyxl.styles import PatternFill,Font,Alignment
+from modules.db import get_conn
 from modules.clean_pipeline.fmt_42 import RULES as RULES_42
 from modules.clean_pipeline.fmt_45 import RULES as RULES_45
 from modules.clean_pipeline.fmt_50 import RULES as RULES_50
@@ -21,6 +22,34 @@ FORMAT_RULES_MAP = {
     "fmt_115": RULES_115,
     "fmt_129": RULES_129,
 }
+
+def load_field_spec(fmt_val):
+    """
+    從資料庫讀取指定格式的欄位定義 (中文名稱, 起始位置, 結束位置)
+    """
+    conn = get_conn()
+    cursor = conn.cursor()
+    # 這裡假設 fmt_val 是數字或字串，對應 CancerRegistry_Fields 的 [fmt] 欄位
+    sql = "SELECT [ChineseName], [Start], [End] FROM CancerRegistry_Fields WHERE [fmt]=? ORDER BY [Start]"
+    cursor.execute(sql, fmt_val)
+    rows = cursor.fetchall()
+    conn.close()
+    return [(r[0], int(r[1]), int(r[2])) for r in rows]
+
+def parse_fixed_width_line(line_text, spec):
+    """
+    依據 spec 解析單行定寬文字
+    """
+    line_bytes = line_text.encode('big5', errors='ignore')
+    parsed_row = {}
+    for name, start, end in spec:
+        # 標註: spec 中的 start 是從 1 開始
+        field_value = line_bytes[start - 1:end]
+        try:
+            parsed_row[name] = field_value.decode('big5').strip()
+        except:
+            parsed_row[name] = field_value.decode('big5', errors='replace').strip()
+    return parsed_row
 
 def annotation(row_errors):
     codes = []
@@ -45,11 +74,41 @@ def cleanValidate(input_file,output_file,report_file,fmt,version,Revision_Date):
         except UnicodeDecodeError:
             df = pd.read_csv(input_file, dtype=str, encoding='cp950')
         sheet_name = os.path.splitext(os.path.basename(input_file))[0]
+    elif file_ext == '.txt':
+        # 定寬文字處理
+        # 提取數字部分，例如 "fmt_115" -> "115"
+        fmt_val = fmt.replace("fmt_", "")
+        field_spec = load_field_spec(fmt_val)
+        
+        if not field_spec:
+            raise ValueError(f"資料庫中找不到格式 {fmt_val} 的欄位定義")
+            
+        # 取得預期長度 (最大結束位置)
+        conn = get_conn()
+        cursor = conn.cursor()
+        sql = "SELECT MAX([End]) FROM CancerRegistry_Fields WHERE [fmt]=? GROUP BY [fmt]"
+        cursor.execute(sql, fmt_val)
+        row = cursor.fetchone()
+        conn.close()
+        expected_length = row[0] if row else 0
 
-    # else:
-    #     df = pd.read_excel(input_file,dtype=str)
-    #     xl = pd.ExcelFile(input_file)
-    #     sheet_name = xl.sheet_names[0]
+        results = []
+        with open(input_file, 'r', encoding='big5', errors='ignore') as f:
+            for i, line in enumerate(f, 1):
+                clean_line = line.replace('\n', '').replace('\r', '')
+                if not clean_line.strip():
+                    continue
+                
+                # 長度檢核 (依據 Big5 編碼位元組長度)
+                line_len = len(clean_line.encode('big5', errors='ignore'))
+                if expected_length > 0 and line_len != expected_length:
+                    raise ValueError(f"第 {i} 行長度不符: 實際 {line_len}, 預期 {expected_length}")
+
+                parsed_data = parse_fixed_width_line(clean_line, field_spec)
+                results.append(parsed_data)
+        
+        df = pd.DataFrame(results).astype(str)
+        sheet_name = os.path.splitext(os.path.basename(input_file))[0]
     else:
         df = pd.read_excel(input_file,dtype=str)
         with pd.ExcelFile(input_file) as xl:
