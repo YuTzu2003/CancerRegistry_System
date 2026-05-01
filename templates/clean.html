@@ -98,7 +98,7 @@
 <section class="card-flat" id="uploadPanel">
   <div class="section-head">
     <h2><span class="dot"></span> 資料上傳與檢核</h2>
-    <span class="hint">支援 CSV / XLS / XLSX</span>
+    <span class="hint">支援 Txt / Csv / Xls / Xlsx</span>
   </div>
   <div class="section-body">
     <form id="cleanForm" action="/api/cleanJob" method="POST" enctype="multipart/form-data" novalidate>
@@ -118,7 +118,7 @@
           <label class="uploader" id="dropZone" for="fileInput">
             <div class="ico"><i class="bi bi-cloud-arrow-up"></i></div>
             <div><strong>拖曳檔案至此</strong>，或點擊選擇</div>
-            <div class="hint">CSV、Excel（xls / xlsx）</div>
+            <div class="hint">Txt、CSV、Excel（xls / xlsx）</div>
             <input id="fileInput" name="data_file" type="file" accept=".csv,.xls,.xlsx,.txt" required />
           </label>
           <div id="fileChosen" class="file-chosen" hidden>
