@@ -6,6 +6,7 @@ dist/
 wheels/
 other/
 Jobs/
+test/
 *.egg-info
 
 # Virtual environments
@@ -18,3 +19,4 @@ Jobs/
 *.doc
 *.txt
 *.ipynb
+*.pdf
