@@ -77,11 +77,22 @@ def api_clean():
     uploaded_file.save(path)
     base_name = os.path.splitext(filename)[0]
     out_path, rep_path = f"{project_folder}/fmt{fmt_name}_{base_name}_clean.xlsx", f"{project_folder}/Report_{base_name}.xlsx"
-    stats, alias_mapping, sorted_df, sorted_mask = cleanValidate(path, out_path, rep_path, f"fmt_{fmt_name}", version, rev_date)
-    cursor.execute("INSERT INTO Job ([JobID],[UserID],[FmtID],[FileName],[TotalCount],[CompletenessScore],[CorrectScore],[ConsistencyScore],[DQI],[Path]) VALUES (?,?,?,?,?,?,?,?,?,?)",
-                    (JobID, user_id, format_id, filename, int(stats['total']), float(stats['completeness']), float(stats['correctness']), float(stats['consistency']), float(stats['quality_score']), project_folder))
-    conn.commit()
-    conn.close()
+    
+    try:
+        stats, alias_mapping, sorted_df, sorted_mask = cleanValidate(path, out_path, rep_path, f"fmt_{fmt_name}", version, rev_date)
+        cursor.execute("INSERT INTO Job ([JobID],[UserID],[FmtID],[FileName],[TotalCount],[CompletenessScore],[CorrectScore],[ConsistencyScore],[DQI],[Path]) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                        (JobID, user_id, format_id, filename, int(stats['total']), float(stats['completeness']), float(stats['correctness']), float(stats['consistency']), float(stats['quality_score']), project_folder))
+        conn.commit()
+    except ValueError as ve:
+        conn.close()
+        return jsonify({"ok": False,"error":str(ve)}), 400
+    except Exception as e:
+        conn.close()
+        return jsonify({"ok": False,"error":str(e)}), 500
+    finally:
+        if conn and not conn.closed:
+            conn.close()
+
     by_field = []
     for col in sorted_mask.columns:
         err_count = (sorted_mask[col] != "").sum()
@@ -98,7 +109,15 @@ def api_clean():
     return jsonify({
         "ok": True, 
         "project_id": JobID,
-        "stats": {"total":int(stats['total']), "passed":int(stats['total']-stats['error_rows']), "error":int(stats['error_rows']), "completeness":float(stats['completeness']), "correctness":float(stats['correctness']), "dqi":float(stats['quality_score'])},
+        "stats": {
+            "total": int(stats['total']), 
+            "passed": int(stats['total'] - stats['error_rows']), 
+            "error": int(stats['error_rows']), 
+            "completeness": float(stats['completeness']), 
+            "correctness": float(stats['correctness']), 
+            "consistency": float(stats['consistency']),
+            "dqi": float(stats['quality_score'])
+        },
         "analysis": {"by_field": by_field,"by_type": by_type},
         "output_fields": output_fields
     })
@@ -114,7 +133,16 @@ def download_file(file_type, job_id):
         if not row: return jsonify({"ok": False, "error": "找不到該紀錄"}), 404
         project_path, original_filename, fmt_name = row
         base_name, _ = os.path.splitext(original_filename)
-        target_filename = f"fmt{fmt_name}_{base_name}_clean.xlsx" if file_type == "cleaned" else f"Report_{base_name}.xlsx"
+        
+        if file_type == "cleaned":
+            target_filename = f"fmt{fmt_name}_{base_name}_clean.xlsx"
+        elif file_type == "report":
+            target_filename = f"Report_{base_name}.xlsx"
+        elif file_type == "original":
+            target_filename = original_filename
+        else:
+            return jsonify({"ok": False, "error": "無效的下載類型"}), 400
+
         file_path = os.path.join(project_path, target_filename)
         conn.close()
         if not os.path.exists(file_path): 
