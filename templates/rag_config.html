@@ -1,0 +1,287 @@
+{% extends "base.html" %}
+
+{% block title %}RAG 知識庫管理 - 癌症登記資料平台{% endblock %}
+
+{% block page_title %}RAG 知識庫管理{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* RAG Specific Layout */
+  .rag-container {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 24px;
+    align-items: start;
+  }
+
+  /* Chat Preview Box */
+  .chat-preview {
+    background: var(--gray-900);
+    border-radius: var(--radius);
+    height: 450px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+  .chat-header {
+    padding: 12px 16px;
+    background: #2d333b;
+    border-bottom: 1px solid #444;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--white);
+  }
+  .chat-body {
+    flex: 1;
+    padding: 16px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .chat-bubble {
+    padding: 10px 14px;
+    border-radius: 12px;
+    max-width: 85%;
+    font-size: 13.5px;
+    line-height: 1.5;
+  }
+  .bubble-ai {
+    background: #374151;
+    color: var(--gray-100);
+    align-self: flex-start;
+    border-bottom-left-radius: 2px;
+  }
+  .bubble-user {
+    background: var(--blue-600);
+    color: var(--white);
+    align-self: flex-end;
+    border-bottom-right-radius: 2px;
+  }
+  .chat-footer {
+    padding: 12px;
+    background: #2d333b;
+    border-top: 1px solid #444;
+  }
+  .chat-input-group {
+    display: flex;
+    gap: 8px;
+  }
+  .chat-input {
+    background: #1c2128;
+    border: 1px solid #444;
+    color: var(--white);
+    border-radius: var(--radius-sm);
+    padding: 6px 12px;
+    flex: 1;
+    font-size: 13px;
+  }
+  .chat-input:focus {
+    outline: none;
+    border-color: var(--blue-500);
+  }
+
+  /* Document Item Status */
+  .status-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .status-indexed { background: var(--success-soft); color: var(--success); }
+  .status-pending { background: var(--warning-soft); color: var(--warning); }
+  
+  /* Parameters slider styling */
+  .param-group { margin-bottom: 15px; }
+  .param-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--gray-600);
+    margin-bottom: 5px;
+  }
+  .param-value { color: var(--blue-600); }
+
+  @media (max-width: 1200px) {
+    .rag-container { grid-template-columns: 1fr; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>RAG 知識庫管理</h1>
+    <p class="lead">建立專屬癌症登記知識庫，透過檢索增強生成 (RAG) 技術提升問答準確度與合規性檢核。</p>
+  </div>
+</div>
+
+<div class="kpi-grid mb-4">
+  <div class="kpi">
+    <div class="label">知識庫文件總數</div>
+    <div class="value blue">24</div>
+  </div>
+  <div class="kpi cyan">
+    <div class="label">向量片段 (Chunks)</div>
+    <div class="value cyan">1,582</div>
+  </div>
+  <div class="kpi amber">
+    <div class="label">索引中任務</div>
+    <div class="value amber">2</div>
+  </div>
+  <div class="kpi green">
+    <div class="label">平均檢索耗時</div>
+    <div class="value" style="color: var(--success);">120ms</div>
+  </div>
+</div>
+
+<div class="rag-container">
+  <!-- Left Side: Knowledge Base & Upload -->
+  <div class="rag-main">
+    <section class="card-flat mb-4">
+      <div class="section-head">
+        <h2><span class="dot"></span> 文件管理</h2>
+        <div class="d-flex gap-2">
+           <button class="btn btn-primary btn-sm" id="btnUploadDoc">
+             <i class="bi bi-plus-circle me-1"></i> 上傳文件
+           </button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="table-flat">
+          <thead>
+            <tr>
+              <th>文件名</th>
+              <th>大小</th>
+              <th>類型</th>
+              <th>索引狀態</th>
+              <th>上傳日期</th>
+              <th style="width: 100px;">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>癌登作業手冊_2024版.pdf</strong></td>
+              <td>4.2 MB</td>
+              <td><span class="badge-soft gray">PDF</span></td>
+              <td><span class="status-tag status-indexed"><i class="bi bi-check-circle-fill"></i> 已索引</span></td>
+              <td>2025/12/01</td>
+              <td><button class="btn btn-sm btn-icon"><i class="bi bi-trash text-danger"></i></button></td>
+            </tr>
+            <tr>
+              <td><strong>TNM分期指引_第8版.pdf</strong></td>
+              <td>2.8 MB</td>
+              <td><span class="badge-soft gray">PDF</span></td>
+              <td><span class="status-tag status-indexed"><i class="bi bi-check-circle-fill"></i> 已索引</span></td>
+              <td>2025/11/15</td>
+              <td><button class="btn btn-sm btn-icon"><i class="bi bi-trash text-danger"></i></button></td>
+            </tr>
+            <tr>
+              <td><strong>臨床檢驗參考值說明.docx</strong></td>
+              <td>850 KB</td>
+              <td><span class="badge-soft gray">DOCX</span></td>
+              <td><span class="status-tag status-pending"><i class="bi bi-hourglass-split"></i> 索引中...</span></td>
+              <td>2025/12/04</td>
+              <td><button class="btn btn-sm btn-icon"><i class="bi bi-trash text-danger"></i></button></td>
+            </tr>
+            <tr>
+              <td><strong>常見編碼錯誤彙整.xlsx</strong></td>
+              <td>1.2 MB</td>
+              <td><span class="badge-soft gray">XLSX</span></td>
+              <td><span class="status-tag status-indexed"><i class="bi bi-check-circle-fill"></i> 已索引</span></td>
+              <td>2025/11/20</td>
+              <td><button class="btn btn-sm btn-icon"><i class="bi bi-trash text-danger"></i></button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card-flat">
+      <div class="section-head">
+        <h2><span class="dot"></span> 系統日誌</h2>
+      </div>
+      <div class="section-body" style="background: #f8f9fa;">
+        <div class="small text-muted font-monospace" style="height: 120px; overflow-y: auto;">
+          [2025-12-04 10:15:32] INFO: 開始讀取 臨床檢驗參考值說明.docx<br>
+          [2025-12-04 10:15:35] INFO: 文本切割完成，共 42 個片段<br>
+          [2025-12-04 10:15:38] INFO: 正在呼叫 Embedding 模型 (text-embedding-3-small)...<br>
+          [2025-12-04 10:15:40] SUCCESS: 向量資料存入知識庫完成
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Right Side: Chat Preview & Settings -->
+  <aside class="rag-sidebar">
+    <div class="card-flat mb-4">
+      <div class="section-head">
+        <h2><i class="bi bi-chat-left-dots me-2 text-primary"></i> 檢索測試</h2>
+      </div>
+      <div class="chat-preview">
+        <div class="chat-header">
+          <i class="bi bi-robot"></i>
+          <span class="fw-bold small">RAG 助手預覽</span>
+        </div>
+        <div class="chat-body" id="chatBody">
+          <div class="chat-bubble bubble-ai">您好！我是您的癌登知識助手。我已準備好回答有關手冊與指引的問題。</div>
+          <div class="chat-bubble bubble-user">2024年版手冊中，關於肺癌的申報期限有更動嗎？</div>
+          <div class="chat-bubble bubble-ai">
+            根據《癌登作業手冊_2024版》第 45 頁顯示：<br>
+            肺癌個案之申報期限維持於診斷後 12 個月內完成，但針對 T1a 期個案新增了...
+          </div>
+        </div>
+        <div class="chat-footer">
+          <div class="chat-input-group">
+            <input type="text" class="chat-input" placeholder="請輸入問題進行測試...">
+            <button class="btn btn-primary btn-sm" style="padding: 4px 10px;"><i class="bi bi-send-fill"></i></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-flat">
+      <div class="section-head">
+        <h2><i class="bi bi-sliders me-2 text-primary"></i> RAG 模型設定</h2>
+      </div>
+      <div class="section-body">
+        <div class="param-group">
+          <div class="param-label">使用模型<span>Gemini 1.5 Pro</span></div>
+          <select class="form-select form-select-sm">
+            <option>Gemini 1.5 Pro</option>
+            <option>GPT-4o</option>
+            <option>Llama-3 (Local)</option>
+          </select>
+        </div>
+        
+        <div class="param-group">
+          <div class="param-label">Temperature <span class="param-value">0.3</span></div>
+          <input type="range" class="form-range" min="0" max="1" step="0.1" value="0.3">
+        </div>
+
+        <div class="param-group">
+          <div class="param-label">Top-K檢索數 <span class="param-value">5</span></div>
+          <input type="range" class="form-range" min="1" max="10" step="1" value="5">
+        </div>
+
+        <div class="param-group">
+          <div class="param-label">Chunk<span class="param-value">500</span></div>
+          <input type="range" class="form-range" min="100" max="1000" step="50" value="500">
+        </div>
+
+        <hr class="my-3 opacity-10">
+        
+        <button class="btn btn-outline-primary btn-sm btn-block">
+          <i class="bi bi-save me-1"></i> 套用設定
+        </button>
+      </div>
+    </div>
+  </aside>
+</div>
+{% endblock %}
