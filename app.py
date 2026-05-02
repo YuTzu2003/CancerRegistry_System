@@ -48,8 +48,8 @@ def inject_nav():
 
 @app.route("/")
 @login_required
-def dashboard():
-    return render_template("dashboard.html", active="dashboard")
+def index():
+    return render_template("index.html", active="index")
 
 # ---- other ------------------------------------------
 @app.route("/dataGen")

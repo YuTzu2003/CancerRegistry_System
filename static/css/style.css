@@ -92,6 +92,15 @@ a {
   border-bottom: 1px solid var(--gray-900);
   min-height: var(--topbar-h);
 }
+.brand-link {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: inherit;
+  overflow: hidden;
+}
 .brand-logo {
   width: 36px; 
   height: 36px; 
@@ -239,7 +248,7 @@ a {
 .sidebar.collapsed { 
   width: var(--sidebar-collapsed); 
 }
-.sidebar.collapsed .brand-text,.sidebar.collapsed .nav-text,.sidebar.collapsed .user-meta { 
+.sidebar.collapsed .brand-link, .sidebar.collapsed .nav-text,.sidebar.collapsed .user-meta, .sidebar.collapsed .user-avatar { 
   display: none; 
 }
 .sidebar.collapsed .sidebar-brand { 
@@ -251,6 +260,10 @@ a {
   padding: 10px; }
 .sidebar.collapsed .user-chip { 
   justify-content: center; 
+  padding: 8px 0;
+}
+.sidebar.collapsed .user-chip i {
+  margin: 0;
 }
 
 /* ==========================================================
@@ -285,6 +298,16 @@ a {
   cursor: pointer;
 }
 .btn-toggle:hover { background: var(--gray-100); }
+
+.sidebar .btn-toggle {
+  border-color: var(--gray-800);
+  color: var(--gray-400);
+}
+.sidebar .btn-toggle:hover {
+  background: var(--gray-800);
+  color: var(--white);
+}
+
 .topbar-title { font-weight: 400; font-size: 16px; color: var(--text); flex: 1; }
 .topbar-actions { display: flex; gap: 6px; }
 .top-btn {

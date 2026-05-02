@@ -1,29 +1,52 @@
-## 資料自動偵測錯誤並清洗
+本專案是一個專為醫療機構設計的癌症登記資料管理系統。透過自動化的資料清洗流程、AI 智慧輔助問答以及統計分析功能，協助癌症登記人員（Cancer Registrar）提升資料申報的品質與效率。
 
-環境建置
+---
+
+## 核心功能
+
+1.  **資料清洗模組**：自動偵測原始 CSV/Excel 資料中的格式錯誤、邏輯衝突，並根據癌症登記手冊進行標準化轉換。
+2.  **申報紀錄與審核**：完整紀錄每次資料清洗的歷程，支援結果匯出與歷史申報檔案管理。
+3.  **統計分析儀表板**：直觀顯示個案登錄數、資料完整率等關鍵指標 (KPI)。
+4.  **虛擬資料生成**：支援產生符合格式規範的測試資料，用於系統測試或學術演練。
+5.  **使用者權限管理**：區分管理者與一般使用者權限，確保資料存取安全。
+
+---
+
+## 環境建置與執行流程
+
+### 1. 環境準備
+請確保電腦已安裝：
+-   Python3.12 或更高版本
+-   [uv](https://github.com/astral-sh/uv)
+-   SQL Server
+
+### 2. 下載專案與環境初始化
 ```bash
+git clone <repository_url>
+cd CancerRegistry_System
+
 uv venv
-.venv\Scripts\activate
+.venv\Scripts\activate  # Windows
+source .venv/bin/activate # Linux/Mac
 uv sync
 ```
 
-欄位名稱轉換
-```bash
-Restore Hospital_data.bak
-uv run field_mapping.py
-```
+### 3. 資料庫配置
+本系統需連接 SQL Server 以儲存醫院代碼及欄位對應資訊：
+1.  還原資料庫：請在 SQL Server 中還原 `data/Hospital_data.bak` 備份檔。
+2.  執行欄位初始化：
+    ```bash
+    uv run modules/field_mapping.py
+    ```
 
-癌症資料抓取
+### 4. 執行應用程式
 ```bash
-uv run cancer_classify.py
+uv run app.py
 ```
+啟動後，平台網址 `http://127.0.0.1:5000`。
 
-資料清洗
-```bash
-uv run clean.py
-```
+---
 
-Flask
-```bash
-uv run app.py # flask run
-```
+## 備註
+-   如需調整資料庫連接字串，請至 `modules/db.py` 進行修改。
+-   資料清洗邏輯在 `modules/clean_pipeline/` 目錄下。
