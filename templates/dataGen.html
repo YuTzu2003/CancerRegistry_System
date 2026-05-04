@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+{% block title %}虛擬資料生成 - 癌症登記資料平台{% endblock %}
+{% block page_title %}虛擬資料生成{% endblock %}
+{% block extra_head %}
+
+<style>
+  .config-section {
+    display: none;
+    animation: fadeIn 0.4s ease-out;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .field-scroll-container {
+    max-height: 250px;
+    overflow-y: auto;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--gray-50);
+  }
+  .column-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
+  }
+  .result-section {
+    margin-top: 24px;
+    display: none;
+  }
+  .table-preview-container {
+    max-height: 500px;
+    overflow: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--white);
+  }
+  .table-flat {
+    min-width: 1300px;
+  }
+  .download-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+  }
+  
+  #loadingOverlay {
+    display: none; 
+    position: fixed; 
+    top: 0; left: 0; 
+    width: 100%; height: 100%; 
+    background: rgba(255,255,255,0.85); 
+    z-index: 9999; 
+    flex-direction: column; 
+    align-items: center; 
+    justify-content: center;
+    backdrop-filter: blur(2px);
+  }
+
+  .header-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>虛擬資料生成</h1>
+    <p class="lead">上傳資料並選擇欄位，系統將自動生成對應之虛擬資料，並進行隨機化與去識別化處理。</p>
+  </div>
+</div>
+
+<div class="card-flat mb-4">
+  <div class="section-head">
+    <div class="d-flex align-items-center flex-grow-1">
+      <h2><span class="dot"></span>資料上傳與格式設定</h2>
+      <span class="hint ms-3">支援 CSV, Excel 格式</span>
+    </div>
+    <div class="header-actions" id="actionGroup" style="display: none;">
+      <button class="btn btn-outline-secondary" onclick="resetUpload()">
+        <i class="bi bi-arrow-counterclockwise"></i> 重置
+      </button>
+      <button class="btn btn-primary" id="genBtn" onclick="generateMockData()">
+        <i class="bi bi-magic"></i> 開始執行生成
+      </button>
+    </div>
+  </div>
+  <div class="section-body">
+    <div class="uploader" id="uploadArea">
+      <div class="ico"><i class="bi bi-cloud-arrow-up"></i></div>
+      <div class="fw-bold">點擊或拖曳檔案至此處上傳</div>
+      <div class="hint mt-1">檔案格式：CSV / XLSX / XLS</div>
+      <input type="file" id="fileInput" accept=".csv, .xlsx, .xls">
+    </div>
+    <div id="fileInfo" class="file-chosen" style="display: none; padding: 12px 20px;">
+      <i class="bi bi-file-earmark-check" style="font-size: 1.2rem; color: var(--success);"></i>
+      <span id="fileName" class="fw-bold ms-2">已選取檔案.csv</span>
+      <button type="button" class="btn-close ms-auto" aria-label="Remove" onclick="resetUpload()"></button>
+    </div>
+  </div>
+</div>
+
+<div class="config-section" id="configSection">
+  <div class="row g-4">
+    <div class="col-lg-6">
+      <div class="card-flat h-100">
+        <div class="section-head">
+          <h2><i class="bi bi-calendar-event me-2 text-primary"></i>日期欄位：自動隨機平移</h2>
+        </div>
+        <div class="section-body">
+          <label class="form-label fw-bold small text-muted mb-3">勾選要進行隨機平移的欄位</label>
+          <div class="field-scroll-container">
+            <div class="column-grid" id="dateFields">
+              <label class="field-chip"><input type="checkbox"> 生日</label>
+              <label class="field-chip"><input type="checkbox"> 診斷日期</label>
+              <label class="field-chip"><input type="checkbox"> 手術日期</label>
+              <label class="field-chip"><input type="checkbox"> 追蹤日期</label>
+              <label class="field-chip"><input type="checkbox"> 復發日期</label>
+              <label class="field-chip"><input type="checkbox"> 死亡日期</label>
+              <label class="field-chip"><input type="checkbox"> 最後接觸日</label>
+              <label class="field-chip"><input type="checkbox"> 化療開始日</label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card-flat h-100">
+        <div class="section-head">
+          <h2><i class="bi bi-shield-lock me-2 text-primary"></i>特殊欄位：自動去識別化</h2>
+        </div>
+        <div class="section-body">
+          <label class="form-label fw-bold small text-muted mb-3">勾選要執行去識別化之欄位</label>
+          <div class="field-scroll-container">
+            <div class="column-grid" id="specialFields">
+              <label class="field-chip"><input type="checkbox" checked> 身分證字號</label>
+              <label class="field-chip"><input type="checkbox" checked> 姓名</label>
+              <label class="field-chip"><input type="checkbox"> 病歷號碼</label>
+              <label class="field-chip"><input type="checkbox"> 電話/手機</label>
+              <label class="field-chip"><input type="checkbox"> 電子郵件</label>
+              <label class="field-chip"><input type="checkbox"> 詳細住址</label>
+              <label class="field-chip"><input type="checkbox"> 家屬聯繫</label>
+              <label class="field-chip"><input type="checkbox"> 投保序號</label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="result-section" id="resultSection">
+  <div class="card-flat">
+    <div class="section-head">
+      <h2><i class="bi bi-check-circle-fill me-2 text-success"></i>結果預覽 (前20筆)</h2>
+    </div>
+    <div class="section-body">
+      <div class="download-actions">
+        <div class="d-flex gap-2">
+          <button class="btn btn-success text-white">下載 XLSX</button>
+        </div>
+        <span class="text-muted small">滑動表格查看完整欄位</span>
+      </div>
+      
+      <div class="table-preview-container">
+        <table class="table-flat">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>病歷號 (Mock)</th>
+              <th>姓名 (Mask)</th>
+              <th>身分證 (Mask)</th>
+              <th>出生日期 (Random)</th>
+              <th>診斷日期 (Random)</th>
+              <th>癌症部位</th>
+              <th>分期 T</th>
+              <th>分期 N</th>
+              <th>分期 M</th>
+              <th>總分期</th>
+              <th>治療方式</th>
+              <th>最後追蹤日期</th>
+            </tr>
+          </thead>
+          <tbody id="previewBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Loading Overlay -->
+<div id="loadingOverlay">
+  <div class="spinner-border text-primary" role="status" style="width: 3.5rem; height: 3.5rem;">
+    <span class="visually-hidden">Loading...</span>
+  </div>
+  <div class="mt-4 h5 fw-bold text-dark">虛擬資料建置生成中...</div>
+  <div class="text-muted small mt-1">這可能需要幾秒鐘的時間</div>
+</div>
+
+<script src="/static/js/dataGen.js"></script>
+{% endblock %}

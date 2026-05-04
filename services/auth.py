@@ -20,7 +20,7 @@ def admin_required(f):
     def decorated_function(*args, **kwargs):
         if session.get("position") != "Admin":
             flash("權限不足，無法存取此頁面", "danger")
-            return redirect(url_for("dashboard"))
+            return redirect(url_for("index"))
         return f(*args, **kwargs)
     return decorated_function
 
@@ -28,7 +28,7 @@ def admin_required(f):
 @auth_bp.route("/login", methods=["GET", "POST"])
 def login():
     if "id" in session: 
-        return redirect(url_for("dashboard"))    
+        return redirect(url_for("index"))    
     if request.method == "POST":
         user_id = request.form["userid"]
         password = request.form["password"]
