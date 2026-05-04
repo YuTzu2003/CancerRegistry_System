@@ -102,6 +102,7 @@ def api_clean():
     filename = secure_filename(uploaded_file.filename)
     path = f"{project_folder}/{filename}"
     uploaded_file.save(path)
+    uploaded_file.close() # 確保釋放檔案控制權，避免 Windows 鎖定
     
     file_ext = os.path.splitext(filename)[1].lower()
     process_path = path

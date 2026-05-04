@@ -276,6 +276,7 @@ a {
   height: var(--topbar-h);
   background: var(--white);
   border-bottom: 1px solid var(--border);
+  box-shadow: 0 2px 12px rgba(15, 17, 21, 0.06);
   display: flex; 
   align-items: center; 
   gap: 14px;
