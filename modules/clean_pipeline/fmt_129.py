@@ -26,8 +26,8 @@ RULES = {
         'ID':'1.4',
         'field': 'ID Number',
         'length': 10,
-        'SV': '9999999999',
         'regex': r'^[A-Za-z][1289]\d{8}$',
+        'SV': '9999999999',
         'description': '記錄個案的身分證統一編號。',
         'purpose': '用來辨識個案。' 
     },
