@@ -2,7 +2,7 @@ RULES = {
     '申報醫院代碼': {
         'ID':'1.1',
         'field': 'Reporting Hospital Code', 
-        'length': 10, 
+        'max_length': 10, 
         'digit': True,
         'description': '確認申報醫院之醫事機構代碼。',
         'purpose': '確認申報醫院。'
@@ -415,7 +415,7 @@ RULES = {
         'field': 'Surgical Procedure of Primary Site at Other Facility',
         'max_length': 3,
         'digit': True,
-        'SV':['00,90,98,99'],
+        'SV':['00','90','98','99'],
         'pattern_range': '10-80',
         'description': '記錄個案於外院對原發部位所進行的外科手術方式。',
         'purpose': '用來比較不同治療方式的效果。'
@@ -425,7 +425,7 @@ RULES = {
         'field': 'Surgical Procedure of Primary Site at This Facility',
         'max_length': 3,
         'digit': True,
-        'SV':['00,90,98,99'],
+        'SV':['00','90','98','99'],
         'pattern_range': '10-80',
         'description': '記錄在申報醫院對原發部位所進行的手術方式。',
         'purpose': '用來比較不同治療方式的效果。'
