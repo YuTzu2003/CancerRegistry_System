@@ -415,7 +415,7 @@ RULES = {
         'field': 'Surgical Procedure of Primary Site at Other Facility',
         'max_length': 3,
         'digit': True,
-        'SV':['00,90,98,99'],
+        'SV':['00','90','98','99'],
         'pattern_range': '10-80',
         'description': '記錄個案於外院對原發部位所進行的外科手術方式。',
         'purpose': '用來比較不同治療方式的效果。'
