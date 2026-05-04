@@ -2,11 +2,19 @@ import os
 import shutil
 import datetime
 import zipfile
+import stat
 from flask import Blueprint, render_template, session, redirect, url_for, flash, jsonify, send_file
 from modules.db import get_conn
 from services.auth import login_required
 
 history_bp = Blueprint('history', __name__)
+
+def remove_readonly(func, path, excinfo):
+    """
+    Error handler for shutil.rmtree to handle read-only files on Windows.
+    """
+    os.chmod(path, stat.S_IWRITE)
+    func(path)
 
 @history_bp.route("/history")
 @login_required
@@ -31,8 +39,13 @@ def delete_history(job_id):
     cursor = conn.cursor()
     cursor.execute("SELECT [Path] FROM [Job] WHERE [JobID]=? AND [UserID]=?", (job_id, user_id))
     row = cursor.fetchone()
+    
     if row and row[0] and os.path.exists(row[0]): 
-        shutil.rmtree(row[0]) 
+        try:
+            shutil.rmtree(row[0], onerror=remove_readonly)
+        except Exception as e:
+            print(f"Error deleting folder {row[0]}: {e}")
+            
     cursor.execute("DELETE FROM [Job] WHERE [JobID] = ? AND [UserID] = ?", (job_id, user_id))
     conn.commit()
     conn.close()

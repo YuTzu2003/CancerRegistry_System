@@ -2,7 +2,7 @@ RULES = {
     '申報醫院代碼': {
         'ID':'1.1',
         'field': 'Reporting Hospital Code', 
-        'length': 10, 
+        'max_length': 10, 
         'digit': True,
         'description': '確認申報醫院之醫事機構代碼。',
         'purpose': '確認申報醫院。'
@@ -125,7 +125,7 @@ RULES = {
     '原發部位':{
         'ID':'2.6',
         'field': 'Primary Site',
-        'max_length': 5,
+        'max_length': 4,
         'pattern_range': 'C000-C809',
         'description': '確認癌症原發部位。',
         'purpose': '原發部位是分期及決定治療方針之依據；同時也影響其預後及病程。'
@@ -142,7 +142,7 @@ RULES = {
     '組織型態':{
         'ID':'2.8',
         'field': 'Histology',
-        'max_length':5,
+        'max_length':4,
         #'digit': True,
         'range': [8000, 9999],
         'description': '原發腫瘤細胞於顯微鏡下之結構。',
@@ -415,7 +415,7 @@ RULES = {
         'field': 'Surgical Procedure of Primary Site at Other Facility',
         'max_length': 3,
         'digit': True,
-        'SV':['00,90,98,99'],
+        'SV':['00','90','98','99'],
         'pattern_range': '10-80',
         'description': '記錄個案於外院對原發部位所進行的外科手術方式。',
         'purpose': '用來比較不同治療方式的效果。'
@@ -425,7 +425,7 @@ RULES = {
         'field': 'Surgical Procedure of Primary Site at This Facility',
         'max_length': 3,
         'digit': True,
-        'SV':['00,90,98,99'],
+        'SV':['00','90','98','99'],
         'pattern_range': '10-80',
         'description': '記錄在申報醫院對原發部位所進行的手術方式。',
         'purpose': '用來比較不同治療方式的效果。'
@@ -1030,11 +1030,4 @@ RULES = {
         'purpose': '因應臨床實務需求及癌症診療品質提升。'
     }
 }
-
-# 執行計算
-print(f"目前定義的欄位總數：{len(RULES)}")
-
-# 如果想看 ID 清單檢查進度
-ids = [v['ID'] for v in RULES.values() if 'ID' in v]
-print(f"已完成的 ID：{ids}")
 
