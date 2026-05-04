@@ -102,7 +102,7 @@ def api_clean():
     filename = secure_filename(uploaded_file.filename)
     path = f"{project_folder}/{filename}"
     uploaded_file.save(path)
-    uploaded_file.close() # 確保釋放檔案控制權，避免 Windows 鎖定
+    uploaded_file.close()
     
     file_ext = os.path.splitext(filename)[1].lower()
     process_path = path
@@ -134,7 +134,7 @@ def api_clean():
             temp_csv = f"{project_folder}/temp.csv"
             keys = [f[0] for f in field_spec]
             with open(temp_csv, 'w', newline='', encoding='utf-8-sig') as f:
-                writer = csv.DictWriter(f, fieldnames=keys)
+                writer = csv.DictWriter(f, fieldnames=keys, quoting=csv.QUOTE_ALL)
                 writer.writeheader()
                 writer.writerows(results)      
             process_path = temp_csv

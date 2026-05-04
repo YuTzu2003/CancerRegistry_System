@@ -104,14 +104,19 @@ def cleanValidate(input_file,output_file,report_file,fmt,version,Revision_Date):
     fill_dateformat = PatternFill("solid", fgColor="00FFFF") # 藍底=日期邏輯錯
     
     for r_idx in range(len(sorted_df)):
-        for c_idx in range(len(sorted_mask.columns)):
-            err_type = sorted_mask.iloc[r_idx, c_idx]
-            if err_type == "missing":
-                ws.cell(row=r_idx + 2, column=c_idx + 1).fill = fill_missing
-            elif err_type == "format":
-                ws.cell(row=r_idx + 2, column=c_idx + 1).fill = fill_format
-            elif err_type == "dateformat": 
-                ws.cell(row=r_idx + 2, column=c_idx + 1).fill = fill_dateformat
+        for c_idx in range(len(sorted_df.columns)):
+            cell = ws.cell(row=r_idx + 2, column=c_idx + 1)
+            cell.number_format = '@'  # 強制設定為文字格式
+            
+            # 只有在 error_mask 範圍內的欄位才進行顏色標記
+            if c_idx < len(sorted_mask.columns):
+                err_type = sorted_mask.iloc[r_idx, c_idx]
+                if err_type == "missing":
+                    cell.fill = fill_missing
+                elif err_type == "format":
+                    cell.fill = fill_format
+                elif err_type == "dateformat": 
+                    cell.fill = fill_dateformat
 
     wb.save(output_file)
     wb.close()
