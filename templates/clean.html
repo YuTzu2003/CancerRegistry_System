@@ -195,6 +195,7 @@
     <div class="section-head">
       <h2><span class="dot"></span>清洗結果分析</h2>
       <div class="d-flex align-items-center gap-2">
+        <span id="detectedSystemBadge" class="badge bg-secondary" style="display: none;">偵測體系：<span id="detectedSystemName"></span></span>
         <button class="btn btn-sm" type="button" id="btnDownloadReport">
           <i class="bi bi-file-earmark-excel"></i> 下載報告 XLSX
         </button>
@@ -266,8 +267,7 @@
 
     <div style="margin-bottom: 18px;">
       <div class="d-flex justify-content-between align-items-center mb-2">
-        <div style="font-size: 13px; font-weight: 600; color: var(--gray-700);">
-          欄位命名方案
+        <div style="font-size: 13px; font-weight: 600; color: var(--gray-700);">欄位命名選擇
           <span class="hint" style="font-weight: 400; margin-left: 6px;">選擇輸出 XLSX 欄位標頭採用的命名來源</span>
         </div>
       </div>
