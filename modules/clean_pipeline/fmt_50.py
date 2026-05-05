@@ -18,7 +18,7 @@ RULES = {
     '姓名': {
         'ID':'1.3',
         'field': 'Name',
-        'max_length': 10,
+        'max_length': 200,
         'description': '填寫個案的姓名。',
         'purpose': '用來辨識個案。'
     },
