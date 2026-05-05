@@ -7,6 +7,7 @@ from openpyxl import Workbook
 from modules.db import get_conn
 from modules.cleaner import cleanValidate
 from services.auth import login_required
+from modules.field_mapping import detect_system
 
 clean_bp = Blueprint('clean', __name__)
 Jobs_FOLDER = 'static/Jobs'
@@ -181,9 +182,14 @@ def api_clean():
     ]
 
     output_fields = [{"key": col, "label": col} for col in sorted_df.columns if not col.startswith('_')]
+    
+    # 偵測資料體系
+    detected_system, _ = detect_system(sorted_df.columns)
+
     return jsonify({
         "ok": True, 
         "project_id": JobID,
+        "detected_system": detected_system,
         "stats": {
             "total": int(stats['total']), 
             "passed": int(stats['total'] - stats['error_rows']), 
