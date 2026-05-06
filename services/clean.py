@@ -3,9 +3,11 @@ import uuid
 import csv
 from flask import Blueprint, render_template, request, session, jsonify, send_file
 from werkzeug.utils import secure_filename
+from openpyxl import Workbook
 from modules.db import get_conn
 from modules.cleaner import cleanValidate
 from services.auth import login_required
+from modules.field_mapping import detect_system
 
 clean_bp = Blueprint('clean', __name__)
 Jobs_FOLDER = 'static/Jobs'
@@ -131,13 +133,21 @@ def api_clean():
                     # if not clean_line.strip(): continue
                     results.append(parse_fixed_width_line(line, field_spec))
 
-            temp_csv = f"{project_folder}/temp.csv"
+            temp_xlsx = f"{project_folder}/temp.xlsx"
             keys = [f[0] for f in field_spec]
-            with open(temp_csv, 'w', newline='', encoding='utf-8-sig') as f:
-                writer = csv.DictWriter(f, fieldnames=keys, quoting=csv.QUOTE_ALL)
-                writer.writeheader()
-                writer.writerows(results)      
-            process_path = temp_csv
+            wb_temp = Workbook()
+            ws_temp = wb_temp.active
+            ws_temp.append(keys)
+
+            for row_dict in results:
+                row_values = [row_dict.get(k, "") for k in keys]
+                ws_temp.append(row_values)
+            for row in ws_temp.iter_rows():
+                for cell in row:
+                    cell.number_format = '@'
+            
+            wb_temp.save(temp_xlsx)
+            process_path = temp_xlsx
             
         except Exception as e:
             conn.close()
@@ -172,9 +182,14 @@ def api_clean():
     ]
 
     output_fields = [{"key": col, "label": col} for col in sorted_df.columns if not col.startswith('_')]
+    
+    # 偵測資料體系
+    detected_system, _ = detect_system(sorted_df.columns)
+
     return jsonify({
         "ok": True, 
         "project_id": JobID,
+        "detected_system": detected_system,
         "stats": {
             "total": int(stats['total']), 
             "passed": int(stats['total'] - stats['error_rows']), 

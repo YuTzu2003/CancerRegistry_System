@@ -198,6 +198,34 @@
       currentJobId = data.project_id;
     }
 
+    // 顯示偵測到的體系
+    const systemBadge = $('#detectedSystemBadge');
+    const systemName = $('#detectedSystemName');
+    if (data.detected_system && data.detected_system !== 'unknown') {
+      if (systemBadge) systemBadge.style.display = 'inline-block';
+      if (systemName) systemName.textContent = data.detected_system;
+      
+      // 自動勾選對應的命名方案
+      const schemeValueMap = {
+        "中文欄位名稱": "chinese",
+        "英文欄位名稱": "english",
+        "台大雲林欄位名稱": "ntu_yunlin",
+        "台大體系醫整庫欄位名稱": "ntu_hospital",
+        "台灣癌症登記中心": "tw_cancer_registry",
+        "雲醫癌AI模組": "yunmed_cancer_ai"
+      };
+      const targetValue = schemeValueMap[data.detected_system];
+      if (targetValue) {
+        const radio = $(`input[name="nameScheme"][value="${targetValue}"]`);
+        if (radio) {
+          radio.checked = true;
+          syncNamingSelection();
+        }
+      }
+    } else {
+      if (systemBadge) systemBadge.style.display = 'none';
+    }
+
     const alertContainer = $('#cleaningAlertContainer');
     if (alertContainer && data.ok) {
       alertContainer.innerHTML = `
