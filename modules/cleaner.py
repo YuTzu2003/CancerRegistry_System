@@ -70,14 +70,6 @@ def cleanValidate(input_file,output_file,report_file,fmt,version,Revision_Date):
             rule = rules_normalized[clean_col]
 
         if rule:
-            fixed_len = rule.get('length')
-            if fixed_len:
-                df[col] = df[col].apply(
-                    lambda x: str(x).strip().zfill(fixed_len) 
-                    if pd.notnull(x) and str(x).strip() != "" 
-                    else x
-                )
-            
             error_mask[col] = df[col].apply(lambda x: check_error_type(x, rule))
 
     for idx, row in df.iterrows():
