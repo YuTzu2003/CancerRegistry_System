@@ -65,10 +65,49 @@ def field_mapping(target_col):
 
     return alias_dict, output_field_list
 
-def process_data(excel_path, mapping_dict, AImodule_list, target_sheet=0):
-
-    df_excel = pd.read_excel(excel_path, sheet_name=target_sheet)
+def get_field_map(target_scheme_key, fmt_name=None):
+    scheme_map = {
+        "field_name_zh":"中文欄位名稱",
+        "field_name_en":"英文欄位名稱",
+        "ntu_yunlin":"台大雲林欄位名稱",
+        "ntu_system":"台大體系醫整庫欄位名稱",
+        "taiwan_cancer_registry":"台灣癌症登記中心",
+        "AI_module":"雲醫癌AI模組"
+    }
     
+    target_col = scheme_map.get(target_scheme_key,"中文欄位名稱")
+    conn = get_conn()
+    
+    if fmt_name:
+        clean_fmt = str(fmt_name).replace("fmt_", "")
+    query = f"""SELECT [中文欄位名稱],[英文欄位名稱],[台大雲林欄位名稱],[台大體系醫整庫欄位名稱],[台灣癌症登記中心],[雲醫癌AI模組]
+                FROM [Hospital_data].[dbo].[v_FieldMap_WithFmt]
+                WHERE [{clean_fmt}欄位] = 1"""
+    
+    cursor = conn.cursor()
+    cursor.execute(query)
+    rows = cursor.fetchall()
+    columns = [column[0] for column in cursor.description]
+    df_mapping = pd.DataFrame.from_records(rows, columns=columns)
+    conn.close()
+
+    alias_to_target = {}
+    for _, row in df_mapping.iterrows():
+        target_name = str(row[target_col]).strip() if pd.notna(row[target_col]) else ""
+        if not target_name:
+            continue
+            
+        for col in columns:
+            val = row[col]
+            if pd.notna(val):
+                alias = str(val).strip()
+                if alias:
+                    alias_to_target[alias] = target_name
+                    
+    return alias_to_target
+
+def process_data(excel_path, mapping_dict, AImodule_list, target_sheet=0):
+    df_excel = pd.read_excel(excel_path, sheet_name=target_sheet)
     rename_map = {}
     for col in df_excel.columns:
         clean_col = str(col).strip()
@@ -81,7 +120,6 @@ def process_data(excel_path, mapping_dict, AImodule_list, target_sheet=0):
     for ai_name in AImodule_list:
         if ai_name not in df_transformed.columns:
             df_transformed[ai_name] = "" 
-            
     df_final = df_transformed[AImodule_list]
     return df_final
 

@@ -6,9 +6,231 @@ from werkzeug.utils import secure_filename
 from modules.db import get_conn
 from modules.cleaner import cleanValidate
 from services.auth import login_required
+from modules.field_mapping import detect_system, get_field_map
+from openpyxl import load_workbook, Workbook
+from openpyxl.utils import get_column_letter
+from copy import copy
 
 clean_bp = Blueprint('clean', __name__)
 Jobs_FOLDER = 'static/Jobs'
+
+def copy_cell(source_cell, target_cell):
+    target_cell.value = source_cell.value
+    if source_cell.has_style:
+        target_cell.font = copy(source_cell.font)
+        target_cell.border = copy(source_cell.border)
+        target_cell.fill = copy(source_cell.fill)
+        target_cell.number_format = copy(source_cell.number_format)
+        target_cell.protection = copy(source_cell.protection)
+        target_cell.alignment = copy(source_cell.alignment)
+
+@clean_bp.route("/api/categorize_fields", methods=["POST"])
+@login_required
+def api_categorize_fields():
+    data = request.json
+    job_id = data.get("job_id")
+    scheme = data.get("scheme")
+
+    if not job_id or not scheme:
+        return jsonify({"ok": False, "error": "參數不足"}), 400
+
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute("""SELECT Job.Path, Job.FileName, DataFormat.FmtName FROM [Job] JOIN [DataFormat] ON Job.FmtID = DataFormat.FmtID WHERE Job.JobID=?""", (job_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return jsonify({"ok": False, "error": "找不到該紀錄"}), 404
+
+    project_path, original_filename, fmt_name = row
+    base_name, _ = os.path.splitext(original_filename)
+    cleaned_file = os.path.join(project_path, f"fmt{fmt_name}_{base_name}_Clean.xlsx")
+
+    if not os.path.exists(cleaned_file):
+        return jsonify({"ok": False, "error": "清洗檔案不存在"}), 404
+
+    try:
+        wb = load_workbook(cleaned_file, read_only=True)
+        ws = wb.active
+        headers = [cell.value for cell in next(ws.iter_rows(max_row=1))]
+        wb.close()
+
+        alias_to_target = get_field_map(scheme, fmt_name)
+        mapped = []
+        unmapped = []
+        for h in headers:
+            if h.startswith('_') or h == '錯誤註記說明(A:遺漏值 B:格式不符 C:邏輯錯誤 D:完全正確)':
+                continue
+            if h in alias_to_target:
+                mapped.append({"key": h, "label": h, "target": alias_to_target[h]})
+            else:
+                unmapped.append({"key": h, "label": h})
+        return jsonify({"ok": True,"mapped": mapped,"unmapped": unmapped})
+    
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+@clean_bp.route("/api/export", methods=["POST"])
+@login_required
+def api_export():
+    data = request.json
+    job_id = data.get("job_id")
+    scheme = data.get("scheme")
+    selected_fields = data.get("fields", [])
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute("""SELECT Job.Path, Job.FileName, DataFormat.FmtName FROM [Job] JOIN [DataFormat] ON Job.FmtID = DataFormat.FmtID WHERE Job.JobID=?""", (job_id,))
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
+        return jsonify({"ok": False, "error": "找不到該紀錄"}), 404
+
+    project_path, original_filename, fmt_name = row
+    base_name, _ = os.path.splitext(original_filename)
+    cleaned_file = os.path.join(project_path, f"fmt{fmt_name}_{base_name}_Clean.xlsx")
+
+    if not os.path.exists(cleaned_file):
+        return jsonify({"ok": False, "error": "清洗檔案不存在"}), 404
+
+    alias_to_target = get_field_map(scheme, fmt_name)
+    scheme_display = {
+        "field_name_zh":"中文欄位名稱",
+        "field_name_en":"英文欄位名稱",
+        "ntu_yunlin":"台大雲林欄位名稱",
+        "ntu_system":"台大體系醫整庫欄位名稱",
+        "taiwan_cancer_registry":"台灣癌症登記中心",
+        "AI_module":"雲醫癌AI模組"}.get(scheme, scheme)
+
+    try:
+        wb = load_workbook(cleaned_file)
+        ws = wb.active
+        headers = [cell.value for cell in ws[1]]
+        output_cols = []
+        mapped_orig_indices = set()
+
+        # 自動加入匹配到的欄位
+        for i, header in enumerate(headers):
+            if header in alias_to_target:
+                idx = i + 1
+                target_name = alias_to_target[header]
+                output_cols.append((idx, target_name))
+                mapped_orig_indices.add(idx)
+
+        # 加入動勾選的未匹配欄位
+        for field in selected_fields:
+            try:
+                orig_idx = headers.index(field) + 1
+                if orig_idx not in mapped_orig_indices:
+                    output_cols.append((orig_idx, field))
+            except ValueError:
+                continue
+
+        err_col_name = '錯誤註記說明(A:遺漏值 B:格式不符 C:邏輯錯誤 D:完全正確)'
+        if err_col_name in headers:
+            err_idx = headers.index(err_col_name) + 1
+            if not any(col[0] == err_idx for col in output_cols):
+                output_cols.append((err_idx, err_col_name))
+
+
+        new_wb = Workbook()
+        new_ws = new_wb.active
+        for r_idx, row in enumerate(ws.iter_rows(), start=1):
+            for c_idx, (orig_col_idx, target_name) in enumerate(output_cols, start=1):
+                source_cell = ws.cell(row=r_idx, column=orig_col_idx)
+                target_cell = new_ws.cell(row=r_idx, column=c_idx)
+                
+                if r_idx == 1:
+                    target_cell.value = target_name
+                    if source_cell.has_style:
+                        target_cell.font = copy(source_cell.font)
+                        target_cell.fill = copy(source_cell.fill)
+                        target_cell.alignment = copy(source_cell.alignment)
+                else:
+                    copy_cell(source_cell, target_cell)
+
+        for c_idx, (orig_col_idx, _) in enumerate(output_cols, start=1):
+            new_ws.column_dimensions[get_column_letter(c_idx)].width = \
+                ws.column_dimensions[get_column_letter(orig_col_idx)].width
+
+        export_filename = f"fmt{fmt_name}_{base_name}_{scheme_display}.xlsx"
+        temp_out = os.path.join(project_path, export_filename)
+        new_wb.save(temp_out)
+        resp = send_file(os.path.abspath(temp_out), as_attachment=True, download_name=export_filename)
+        resp.headers['Access-Control-Expose-Headers'] = 'Content-Disposition'
+        return resp
+
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+@clean_bp.route("/api/preview", methods=["POST"])
+@login_required
+def api_preview():
+    data = request.json
+    job_id = data.get("job_id")
+    scheme = data.get("scheme")
+    selected_fields = data.get("fields", [])
+
+    if not job_id:
+        return jsonify({"ok": False, "error": "缺少 JobID"}), 400
+
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT Job.Path, Job.FileName, DataFormat.FmtName 
+        FROM [Job] 
+        JOIN [DataFormat] ON Job.FmtID = DataFormat.FmtID 
+        WHERE Job.JobID=?
+    """, (job_id,))
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
+        return jsonify({"ok": False, "error": "找不到該紀錄"}), 404
+
+    project_path, original_filename, fmt_name = row
+    base_name, _ = os.path.splitext(original_filename)
+    cleaned_file = os.path.join(project_path, f"fmt{fmt_name}_{base_name}_Clean.xlsx")
+
+    if not os.path.exists(cleaned_file):
+        return jsonify({"ok": False, "error": "清洗檔案不存在"}), 404
+
+    # 取得欄位對照表
+    alias_to_target = get_field_map(scheme, fmt_name)
+
+    try:
+        wb = load_workbook(cleaned_file, data_only=True)
+        ws = wb.active
+        headers = [cell.value for cell in ws[1]]
+        
+        # 決定輸出欄位
+        output_cols = [(i+1, alias_to_target[h]) for i, h in enumerate(headers) if h in alias_to_target]
+        mapped_indices = {c[0] for c in output_cols}
+        
+        # 加入使用者勾選的未匹配欄位 與 強制保留的錯誤註記
+        for f in selected_fields + ['錯誤註記說明(A:遺漏值 B:格式不符 C:邏輯錯誤 D:完全正確)']:
+            if f in headers:
+                idx = headers.index(f) + 1
+                if idx not in mapped_indices:
+                    output_cols.append((idx, f))
+                    mapped_indices.add(idx)
+
+        # 讀取前 5 筆資料
+        preview_data = []
+        preview_headers = [col[1] for col in output_cols]
+        
+        for row in ws.iter_rows(min_row=2, max_row=6):
+            row_data = [str(ws.cell(row=row[0].row, column=c_idx).value or "") for c_idx, _ in output_cols]
+            preview_data.append(row_data)
+
+        return jsonify({
+            "ok": True,
+            "headers": preview_headers,
+            "data": preview_data
+        })
+
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 def load_field_spec(fmt_val):
     conn = get_conn()
@@ -105,6 +327,7 @@ def api_clean():
     uploaded_file.close()
     
     file_ext = os.path.splitext(filename)[1].lower()
+    base_name = os.path.splitext(filename)[0]
     process_path = path
 
     if file_ext == '.txt':
@@ -131,20 +354,27 @@ def api_clean():
                     # if not clean_line.strip(): continue
                     results.append(parse_fixed_width_line(line, field_spec))
 
-            temp_csv = f"{project_folder}/temp.csv"
+            temp_xlsx = f"{project_folder}/{base_name}.xlsx"
             keys = [f[0] for f in field_spec]
-            with open(temp_csv, 'w', newline='', encoding='utf-8-sig') as f:
-                writer = csv.DictWriter(f, fieldnames=keys, quoting=csv.QUOTE_ALL)
-                writer.writeheader()
-                writer.writerows(results)      
-            process_path = temp_csv
+            wb_temp = Workbook()
+            ws_temp = wb_temp.active
+            ws_temp.append(keys)
+
+            for row_dict in results:
+                row_values = [row_dict.get(k, "") for k in keys]
+                ws_temp.append(row_values)
+            for row in ws_temp.iter_rows():
+                for cell in row:
+                    cell.number_format = '@'
+            
+            wb_temp.save(temp_xlsx)
+            process_path = temp_xlsx
             
         except Exception as e:
             conn.close()
             return jsonify({"ok": False, "error": f"TXT 解析失敗: {str(e)}"}), 500
 
-    base_name = os.path.splitext(filename)[0]
-    out_path, rep_path = f"{project_folder}/fmt{fmt_name}_{base_name}_clean.xlsx", f"{project_folder}/Report_{base_name}.xlsx"
+    out_path, rep_path = f"{project_folder}/fmt{fmt_name}_{base_name}_Clean.xlsx", f"{project_folder}/fmt{fmt_name}_{base_name}_Report.xlsx"
     
     try:
         stats, alias_mapping, sorted_df, sorted_mask = cleanValidate(process_path, out_path, rep_path, f"fmt_{fmt_name}", version, rev_date)
@@ -172,9 +402,14 @@ def api_clean():
     ]
 
     output_fields = [{"key": col, "label": col} for col in sorted_df.columns if not col.startswith('_')]
+    
+    # 偵測資料體系
+    detected_system, _ = detect_system(sorted_df.columns)
+
     return jsonify({
         "ok": True, 
         "project_id": JobID,
+        "detected_system": detected_system,
         "stats": {
             "total": int(stats['total']), 
             "passed": int(stats['total'] - stats['error_rows']), 
@@ -201,9 +436,9 @@ def download_file(file_type, job_id):
         base_name, _ = os.path.splitext(original_filename)
         
         if file_type == "cleaned":
-            target_filename = f"fmt{fmt_name}_{base_name}_clean.xlsx"
+            target_filename = f"fmt{fmt_name}_{base_name}_Clean.xlsx"
         elif file_type == "report":
-            target_filename = f"Report_{base_name}.xlsx"
+            target_filename = f"fmt{fmt_name}_{base_name}_Report.xlsx"
         elif file_type == "original":
             target_filename = original_filename
         else:

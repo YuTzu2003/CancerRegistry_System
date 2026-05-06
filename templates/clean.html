@@ -195,6 +195,7 @@
     <div class="section-head">
       <h2><span class="dot"></span>清洗結果分析</h2>
       <div class="d-flex align-items-center gap-2">
+        <span id="detectedSystemBadge" class="badge bg-secondary" style="display: none;">偵測體系：<span id="detectedSystemName"></span></span>
         <button class="btn btn-sm" type="button" id="btnDownloadReport">
           <i class="bi bi-file-earmark-excel"></i> 下載報告 XLSX
         </button>
@@ -258,22 +259,15 @@
     <span class="hint">勾選要輸出的欄位，並可設定輸出檔名及命名規則</span>
   </div>
   <div class="section-body">
-    <div class="form-field" style="margin-bottom: 18px;">
-      <label>輸出檔案名稱</label>
-      <input type="text" class="form-control" id="outputFileName"
-             placeholder="例：Rule(129)_verified" style="max-width: 480px;" />
-    </div>
-
     <div style="margin-bottom: 18px;">
       <div class="d-flex justify-content-between align-items-center mb-2">
-        <div style="font-size: 13px; font-weight: 600; color: var(--gray-700);">
-          欄位命名方案
+        <div style="font-size: 13px; font-weight: 600; color: var(--gray-700);">欄位命名選擇
           <span class="hint" style="font-weight: 400; margin-left: 6px;">選擇輸出 XLSX 欄位標頭採用的命名來源</span>
         </div>
       </div>
       <div class="naming-grid" id="namingScheme">
         <label class="naming-chip selected">
-          <input type="radio" name="nameScheme" value="chinese" checked />
+          <input type="radio" name="nameScheme" value="field_name_zh" checked />
           <span class="nc-mark"></span>
           <span class="nc-body">
             <span class="nc-title">中文欄位名稱</span>
@@ -281,7 +275,7 @@
           </span>
         </label>
         <label class="naming-chip">
-          <input type="radio" name="nameScheme" value="english" />
+          <input type="radio" name="nameScheme" value="field_name_en" />
           <span class="nc-mark"></span>
           <span class="nc-body">
             <span class="nc-title">英文欄位名稱</span>
@@ -297,7 +291,7 @@
           </span>
         </label>
         <label class="naming-chip">
-          <input type="radio" name="nameScheme" value="ntu_hospital" />
+          <input type="radio" name="nameScheme" value="ntu_system" />
           <span class="nc-mark"></span>
           <span class="nc-body">
             <span class="nc-title">台大體系醫整庫欄位</span>
@@ -305,7 +299,7 @@
           </span>
         </label>
         <label class="naming-chip">
-          <input type="radio" name="nameScheme" value="tw_cancer_registry" />
+          <input type="radio" name="nameScheme" value="taiwan_cancer_registry" />
           <span class="nc-mark"></span>
           <span class="nc-body">
             <span class="nc-title">台灣癌症登記中心</span>
@@ -313,7 +307,7 @@
           </span>
         </label>
         <label class="naming-chip">
-          <input type="radio" name="nameScheme" value="yunmed_cancer_ai" />
+          <input type="radio" name="nameScheme" value="AI_module" />
           <span class="nc-mark"></span>
           <span class="nc-body">
             <span class="nc-title">雲醫癌AI模組</span>
@@ -325,8 +319,8 @@
 
     <div>
       <div class="d-flex justify-content-between align-items-center mb-2">
-        <div style="font-size: 13px; font-weight: 600; color: var(--gray-700);">欄位選擇
-          <span class="hint" style="font-weight: 400; margin-left: 6px;">勾選要匯入XLSX的指定欄位</span>
+        <div style="font-size: 13px; font-weight: 600; color: var(--gray-700);">額外欄位選擇
+          <span class="hint" style="font-weight: 400; margin-left: 6px;">未匹配到的原始欄位，可勾選要保留的欄位</span>
         </div>
       </div>
       <div class="field-chiplist" id="outputFieldList">
@@ -340,11 +334,33 @@
         <i class="bi bi-file-earmark-excel"></i> 匯出 XLSX
       </button>
     </div>
-  </div>
-</section>
+    </div>
+    </section>
 
-<!-- ===================== 新增/編輯 ===================== -->
-<div class="modal-backdrop-custom" id="formatModal" hidden>
+    <!-- ===================== 預覽 Modal ===================== -->
+    <div class="modal-backdrop-custom" id="previewModal" hidden>
+    <div class="modal-box" style="max-width: 90%; width: 1200px;">
+    <header>
+      <h3>資料轉換預覽 (前五筆)</h3>
+      <button class="close-btn" type="button" onclick="document.getElementById('previewModal').setAttribute('hidden', '')">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </header>
+    <div class="body" style="overflow-x: auto; padding: 0;">
+      <table class="table table-sm table-hover mb-0" id="previewTable" style="font-size: 12px; white-space: nowrap;">
+        <thead class="table-light">
+          <tr id="previewThead"></tr>
+        </thead>
+        <tbody id="previewTbody"></tbody>
+      </table>
+    </div>
+    <footer>
+      <button class="btn" type="button" onclick="document.getElementById('previewModal').setAttribute('hidden', '')">關閉</button>
+    </footer>
+    </div>
+    </div>
+
+    <!-- ===================== 新增/編輯 ===================== --><div class="modal-backdrop-custom" id="formatModal" hidden>
   <div class="modal-box">
     <header>
       <h3 id="modalTitle">新增參考資料格式</h3>
