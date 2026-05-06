@@ -43,6 +43,13 @@ def validate_cell(val, rule):
         if re.match(rule['regex'], val):
             passed_content_rule = True
 
+    if 'patterns' in rule:
+        has_content_rule = True
+        for pattern_rule in rule['patterns']:
+            if re.match(pattern_rule['regex'], val):
+                passed_content_rule = True
+                break
+
     if 'pattern_range' in rule and not passed_content_rule:
         has_content_rule = True
         conditions = [c.strip() for c in rule['pattern_range'].split(',')]
