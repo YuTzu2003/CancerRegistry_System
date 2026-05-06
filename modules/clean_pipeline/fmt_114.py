@@ -108,7 +108,7 @@ RULES = {
         'ID':'2.4',
         'field': 'Date of First Contact',
         'length': 8,
-        'SV': ['00000000', '99999999'],  
+        'SV': '99999999',  
         'is_date': '%Y%m%d',
         'description': '個案因此癌症至申報醫院門診或住院之最早日期。',
         'purpose': '可用來計算個案首次就診至進行癌症登記之時間間隔；也可用來計算首次就診至治療之時間差距，以監控癌症照護品質。  '
@@ -117,7 +117,7 @@ RULES = {
         'ID':'2.5',
         'field': 'Date of Initial Diagnosis',
         'length': 8,
-        'SV': ['00000000', '99999999'],  
+        'SV': '99999999',  
         'is_date': '%Y%m%d',
         'description': '記錄此癌症最早被醫師診斷的日期。',
         'purpose': '可計算癌症最初診斷日期至完成分期或開始治療的時間間隔。'
@@ -244,7 +244,7 @@ RULES = {
         'ID':'3.4',
         'field': 'Clinical T',
         'max_length': 3,
-        'pattern_range': 'X, 0, A, IS, ISU, ISD, 1M, 1, 1A, 1A1, 1A2, 1B, 1B1, 1B2 , 1B3, 1C, 1C1, 1C2, 1C3, 1D, 2, 2A, 2A1, 2A2, 2B, 2C, 2D, 3, 3A, 3B, 3C, 3D, 3E, 4, 4A, 4B, 4C, 4D, 4E, 8888, 9999',
+        'pattern_range': 'X, 0, A, IS, ISU, ISD, 1M, 1, 1A, 1A1, 1A2, 1B, 1B1, 1B2, 1C, 1D, 2, 2A, 2A1, 2A2, 2B, 2C, 2D, 3, 3A, 3B, 3C, 3D, 4, 4A, 4B, 4C, 4D, 4E, 888, 999',
         'description': '指原發腫瘤大小或侵犯程度。',
         'purpose': '作為 TNM 分期依據資料，該分期系統可用以評估癌症治療及控制的趨勢。醫師則用以進行預後的推估、治療的規劃、新療法的評估、結果的分析、追蹤的策劃和早期偵測結果的評定。'
     },
@@ -949,8 +949,12 @@ RULES = {
         'ID':'8.1',
         'field': 'Site-Specific Factor 1',
         'length': 3,
-        'digit': True,
-        'range': [0, 999],
+        'patterns': [
+                        {'name': '白血病', 'regex': r'^8\d{2}$'},
+                        {'name': '子宮體癌、乳癌', 'regex': r'^[ISW]\d{2}$'},
+                        {'name': '肝癌', 'regex': r'^[A]\d{2}$'},
+                        {'name': '一般癌別', 'regex': r'^\d{3}$'},
+        ],
         'description': '記錄與癌症預後和治療決策有關之癌症部位特定因子。',
         'purpose': '因應臨床實務需求及癌症診療品質提升。' 
     },
@@ -958,8 +962,11 @@ RULES = {
         'ID':'8.2',
         'field': 'Site-Specific Factor 2',
         'length': 3,
-        'digit': True,
-        'range': [0, 999],
+        'patterns': [
+                        {'name': '白血病', 'regex': r'^8\d{2}$'},
+                        {'name': '子宮體癌、乳癌', 'regex': r'^[ISW]\d{2}$'},
+                        {'name': '一般癌別', 'regex': r'^\d{3}$'},
+        ],
         'description': '記錄與癌症預後和治療決策有關之癌症部位特定因子。',
         'purpose': '因應臨床實務需求及癌症診療品質提升。'
     },
@@ -976,8 +983,10 @@ RULES = {
         'ID':'8.4',
         'field': 'Site-Specific Factor 4',
         'length': 3,
-        'digit': True,
-        'range': [0, 999],
+        'patterns': [
+                        {'name': '胰臟癌', 'regex': r'^[A]\d{2}$'},
+                        {'name': '一般癌別', 'regex': r'^\d{3}$'},
+        ],
         'description': '記錄與癌症預後和治療決策有關之癌症部位特定因子。',
         'purpose': '因應臨床實務需求及癌症診療品質提升。'
     },
@@ -994,8 +1003,10 @@ RULES = {
         'ID':'8.6',
         'field': 'Site-Specific Factor 6',
         'length': 3,
-        'digit': True,
-        'range': [0, 999],
+        'patterns': [
+                        {'name': '肺癌', 'regex': r'^[A-Z]\d{2}$'},
+                        {'name': '一般癌別', 'regex': r'^\d{3}$'},
+        ],
         'description': '記錄與癌症預後和治療決策有關之癌症部位特定因子。',
         'purpose': '因應臨床實務需求及癌症診療品質提升。'
     },
