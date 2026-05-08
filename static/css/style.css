@@ -476,11 +476,13 @@ table.table-flat.centered td { text-align: center; }
   display: inline-flex; align-items: center; gap: 6px;
   padding: 9px 15px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
+  border: 1px solid var(--bs-btn-border-color, var(--border));
   font-size: 14px;
   cursor: pointer;
   transition: background-color .15s ease, border-color .15s ease, color .15s ease;
 }
+/* Remove the previous conditional border-color fix to simplify */
+
 .btn:disabled, .btn[disabled] {
   opacity: .55; cursor: not-allowed;
 }
@@ -745,6 +747,38 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   background: var(--white);
 }
 .naming-chip.selected .nc-body .nc-title { color: var(--blue-700); }
+
+/* ==========================================================
+   Excel-like Table for Preview
+   ========================================================== */
+.table-excel {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+  border: 1px solid var(--border);
+  font-family: "Segoe UI", Tahoma, sans-serif;
+}
+.table-excel th, .table-excel td {
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 6px 12px;
+  font-size: 13px;
+}
+.table-excel thead th {
+  background: var(--gray-100);
+  color: var(--gray-700);
+  font-weight: 600;
+  position: sticky; top: 0;
+  z-index: 10;
+  text-align: left;
+  border-bottom: 2px solid var(--gray-300);
+}
+.table-excel tbody tr:nth-child(even) {
+  background: #f9fafb;
+}
+.table-excel tbody tr:hover {
+  background: #f0f4f8;
+}
 
 /* ==========================================================
    Responsive

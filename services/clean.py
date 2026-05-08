@@ -170,23 +170,13 @@ def api_preview():
     job_id = data.get("job_id")
     scheme = data.get("scheme")
     selected_fields = data.get("fields", [])
-
-    if not job_id:
-        return jsonify({"ok": False, "error": "缺少 JobID"}), 400
-
     conn = get_conn()
     cursor = conn.cursor()
-    cursor.execute("""
-        SELECT Job.Path, Job.FileName, DataFormat.FmtName 
-        FROM [Job] 
-        JOIN [DataFormat] ON Job.FmtID = DataFormat.FmtID 
-        WHERE Job.JobID=?
-    """, (job_id,))
+    cursor.execute("""SELECT Job.Path, Job.FileName, DataFormat.FmtName FROM [Job] 
+                    JOIN [DataFormat] ON Job.FmtID = DataFormat.FmtID 
+                    WHERE Job.JobID=?""", (job_id,))
     row = cursor.fetchone()
     conn.close()
-
-    if not row:
-        return jsonify({"ok": False, "error": "找不到該紀錄"}), 404
 
     project_path, original_filename, fmt_name = row
     base_name, _ = os.path.splitext(original_filename)
@@ -194,20 +184,15 @@ def api_preview():
 
     if not os.path.exists(cleaned_file):
         return jsonify({"ok": False, "error": "清洗檔案不存在"}), 404
-
-    # 取得欄位對照表
     alias_to_target = get_field_map(scheme, fmt_name)
 
     try:
         wb = load_workbook(cleaned_file, data_only=True)
         ws = wb.active
         headers = [cell.value for cell in ws[1]]
-        
-        # 決定輸出欄位
         output_cols = [(i+1, alias_to_target[h]) for i, h in enumerate(headers) if h in alias_to_target]
         mapped_indices = {c[0] for c in output_cols}
         
-        # 加入使用者勾選的未匹配欄位 與 強制保留的錯誤註記
         for f in selected_fields + ['錯誤註記說明(A:遺漏值 B:格式不符 C:邏輯錯誤 D:完全正確)']:
             if f in headers:
                 idx = headers.index(f) + 1
@@ -215,19 +200,12 @@ def api_preview():
                     output_cols.append((idx, f))
                     mapped_indices.add(idx)
 
-        # 讀取前 5 筆資料
         preview_data = []
         preview_headers = [col[1] for col in output_cols]
-        
         for row in ws.iter_rows(min_row=2, max_row=6):
             row_data = [str(ws.cell(row=row[0].row, column=c_idx).value or "") for c_idx, _ in output_cols]
             preview_data.append(row_data)
-
-        return jsonify({
-            "ok": True,
-            "headers": preview_headers,
-            "data": preview_data
-        })
+        return jsonify({"ok": True,"headers": preview_headers,"data": preview_data})
 
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
