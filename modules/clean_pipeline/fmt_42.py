@@ -108,16 +108,16 @@ RULES = {
         'ID':'2.4',
         'field': 'Date of First Contact',
         'length': 8,
-        'SV': ['00000000', '99999999'],  
+        'SV': ['99999999'],  
         'is_date': '%Y%m%d',
         'description': '個案因此癌症至申報醫院門診或住院之最早日期。',
-        'purpose': '可用來計算個案首次就診至進行癌症登記之時間間隔；也可用來計算首次就診至治療之時間差距，以監控癌症照護品質。'
+        'purpose': '可用來計算個案首次就診至進行癌症登記之時間間隔；也可用來計算首次就診至治療之時間差距，以作為監控癌症照護品質之用。'
     },
     '最初診斷日期':{
         'ID':'2.5',
         'field': 'Date of Initial Diagnosis',
         'length': 8,
-        'SV': ['00000000', '99999999'],  
+        'SV': ['99999999'],  
         'is_date': '%Y%m%d',
         'description': '記錄此癌症最早被醫師診斷的日期。',
         'purpose': '可計算癌症最初診斷日期至完成分期或開始治療的時間間隔。'
@@ -143,8 +143,7 @@ RULES = {
         'ID':'2.8',
         'field': 'Histology',
         'max_length':4,
-        #'digit': True,
-        'range': [8000, 9999],
+        'range': [8000, 9993],
         'description': '原發腫瘤細胞於顯微鏡下之結構。',
         'purpose': '作為分期及決定治療方針之根據；同時也影響其預後及病程。'
     },
@@ -155,7 +154,7 @@ RULES = {
         'digit': True,     
         'choices': ['2', '3'],
         'description': '記錄病理診斷中的性態碼。',
-        'purpose': '病理醫師常使用 0、1、2、3、6、9 等碼來描述腫瘤性態；若性態碼為 2、3、6 或 9（或已轉為 3），需申報至癌症登記中心，以便統計、監測。'
+        'purpose': '病理醫師常使用 benign(0)、borderline(1)、in situ(2)、malignant, primary site(3)、malignant,metastatic site(6)、或 malignant, uncertain whether primary or metastatic site(9)來描述腫瘤的性態。其中性態碼為 2、3、6 或 9(若為 6 或 9 者，須申報原發部位，且性態碼改為 3)的個案必須申報至癌症登記中心。'
     },
     '分級/分化':{
         'ID':'2.10',
