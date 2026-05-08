@@ -345,6 +345,7 @@
       chip.classList.toggle('selected', !!input?.checked);
     });
     updateFieldCategorization();
+    if (currentJobId) setStep(4);
   }
   
   $$('#namingScheme input[type="radio"]').forEach(r => r.addEventListener('change', syncNamingSelection));

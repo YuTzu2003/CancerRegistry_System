@@ -72,7 +72,7 @@
       <div class="step-index">2</div>
       <div class="step-label">
         <span class="t">執行清洗</span>
-        <span class="s">格式檢核與比對</span>
+        <span class="s">格式檢核與清洗</span>
       </div>
     </div>
     <div class="step-sep"></div>
@@ -80,7 +80,7 @@
       <div class="step-index">3</div>
       <div class="step-label">
         <span class="t">檢視結果</span>
-        <span class="s">明細與分析</span>
+        <span class="s">報告與分析</span>
       </div>
     </div>
     <div class="step-sep"></div>
@@ -161,7 +161,7 @@
       <div class="section-head">
         <h2><span class="dot"></span>清洗個案清單明細</h2>
         <div class="d-flex align-items-center gap-2">
-        <button class="btn btn-sm" type="button" id="btnDownloadCleaned">
+        <button class="btn btn-outline-dark btn-sm" type="button" id="btnDownloadCleaned">
           <i class="bi bi-file-earmark-excel"></i> 下載報告 XLSX
         </button>
       </div>
@@ -196,11 +196,12 @@
       <h2><span class="dot"></span>清洗結果分析</h2>
       <div class="d-flex align-items-center gap-2">
         <span id="detectedSystemBadge" class="badge bg-secondary" style="display: none;">偵測體系：<span id="detectedSystemName"></span></span>
-        <button class="btn btn-sm" type="button" id="btnDownloadReport">
+        <button class="btn btn-outline-dark btn-sm" type="button" id="btnDownloadReport">
           <i class="bi bi-file-earmark-excel"></i> 下載報告 XLSX
         </button>
       </div>
     </div>
+
     <div class="section-body">
       <div id="analysisContent" hidden>
         <div class="row g-2 mb-4">
@@ -271,7 +272,7 @@
           <span class="nc-mark"></span>
           <span class="nc-body">
             <span class="nc-title">中文欄位名稱</span>
-            <span class="nc-desc">以繁體中文呈現，適合一般申報使用</span>
+            <span class="nc-desc">以繁體中文呈現欄位</span>
           </span>
         </label>
         <label class="naming-chip">
@@ -279,7 +280,7 @@
           <span class="nc-mark"></span>
           <span class="nc-body">
             <span class="nc-title">英文欄位名稱</span>
-            <span class="nc-desc">英文代碼，適合資料交換與系統串接</span>
+            <span class="nc-desc">以英文呈現欄位</span>
           </span>
         </label>
         <label class="naming-chip">
@@ -287,15 +288,15 @@
           <span class="nc-mark"></span>
           <span class="nc-body">
             <span class="nc-title">台大雲林欄位名稱</span>
-            <span class="nc-desc">對應台大雲林分院系統欄位</span>
+            <span class="nc-desc">以台大雲林分院系統呈現欄位</span>
           </span>
         </label>
         <label class="naming-chip">
           <input type="radio" name="nameScheme" value="ntu_system" />
           <span class="nc-mark"></span>
           <span class="nc-body">
-            <span class="nc-title">台大體系醫整庫欄位</span>
-            <span class="nc-desc">對應台大醫療體系醫整庫命名</span>
+            <span class="nc-title">台大體系醫整庫欄位名稱</span>
+            <span class="nc-desc">以台大體系醫整庫呈現欄位</span>
           </span>
         </label>
         <label class="naming-chip">
@@ -303,7 +304,7 @@
           <span class="nc-mark"></span>
           <span class="nc-body">
             <span class="nc-title">台灣癌症登記中心</span>
-            <span class="nc-desc">符合癌症登記中心申報欄位</span>
+            <span class="nc-desc">以台灣癌症登記中心呈現欄位</span>
           </span>
         </label>
         <label class="naming-chip">
@@ -311,7 +312,7 @@
           <span class="nc-mark"></span>
           <span class="nc-body">
             <span class="nc-title">雲醫癌AI模組</span>
-            <span class="nc-desc">對應雲端醫療癌症AI模組欄位</span>
+            <span class="nc-desc">以雲端醫療癌症AI模組呈現欄位</span>
           </span>
         </label>
       </div>
@@ -329,8 +330,8 @@
     </div>
 
     <div class="d-flex justify-content-end gap-2 mt-3 pt-3" style="border-top:1px solid var(--border);">
-      <button class="btn" type="button" id="btnPreviewOutput"><i class="bi bi-eye"></i> 預覽</button>
-      <button class="btn btn-accent" type="button" id="btnExportXlsx">
+      <button class="btn btn-light" type="button" id="btnPreviewOutput"><i class="bi bi-eye"></i> 預覽</button>
+      <button class="btn btn-outline-dark" type="button" id="btnExportXlsx">
         <i class="bi bi-file-earmark-excel"></i> 匯出 XLSX
       </button>
     </div>
@@ -347,8 +348,8 @@
       </button>
     </header>
     <div class="body" style="overflow-x: auto; padding: 0;">
-      <table class="table table-sm table-hover mb-0" id="previewTable" style="font-size: 12px; white-space: nowrap;">
-        <thead class="table-light">
+      <table class="table-excel mb-0" id="previewTable" style="white-space: nowrap;">
+        <thead>
           <tr id="previewThead"></tr>
         </thead>
         <tbody id="previewTbody"></tbody>
