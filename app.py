@@ -6,6 +6,7 @@ from services.auth import auth_bp, login_required, admin_required
 from services.member import member_bp
 from services.history import history_bp
 from services.clean import clean_bp
+from modules.db import get_conn
 
 logging.basicConfig(
     level=logging.INFO,
@@ -49,7 +50,21 @@ def inject_nav():
 @app.route("/")
 @login_required
 def index():
-    return render_template("index.html", active="index")
+    try:
+        conn = get_conn()
+        cursor = conn.cursor()
+        cursor.execute("SELECT SUM(TotalCount) as Sum_TotalCount ,avg(CompletenessScore) as Avg_CompletenessScore FROM [Hospital_data].[dbo].[Job];")
+        row = cursor.fetchone()
+        stats = {
+            "sum_total_count": f"{int(getattr(row,'Sum_TotalCount',0) or 0):,}",
+            "avg_completeness_score": f"{(getattr(row,'Avg_CompletenessScore',0) or 0)*100:.2f}%"
+        }
+        conn.close()
+    except Exception as e:
+        app.logger.error(f"Error fetching dashboard stats: {e}")
+        stats = {"sum_total_count": "0", "avg_completeness_score": "0.0%"}
+    
+    return render_template("index.html", active="index", stats=stats)
 
 # ---- other ------------------------------------------
 @app.route("/dataGen")

@@ -197,7 +197,7 @@
     <div class="kpi-content-wrap">
       <div>
         <div class="label">已登錄個案數</div>
-        <div class="value blue">12,486</div>
+        <div class="value blue">{{ stats.sum_total_count }}</div>
       </div>
       <i class="bi bi-people kpi-icon-lg text-primary"></i>
     </div>
@@ -206,7 +206,7 @@
     <div class="kpi-content-wrap">
       <div>
         <div class="label">資料完整率</div>
-        <div class="value cyan">98.4%</div>
+        <div class="value cyan">{{ stats.avg_completeness_score }}</div>
       </div>
       <i class="bi bi-check-all kpi-icon-lg text-ai"></i>
     </div>
