@@ -1,6 +1,5 @@
 import os
 import uuid
-import csv
 from flask import Blueprint, render_template, request, session, jsonify, send_file
 from werkzeug.utils import secure_filename
 from modules.db import get_conn
@@ -52,21 +51,21 @@ def api_categorize_fields():
     try:
         wb = load_workbook(cleaned_file, read_only=True)
         ws = wb.active
-        headers = [cell.value for cell in next(ws.iter_rows(max_row=1))]
+        headers = [str(cell.value).strip() if cell.value else "" for cell in next(ws.iter_rows(max_row=1))]
         wb.close()
 
         alias_to_target = get_field_map(scheme, fmt_name)
+        
         mapped = []
         unmapped = []
         for h in headers:
-            if h.startswith('_') or h == '錯誤註記說明(A:遺漏值 B:格式不符 C:邏輯錯誤 D:完全正確)':
+            if not h or h.startswith('_') or h == '錯誤註記說明(A:遺漏值 B:格式不符 C:邏輯錯誤 D:完全正確)':
                 continue
             if h in alias_to_target:
                 mapped.append({"key": h, "label": h, "target": alias_to_target[h]})
             else:
                 unmapped.append({"key": h, "label": h})
         return jsonify({"ok": True,"mapped": mapped,"unmapped": unmapped})
-    
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
@@ -105,31 +104,40 @@ def api_export():
     try:
         wb = load_workbook(cleaned_file)
         ws = wb.active
-        headers = [cell.value for cell in ws[1]]
+        headers = [str(cell.value).strip() if cell.value else "" for cell in ws[1]]
+        
+        unique_targets = sorted(list(set(alias_to_target.values())))
         output_cols = []
-        mapped_orig_indices = set()
+        used_orig_indices = set()
 
-        # 自動加入匹配到的欄位
-        for i, header in enumerate(headers):
-            if header in alias_to_target:
-                idx = i + 1
-                target_name = alias_to_target[header]
-                output_cols.append((idx, target_name))
-                mapped_orig_indices.add(idx)
+        # 1. ALWAYS include ALL fields defined for this module
+        for target_name in unique_targets:
+            source_idx = None
+            # Find if any header in source file maps to this target
+            for i, h in enumerate(headers):
+                if h in alias_to_target and alias_to_target[h] == target_name:
+                    source_idx = i + 1
+                    break
+            
+            if source_idx:
+                output_cols.append((source_idx, target_name))
+                used_orig_indices.add(source_idx)
+            else:
+                # Missing from source -> add as empty column
+                output_cols.append((None, target_name))
 
-        # 加入動勾選的未匹配欄位
+        # 2. Add extra manually selected fields (that are NOT in the module)
         for field in selected_fields:
-            try:
+            if field in headers:
                 orig_idx = headers.index(field) + 1
-                if orig_idx not in mapped_orig_indices:
+                if orig_idx not in used_orig_indices:
                     output_cols.append((orig_idx, field))
-            except ValueError:
-                continue
+                    used_orig_indices.add(orig_idx)
 
         err_col_name = '錯誤註記說明(A:遺漏值 B:格式不符 C:邏輯錯誤 D:完全正確)'
         if err_col_name in headers:
             err_idx = headers.index(err_col_name) + 1
-            if not any(col[0] == err_idx for col in output_cols):
+            if err_idx not in used_orig_indices:
                 output_cols.append((err_idx, err_col_name))
 
 
@@ -137,21 +145,30 @@ def api_export():
         new_ws = new_wb.active
         for r_idx, row in enumerate(ws.iter_rows(), start=1):
             for c_idx, (orig_col_idx, target_name) in enumerate(output_cols, start=1):
-                source_cell = ws.cell(row=r_idx, column=orig_col_idx)
                 target_cell = new_ws.cell(row=r_idx, column=c_idx)
                 
-                if r_idx == 1:
-                    target_cell.value = target_name
-                    if source_cell.has_style:
-                        target_cell.font = copy(source_cell.font)
-                        target_cell.fill = copy(source_cell.fill)
-                        target_cell.alignment = copy(source_cell.alignment)
+                if orig_col_idx is not None:
+                    source_cell = ws.cell(row=r_idx, column=orig_col_idx)
+                    if r_idx == 1:
+                        target_cell.value = target_name
+                        if source_cell.has_style:
+                            target_cell.font = copy(source_cell.font)
+                            target_cell.fill = copy(source_cell.fill)
+                            target_cell.alignment = copy(source_cell.alignment)
+                    else:
+                        copy_cell(source_cell, target_cell)
                 else:
-                    copy_cell(source_cell, target_cell)
+                    if r_idx == 1:
+                        target_cell.value = target_name
+                    else:
+                        target_cell.value = ""
 
         for c_idx, (orig_col_idx, _) in enumerate(output_cols, start=1):
-            new_ws.column_dimensions[get_column_letter(c_idx)].width = \
-                ws.column_dimensions[get_column_letter(orig_col_idx)].width
+            if orig_col_idx is not None:
+                new_ws.column_dimensions[get_column_letter(c_idx)].width = \
+                    ws.column_dimensions[get_column_letter(orig_col_idx)].width
+            else:
+                new_ws.column_dimensions[get_column_letter(c_idx)].width = 15
 
         export_filename = f"fmt{fmt_name}_{base_name}_{scheme_display}.xlsx"
         temp_out = os.path.join(project_path, export_filename)
@@ -189,21 +206,50 @@ def api_preview():
     try:
         wb = load_workbook(cleaned_file, data_only=True)
         ws = wb.active
-        headers = [cell.value for cell in ws[1]]
-        output_cols = [(i+1, alias_to_target[h]) for i, h in enumerate(headers) if h in alias_to_target]
-        mapped_indices = {c[0] for c in output_cols}
+        headers = [str(cell.value).strip() if cell.value else "" for cell in ws[1]]
         
-        for f in selected_fields + ['錯誤註記說明(A:遺漏值 B:格式不符 C:邏輯錯誤 D:完全正確)']:
+        unique_targets = sorted(list(set(alias_to_target.values())))
+        output_cols = []
+        used_orig_indices = set()
+
+        # 1. ALWAYS include ALL fields defined for this module
+        for target_name in unique_targets:
+            source_idx = None
+            for i, h in enumerate(headers):
+                if h in alias_to_target and alias_to_target[h] == target_name:
+                    source_idx = i + 1
+                    break
+            
+            if source_idx:
+                output_cols.append((source_idx, target_name))
+                used_orig_indices.add(source_idx)
+            else:
+                output_cols.append((None, target_name))
+        
+        # 2. Add extra manually selected fields
+        for f in selected_fields:
             if f in headers:
                 idx = headers.index(f) + 1
-                if idx not in mapped_indices:
+                if idx not in used_orig_indices:
                     output_cols.append((idx, f))
-                    mapped_indices.add(idx)
+                    used_orig_indices.add(idx)
+
+        err_f = '錯誤註記說明(A:遺漏值 B:格式不符 C:邏輯錯誤 D:完全正確)'
+        if err_f in headers:
+            idx = headers.index(err_f) + 1
+            if idx not in used_orig_indices:
+                output_cols.append((idx, err_f))
 
         preview_data = []
         preview_headers = [col[1] for col in output_cols]
-        for row in ws.iter_rows(min_row=2, max_row=6):
-            row_data = [str(ws.cell(row=row[0].row, column=c_idx).value or "") for c_idx, _ in output_cols]
+        for r_idx in range(2, 7):
+            row_data = []
+            for c_idx, _ in output_cols:
+                if c_idx is not None:
+                    val = ws.cell(row=r_idx, column=c_idx).value
+                    row_data.append(str(val or ""))
+                else:
+                    row_data.append("")
             preview_data.append(row_data)
         return jsonify({"ok": True,"headers": preview_headers,"data": preview_data})
 
@@ -213,11 +259,22 @@ def api_preview():
 def load_field_spec(fmt_val):
     conn = get_conn()
     cursor = conn.cursor()
-    sql = "SELECT [ChineseName], [Start], [End] FROM CancerRegistry_Fields WHERE [fmt]=? ORDER BY [Start]"
+    sql = """SELECT M.[序號], F.[ChineseName], F.[Start], F.[End] FROM [CancerRegistry_Fields] F
+            LEFT JOIN [CancerRegistry_FieldMap] M ON F.ChineseName = M.中文欄位名稱
+            WHERE F.[fmt]=? 
+            ORDER BY F.[Start]"""
     cursor.execute(sql, fmt_val)
     rows = cursor.fetchall()
     conn.close()
-    field_spec = [(r[0], int(r[1]), int(r[2])) for r in rows]
+    
+    field_spec = []
+    for r in rows:
+        seq = str(r[0]).strip() if r[0] is not None else ""
+        if seq.endswith('.0'):
+            seq = seq[:-2]
+        name = str(r[1]).strip()
+        header_name = f"{seq}{name}" if seq else name
+        field_spec.append((header_name, int(r[2]), int(r[3])))
     return field_spec
 
 def parse_fixed_width_line(line_text, spec):
@@ -298,8 +355,10 @@ def api_clean():
         return jsonify({"ok": False, "error": "找不到指定的格式"}), 400
         
     fmt_name, version, rev_date = fmt_data
-    
-    filename = secure_filename(uploaded_file.filename)
+    filename = os.path.basename(uploaded_file.filename)
+    if not filename:
+        filename = "uploaded_file"
+        
     path = f"{project_folder}/{filename}"
     uploaded_file.save(path)
     uploaded_file.close()
