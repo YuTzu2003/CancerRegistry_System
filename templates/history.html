@@ -18,16 +18,12 @@
     </div>
     <div class="d-flex align-items-center gap-3">
       <div class="d-flex align-items-center gap-2">
-        <button type="button" class="btn btn-outline-dark btn-sm d-flex align-items-center gap-1" onclick="batchDownload()">
-          <i class="bi bi-cloud-download"></i> 批次下載
-        </button>
-        <button type="button" class="btn btn-danger btn-sm d-flex align-items-center gap-1" onclick="batchDelete()">
-          <i class="bi bi-trash3"></i> 批次刪除
-        </button>
+        <button type="button" class="btn btn-outline-dark btn-sm d-flex align-items-center gap-1" onclick="batchDownload()">批次下載</button>
+        <button type="button" class="btn btn-danger btn-sm d-flex align-items-center gap-1" onclick="batchDelete()">批次刪除</button>
         <div class="vr mx-2"></div>
         <label class="small text-muted text-nowrap">資料格式：</label>
-        <select class="form-select form-select-sm" id="filterFormat" style="width: 180px;">
-          <option value="all" selected>全部格式</option>
+        <select class="form-select form-select-sm" id="filterFormat" style="width: 120px; font-size: 13px;">
+          <option value="all" selected>全部</option>
           {% set formats = [] %}
           {% for item in history %}
             {% if item.FmtName and item.FmtName not in formats %}
