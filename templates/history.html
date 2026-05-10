@@ -18,6 +18,13 @@
     </div>
     <div class="d-flex align-items-center gap-3">
       <div class="d-flex align-items-center gap-2">
+        <button type="button" class="btn btn-outline-dark btn-sm d-flex align-items-center gap-1" onclick="batchDownload()">
+          <i class="bi bi-cloud-download"></i> 批次下載
+        </button>
+        <button type="button" class="btn btn-danger btn-sm d-flex align-items-center gap-1" onclick="batchDelete()">
+          <i class="bi bi-trash3"></i> 批次刪除
+        </button>
+        <div class="vr mx-2"></div>
         <label class="small text-muted text-nowrap">資料格式：</label>
         <select class="form-select form-select-sm" id="filterFormat" style="width: 180px;">
           <option value="all" selected>全部格式</option>
@@ -38,6 +45,7 @@
     <table class="table-flat" id="historyTable">
       <thead>
         <tr>
+          <th style="width: 40px;"><input type="checkbox" id="selectAll" class="form-check-input"></th>
           <th>審核編號</th>
           <th>審核日期</th>
           <th>資料格式</th>
@@ -48,6 +56,7 @@
       <tbody>
         {% for item in history %}
         <tr class="history-row" data-date="{{ item.CreatedAt }}" data-format="{{ item.FmtName }}">
+          <td><input type="checkbox" class="row-checkbox form-check-input" value="{{ item.JobID }}"></td>
           <td>{{item.JobID}}</td>
           <td>{{item.CreatedAt}}</td>
           <td>{{item.FmtName}}欄位({{item.Version}})</td>
@@ -67,7 +76,7 @@
         </tr>
         {% else %}
         <tr>
-          <td colspan="6" style="text-align:center; padding: 30px; color: var(--gray-500);">目前尚無任何審核紀錄。</td>
+          <td colspan="7" style="text-align:center; padding: 30px; color: var(--gray-500);">目前尚無任何審核紀錄。</td>
         </tr>
         {% endfor %}
       </tbody>

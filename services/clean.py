@@ -1,5 +1,6 @@
 import os
 import uuid
+import pandas as pd
 from flask import Blueprint, render_template, request, session, jsonify, send_file
 from werkzeug.utils import secure_filename
 from modules.db import get_conn
@@ -55,7 +56,6 @@ def api_categorize_fields():
         wb.close()
 
         alias_to_target = get_field_map(scheme, fmt_name)
-        
         mapped = []
         unmapped = []
         for h in headers:
@@ -113,7 +113,6 @@ def api_export():
         # 1. ALWAYS include ALL fields defined for this module
         for target_name in unique_targets:
             source_idx = None
-            # Find if any header in source file maps to this target
             for i, h in enumerate(headers):
                 if h in alias_to_target and alias_to_target[h] == target_name:
                     source_idx = i + 1
@@ -123,7 +122,6 @@ def api_export():
                 output_cols.append((source_idx, target_name))
                 used_orig_indices.add(source_idx)
             else:
-                # Missing from source -> add as empty column
                 output_cols.append((None, target_name))
 
         # 2. Add extra manually selected fields (that are NOT in the module)
@@ -219,7 +217,6 @@ def api_preview():
                 if h in alias_to_target and alias_to_target[h] == target_name:
                     source_idx = i + 1
                     break
-            
             if source_idx:
                 output_cols.append((source_idx, target_name))
                 used_orig_indices.add(source_idx)
@@ -367,6 +364,16 @@ def api_clean():
     base_name = os.path.splitext(filename)[0]
     process_path = path
 
+    if file_ext == '.csv':
+        try:
+            df_csv = pd.read_csv(path, dtype=str, encoding='utf-8-sig')
+        except UnicodeDecodeError:
+            df_csv = pd.read_csv(path, dtype=str, encoding='cp950')
+        
+        temp_xlsx = f"{project_folder}/{base_name}.xlsx"
+        df_csv.to_excel(temp_xlsx, index=False)
+        process_path = temp_xlsx
+
     if file_ext == '.txt':
         try:
             fmt_val = str(fmt_name).replace("fmt_", "")
@@ -377,7 +384,6 @@ def api_clean():
             with open(path, 'r', encoding='big5', errors='ignore') as f:
                 for i, line in enumerate(f):
                     clean_line = line.rstrip('\n').rstrip('\r')
-                    # if not clean_line.strip(): continue
                     length = len(clean_line.encode('big5', errors='ignore'))
                     if expected_length > 0 and length != expected_length:
                         conn.close()
@@ -387,8 +393,6 @@ def api_clean():
             results = []
             with open(path, 'r', encoding='big5', errors='ignore') as f:
                 for line in f:
-                    # clean_line = line.rstrip('\n').rstrip('\r')
-                    # if not clean_line.strip(): continue
                     results.append(parse_fixed_width_line(line, field_spec))
 
             temp_xlsx = f"{project_folder}/{base_name}.xlsx"
@@ -406,7 +410,6 @@ def api_clean():
             
             wb_temp.save(temp_xlsx)
             process_path = temp_xlsx
-            
         except Exception as e:
             conn.close()
             return jsonify({"ok": False, "error": f"TXT 解析失敗: {str(e)}"}), 500
@@ -415,7 +418,6 @@ def api_clean():
     
     try:
         stats, alias_mapping, sorted_df, sorted_mask = cleanValidate(process_path, out_path, rep_path, f"fmt_{fmt_name}", version, rev_date)
-        
         cursor.execute("INSERT INTO Job ([JobID],[UserID],[FmtID],[FileName],[TotalCount],[CompletenessScore],[CorrectScore],[ConsistencyScore],[DQI],[Path]) VALUES (?,?,?,?,?,?,?,?,?,?)",
                         (JobID, user_id, format_id, filename, int(stats['total']), float(stats['completeness']), float(stats['correctness']), float(stats['consistency']), float(stats['quality_score']), project_folder))
         conn.commit()
@@ -442,7 +444,6 @@ def api_clean():
     
     # 偵測資料體系
     detected_system, _ = detect_system(sorted_df.columns)
-
     return jsonify({
         "ok": True, 
         "project_id": JobID,

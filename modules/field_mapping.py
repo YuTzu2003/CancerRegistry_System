@@ -4,11 +4,9 @@ from modules.db import get_conn
 def detect_system(excel_columns):
     conn = get_conn()
     systems = ['中文欄位名稱','英文欄位名稱','台大雲林欄位名稱','台大體系醫整庫欄位名稱','台灣癌症登記中心','雲醫癌AI模組']
-
     columns_sql = ', '.join(f'[{s}]' for s in systems)
-    # Include [序號] to match the new format 序號_欄位名稱
+
     query = f"SELECT [序號], {columns_sql} FROM [Hospital_data].[dbo].[CancerRegistry_FieldMap]"
-    
     cursor = conn.cursor()
     cursor.execute(query)
     rows = cursor.fetchall()
@@ -18,12 +16,10 @@ def detect_system(excel_columns):
 
     excel_cols_set = set(str(col).strip() for col in excel_columns)
     scores = {}
-
     for s in systems:
         db_cols = set()
         for _, row in df_mapping.iterrows():
             seq = str(row['序號']).strip()
-            # If seq ends with .0, remove it (e.g., "1.0" -> "1")
             if seq.endswith('.0'):
                 seq = seq[:-2]
                 
@@ -31,10 +27,7 @@ def detect_system(excel_columns):
             if pd.notna(val):
                 clean_val = str(val).strip()
                 if clean_val:
-                    # ONLY support prefixed versions
-                    db_cols.add(f"{seq}_{clean_val}")
                     db_cols.add(f"{seq}{clean_val}")
-        
         match_count = len(excel_cols_set.intersection(db_cols))
         scores[s] = match_count
 
@@ -46,7 +39,6 @@ def detect_system(excel_columns):
 def field_mapping(target_col):
     conn = get_conn()
     query = """SELECT * FROM [Hospital_data].[dbo].[CancerRegistry_FieldMap]"""
-    
     cursor = conn.cursor()
     cursor.execute(query)
     rows = cursor.fetchall()
@@ -56,7 +48,6 @@ def field_mapping(target_col):
 
     alias_dict = {}
     output_field_list = []
-
     for _, row in df_mapping.iterrows():
         val = row[target_col]
         output_name = str(val).strip() if pd.notna(val) else ""
@@ -80,14 +71,11 @@ def field_mapping(target_col):
             if pd.notna(alias):
                 clean_alias = str(alias).strip()
                 if clean_alias:
-                    # ONLY add prefixed versions
-                    alias_dict[f"{seq}_{clean_alias}"] = output_name
                     alias_dict[f"{seq}{clean_alias}"] = output_name
-                    alias_dict[f"{seq} {clean_alias}"] = output_name
 
     return alias_dict, output_field_list
 
-def get_field_map(target_scheme_key, fmt_name=None):
+def get_field_map(target_scheme_key, fmt_name):
     scheme_map = {
         "field_name_zh":"中文欄位名稱",
         "field_name_en":"英文欄位名稱",
@@ -99,16 +87,10 @@ def get_field_map(target_scheme_key, fmt_name=None):
     
     target_col = scheme_map.get(target_scheme_key,"中文欄位名稱")
     conn = get_conn()
-    
-    clean_fmt = "42" # default
-    if fmt_name:
-        # Support both fmt_42 and 42 formats
-        clean_fmt = str(fmt_name).replace("fmt_", "")
-        
+    clean_fmt = str(fmt_name).replace("fmt_", "")
     query = f"""SELECT [序號],[中文欄位名稱],[英文欄位名稱],[台大雲林欄位名稱],[台大體系醫整庫欄位名稱],[台灣癌症登記中心],[雲醫癌AI模組]
                 FROM [Hospital_data].[dbo].[v_FieldMap_WithFmt]
                 WHERE [{clean_fmt}欄位] = 1"""
-    
     cursor = conn.cursor()
     cursor.execute(query)
     rows = cursor.fetchall()
@@ -121,13 +103,12 @@ def get_field_map(target_scheme_key, fmt_name=None):
         target_base_name = str(row[target_col]).strip() if pd.notna(row[target_col]) else ""
         if not target_base_name:
             continue
-            
         seq = str(row['序號']).strip()
         if seq.endswith('.0'):
             seq = seq[:-2]
         
-        # Prepend sequence to the target name for the output header
-        target_name = f"{seq}_{target_base_name}"
+        # Prepend sequence to the target name for the output header without symbols
+        target_name = f"{seq}{target_base_name}"
 
         for col in columns:
             if col == '序號': continue
@@ -135,10 +116,8 @@ def get_field_map(target_scheme_key, fmt_name=None):
             if pd.notna(val):
                 alias = str(val).strip()
                 if alias:
-                    # ONLY add prefixed versions
-                    alias_to_target[f"{seq}_{alias}"] = target_name
+                    # ONLY add prefixed version without symbols
                     alias_to_target[f"{seq}{alias}"] = target_name
-                    alias_to_target[f"{seq} {alias}"] = target_name
                     
     return alias_to_target
 

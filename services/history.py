@@ -3,7 +3,8 @@ import shutil
 import datetime
 import zipfile
 import stat
-from flask import Blueprint, render_template, session, redirect, url_for, flash, jsonify, send_file
+import io
+from flask import Blueprint, render_template, session, redirect, url_for, flash, jsonify, send_file, request
 from modules.db import get_conn
 from services.auth import login_required
 
@@ -41,16 +42,34 @@ def delete_history(job_id):
     row = cursor.fetchone()
     
     if row and row[0] and os.path.exists(row[0]): 
-        try:
-            shutil.rmtree(row[0], onerror=remove_readonly)
-        except Exception as e:
-            print(f"Error deleting folder {row[0]}: {e}")
-            
+        shutil.rmtree(row[0], onerror=remove_readonly)      
     cursor.execute("DELETE FROM [Job] WHERE [JobID] = ? AND [UserID] = ?", (job_id, user_id))
     conn.commit()
     conn.close()
     flash("紀錄已成功刪除", "success")
     return redirect(url_for("history.history"))
+
+@history_bp.route("/history/batch_delete", methods=["POST"])
+@login_required
+def batch_delete_history():
+    user_id = session.get("id")
+    data = request.json
+    job_ids = data.get("job_ids", [])
+    if not job_ids:
+        return jsonify({"ok": False, "error": "未提供選取的項目"})
+
+    conn = get_conn()
+    cursor = conn.cursor()
+    for job_id in job_ids:
+        cursor.execute("SELECT [Path] FROM [Job] WHERE [JobID]=? AND [UserID]=?", (job_id, user_id))
+        row = cursor.fetchone()
+        if row and row[0] and os.path.exists(row[0]):
+            shutil.rmtree(row[0], onerror=remove_readonly)
+        cursor.execute("DELETE FROM [Job] WHERE [JobID] = ? AND [UserID] = ?", (job_id, user_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
 
 @history_bp.route("/history/detail/<job_id>")
 @login_required
@@ -58,10 +77,8 @@ def detail_history(job_id):
     conn = get_conn()
     cursor = conn.cursor()
     cursor.execute("""SELECT Job.JobID,DataFormat.FmtName,DataFormat.Version,Job.TotalCount,Job.CompletenessScore,Job.CorrectScore,Job.ConsistencyScore,Job.DQI,Job.Path,Job.CreatedAt
-                    FROM DataFormat RIGHT JOIN Job ON DataFormat.FmtID = Job.FmtID 
-                    WHERE Job.JobID = ?""", (job_id,))
+                      FROM DataFormat RIGHT JOIN Job ON DataFormat.FmtID = Job.FmtID WHERE Job.JobID = ?""", (job_id,))
     row = cursor.fetchone()
-    if not row: return jsonify({"ok": False, "error": "找不到資料"}), 404
     data = dict(zip([c[0] for c in cursor.description], row))
     if isinstance(data['CreatedAt'], datetime.datetime): 
         data['CreatedAt'] = data['CreatedAt'].strftime("%Y/%m/%d %H:%M:%S")
@@ -90,3 +107,38 @@ def history_download_zip(job_id):
         
         return send_file(os.path.abspath(zip_path), as_attachment=True)
     except Exception as e: return jsonify({"ok": False, "error": str(e)}), 500
+
+@history_bp.route("/history/batch_download", methods=["POST"])
+@login_required
+def batch_download_history():
+    user_id = session.get("id")
+    data = request.json
+    job_ids = data.get("job_ids", [])
+    
+    if not job_ids:
+        conn = get_conn()
+        cursor = conn.cursor()
+        cursor.execute("SELECT JobID FROM Job WHERE UserID = ?", (user_id,))
+        job_ids = [r[0] for r in cursor.fetchall()]
+        conn.close()
+    if not job_ids:
+        return jsonify({"ok": False, "error": "目前無任何紀錄可下載"})
+
+    conn = get_conn()
+    cursor = conn.cursor()
+    memory_file = io.BytesIO()
+    with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        for job_id in job_ids:
+            cursor.execute("SELECT [Path], [FileName] FROM [Job] WHERE [JobID]=? AND [UserID]=?", (job_id, user_id))
+            row = cursor.fetchone()
+            if row and row[0] and os.path.exists(row[0]):
+                project_path = row[0]
+                folder_name = f"Job_{job_id}"
+                for root, dirs, files in os.walk(project_path):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        rel_path = os.path.join(folder_name, os.path.relpath(file_path, project_path))
+                        zipf.write(file_path, rel_path)
+    conn.close()
+    memory_file.seek(0)
+    return send_file(memory_file,mimetype='application/zip',as_attachment=True,download_name=f"Batch_Download_{datetime.datetime.now().strftime('%Y%m%d%H%M')}.zip")

@@ -30,7 +30,6 @@ def annotation(row_errors):
         codes.append("B:格式不符")
     if (row_errors == "dateformat").any():
         codes.append("C:邏輯錯誤")
-    
     if not codes:
         return "D:完全正確的資訊"
     return " ".join(codes)
@@ -44,17 +43,12 @@ def cleanValidate(input_file,output_file,report_file,fmt,version,Revision_Date):
             df = pd.read_csv(input_file, dtype=str, encoding='utf-8-sig')
         except UnicodeDecodeError:
             df = pd.read_csv(input_file, dtype=str, encoding='cp950')
-        sheet_name = os.path.splitext(os.path.basename(input_file))[0]
     else:
         df = pd.read_excel(input_file,dtype=str)
-        with pd.ExcelFile(input_file) as xl:
-            sheet_name = xl.sheet_names[0]
 
     alias_mapping, _ = field_mapping('中文欄位名稱')
     error_mask = pd.DataFrame("", index=df.index, columns=df.columns) 
-
     clean_alias_mapping = {re.sub(r'\s+', '', str(k)): v for k, v in alias_mapping.items()}
-    rules_normalized = {re.sub(r'\s+', '', str(k)): v for k, v in rules.items()}
     
     for col in df.columns:
         raw_col = str(col)
@@ -63,7 +57,6 @@ def cleanValidate(input_file,output_file,report_file,fmt,version,Revision_Date):
         rule = None
         if rule_name and rule_name in rules:
             rule = rules[rule_name]
-
         if rule:
             error_mask[col] = df[col].apply(lambda x: check_error_type(x, rule))
 
@@ -93,7 +86,7 @@ def cleanValidate(input_file,output_file,report_file,fmt,version,Revision_Date):
     for r_idx in range(len(sorted_df)):
         for c_idx in range(len(sorted_df.columns)):
             cell = ws.cell(row=r_idx + 2, column=c_idx + 1)
-            cell.number_format = '@'  # 強制設定為文字格式
+            cell.number_format = '@' 
             
             # 只有在 error_mask 範圍內的欄位才進行顏色標記
             if c_idx < len(sorted_mask.columns):
@@ -141,11 +134,9 @@ def cleanValidate(input_file,output_file,report_file,fmt,version,Revision_Date):
         'logic_cells': dateformat_cell_count
     }
 
-    # report_file = f"Report_{sheet_name}.xlsx"
     wb_report = Workbook()
     ws_report = wb_report.active
     ws_report.title = "清洗結果"
-    
     title_text = f"癌症登記資料清洗結果"
     ws_report.merge_cells('A1:C1')
     cell_title = ws_report['A1']
@@ -193,7 +184,7 @@ def cleanValidate(input_file,output_file,report_file,fmt,version,Revision_Date):
     ws_report.column_dimensions['C'].width = 10 
     wb_report.save(report_file)
     wb_report.close()
-    print(f"Data-Clean Report file: {report_file}")
+    print(f"Data Clean Report file: {report_file}")
     return stats, alias_mapping, sorted_df, sorted_mask
 
 if __name__ == "__main__": 
