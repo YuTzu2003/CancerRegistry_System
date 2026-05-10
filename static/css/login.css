@@ -22,17 +22,11 @@
   margin-bottom: 32px;
 }
 
-.login-logo {
-  width: 56px;
-  height: 56px;
-  background: var(--blue-100);
-  color: var(--blue-600);
-  border-radius: 14px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 28px;
-  margin-bottom: 16px;
+.login-img-logo {
+  max-width: 80px;
+  height: auto;
+  margin-bottom: 20px;
+  display: inline-block;
 }
 
 .login-title {

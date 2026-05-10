@@ -33,3 +33,26 @@ function openDetail(jobId) {
             alert('系統連線發生錯誤，請稍後再試。');
         });
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+    const filterFormat = document.getElementById('filterFormat');
+    const historyTable = document.getElementById('historyTable');
+    if (!historyTable) return;
+
+    const tbody = historyTable.querySelector('tbody');
+
+    // 格式篩選邏輯
+    if (filterFormat) {
+        filterFormat.addEventListener('change', () => {
+            const val = filterFormat.value;
+            const rows = tbody.querySelectorAll('.history-row');
+            rows.forEach(row => {
+                if (val === 'all' || row.dataset.format === val) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        });
+    }
+});
