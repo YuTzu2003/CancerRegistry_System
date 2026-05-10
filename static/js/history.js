@@ -30,7 +30,6 @@ function openDetail(jobId) {
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('系統連線發生錯誤，請稍後再試。');
         });
 }
 
@@ -40,8 +39,21 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!historyTable) return;
 
     const tbody = historyTable.querySelector('tbody');
+    const selectAll = document.getElementById('selectAll');
 
-    // 格式篩選邏輯
+    // 全選
+    if (selectAll) {
+        selectAll.addEventListener('change', () => {
+            const checkboxes = tbody.querySelectorAll('.row-checkbox');
+            checkboxes.forEach(cb => {
+                if (cb.closest('tr').style.display !== 'none') {
+                    cb.checked = selectAll.checked;
+                }
+            });
+        });
+    }
+
+    // 格式篩選
     if (filterFormat) {
         filterFormat.addEventListener('change', () => {
             const val = filterFormat.value;
@@ -51,8 +63,80 @@ document.addEventListener('DOMContentLoaded', () => {
                     row.style.display = '';
                 } else {
                     row.style.display = 'none';
+                    const cb = row.querySelector('.row-checkbox');
+                    if (cb) cb.checked = false;
                 }
             });
+            if (selectAll) selectAll.checked = false;
         });
     }
 });
+
+// 取得選取的 JobID
+function getSelectedIds() {
+    const checkboxes = document.querySelectorAll('.row-checkbox:checked');
+    return Array.from(checkboxes).map(cb => cb.value);
+}
+
+// 批次刪除
+function batchDelete() {
+    const ids = getSelectedIds();
+    if (ids.length === 0) {
+        alert('請先勾選欲刪除的項目。');
+        return;
+    }
+
+    if (!confirm(`確定要刪除這 ${ids.length} 筆紀錄嗎？此動作無法復原。`)) return;
+
+    fetch('/history/batch_delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ job_ids: ids })
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.ok) {
+            location.reload();
+        } else {
+            alert(res.error || '刪除失敗');
+        }
+    })
+    .catch(err => {
+        console.error(err);
+    });
+}
+
+// 批次下載
+async function batchDownload() {
+    const ids = getSelectedIds();
+    // 如果沒有選取，可以詢問是否下載全部（或依照目前的後端邏輯，沒傳 ID 就下載全部）
+    const msg = ids.length === 0 ? '將下載全部紀錄。確定要執行嗎？' : `確定要下載這 ${ids.length} 筆選取的紀錄嗎？`;
+    
+    if (!confirm(msg)) 
+        return;
+    try {
+        const response = await fetch('/history/batch_download', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ job_ids: ids })
+        });
+
+        if (!response.ok) {
+            const res = await response.json();
+            throw new Error(res.error || '下載失敗');
+        }
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Batch_Download_${new Date().getTime()}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+    } catch (err) {
+        console.error(err);
+        alert(err.message || '下載發生錯誤');
+    }
+}
