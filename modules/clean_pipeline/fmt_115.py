@@ -168,7 +168,7 @@ RULES = {
         'ID':'2.10.2',
         'field': 'Grade Pathological',
         'length': 1,
-        'pattern_range': '1-5, 8-9, A-E, H, L-M, S, X',
+        'pattern_range': '1-5, 8-9, A-E, H, L, M, S, X',
         'description': '收錄實質腫瘤於原發部位手術之後的分級/分化。分級/分化為腫瘤和正常組織的相似的程度。Well differentiated (Grade I)和正常組織最相似；Undifferentiated (Grade IV)和正常組織差異最大。',
         'purpose': '與個案的預後有關。分級/分化可用以評估癌症嚴重程度；分級/分化及細胞型態對於許多癌症而言是重要的預後因子。分級/分化對於某些癌症更是判定病理期別的依據之一。'
     },
@@ -946,7 +946,7 @@ RULES = {
         'description': '記錄醫師於首次治療前最近一次評估個案的生活功能狀態。',
         'purpose': '本項目的資料可作為訂定個案治療計畫參考之用。'
     },
-    '癌症部位特定因子1':{
+    '癌症部位特定因子 1':{
         'ID':'8.1',
         'field': 'Site-Specific Factor 1',
         'length': 3,
@@ -959,7 +959,7 @@ RULES = {
         'description': '記錄與癌症預後和治療決策有關之癌症部位特定因子',
         'purpose': '因應臨床實務需求及癌症診療品質提升。'
     },
-    '癌症部位特定因子2':{
+    '癌症部位特定因子 2':{
         'ID':'8.2',
         'field': 'Site-Specific Factor 2',
         'length': 3,
@@ -971,7 +971,7 @@ RULES = {
         'description': '記錄與癌症預後和治療決策有關之癌症部位特定因子',
         'purpose': '因應臨床實務需求及癌症診療品質提升。'
     },
-    '癌症部位特定因子3':{
+    '癌症部位特定因子 3':{
         'ID':'8.3',
         'field': 'Site-Specific Factor 3',
         'length': 3,
@@ -980,7 +980,7 @@ RULES = {
         'description': '記錄與癌症預後和治療決策有關之癌症部位特定因子',
         'purpose': '因應臨床實務需求及癌症診療品質提升。'
     },
-    '癌症部位特定因子4':{
+    '癌症部位特定因子 4':{
         'ID':'8.4',
         'field': 'Site-Specific Factor 4',
         'length': 3,
@@ -991,7 +991,7 @@ RULES = {
         'description': '記錄與癌症預後和治療決策有關之癌症部位特定因子',
         'purpose': '因應臨床實務需求及癌症診療品質提升。'
     },
-    '癌症部位特定因子5':{
+    '癌症部位特定因子 5':{
         'ID':'8.5',
         'field': 'Site-Specific Factor 5',
         'length': 3,
@@ -1000,7 +1000,7 @@ RULES = {
         'description': '記錄與癌症預後和治療決策有關之癌症部位特定因子',
         'purpose': '因應臨床實務需求及癌症診療品質提升。'
     },
-    '癌症部位特定因子6':{
+    '癌症部位特定因子 6':{
         'ID':'8.6',
         'field': 'Site-Specific Factor 6',
         'length': 3,
@@ -1011,7 +1011,7 @@ RULES = {
         'description': '記錄與癌症預後和治療決策有關之癌症部位特定因子',
         'purpose': '因應臨床實務需求及癌症診療品質提升。'
     },
-    '癌症部位特定因子7':{
+    '癌症部位特定因子 7':{
         'ID':'8.7',
         'field': 'Site-Specific Factor 7',
         'length': 3,
@@ -1020,7 +1020,7 @@ RULES = {
         'description': '記錄與癌症預後和治療決策有關之癌症部位特定因子',
         'purpose': '因應臨床實務需求及癌症診療品質提升。'
     },
-    '癌症部位特定因子8':{
+    '癌症部位特定因子 8':{
         'ID':'8.8',
         'field': 'Site-Specific Factor 8',
         'length': 3,
@@ -1038,7 +1038,7 @@ RULES = {
         'description': '記錄與癌症預後和治療決策有關之癌症部位特定因子',
         'purpose': '因應臨床實務需求及癌症診療品質提升。'
     },
-    '癌症部位特定因子10':{
+    '癌症部位特定因子 10':{
         'ID':'8.10',
         'field': 'Site-Specific Factor 10',
         'length': 3,
