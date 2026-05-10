@@ -58,16 +58,11 @@ def cleanValidate(input_file,output_file,report_file,fmt,version,Revision_Date):
     
     for col in df.columns:
         raw_col = str(col)
-        #clean_col = str(col).strip()
         clean_col = re.sub(r'\s+', '', raw_col)
         rule_name = clean_alias_mapping.get(clean_col)
-        #rule_name = alias_mapping.get(clean_col)
-
         rule = None
         if rule_name and rule_name in rules:
             rule = rules[rule_name]
-        elif clean_col in rules_normalized:
-            rule = rules_normalized[clean_col]
 
         if rule:
             error_mask[col] = df[col].apply(lambda x: check_error_type(x, rule))
