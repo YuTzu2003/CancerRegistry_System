@@ -294,7 +294,7 @@ RULES = {
         'ID':'3.10',
         'field': 'Pathologic T',
         'max_length': 3,
-        'pattern_range': 'X, 0, A, IS, ISU, ISD, ISDC, ISPA, ISLA, 1M, 1, 1A, 1A1, 1A2, 1B, 1B1, 1B2, 1B3, 1C, 1C1, 1C2, 1C3, 1D, 2, 2A, 2A1, 2A2, 2B, 2C, 2D, 3, 3A, 3B, 3C, 3D, 4, 4A, 4B, 4C, 4D, 4E, 8888, 9999',
+        'pattern_range': 'X, 0, A, IS, ISU, ISD, ISDC, ISPA, ISLA, 1M, 1, 1A, 1A1, 1A2, 1B, 1B1, 1B2, 1B3, 1C, 1C1, 1C2, 1C3, 1D, 2, 2A, 2A1, 2A2, 2B, 2C, 2D, 3, 3A, 3B, 3C, 3D, 4, 4A, 4B, 4C, 4D, 4E, 888, 999',
         'description': '指原發腫瘤大小或侵犯程度。',
         'purpose': '作為 TNM 分期依據資料，該分期系統可用以評估癌症治療及控制的趨勢。醫師則用以進行預後的推估、治療的規劃、新療法的評估、結果的分析、追蹤的策劃和早期偵測結果的評定。'
     },
@@ -953,7 +953,7 @@ RULES = {
         'field': 'Site-Specific Factor 1',
         'length': 3,
         'patterns': [
-                        {'name': '白血病', 'regex': r'^8[A-Z]{2}$'},
+                        {'name': '白血病', 'regex': r'^8XX$'},
                         {'name': '子宮體癌、乳癌', 'regex': r'^[ISW]\d{2}$'},
                         {'name': '肝癌', 'regex': r'^[A]\d{2}$'},
                         {'name': '一般癌別', 'regex': r'^\d{3}$'},
@@ -966,7 +966,7 @@ RULES = {
         'field': 'Site-Specific Factor 2',
         'length': 3,
         'patterns': [
-                        {'name': '白血病', 'regex': r'^8[A-Z]{2}$'},
+                        {'name': '白血病', 'regex': r'^8XX$'},
                         {'name': '子宮體癌、乳癌', 'regex': r'^[ISW]\d{2}$'},
                         {'name': '一般癌別', 'regex': r'^\d{3}$'},
         ],
