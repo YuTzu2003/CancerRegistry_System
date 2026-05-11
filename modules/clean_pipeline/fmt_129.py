@@ -61,7 +61,7 @@ RULES = {
     '診斷年齡': {
         'ID':'2.1',
         'field': 'Age at Diagnosis',
-        'max_length': 3,
+        'length': 3,
         'digit': True,
         'SV': ['999'],       
         'range': [0, 120],
@@ -125,7 +125,7 @@ RULES = {
     '原發部位':{
         'ID':'2.6',
         'field': 'Primary Site',
-        'max_length': 5,
+        'length': 5,
         'regex': r'^C([0-7]\d{2}|80[0-9])[\s\d]$',
         'description': '確認癌症原發部位。',
         'purpose': '原發部位是分期及決定治療方針之依據；同時也影響其預後及病程。'
@@ -142,7 +142,7 @@ RULES = {
     '組織型態':{
         'ID':'2.8',
         'field': 'Histology',
-        'max_length': 5,
+        'length': 5,
         'regex': r'^(8\d{3}|9[0-8]\d{2}|99[0-8]\d|999[0-3])[\s\d|A-H|J-N|P-Z]$',
         'description': '原發腫瘤細胞於顯微鏡下之結構。',
         'purpose': '作為分期及決定治療方針之根據；同時也影響其預後及病程。'
@@ -987,11 +987,11 @@ RULES = {
         'field': 'Site-Specific Factor 1',
         'length': 3,
         'patterns': [
-                        {'name': '一般癌別', 'regex': r'^\d{3}$'},
+                        {'name': '白血病', 'regex': r'^8XX$'},
                         {'name': '子宮體癌、乳癌', 'regex': r'^[ISW]\d{2}$'},
-                        {'name': '白血病', 'regex': r'^8\d{2}$'},                        
-                        {'name': '肝癌', 'regex': r'^[A]\d{2}$'}                        
-        ], 
+                        {'name': '肝癌', 'regex': r'^[A]\d{2}$'},
+                        {'name': '一般癌別', 'regex': r'^\d{3}$'},
+        ],
         'description': '記錄與癌症預後和治療決策有關之癌症部位特定因子',
         'purpose': '因應臨床實務需求及癌症診療品質提升。'
     },
@@ -1000,9 +1000,9 @@ RULES = {
         'field': 'Site-Specific Factor 2',
         'length': 3,
         'patterns': [
-                        {'name': '一般癌別', 'regex': r'^\d{3}$'},
+                        {'name': '白血病', 'regex': r'^8XX$'},
                         {'name': '子宮體癌、乳癌', 'regex': r'^[ISW]\d{2}$'},
-                        {'name': '白血病', 'regex': r'^8\d{2}$'}
+                        {'name': '一般癌別', 'regex': r'^\d{3}$'},
         ],
         'description': '記錄與癌症預後和治療決策有關之癌症部位特定因子',
         'purpose': '因應臨床實務需求及癌症診療品質提升。'
@@ -1022,7 +1022,7 @@ RULES = {
         'length': 3,
         'patterns': [
                         {'name': '胰臟癌', 'regex': r'^[A]\d{2}$'},
-                        {'name': '一般癌別', 'regex': r'^\d{3}$'}
+                        {'name': '一般癌別', 'regex': r'^\d{3}$'},
         ],
         'description': '記錄與癌症預後和治療決策有關之癌症部位特定因子',
         'purpose': '因應臨床實務需求及癌症診療品質提升。'
@@ -1041,8 +1041,8 @@ RULES = {
         'field': 'Site-Specific Factor 6',
         'length': 3,
         'patterns': [
+                        {'name': '肺癌', 'regex': r'^[A-Z]\d{2}$'},
                         {'name': '一般癌別', 'regex': r'^\d{3}$'},
-                        {'name': '肺癌', 'regex': r'^[A-Z]\d{2}$'},                        
         ],
         'description': '記錄與癌症預後和治療決策有關之癌症部位特定因子',
         'purpose': '因應臨床實務需求及癌症診療品質提升。'

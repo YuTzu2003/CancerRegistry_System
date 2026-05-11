@@ -61,7 +61,7 @@ RULES = {
     '診斷年齡': {
         'ID':'2.1',
         'field': 'Age at Diagnosis',
-        'max_length': 3,
+        'length': 3,
         'digit': True,
         'SV': ['999'],       
         'range': [0, 120],
@@ -125,7 +125,7 @@ RULES = {
     '原發部位':{
         'ID':'2.6',
         'field': 'Primary Site',
-        'max_length': 5,
+        'length': 5,
         'regex': r'^C([0-7]\d{2}|80[0-9])[\s\d]$',
         'description': '確認癌症原發部位。',
         'purpose': '原發部位是分期及決定治療方針之依據；同時也影響其預後及病程。'
@@ -142,7 +142,7 @@ RULES = {
     '組織型態':{
         'ID':'2.8',
         'field': 'Histology',
-        'max_length':5,
+        'length':5,
         'regex': r'^(8\d{3}|9[0-8]\d{2}|99[0-8]\d|999[0-3])[\s\d|A-H|J-N|P-Z]$',
         'description': '原發腫瘤細胞於顯微鏡下之結構。',
         'purpose': '作為分期及決定治療方針之根據；同時也影響其預後及病程。'
@@ -202,7 +202,7 @@ RULES = {
     '申報醫院原發部位手術方式':{
         'ID':'4.1.4',
         'field': 'Surgical Procedure of Primary Site at This Facility',
-        'max_length': 3,
+        'length': 3,
         'digit': True,
         'SV':['000','990'],
         'pattern_range': '800-900',
@@ -366,7 +366,7 @@ RULES = {
     '體重': {
         'ID':'7.2',
         'field': 'Weight',
-        'max_length': 3,
+        'length': 3,
         'digit': True,     
         'range': [0, 999],
         'description': '記錄個案於首次治療前的體重。',
@@ -416,7 +416,7 @@ RULES = {
         'description': '記錄個案有血緣關係之家庭成員中是否患有相同癌症的家族病史。',
         'purpose': '家族病史為致癌的危險因子之一。'
     },
-    '其他因子 8':{
+    '其他因子8':{
         'ID':'7.8',
         'field': 'Other Factor 8',
         'length': 3,
@@ -425,7 +425,7 @@ RULES = {
         'description': '記錄與癌症預後和治療決策相關之其他因子。',
         'purpose': '因應臨床實務需求及癌症診療品質提升。'
     },
-    '其他因子 9':{
+    '其他因子9':{
         'ID':'7.9',
         'field': 'Other Factor 9',
         'length': 3,
@@ -434,7 +434,7 @@ RULES = {
         'description': '記錄與癌症預後和治療決策相關之其他因子。',
         'purpose': '因應臨床實務需求及癌症診療品質提升。'
     },
-    '其他因子 10':{
+    '其他因子10':{
         'ID':'7.10',
         'field': 'Other Factor 10',
         'length': 3,

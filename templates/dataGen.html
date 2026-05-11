@@ -39,6 +39,11 @@
   }
   .table-flat {
     min-width: 1300px;
+    table-layout: auto;
+  }
+  .table-flat th, .table-flat td {
+    white-space: nowrap;
+    padding: 10px 18px;
   }
   .download-actions {
     display: flex;
@@ -163,7 +168,7 @@
     <div class="section-body">
       <div class="download-actions">
         <div class="d-flex gap-2">
-          <button class="btn btn-success text-white">下載 XLSX</button>
+          <button class="btn btn-success text-white" onclick="downloadResult()">下載 XLSX</button>
         </div>
         <span class="text-muted small">滑動表格查看完整欄位</span>
       </div>

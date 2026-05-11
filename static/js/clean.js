@@ -54,12 +54,14 @@
           openModal();
         } 
         else if (action === 'delete') {
-          if (confirm(`確定要刪除「${tr.dataset.name}」嗎？`)) {
+          const displayName = tr.querySelector('.fmt-name').textContent.trim();
+          const confirmed = await utils.confirm(`確定要刪除「${displayName}」嗎？`);
+          if (confirmed.isConfirmed) {
             try {
               const res = await fetch(`/api/formats/${id}`, { method: 'DELETE' });
               const data = await res.json();
-              if (data.ok) location.reload(); else alert(data.message);
-            } catch (err) { alert('連線失敗'); }
+              if (data.ok) location.reload(); else utils.alert(data.message, 'error');
+            } catch (err) { utils.alert('連線失敗', 'error'); }
           }
         }
       });
@@ -70,7 +72,7 @@
       const payload = { name: fmtNameInput.value, version: fmtVersionInput.value, updated: fmtUpdatedInput.value };
       const isEdit = id !== '';
       const url = isEdit ? `/api/formats/${id}` : '/api/formats';
-      if (!payload.name || !payload.version) return alert('資料須填寫完畢！');
+      if (!payload.name || !payload.version) return utils.alert('資料須填寫完畢！', 'warning');
 
       try {
         const res = await fetch(url, {
@@ -79,8 +81,8 @@
           body: JSON.stringify(payload)
         });
         const data = await res.json();
-        if (data.ok) location.reload(); else alert(data.message);
-      } catch (err) { alert('連線失敗'); }
+        if (data.ok) location.reload(); else utils.alert(data.message, 'error');
+      } catch (err) { utils.alert('連線失敗', 'error'); }
     });
   });
 
@@ -146,7 +148,9 @@
     e.preventDefault();
     const formatId = $('#formatSelect').value;
     const file = fileInput.files?.[0];
-    if (!formatId || !file) return alert('請選擇格式與上傳檔案');
+
+    if (!formatId) return utils.alert('請選擇參考資料格式', 'warning');
+    if (!file) return utils.alert('請上傳檔案', 'warning');
 
     const loadingOverlay = document.getElementById('loadingOverlay');
     const btnStart = document.getElementById('btnStartClean');
@@ -355,18 +359,18 @@
 
   // ---------- 下載清洗結果 ----------
   $('#btnDownloadCleaned')?.addEventListener('click', () => {
-    if (!currentJobId) return alert('尚未執行清洗任務');
+    if (!currentJobId) return utils.alert('尚未執行清洗任務', 'warning');
     window.location.href = `/api/download/cleaned/${currentJobId}`;
   });
 
   $('#btnDownloadReport')?.addEventListener('click', () => {
-    if (!currentJobId) return alert('尚未執行清洗任務');
+    if (!currentJobId) return utils.alert('尚未執行清洗任務', 'warning');
     window.location.href = `/api/download/report/${currentJobId}`;
   });
 
   // ---------- 匯出 XLSX ----------
   $('#btnExportXlsx')?.addEventListener('click', async () => {
-    if (!currentJobId) return alert('尚未執行清洗任務');
+    if (!currentJobId) return utils.alert('尚未執行清洗任務', 'warning');
     
     const nameScheme = $('input[name="nameScheme"]:checked')?.value;
     const selectedFields = $$('#outputFieldList input[type="checkbox"]:checked').map(cb => cb.value);
@@ -415,16 +419,16 @@
       } 
       else {
         const data = await res.json();
-        alert(data.error || '匯出失敗');
+        utils.alert(data.error || '匯出失敗', 'error');
       }
-    } catch (err) {alert('連線失敗');
+    } catch (err) {utils.alert('連線失敗', 'error');
     } finally {if (loadingOverlay) loadingOverlay.style.display = 'none';
     }
   });
 
   // ---------- 預覽功能 ----------
   $('#btnPreviewOutput')?.addEventListener('click', async () => {
-    if (!currentJobId) return alert('尚未執行清洗任務');
+    if (!currentJobId) return utils.alert('尚未執行清洗任務', 'warning');
     
     const nameScheme = $('input[name="nameScheme"]:checked')?.value;
     const selectedFields = $$('#outputFieldList input[type="checkbox"]:checked').map(cb => cb.value);
@@ -453,10 +457,10 @@
         $('#previewModal').removeAttribute('hidden');
       } 
       else {
-        alert(data.error || '預覽失敗');
+        utils.alert(data.error || '預覽失敗', 'error');
       }
     } 
-    catch (err) {alert('連線失敗');} 
+    catch (err) {utils.alert('連線失敗', 'error');} 
     finally {if (loadingOverlay) loadingOverlay.style.display = 'none';}
   });
 })();

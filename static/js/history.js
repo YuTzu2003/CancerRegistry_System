@@ -25,7 +25,7 @@ function openDetail(jobId) {
                 detailModal.show();
             } 
             else {
-                alert((res.error));
+                utils.alert(res.error, "error");
             }
         })
         .catch(error => {
@@ -79,14 +79,15 @@ function getSelectedIds() {
 }
 
 // 批次刪除
-function batchDelete() {
+async function batchDelete() {
     const ids = getSelectedIds();
     if (ids.length === 0) {
-        alert('請先勾選欲刪除的項目。');
+        utils.alert('請先勾選欲刪除的項目。', 'warning');
         return;
     }
 
-    if (!confirm(`確定要刪除這 ${ids.length} 筆紀錄嗎？此動作無法復原。`)) return;
+    const confirmed = await utils.confirm(`確定要刪除這 ${ids.length} 筆紀錄嗎？此動作無法復原。`);
+    if (!confirmed.isConfirmed) return;
 
     fetch('/history/batch_delete', {
         method: 'POST',
@@ -98,7 +99,7 @@ function batchDelete() {
         if (res.ok) {
             location.reload();
         } else {
-            alert(res.error || '刪除失敗');
+            utils.alert(res.error || '刪除失敗', 'error');
         }
     })
     .catch(err => {
@@ -109,11 +110,14 @@ function batchDelete() {
 // 批次下載
 async function batchDownload() {
     const ids = getSelectedIds();
-    // 如果沒有選取，可以詢問是否下載全部（或依照目前的後端邏輯，沒傳 ID 就下載全部）
-    const msg = ids.length === 0 ? '將下載全部紀錄。確定要執行嗎？' : `確定要下載這 ${ids.length} 筆選取的紀錄嗎？`;
-    
-    if (!confirm(msg)) 
+    if (ids.length === 0) {
+        utils.alert('請先勾選欲下載的項目。', 'warning');
         return;
+    }
+    
+    const confirmed = await utils.confirm(`確定要下載這 ${ids.length} 筆選取的紀錄嗎？`, '確認下載');
+    if (!confirmed.isConfirmed) return;
+    
     try {
         const response = await fetch('/history/batch_download', {
             method: 'POST',
@@ -137,6 +141,6 @@ async function batchDownload() {
         document.body.removeChild(a);
     } catch (err) {
         console.error(err);
-        alert(err.message || '下載發生錯誤');
+        utils.alert(err.message || '下載發生錯誤', 'error');
     }
 }

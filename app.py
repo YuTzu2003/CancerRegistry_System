@@ -6,6 +6,7 @@ from services.auth import auth_bp, login_required, admin_required
 from services.member import member_bp
 from services.history import history_bp
 from services.clean import clean_bp
+from services.data_gen import data_gen_bp
 from modules.db import get_conn
 
 logging.basicConfig(
@@ -25,6 +26,7 @@ app.register_blueprint(auth_bp)
 app.register_blueprint(member_bp)
 app.register_blueprint(history_bp)
 app.register_blueprint(clean_bp)
+app.register_blueprint(data_gen_bp)
 
 BASE_DIR = os.path.dirname(__file__)
 Jobs_FOLDER = 'static/Jobs'
