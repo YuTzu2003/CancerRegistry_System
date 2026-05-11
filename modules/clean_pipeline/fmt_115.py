@@ -378,7 +378,7 @@ RULES = {
         'ID':'3.21',
         'field': 'Pathologic Other Staging System',
         'max_length': 4,
-        'pattern_range': '0, 1, 1A, 1A1, 1A2, 1A3, 1B, 1B1, 1B2, 1B3, 1C, 1C1, 1C2, 1C3, 2, 2A, 2A1, 2A2, 2B, 2C, 3, 3A, 3A1, 3A11, 3A12, 3A2, 3B, 3B1, 3B2, 3C, 3C1, 3C11, 3C12, 3C2, 3C21, 3C22, 4, 4A, 4B, 4C, 8888, 9999, A, B1, B2, B3, C1, C2, C3, D, 0000',
+        'pattern_range': '0, 1, 1A, 1A1, 1A2, 1A3, 1B, 1B1, 1B2, 1C, 1C1, 1C2, 1C3, 2, 2A, 2A1, 2A2, 2B, 2C, 3, 3A, 3A1, 3A11, 3A12, 3A2, 3B, 3B1, 3B2, 3C, 3C1, 3C11, 3C12, 3C2, 3C21, 3C22, 4, 4A, 4B, 4C, 8888, 9999, A, B1, B2, B3, C1, C2, C3, D, 0000',
         'description': '若非 AJCC 癌症分期系統，可選擇下列其他分期系統摘錄。'
     },
     '首次療程開始日期':{
