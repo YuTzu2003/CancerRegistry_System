@@ -953,7 +953,7 @@ RULES = {
         'field': 'Site-Specific Factor 1',
         'length': 3,
         'patterns': [
-                        {'name': '白血病', 'regex': r'^8[A-Z]{2}$'},
+                        {'name': '白血病', 'regex': r'^8XX$'},
                         {'name': '子宮體癌、乳癌', 'regex': r'^[ISW]\d{2}$'},
                         {'name': '肝癌', 'regex': r'^[A]\d{2}$'},
                         {'name': '一般癌別', 'regex': r'^\d{3}$'},
@@ -966,7 +966,7 @@ RULES = {
         'field': 'Site-Specific Factor 2',
         'length': 3,
         'patterns': [
-                        {'name': '白血病', 'regex': r'^8[A-Z]{2}$'},
+                        {'name': '白血病', 'regex': r'^8XX$'},
                         {'name': '子宮體癌、乳癌', 'regex': r'^[ISW]\d{2}$'},
                         {'name': '一般癌別', 'regex': r'^\d{3}$'},
         ],
