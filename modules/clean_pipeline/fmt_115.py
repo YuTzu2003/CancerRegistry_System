@@ -356,7 +356,6 @@ RULES = {
         'description': '記錄判定個案癌症期別所使用之AJCC癌症分期手冊的版本。',
         'purpose': 'AJCC 分期及T、N、M組成之編碼及規則會隨時間演進而改變，以利個案分析之用。'
     },
-
     '其他分期系統':{
         'ID':'3.17',
         'field': 'Other Staging System',

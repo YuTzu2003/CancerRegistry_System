@@ -11,7 +11,7 @@ RULES = {
         'ID':'1.2',
         'field': 'Medical Record Number', 
         'max_length': 10, 
-        'SV': '9999999999',
+        'SV': ['9999999999'],
         'description': '記錄個案於申報醫院之病歷號碼。',
         'purpose': '用來辨識個案及作為調閱病歷之依據；亦可作為辨識個案是否有多重原發腫瘤之依據。'
     },
@@ -27,7 +27,7 @@ RULES = {
         'field': 'ID Number',
         'length': 10,
         'regex': r'^[A-Za-z][1289]\d{8}$',
-        'SV': '9999999999',
+        'SV': ['9999999999'],
         'description': '記錄個案的身分證統一編號。',
         'purpose': '用來辨識個案。' 
     },
@@ -44,7 +44,7 @@ RULES = {
         'ID':'1.6',
         'field': 'Date of Birth',
         'length': 8,
-        'SV': '99999999',
+        'SV': ['99999999'],
         'is_date': '%Y%m%d',
         'description': '確認個案的出生日期。',
         'purpose': '有助於確認個案的身份；對於以個案世代研究(patient cohort)作為腫瘤分析也很有幫助。'
@@ -61,9 +61,9 @@ RULES = {
     '診斷年齡': {
         'ID':'2.1',
         'field': 'Age at Diagnosis',
-        'max_length': 3,
+        'length': 3,
         'digit': True,
-        'SV': '999',       
+        'SV': ['999'],       
         'range': [0, 120],
         'description': '記錄個案診斷此癌症時之實足年齡。',
         'purpose': '有助於個案的確認，且對於統計分析癌症相關資料時，年齡常是一個重要的因素。' 
@@ -108,7 +108,7 @@ RULES = {
         'ID':'2.4',
         'field': 'Date of First Contact',
         'length': 8,
-        'SV': '99999999',  
+        'SV': ['99999999'],  
         'is_date': '%Y%m%d',
         'description': '個案因此癌症至申報醫院門診或住院之最早日期。',
         'purpose': '可用來計算個案首次就診至進行癌症登記之時間間隔；也可用來計算首次就診至治療之時間差距，以監控癌症照護品質。  '
@@ -117,7 +117,7 @@ RULES = {
         'ID':'2.5',
         'field': 'Date of Initial Diagnosis',
         'length': 8,
-        'SV': '99999999',  
+        'SV': ['99999999'],  
         'is_date': '%Y%m%d',
         'description': '記錄此癌症最早被醫師診斷的日期。',
         'purpose': '可計算癌症最初診斷日期至完成分期或開始治療的時間間隔。'
@@ -125,7 +125,7 @@ RULES = {
     '原發部位':{
         'ID':'2.6',
         'field': 'Primary Site',
-        'max_length': 4,
+        'length': 4,
         'pattern_range': 'C000-C809',
         'description': '確認癌症原發部位。',
         'purpose': '原發部位是分期及決定治療方針之依據；同時也影響其預後及病程。'
@@ -142,7 +142,7 @@ RULES = {
     '組織型態':{
         'ID':'2.8',
         'field': 'Histology',
-        'max_length':4,
+        'length':4,
         'digit': True,
         'range': [8000, 9993],
         'description': '原發腫瘤細胞於顯微鏡下之結構。',
@@ -188,7 +188,7 @@ RULES = {
         'field': 'Tumor Size',
         'length': 3,
         'digit': True,
-        'SV': '998, 999',
+        'SV': ['998', '999'],
         'range': [0, 995],
         'description': '描述原發腫瘤之最大尺寸或直徑，單位通常為亳米(mm)。',
         'purpose': '腫瘤大小是重要的癌症預後因子，也是判定 AJCC 期別的依據。'
@@ -433,7 +433,8 @@ RULES = {
         'field': 'Surgical Procedure of Primary Site at Other Facility',
         'length': 2,
         'digit': True,
-        'pattern_range': '00, 10-80, 90, 98, 99',
+        'SV':['00','90','98','99'],
+        'pattern_range': '10-80',
         'description': '記錄個案於外院對原發部位所進行的外科手術方式。',
         'purpose': '用來比較不同治療方式的效果。'
     },
@@ -442,7 +443,8 @@ RULES = {
         'field': 'Surgical Procedure of Primary Site at This Facility',
         'length': 2,
         'digit': True,
-        'pattern_range': '00, 10-80, 90, 98, 99',
+        'SV':['00','90','98','99'],
+        'pattern_range': '10-80',
         'description': '記錄在申報醫院對原發部位所進行的手術方式。',
         'purpose': '用來比較不同治療方式的效果。'
     },
@@ -506,7 +508,7 @@ RULES = {
         'max_length': 2,
         'digit': True,
         'range': [0, 63],
-        'SV': '-1, -9',
+        'SV': ['-1', '-9'],
         'description': '記錄在申報醫院的首次療程中，進行放射治療之放射線標靶體積涵蓋的範圍 (局部原發腫瘤「T」、區域淋巴結「N」和遠端轉移「M」)。',
         'purpose': '以簡單可組合編碼方法登錄個別癌症的放射治療的目標範圍，該資訊可被用於評估放射治療的醫療模式。'
     },
@@ -516,7 +518,7 @@ RULES = {
         'max_length': 3,
         'digit': True,
         'range': [0, 127],
-        'SV': '-1, -9',
+        'SV': ['-1', '-9'],
         'description': '記錄在申報醫院的首次療程中，進行放射治療所使用的治療儀器或治療方式。',
         'purpose': '可作為治療結果分析之依據。'
     },
@@ -544,7 +546,7 @@ RULES = {
         'max_length': 2,
         'digit': True,
         'range': [0, 7],
-        'SV': '-9,-8,-7,-6,-1',
+        'SV': ['-9', '-8', '-7', '-6', '-1'],
         'description': '記錄在任何醫療機構的首次療程中，針對治療區域，放射治療及手術的時間順序關係。',
         'purpose': '放射治療及手術的時間順序關係可能無法由相關日期直接計算得知，提供更詳實的時間順序關係。'
     },
@@ -554,7 +556,7 @@ RULES = {
         'max_length': 2,
         'digit': True,
         'range': [0, 7],
-        'SV': '-9,-8,-7,-1',
+        'SV': ['-9', '-8', '-7', '-1'],
         'description': '記錄在任何醫療機構的首次療程中，針對原發部位的手術或放射治療，與全身性治療的時間順序關係。',
         'purpose': '區域治療與全身性治療的時間順序關係可能無法由相關日期直接計算得知。此項目提供經判斷後更直接正確的時間順序關係。'
     },
@@ -572,7 +574,8 @@ RULES = {
         'field': 'RT Status',
         'length': 1,
         'digit': True,
-        'choices': ['0', '1', '2', '5', '6', '7', '8', '9'],       
+        'SV': ['9'],
+        'choices': ['0', '1', '2', '5', '6', '7', '8'],       
         'description': '記錄在申報醫院的首次療程中，接受放射治療的執行狀態。',
         'purpose': '有助於了解建議之治療模式未被採用的理由及確認治療的執行度。'
     },
@@ -582,7 +585,7 @@ RULES = {
         'max_length': 3,
         'digit': True,
         'range': [0, 111],
-        'SV': '-9,-1',
+        'SV': ['-9', '-1'],
         'description': '記錄在申報醫院的首次療程中，進行體外放射治療所使用的技術。',
         'purpose': '本項目的資料有助於分析治療技術與治療效果的關係。'
     },
@@ -592,7 +595,7 @@ RULES = {
         'max_length': 2,
         'digit': True,
         'range': [0, 63],
-        'SV': '-9,-1',
+        'SV': ['-9', '-1'],
         'description': '記錄在申報醫院的首次療程中，利用放射線涵蓋之局部原發腫瘤 (T)、區域淋巴結 (N) 或遠端轉移 (M) 來區分並記錄體外射治療中接受最高劑量的目標區域之範圍。一般而言，此最高劑量區域也就是腫瘤負荷最重的區域。',
         'purpose': '''在作治療效果分析時，放射腫瘤醫師會將局部治療失敗的因素分為下列四類：
                         1. 治療部位：是在原發部位失敗，還是淋巴引流區域失敗。
@@ -708,7 +711,7 @@ RULES = {
         'length': 2,
         'digit': True,      
         'range': [0, 13],
-        'SV': '99',
+        'SV': ['99'],
         'description': '記錄個案在外院首次療程中，所給予化學治療相關情形。化學治療包括多種抗癌藥物，可干擾癌細胞中 DNA 的合成和分裂。',
         'purpose': '全身性治療可為單一藥物或複合處方能包括給予個案一種或是多種的治療物質。本欄位可評估外院首次療程的化學治療。'
     },
@@ -718,7 +721,7 @@ RULES = {
         'length': 2,
         'digit': True,      
         'range': [0, 13],
-        'SV': '82, 85, 86, 87, 88, 99',
+        'SV': ['82', '85', '86', '87', '88', '99'],
         'description': '記錄個案於申報醫院首次療程中，所給予化學治療相關情形。若個案未接受化學治療，則記錄未進行化學治療的原因。化學治療包括多種抗癌藥物，可干擾癌細胞中 DNA 的合成和分裂。',
         'purpose': '全身性治療可能包括單一或複合藥物處方。本欄位可評估首次療程的化學治療，及了解個案未接受化學治療的原因。'
     },
@@ -950,7 +953,7 @@ RULES = {
         'field': 'Site-Specific Factor 1',
         'length': 3,
         'patterns': [
-                        {'name': '白血病', 'regex': r'^8\d{2}$'},
+                        {'name': '白血病', 'regex': r'^8[A-Z]{2}$'},
                         {'name': '子宮體癌、乳癌', 'regex': r'^[ISW]\d{2}$'},
                         {'name': '肝癌', 'regex': r'^[A]\d{2}$'},
                         {'name': '一般癌別', 'regex': r'^\d{3}$'},
@@ -963,7 +966,7 @@ RULES = {
         'field': 'Site-Specific Factor 2',
         'length': 3,
         'patterns': [
-                        {'name': '白血病', 'regex': r'^8\d{2}$'},
+                        {'name': '白血病', 'regex': r'^8[A-Z]{2}$'},
                         {'name': '子宮體癌、乳癌', 'regex': r'^[ISW]\d{2}$'},
                         {'name': '一般癌別', 'regex': r'^\d{3}$'},
         ],
