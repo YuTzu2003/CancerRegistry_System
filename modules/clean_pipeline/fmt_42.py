@@ -61,7 +61,7 @@ RULES = {
     '診斷年齡': {
         'ID':'2.1',
         'field': 'Age at Diagnosis',
-        'max_length': 3,
+        'length': 3,
         'digit': True,
         'SV': ['999'],       
         'range': [0, 120],
@@ -125,7 +125,7 @@ RULES = {
     '原發部位':{
         'ID':'2.6',
         'field': 'Primary Site',
-        'max_length': 4,
+        'length': 4,
         'pattern_range': 'C000-C809',
         'description': '確認癌症原發部位。',
         'purpose': '原發部位是分期及決定治療方針之依據；同時也影響其預後及病程。'
@@ -142,7 +142,7 @@ RULES = {
     '組織型態':{
         'ID':'2.8',
         'field': 'Histology',
-        'max_length':4,
+        'length':4,
         'range': [8000, 9993],
         'description': '原發腫瘤細胞於顯微鏡下之結構。',
         'purpose': '作為分期及決定治療方針之根據；同時也影響其預後及病程。'
@@ -194,7 +194,7 @@ RULES = {
     '申報醫院原發部位手術方式':{
         'ID':'4.1.4',
         'field': 'Surgical Procedure of Primary Site at This Facility',
-        'max_length': 2,
+        'length': 2,
         'digit': True,
         'SV':['00','99'],
         'pattern_range': '80-90',
@@ -339,7 +339,7 @@ RULES = {
     '體重': {
         'ID':'7.2',
         'field': 'Weight',
-        'max_length': 3,
+        'length': 3,
         'digit': True,     
         'range': [0, 999],
         'description': '記錄個案於首次治療前的體重。',
