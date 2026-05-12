@@ -51,6 +51,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         });
+
+        // 監聽子核取方塊，同步全選狀態
+        tbody.addEventListener('change', (e) => {
+            if (e.target.classList.contains('row-checkbox')) {
+                const checkboxes = Array.from(tbody.querySelectorAll('.row-checkbox'))
+                                        .filter(cb => cb.closest('tr').style.display !== 'none');
+                const allChecked = checkboxes.length > 0 && checkboxes.every(cb => cb.checked);
+                selectAll.checked = allChecked;
+            }
+        });
     }
 
     // 格式篩選

@@ -149,8 +149,15 @@
     const formatId = $('#formatSelect').value;
     const file = fileInput.files?.[0];
 
-    if (!formatId) return utils.alert('請選擇參考資料格式', 'warning');
-    if (!file) return utils.alert('請上傳檔案', 'warning');
+    const errors = [];
+    if (!formatId) errors.push('請選擇參考資料格式');
+    if (!file) errors.push('請上傳檔案');
+
+    if (errors.length === 2) {
+      return utils.alert('請選擇參考資料格式及上傳檔案', 'warning');
+    } else if (errors.length === 1) {
+      return utils.alert(errors[0], 'warning');
+    }
 
     const loadingOverlay = document.getElementById('loadingOverlay');
     const btnStart = document.getElementById('btnStartClean');
