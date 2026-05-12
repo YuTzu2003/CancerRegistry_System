@@ -5,7 +5,7 @@ from flask import Blueprint, render_template, request, session, jsonify, send_fi
 from werkzeug.utils import secure_filename
 from modules.db import get_conn
 from modules.cleaner import cleanValidate
-from services.auth import login_required
+from services.auth import login_required, admin_required
 from modules.field_mapping import detect_system, get_field_map
 from openpyxl import load_workbook, Workbook
 from openpyxl.utils import get_column_letter
@@ -296,7 +296,7 @@ def clean():
     return render_template("clean.html", active="clean", formats=formats)
 
 @clean_bp.route("/api/formats", methods=["POST"])
-@login_required
+@admin_required
 def api_add_format():
     if request.is_json:
         data = request.json
@@ -312,7 +312,7 @@ def api_add_format():
     return jsonify({"ok": True})
 
 @clean_bp.route("/api/formats/<fmt_id>", methods=["PUT", "DELETE", "POST"])
-@login_required
+@admin_required
 def api_manage_format(fmt_id):
     conn = get_conn()
     cursor = conn.cursor()
