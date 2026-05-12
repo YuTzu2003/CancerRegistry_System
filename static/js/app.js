@@ -48,7 +48,8 @@
       return Swal.fire({
         text: msg,
         icon: icon,
-        confirmButtonColor: '#0d6efd',
+        confirmButtonColor: '#dc3545',
+        confirmButtonText: '確定',
       });
     },
     confirm: (msg, title = '確認操作') => {
