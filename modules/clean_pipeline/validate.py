@@ -117,20 +117,6 @@ def parse_cancer_date(date_val):
     
     return None
 
-def cancer_date_compare(date_val):
-
-    date_str = parse_cancer_date(date_val)
-
-    if date_str is None:
-        return None
-
-    # 若 DD 為 99，依規則只比較 CCYYMM
-    if date_str[6:8] == '99':
-        return date_str[:6]
-
-    # 一般日期比較完整 CCYYMMDD
-    return date_str
-
 def validate_date_rules(row, alias_mapping):
     std_row = {}
     std_to_orig = {}  
