@@ -110,12 +110,24 @@ def parse_cancer_date(date_val):
         return None
 
     if len(date_str) == 8 and date_str.isdigit():
-        # 例：20220199 → 20220115
-        if date_str[6:8] == '99':
-            date_str = date_str[:6] + '15'
         return date_str
     
     return None
+
+def compare_cancer_date(date1, date2):
+
+    d1 = parse_cancer_date(date1)
+    d2 = parse_cancer_date(date2)
+
+    if d1 is None or d2 is None:
+        return None
+
+    # 只要其中一個日期的 DD 是 99，就只比較 CCYYMM
+    if d1[6:8] == '99' or d2[6:8] == '99':
+        return d1[:6] <= d2[:6]
+
+    # 一般日期才比較完整 CCYYMMDD
+    return d1 <= d2
 
 def validate_date_rules(row, alias_mapping):
     std_row = {}
@@ -144,8 +156,8 @@ def validate_date_rules(row, alias_mapping):
         ('最初診斷日期', '<=', '首次復發或癌症狀態追蹤日期', '最初診斷日期不可晚於首次復發或癌症狀態追蹤日期'),
         ('最初診斷日期', '<=', '最後聯絡或死亡日期', '最初診斷日期不可晚於最後聯絡或死亡日期'),
         ('首次就診日期', '<=', '首次療程開始日期', '首次就診日期不可晚於首次療程開始日期'),
-        ('首次就診日期', '<=', '首次手術日期 ', '首次就診日期不可晚於首次手術日期 '),
-        ('首次就診日期', '<=', '原發部位最確切的手術切除日期 ', '首次就診日期不可晚於原發部位最確切的手術切除日期 '),        
+        ('首次就診日期', '<=', '首次手術日期', '首次就診日期不可晚於首次手術日期'),
+        ('首次就診日期', '<=', '原發部位最確切的手術切除日期', '首次就診日期不可晚於原發部位最確切的手術切除日期'),        
         ('首次就診日期', '<=', '放射治療開始日期', '首次就診日期不可晚於放射治療開始日期'),
         ('首次就診日期', '<=', '放射治療結束日期', '首次就診日期不可晚於放射治療結束日期'),
         ('首次就診日期', '<=', '全身性治療開始日期', '首次就診日期不可晚於全身性治療開始日期'),
@@ -181,11 +193,16 @@ def validate_date_rules(row, alias_mapping):
             d2_val = parse_cancer_date(std_row[d2_field])
 
             if d1_val and d2_val:
-                if op == '<=' and d1_val > d2_val:
-                    errors.append(error_msg)
-                    error_fields.add(std_to_orig[d1_field])
-                    error_fields.add(std_to_orig[d2_field])
+                if op == '<=':
+                    result = compare_cancer_date(
+                        std_row[d1_field],
+                        std_row[d2_field]
+                    )
 
+                    if result is False:
+                        errors.append(error_msg)
+                        error_fields.add(std_to_orig[d1_field])
+                        error_fields.add(std_to_orig[d2_field])
     return list(error_fields), errors
 
 def check_error_type(val, rule):
