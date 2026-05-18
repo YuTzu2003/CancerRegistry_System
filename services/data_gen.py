@@ -61,7 +61,7 @@ def format_date_special(date_val, format_str="%Y/%m/%d"):
 
 @data_gen_bp.route('/api/data_gen/analyze', methods=['POST'])
 def analyze_file():
-    """接收上傳檔案並回傳欄位清單"""
+    """接收上傳檔案並回傳欄位清單與所有可能的映射資訊"""
     if 'file' not in request.files:
         return jsonify({"ok": False, "error": "無檔案"}), 400
     
@@ -79,30 +79,35 @@ def analyze_file():
         else:
             df = pd.read_csv(file_path, nrows=5, encoding='utf-8-sig', dtype=str)
         
-        # 1. 取得 SQL Server 所有的對照資料 (嚴格格式：序號名稱)
+        # 1. 取得 SQL Server 所有的完整對照資料
         from modules.db import get_conn
         conn = get_conn()
         cursor = conn.cursor()
-        cursor.execute("SELECT [序號], [中文欄位名稱], [英文欄位名稱], [台大雲林欄位名稱], [台大體系醫整庫欄位名稱], [台灣癌症登記中心] FROM [Hospital_data].[dbo].[CancerRegistry_FieldMap]")
+        cursor.execute("SELECT [序號], [中文欄位名稱], [英文欄位名稱], [台大雲林欄位名稱], [台大體系醫整庫欄位名稱], [台灣癌症登記中心], [雲醫癌AI模組] FROM [Hospital_data].[dbo].[CancerRegistry_FieldMap]")
         rows = cursor.fetchall()
         conn.close()
 
-        alias_to_std = {}
+        field_db_map = {}
         for r in rows:
             seq = str(r[0]).strip().replace('.0', '')
-            std_name = str(r[1]).strip()
-            if not std_name: continue
-            for alias in r[1:]:
-                if pd.notna(alias):
-                    a = str(alias).strip()
-                    if a:
-                        alias_to_std[f"{seq}{a}"] = std_name
+            field_db_map[seq] = {
+                "field_name_zh": str(r[1]).strip() if pd.notna(r[1]) else "",
+                "field_name_en": str(r[2]).strip() if pd.notna(r[2]) else "",
+                "ntu_yunlin": str(r[3]).strip() if pd.notna(r[3]) else "",
+                "ntu_system": str(r[4]).strip() if pd.notna(r[4]) else "",
+                "taiwan_cancer_registry": str(r[5]).strip() if pd.notna(r[5]) else "",
+                "AI_module": str(r[6]).strip() if pd.notna(r[6]) else "",
+                "aliases": [] # 初始化為 list，稍後填充
+            }
+            # 收集所有可能的嚴格別名 (序號+名稱)
+            for alias in r[1:7]:
+                if pd.notna(alias) and str(alias).strip():
+                    field_db_map[seq]["aliases"].append(f"{seq}{str(alias).strip()}")
 
         # 2. 分析上傳的欄位
         analyzed_columns = []
         raw_cols = [str(c).strip() for c in df.columns if not str(c).startswith('Unnamed')]
         
-        # 定義特殊欄位標準名稱與 Key 的對應
         special_map = {
             "病歷號碼": "cno",
             "姓名": "name",
@@ -113,17 +118,25 @@ def analyze_file():
         }
 
         for col in raw_cols:
-            std = alias_to_std.get(col)
+            # 尋找這個欄位屬於哪個序號 (嚴格比對)
+            found_seq = None
+            for seq, data in field_db_map.items():
+                if col in data["aliases"]:
+                    found_seq = seq
+                    break
+            
             info = {
                 "name": col,
                 "is_date": False,
-                "special_key": None
+                "special_key": None,
+                "seq": found_seq,
+                "mappings": field_db_map.get(found_seq, {}) if found_seq else {}
             }
-            if std:
-                # 判斷是否為日期 (標準名稱含"日期"或"生日")
+            
+            if found_seq:
+                std = field_db_map[found_seq]["field_name_zh"]
                 if "日期" in std or "日" in std or "生日" in std:
                     info["is_date"] = True
-                # 判斷是否為特殊欄位
                 if std in special_map:
                     info["special_key"] = special_map[std]
             
@@ -131,7 +144,6 @@ def analyze_file():
 
         system_name, _ = detect_system(raw_cols)
         session['last_gen_file'] = file_path
-        session['last_gen_system'] = system_name
         
         return jsonify({
             "ok": True, 
@@ -140,15 +152,18 @@ def analyze_file():
             "filename": filename
         })
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({"ok": False, "error": str(e)}), 500
 
 @data_gen_bp.route('/api/data_gen/process', methods=['POST'])
 def process_file():
     """執行去識別化處理"""
     data = request.json
-    # 注意：這裡的 selected_date_cols 是原始檔案的欄位名
     selected_date_cols_raw = data.get('date_cols', [])
+    extra_cols = data.get('extra_cols', []) 
     special_configs = data.get('special_configs', {}) 
+    naming_scheme = data.get('naming_scheme', 'field_name_zh')
     
     file_path = session.get('last_gen_file')
     if not file_path or not os.path.exists(file_path):
@@ -165,41 +180,48 @@ def process_file():
         df.columns = df.columns.str.strip()
         row_count = len(df)
 
-        # --- A. 欄位標準化 (統一輸出格式為 [序號][標準名稱]) ---
+        # --- A. 欄位標準化 (依據 naming_scheme 與 嚴格匹配 決定) ---
         from modules.db import get_conn
         conn = get_conn()
         cursor = conn.cursor()
-        # 這裡讀取所有可能的別名欄位
-        cursor.execute("SELECT [序號], [中文欄位名稱], [英文欄位名稱], [台大雲林欄位名稱], [台大體系醫整庫欄位名稱], [台灣癌症登記中心] FROM [Hospital_data].[dbo].[CancerRegistry_FieldMap]")
+        cursor.execute("SELECT [序號], [中文欄位名稱], [英文欄位名稱], [台大雲林欄位名稱], [台大體系醫整庫欄位名稱], [台灣癌症登記中心], [雲醫癌AI模組] FROM [Hospital_data].[dbo].[CancerRegistry_FieldMap]")
         rows = cursor.fetchall()
         conn.close()
 
-        # 建立地圖：序號+別名 -> "序號標準中文"
-        alias_to_prefixed = {}
+        # 建立嚴格的 alias -> target_header 地圖
+        alias_to_target = {}
+        all_possible_target_headers = set() # 記錄所有該體系定義過的標準名稱
+        scheme_target_for_seq = {} # 記錄每個序號對應的目標名稱
+        
+        scheme_idx_map = {
+            'field_name_zh': 1,
+            'field_name_en': 2,
+            'ntu_yunlin': 3,
+            'ntu_system': 4,
+            'taiwan_cancer_registry': 5,
+            'AI_module': 6
+        }
+        target_idx = scheme_idx_map.get(naming_scheme, 1)
+
         for r in rows:
             seq = str(r[0]).strip().replace('.0', '')
-            std_name = str(r[1]).strip()
-            if not std_name: continue
-            
-            # 統一輸出格式：序號名稱 (中間無底線)
-            target_prefixed = f"{seq}{std_name}" 
-            
-            # 遍歷所有欄位作為別名 (r[1:] 包含中、英、體系名等)
-            for alias in r[1:]:
-                if pd.notna(alias):
-                    a = str(alias).strip()
-                    if a:
-                        # 僅支援序號與名稱直接連在一起的格式
-                        variation = f"{seq}{a}"
-                        alias_to_prefixed[variation] = target_prefixed
+            target_val = r[target_idx]
 
-        # 執行重新命名 (嚴格比對大小寫)
+            if pd.notna(target_val) and str(target_val).strip():
+                target_header = f"{seq}{str(target_val).strip()}"
+                all_possible_target_headers.add(target_header)
+                scheme_target_for_seq[seq] = target_header
+                for alias in r[1:7]:
+                    if pd.notna(alias) and str(alias).strip():
+                        alias_to_target[f"{seq}{str(alias).strip()}"] = target_header
+
+        # 執行重新命名 (僅針對有目標名稱的欄位)
         rename_map = {}
         for col in df.columns:
-            c = str(col).strip()
-            if c in alias_to_prefixed:
-                rename_map[col] = alias_to_prefixed[c]
-        
+            if col in alias_to_target:
+                rename_map[col] = alias_to_target[col]
+
+        # 轉換日期選取清單
         selected_date_cols_std = []
         for col in selected_date_cols_raw:
             if col in rename_map:
@@ -209,7 +231,8 @@ def process_file():
 
         df.rename(columns=rename_map, inplace=True)
         
-        # --- B. 執行原本的處理邏輯 ---
+        # --- B. 執行處理邏輯 ---
+
 
         # 1. 記錄 99
         is_originally_99 = {col: [False] * row_count for col in selected_date_cols_std}
@@ -221,7 +244,10 @@ def process_file():
                     if len(val) >= 8 and (val.endswith("99") or "/99" in val):
                         is_originally_99[col][i] = True
                         df.loc[i, col] = val[:-2] + "15"
-                df[col] = pd.to_datetime(df[col], errors='coerce')
+                try:
+                    df[col] = pd.to_datetime(df[col], errors='coerce', format='mixed')
+                except:
+                    df[col] = pd.to_datetime(df[col], errors='coerce')
 
         # 2. 計算偏移 (尋找包含標準名稱的標籤)
         diag_col_name = next((c for c in df.columns if "最初診斷日期" in c or "診斷日期" in c), None)
@@ -254,7 +280,11 @@ def process_file():
 
         # 5. 特殊欄位遮罩 (嚴格使用序號定位，確保與 Mapping 邏輯一致)
         def find_col_by_seq_or_key(seq_prefix):
-            # 僅認序號開頭的 (例如 "1.3")
+            # 優先找已經改名後的目標標頭，再找原始標頭
+            target_name = scheme_target_for_seq.get(seq_prefix)
+            if target_name and target_name in df.columns:
+                return target_name
+            # 尋找序號開頭的原始欄位
             for c in df.columns:
                 if c.startswith(seq_prefix):
                     return c
@@ -285,7 +315,8 @@ def process_file():
         diag_col_name = find_col_by_seq_or_key("2.5")
         
         if special_configs.get('age_calc') and birth_col and diag_col_name:
-            age_col = find_col_by_seq_or_key("2.1") or "2.1診斷年齡"
+            # 決定年齡欄位名稱：優先用體系名稱，若無則用預設
+            age_col = scheme_target_for_seq.get("2.1") or find_col_by_seq_or_key("2.1") or "2.1診斷年齡"
             # 確保日期是 datetime 格式才能計算
             temp_birth = pd.to_datetime(df[birth_col], errors='coerce')
             temp_diag = pd.to_datetime(df[diag_col_name], errors='coerce')
@@ -313,20 +344,35 @@ def process_file():
                         res.append(dt.strftime(fmt))
                 df[col] = res
 
-        # 8. 最終依序號排序
-        def get_sort_key(col_name):
-            import re
-            match = re.match(r'^(\d+\.?\d*\.?\d*)', col_name)
-            if match:
-                prefix = match.group(1)
+        # --- 最終順序調整：嚴格執行「標準欄位在左(依序號)，未匹配欄位在右」 ---
+        current_cols = list(df.columns)
+        
+        # 1. 找出真正屬於「目標格式」且有定義名稱的標準名稱
+        mapped_target_headers = set(rename_map.values())
+        
+        final_standard_cols = []
+        for col in current_cols:
+            if col in mapped_target_headers:
+                import re
+                m = re.match(r'^(\d+\.?\d*\.?\d*)', col)
+                seq_val = m.group(1) if m else "999"
                 try:
-                    return [int(x) for x in prefix.split('.')]
+                    seq_parts = [int(x) for x in seq_val.split('.')]
                 except:
-                    return [9999]
-            return [9999]
-
-        sorted_cols = sorted(df.columns, key=get_sort_key)
-        df = df[sorted_cols]
+                    seq_parts = [999]
+                final_standard_cols.append({"name": col, "seq_parts": seq_parts})
+        
+        # 依照序號排序標準欄位 (左側)
+        final_standard_cols.sort(key=lambda x: x["seq_parts"])
+        ordered_left = [x["name"] for x in final_standard_cols]
+        
+        # 2. 處理未匹配欄位 (排除掉已經在左側的欄位，其餘通通丟右側)
+        # 這裡要包含所有 extra_cols 中沒被 match 到的
+        ordered_right = [c for c in extra_cols if c in current_cols and c not in mapped_target_headers]
+        
+        # 3. 組合最終順序並重新選取 DataFrame 欄位
+        final_col_order = ordered_left + ordered_right
+        df = df[final_col_order]
         
         # 定義輸出的檔名
         base_name = os.path.basename(file_path)
@@ -337,9 +383,18 @@ def process_file():
         else: df.to_csv(out_path, index=False, encoding="utf-8-sig")
         
         session['last_gen_output'] = out_path
-        preview = df.head(20).fillna('').to_dict(orient='records')
         
-        return jsonify({"ok": True, "preview": preview, "download_url": f"/api/data_gen/download"})
+        # --- 關鍵：確保預覽資料的欄位順序也是正確的 ---
+        preview_data = []
+        for _, row in df.head(20).iterrows():
+            # 使用 OrderedDict 或是依照 final_col_order 建立 dict 確保順序
+            item = {}
+            for col in final_col_order:
+                val = row[col]
+                item[col] = str(val) if pd.notna(val) else ""
+            preview_data.append(item)
+        
+        return jsonify({"ok": True, "preview": preview_data, "headers": final_col_order, "download_url": f"/api/data_gen/download"})
 
     except Exception as e:
         import traceback

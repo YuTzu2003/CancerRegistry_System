@@ -111,6 +111,77 @@
   </div>
 </div>
 
+<!-- ===================== 輸出欄位命名 ===================== -->
+<section class="card-flat mb-4" id="namingSection" style="display: none;">
+  <div class="section-head">
+    <h2><span class="dot"></span> 模組欄位輸出設定</h2>
+    <span class="hint">選擇輸出 XLSX 欄位標頭採用的命名來源</span>
+  </div>
+  <div class="section-body">
+    <div class="naming-grid" id="namingScheme">
+      <label class="naming-chip selected">
+        <input type="radio" name="nameScheme" value="field_name_zh" checked />
+        <span class="nc-mark"></span>
+        <span class="nc-body">
+          <span class="nc-title">中文欄位名稱</span>
+          <span class="nc-desc">以繁體中文呈現欄位</span>
+        </span>
+      </label>
+      <label class="naming-chip">
+        <input type="radio" name="nameScheme" value="field_name_en" />
+        <span class="nc-mark"></span>
+        <span class="nc-body">
+          <span class="nc-title">英文欄位名稱</span>
+          <span class="nc-desc">以英文呈現欄位</span>
+        </span>
+      </label>
+      <label class="naming-chip">
+        <input type="radio" name="nameScheme" value="ntu_yunlin" />
+        <span class="nc-mark"></span>
+        <span class="nc-body">
+          <span class="nc-title">台大雲林欄位名稱</span>
+          <span class="nc-desc">以台大雲林分院系統呈現欄位</span>
+        </span>
+      </label>
+      <label class="naming-chip">
+        <input type="radio" name="nameScheme" value="ntu_system" />
+        <span class="nc-mark"></span>
+        <span class="nc-body">
+          <span class="nc-title">台大體系醫整庫欄位名稱</span>
+          <span class="nc-desc">以台大體系醫整庫呈現欄位</span>
+        </span>
+      </label>
+      <label class="naming-chip">
+        <input type="radio" name="nameScheme" value="taiwan_cancer_registry" />
+        <span class="nc-mark"></span>
+        <span class="nc-body">
+          <span class="nc-title">台灣癌症登記中心</span>
+          <span class="nc-desc">以台灣癌症登記中心呈現欄位</span>
+        </span>
+      </label>
+      <label class="naming-chip">
+        <input type="radio" name="nameScheme" value="AI_module" />
+        <span class="nc-mark"></span>
+        <span class="nc-body">
+          <span class="nc-title">雲醫癌AI模組</span>
+          <span class="nc-desc">以雲端醫療癌症AI模組呈現欄位</span>
+        </span>
+      </label>
+    </div>
+
+    <div class="mt-4">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <div style="font-size: 13px; font-weight: 600; color: var(--gray-700);">額外欄位選擇
+          <span class="hint" style="font-weight: 400; margin-left: 6px;">未匹配到的原始欄位，可勾選要保留的欄位</span>
+        </div>
+      </div>
+      <div class="field-chiplist" id="outputFieldList">
+        <span class="field-chip disabled"><i class="bi bi-asterisk"></i> 尚未載入欄位，請先上傳檔案</span>
+      </div>
+    </div>
+  </div>
+</section>
+
 <div class="config-section" id="configSection">
   <div class="row g-4">
     <div class="col-lg-6">
