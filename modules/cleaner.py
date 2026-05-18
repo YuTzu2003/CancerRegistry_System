@@ -12,6 +12,7 @@ from modules.clean_pipeline.fmt_129 import RULES as RULES_129
 from modules.clean_pipeline.validate import check_error_type,validate_date_rules
 from modules.field_mapping import field_mapping
 from datetime import datetime
+from modules.special_rules.runner import apply_special_rules
 
 FORMAT_RULES_MAP = {
     "fmt_42": RULES_42,
@@ -66,6 +67,15 @@ def cleanValidate(input_file,output_file,report_file,fmt,version,Revision_Date):
             for col in bad_cols:
                 if col in error_mask.columns and error_mask.at[idx, col] == "":
                     error_mask.at[idx, col] = "dateformat"
+
+    # 跨欄位特殊規則
+    error_mask = apply_special_rules(
+        df=df,
+        error_mask=error_mask,
+        rules=rules,
+        alias_mapping=alias_mapping,
+        fmt=fmt
+    )
 
     df['_has_error'] = (error_mask != "").any(axis=1)
     df['錯誤註記說明(A:遺漏值 B:格式不符 C:邏輯錯誤 D:完全正確)'] = error_mask.apply(annotation, axis=1)
