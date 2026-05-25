@@ -1,4 +1,7 @@
-from modules.special_rules.class_case_rules import apply_class_case_rules
+from modules.special_rules.class_case_rules import (
+    apply_class_case_rules,
+    stop_if_too_many_date_errors,
+)
 
 
 def apply_special_rules(df, error_mask, rules, alias_mapping, fmt):
@@ -9,5 +12,10 @@ def apply_special_rules(df, error_mask, rules, alias_mapping, fmt):
         alias_mapping=alias_mapping,
         fmt=fmt,
     )
-    
+
+    stop_if_too_many_date_errors(
+        error_mask=error_mask,
+        max_errors=3,
+    )
+
     return error_mask

@@ -563,6 +563,14 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   font-size: 13px;
   padding: 10px 14px;
 }
+.error-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.alert-message {
+  white-space: pre-line;
+}
 .alert-success { background: var(--success-soft); color: var(--success); border-color: #bbf7d0; }
 .alert-danger  { background: var(--danger-soft);  color: var(--danger);  border-color: #fecaca; }
 .alert-info    { background: var(--accent-soft);  color: var(--accent-strong); border-color: #a5f3fc; }
