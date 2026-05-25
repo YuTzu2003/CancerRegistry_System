@@ -176,17 +176,20 @@
       const response = await fetch('/api/cleanJob', { method: 'POST', body: formData });
       const result = await response.json();
       
-      if (!response.ok || !result.ok) {
-        const errorMsg = result.message || result.error || '清洗失敗';
-        const alertContainer = $('#cleaningAlertContainer');
-        if (alertContainer) {
-          alertContainer.innerHTML = `
-            <div class="alert alert-danger border shadow-sm mt-3" role="alert">
-              <i class="bi bi-exclamation-triangle-fill me-2"></i>${errorMsg}
-            </div>`;
-        }
-        throw new Error(errorMsg);
+     if (!response.ok || !result.ok) {
+       const errorMsg = result.message || result.error || '清洗失敗';
+       const alertContainer = $('#cleaningAlertContainer');
+
+     if (alertContainer) {
+       alertContainer.innerHTML = `
+         <div class="alert alert-danger border shadow-sm mt-3 error-alert" role="alert">
+           <i class="bi bi-exclamation-triangle-fill alert-icon"></i>
+           <span class="alert-message">${errorMsg}</span>
+         </div>`;
       }
+
+      throw new Error(errorMsg);
+    } 
       
       renderResult(result);
       setStep(3);

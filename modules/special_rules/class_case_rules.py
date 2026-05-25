@@ -231,3 +231,20 @@ def apply_class_case_rules(df, error_mask, rules, alias_mapping, fmt):
                     break
 
     return error_mask
+
+def stop_if_too_many_date_errors(error_mask, max_errors=3):
+    """
+    error_mask 裡面如果有 dateformat，代表日期格式或日期邏輯錯誤。
+    預設超過或等於 3 筆時，要求使用者先修正。
+    """
+
+    if error_mask is None or error_mask.empty:
+        return
+
+    date_error_count = (error_mask == "dateformat").sum().sum()
+
+    if date_error_count >= max_errors:
+        raise ValueError(
+            f"日期邏輯錯誤共有 {date_error_count} 筆，已達系統限制 ({max_errors} 筆)\n"
+            f"請先修正錯誤的日期資料，完成修正後再進行後續資料清洗作業"
+        )
