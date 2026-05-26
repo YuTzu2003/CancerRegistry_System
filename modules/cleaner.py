@@ -12,7 +12,7 @@ from modules.clean_pipeline.fmt_129 import RULES as RULES_129
 from modules.clean_pipeline.validate import check_error_type,validate_date_rules
 from modules.field_mapping import field_mapping
 from datetime import datetime
-from modules.special_rules.runner import apply_special_rules
+from modules.special_rules.run import apply_special_rules
 
 FORMAT_RULES_MAP = {
     "fmt_42": RULES_42,
@@ -22,6 +22,60 @@ FORMAT_RULES_MAP = {
     "fmt_115": RULES_115,
     "fmt_129": RULES_129,
 }
+
+
+def _build_rule_id_map(rules):
+    return {
+        str(rule.get("ID", "")).strip(): rule
+        for rule in rules.values()
+        if str(rule.get("ID", "")).strip()
+    }
+
+
+def _normalize_text(value):
+    return re.sub(r'\s+', '', str(value).strip())
+
+
+def _build_rule_name_map(rules):
+    rule_name_map = {
+        _normalize_text(rule_name): rule
+        for rule_name, rule in rules.items()
+        if _normalize_text(rule_name)
+    }
+
+    return sorted(
+        rule_name_map.items(),
+        key=lambda item: len(item[0]),
+        reverse=True
+    )
+
+
+def _extract_field_id(col_name):
+    match = re.match(r"^\s*(\d+(?:\.\d+)+)", str(col_name).strip())
+    if not match:
+        return None
+
+    return match.group(1)
+
+
+def _resolve_rule_for_column(col_name, rules, clean_alias_mapping, rule_id_map, rule_name_map):
+    clean_col = _normalize_text(col_name)
+    rule_name = clean_alias_mapping.get(clean_col)
+
+    if rule_name and rule_name in rules:
+        return rules[rule_name]
+
+    field_id = _extract_field_id(col_name)
+
+    if field_id:
+        return rule_id_map.get(field_id)
+
+    for normalized_rule_name, rule in rule_name_map:
+        if normalized_rule_name in clean_col:
+            return rule
+
+    return None
+
 
 def annotation(row_errors):
     codes = []
@@ -50,14 +104,18 @@ def cleanValidate(input_file,output_file,report_file,fmt,version,Revision_Date):
     alias_mapping, _ = field_mapping('中文欄位名稱')
     error_mask = pd.DataFrame("", index=df.index, columns=df.columns) 
     clean_alias_mapping = {re.sub(r'\s+', '', str(k)): v for k, v in alias_mapping.items()}
+    rule_id_map = _build_rule_id_map(rules)
+    rule_name_map = _build_rule_name_map(rules)
     
     for col in df.columns:
-        raw_col = str(col)
-        clean_col = re.sub(r'\s+', '', raw_col)
-        rule_name = clean_alias_mapping.get(clean_col)
-        rule = None
-        if rule_name and rule_name in rules:
-            rule = rules[rule_name]
+        rule = _resolve_rule_for_column(
+            col,
+            rules,
+            clean_alias_mapping,
+            rule_id_map,
+            rule_name_map
+        )
+
         if rule:
             error_mask[col] = df[col].apply(lambda x: check_error_type(x, rule))
 

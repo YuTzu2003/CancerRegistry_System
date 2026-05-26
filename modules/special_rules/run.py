@@ -1,4 +1,4 @@
-from modules.special_rules.class_case_rules import (
+from modules.special_rules.special_validate_rules import (
     apply_class_case_rules,
     stop_if_too_many_date_errors,
 )

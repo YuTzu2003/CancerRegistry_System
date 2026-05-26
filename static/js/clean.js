@@ -113,6 +113,7 @@
     if ($('#analysisContent')) $('#analysisContent').hidden = true;
     if ($('#analysisEmpty')) $('#analysisEmpty').hidden = false;
     if ($('#cleaningAlertContainer')) $('#cleaningAlertContainer').innerHTML = '';
+    if ($('#dateErrorEditor')) $('#dateErrorEditor').innerHTML = '';
 
     const list = $('#outputFieldList');
     if (list) {
@@ -208,8 +209,8 @@
   // ---------- 清洗結果 ----------
   function renderResult(data) {
 
-    if (data.project_id) {
-      currentJobId = data.project_id;
+    if (data.job_id || data.project_id) {
+      currentJobId = data.job_id || data.project_id;
     }
 
     // 顯示偵測到的體系
@@ -244,17 +245,69 @@
 
     const alertContainer = $('#cleaningAlertContainer');
     if (alertContainer && data.ok) {
-      alertContainer.innerHTML = `
-        <div class="alert alert-light border shadow-sm mt-3" role="alert">
-          <i class="bi bi-check-circle-fill text-success me-2"></i>資料清洗並存檔完成！
-        </div>`;
-      if (window.autoHideAlerts) window.autoHideAlerts();
+      const dateErrorCount = data.date_error_count || 0;
+      const dateErrorLimit = data.date_error_limit || 3;
+
+      if (dateErrorCount > dateErrorLimit) {
+        const alertContainer = $('#cleaningAlertContainer');
+
+if (alertContainer && data.ok) {
+  const dateErrorCount = data.date_error_count || 0;
+  const dateErrorLimit = data.date_error_limit || 3;
+
+  if (dateErrorCount > dateErrorLimit) {
+    alertContainer.innerHTML = `
+      <div class="alert alert-danger border shadow-sm mt-3 d-flex align-items-center justify-content-between" role="alert">
+        <div class="d-flex align-items-center">
+          <i class="bi bi-exclamation-triangle-fill me-2"></i>
+
+          <span>
+            日期邏輯錯誤共有 <strong>${dateErrorCount}</strong> 筆，已達系統限制，<br>
+            請先修正錯誤的日期資料，完成修正後再進行後續資料清洗作業
+          </span>
+        </div>
+
+        <button
+          class="btn btn-sm btn-danger ms-3"
+          type="button"
+          id="btnShowDateEditor"
+        >
+          <i class="bi bi-pencil-square"></i> 線上修正錯誤資料
+        </button>
+      </div>
+    `;
+  } else {
+    alertContainer.innerHTML = `
+      <div class="alert alert-light border shadow-sm mt-3" role="alert">
+        <i class="bi bi-check-circle-fill text-success me-2"></i>資料清洗並存檔完成！
+      </div>
+    `;
+
+    if (window.autoHideAlerts) window.autoHideAlerts();
+  }
+}
+      } else {
+        alertContainer.innerHTML = `
+          <div class="alert alert-light border shadow-sm mt-3" role="alert">
+            <i class="bi bi-check-circle-fill text-success me-2"></i>資料清洗並存檔完成！
+          </div>`;
+        if (window.autoHideAlerts) window.autoHideAlerts();
+      }
+    }
+
+    if ((data.date_errors || []).length > 0) {
+      renderDateErrorEditor(data.date_errors || [], data.date_error_limit || 3);
     }
 
     const s = data.stats || {};
-    $('#kpiTotal').textContent = (s.total ?? 0).toLocaleString();
-    $('#kpiPassed').textContent = (s.passed ?? 0).toLocaleString();
-    $('#kpiError').textContent = (s.error ?? 0).toLocaleString();
+
+    if ($('#kpiTotal')) {$('#kpiTotal').textContent = (s.total ?? 0).toLocaleString();}
+    if ($('#kpiPassed')) {$('#kpiPassed').textContent = (s.passed ?? 0).toLocaleString();}
+    if ($('#kpiError')) {$('#kpiError').textContent = (s.error ?? 0).toLocaleString();}
+    if ($('#stat-completeness')) {$('#stat-completeness').textContent = `${((s.completeness ?? 0) * 100).toFixed(2)}%`;}
+    if ($('#stat-correctness')) {$('#stat-correctness').textContent = `${((s.correctness ?? 0) * 100).toFixed(2)}%`;}
+    if ($('#stat-consistency')) {$('#stat-consistency').textContent = `${((s.consistency ?? 0) * 100).toFixed(2)}%`;}
+    if ($('#stat-dqi')) {$('#stat-dqi').textContent = `${((s.dqi ?? 0) * 100).toFixed(2)}%`;}
 
     const analysis = data.analysis || {};
     const byField = analysis.by_field || [];
@@ -303,6 +356,125 @@
           </tr>`;
       }).join('');
     }
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+  }
+
+  function toDateInputValue(value) {
+    const dateText = String(value || '').trim().replaceAll('-', '').replaceAll('/', '');
+
+    if (!/^\d{8}$/.test(dateText)) return '';
+    if (dateText === '00000000' || dateText === '99999999') return '';
+
+    return `${dateText.slice(0, 4)}-${dateText.slice(4, 6)}-${dateText.slice(6, 8)}`;
+  }
+
+  function getManualDateValue(value) {
+    const dateText = String(value || '').trim().replaceAll('-', '').replaceAll('/', '');
+
+    if (!dateText) return '';
+    if (dateText === '00000000' || dateText === '99999999') return dateText;
+    if (/^\d{8}$/.test(dateText)) return dateText;
+
+    return '';
+  }
+
+  function normalizeDateInputValue(value) {
+    return String(value || '').trim().replaceAll('-', '').replaceAll('/', '');
+  }
+
+  function renderDateErrorEditor(errors, limit) {
+    const editor = $('#dateErrorEditor');
+    if (!editor) return;
+
+    if (!errors || errors.length === 0) {
+      editor.innerHTML = '';
+      return;
+    }
+
+    const rowsHtml = errors.map((item, index) => {
+      const fieldsHtml = (item.fields || []).map(field => `
+        <div class="mb-2">
+          <label class="form-label mb-1 small">${escapeHtml(field.name)}</label>
+          <div class="d-flex gap-2">
+            <input
+              type="date"
+              class="form-control form-control-sm date-fix-input"
+              data-field="${escapeHtml(field.name)}"
+              value="${escapeHtml(toDateInputValue(field.value))}"
+            >
+            <input
+              type="text"
+              class="form-control form-control-sm date-special-select"
+              value="${escapeHtml(getManualDateValue(field.value))}"
+              placeholder="YYYYMMDD"
+              inputmode="numeric"
+              style="max-width: 130px;"
+            >
+            <select class="form-select form-select-sm date-special-picker" style="max-width: 130px;">
+              <option value="">選擇</option>
+              <option value="00000000">00000000</option>
+              <option value="99999999">99999999</option>
+            </select>
+          </div>
+        </div>
+      `).join('');
+
+      const messagesHtml = (item.messages || []).map(msg => `
+        <div class="text-danger small">${escapeHtml(msg)}</div>
+      `).join('');
+
+      return `
+        <tr data-row-index="${item.row_index}">
+          <td class="text-center align-middle">${index + 1}</td>
+          <td>${fieldsHtml}</td>
+          <td>${messagesHtml}</td>
+          <td class="text-center align-middle">
+            <button type="button" class="btn btn-sm btn-success btnSaveDateFix">
+              儲存
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    editor.innerHTML = `
+      <div class="card mt-3" id="dateErrorPanel">
+        <div class="card-header fw-bold d-flex justify-content-between align-items-center">
+          <span>
+            <i class="bi bi-pencil-square me-1"></i>
+            線上修正日期邏輯錯誤
+          </span>
+          <span class="badge bg-danger">
+            ${errors.length} 筆 / 限制 ${limit} 筆
+          </span>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-bordered table-sm align-middle">
+              <thead>
+                <tr>
+                  <th class="text-center" style="width:70px;">序號</th>
+                  <th>可修正日期欄位</th>
+                  <th>錯誤原因</th>
+                  <th class="text-center" style="width:90px;">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rowsHtml}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    `;
   }
 
   // ---------- 欄位輸出設定 ----------
@@ -473,4 +645,268 @@
     catch (err) {utils.alert('連線失敗', 'error');} 
     finally {if (loadingOverlay) loadingOverlay.style.display = 'none';}
   });
+
+  function validateCancerDateValue(value, fieldName) {
+    const dateText = normalizeDateInputValue(value);
+
+    if (dateText === '') {
+      return null;
+    }
+
+    if (dateText === '00000000' || dateText === '99999999') {
+      return null;
+    }
+
+    if (!/^\d+$/.test(dateText)) {
+      return `${fieldName}：日期只能輸入數字`;
+    }
+
+    if (dateText.length > 8) {
+      return `${fieldName}：日期超過 8 位數，請輸入 YYYYMMDD`;
+    }
+
+    if (dateText.length < 8) {
+      return `${fieldName}：日期不足 8 位數，請輸入 YYYYMMDD`;
+    }
+
+    const year = Number(dateText.slice(0, 4));
+    const month = Number(dateText.slice(4, 6));
+    const day = Number(dateText.slice(6, 8));
+
+    if (month < 1 || month > 12) {
+      return `${fieldName}：月份輸入錯誤，須介於 1 到 12`;
+    }
+
+    const isLeapYear =
+      (year % 4 === 0 && year % 100 !== 0) ||
+      (year % 400 === 0);
+
+    const daysInMonth = [31, isLeapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    const maxDay = daysInMonth[month - 1];
+
+    if (day < 1 || day > maxDay) {
+      if (month === 2) {
+        return `${fieldName}：${year} 年 2 月最多只有 ${maxDay} 天，請修正日期`;
+      }
+
+      return `${fieldName}：${month} 月最多只有 ${maxDay} 天，請修正日期`;
+    }
+
+    return null;
+  }
+
+  // ---------- 日期邏輯錯誤線上修正 ----------
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+
+    const input = e.target.closest('.date-fix-input, .date-special-select, .date-special-picker');
+    if (!input) return;
+
+    e.preventDefault();
+
+    const tr = input.closest('tr');
+    const btn = tr?.querySelector('.btnSaveDateFix');
+
+    if (!btn || btn.disabled) return;
+
+    btn.click();
+  });
+
+  document.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.btnSaveDateFix');
+    if (!btn || !currentJobId) return;
+
+    const tr = btn.closest('tr');
+    const rowIndex = Number(tr.dataset.rowIndex);
+
+    const updates = {};
+    const validationErrors = [];
+
+    tr.querySelectorAll('.date-fix-input').forEach(input => {
+      const fieldName = input.dataset.field;
+      const manualInput = input.closest('.d-flex')?.querySelector('.date-special-select');
+      const value = normalizeDateInputValue(manualInput?.value) || normalizeDateInputValue(input.value);
+
+      const errorMessage = validateCancerDateValue(value, fieldName);
+
+      if (errorMessage) {
+        validationErrors.push(errorMessage);
+      }
+
+      updates[fieldName] = value;
+    });
+
+    if (validationErrors.length > 0) {
+      utils.alert(validationErrors.join('<br>'), 'error');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+    try {
+      const res = await fetch('/api/date_errors/update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          job_id: currentJobId,
+          row_index: rowIndex,
+          updates: updates
+        })
+      });
+
+      const text = await res.text();
+      let data;
+
+      try {
+        data = JSON.parse(text);
+      } catch (err) {
+        console.error('後端回傳的不是 JSON：', text);
+        throw new Error('後端回傳不是 JSON，請查看 Flask 終端機錯誤訊息');
+      }
+
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || '修正失敗');
+      }
+
+      const s = data.stats || {};
+      if ($('#kpiTotal')) $('#kpiTotal').textContent = (s.total ?? 0).toLocaleString();
+      if ($('#kpiPassed')) $('#kpiPassed').textContent = (s.passed ?? 0).toLocaleString();
+      if ($('#kpiError')) $('#kpiError').textContent = (s.error ?? 0).toLocaleString();
+      if ($('#stat-completeness')) $('#stat-completeness').textContent = `${((s.completeness ?? 0) * 100).toFixed(1)}%`;
+      if ($('#stat-correctness')) $('#stat-correctness').textContent = `${((s.correctness ?? 0) * 100).toFixed(1)}%`;
+      if ($('#stat-consistency')) $('#stat-consistency').textContent = `${((s.consistency ?? 0) * 100).toFixed(1)}%`;
+      if ($('#stat-dqi')) $('#stat-dqi').textContent = `${(s.dqi ?? 0).toFixed(2)}%`;
+
+      const analysis = data.analysis || {};
+      const byField = analysis.by_field || [];
+      const byType = analysis.by_type || [];
+
+      const fieldWrap = $('#fieldAnalysisContent');
+      const fieldEmpty = $('#fieldAnalysisEmpty');
+      const fieldTbody = $('#analysisByField tbody');
+
+      if (fieldWrap && fieldEmpty && fieldTbody) {
+        if (byField.length > 0) {
+          fieldWrap.hidden = false;
+          fieldEmpty.hidden = true;
+          fieldTbody.innerHTML = byField.map(r => `
+            <tr>
+              <td>${escapeHtml(r.name)}</td>
+              <td><span class="badge-soft gray">${escapeHtml(r.format || '—')}</span></td>
+              <td style="text-align:right;">${r.errors ?? 0}</td>
+            </tr>
+          `).join('');
+        } else {
+          fieldWrap.hidden = true;
+          fieldEmpty.hidden = false;
+          fieldTbody.innerHTML = '';
+        }
+      }
+
+      const analysisContent = $('#analysisContent');
+      const analysisEmpty = $('#analysisEmpty');
+      const typeTbody = $('#analysisByType tbody');
+
+      if (analysisContent && analysisEmpty && typeTbody) {
+        analysisContent.hidden = false;
+        analysisEmpty.hidden = true;
+        typeTbody.innerHTML = byType.map(r => {
+          let bgClass = '';
+          if (r.type.startsWith('A:')) bgClass = 'bg-warning bg-opacity-10';
+          else if (r.type.startsWith('B:')) bgClass = 'bg-danger bg-opacity-10';
+          else if (r.type.startsWith('C:')) bgClass = 'bg-info bg-opacity-10';
+
+          return `
+            <tr class="${bgClass} text-dark">
+              <td>${escapeHtml(r.type)}</td>
+              <td style="text-align:right;">${r.count ?? 0}</td>
+              <td style="text-align:right;">${escapeHtml(r.ratio ?? '—')}</td>
+            </tr>
+          `;
+        }).join('');
+      }
+
+      const dateErrorCount = data.date_error_count || 0;
+      const limit = data.date_error_limit || 3;
+      const alertContainer = $('#cleaningAlertContainer');
+
+      if (alertContainer) {
+        if (dateErrorCount > limit) {
+          alertContainer.innerHTML = `
+            <div class="alert alert-danger border shadow-sm mt-3 d-flex align-items-center justify-content-between" role="alert">
+
+              <div class="d-flex align-items-center">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+
+                <span>日期邏輯錯誤剩下 <strong>${dateErrorCount}</strong> 筆，仍超過系統限制。</span>
+              </div>
+
+              <button class="btn btn-sm btn-danger ms-3" type="button" id="btnShowDateEditor">
+                <i class="bi bi-pencil-square"></i> 繼續修正錯誤資料
+              </button>
+
+            </div>
+          `;
+        } else if (dateErrorCount > 0) {
+          alertContainer.innerHTML = `
+            <div class="alert alert-warning border shadow-sm mt-3 d-flex align-items-center justify-content-between" role="alert">
+
+              <div class="d-flex align-items-center">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+
+                <span>日期邏輯錯誤剩下 <strong>${dateErrorCount}</strong> 筆，請繼續修正。</span>
+              </div>
+
+              <button class="btn btn-sm btn-warning ms-3" type="button" id="btnShowDateEditor">
+                <i class="bi bi-pencil-square"></i> 繼續修正錯誤資料
+              </button>
+
+            </div>
+          `;
+        } else {
+          alertContainer.innerHTML = `
+            <div class="alert alert-success border shadow-sm mt-3" role="alert">
+              <i class="bi bi-check-circle-fill me-2"></i>
+                日期邏輯錯誤已修改完成，可繼續資料清洗作業。
+            </div>
+          `;
+        }
+      }
+
+      renderDateErrorEditor(data.date_errors || [], limit);
+
+    } catch (err) {
+      utils.alert(err.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '儲存';
+    }
+  });
+
+  document.addEventListener('change', (e) => {
+    const picker = e.target.closest('.date-special-picker');
+    if (!picker || !picker.value) return;
+
+    const manualInput = picker.closest('.d-flex')?.querySelector('.date-special-select');
+    if (manualInput) {
+      manualInput.value = picker.value;
+      manualInput.focus();
+    }
+
+    picker.value = '';
+  });
+
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('#btnShowDateEditor');
+    if (!btn) return;
+
+    document.getElementById('dateErrorPanel')?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start'
+    });
+  });
+
 })();
