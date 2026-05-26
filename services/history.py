@@ -40,9 +40,9 @@ def _should_include_result_file(filename, original_filename=None):
 
     if original_filename:
         original_base, _ = os.path.splitext(original_filename)
-        converted_xlsx = f"{original_base}.xlsx"
+        file_base, file_ext = os.path.splitext(filename)
 
-        if filename == converted_xlsx:
+        if file_base == original_base and file_ext.lower() in [".txt", ".xls", ".xlsx"]:
             return True
 
     return False
