@@ -390,6 +390,55 @@ if (alertContainer && data.ok) {
     return String(value || '').trim().replaceAll('-', '').replaceAll('/', '');
   }
 
+  function dateInputValueFromNormalized(value) {
+    const dateText = normalizeDateInputValue(value);
+
+    if (!/^\d{8}$/.test(dateText)) return '';
+    if (dateText === '00000000' || dateText === '99999999') return '';
+
+    return `${dateText.slice(0, 4)}-${dateText.slice(4, 6)}-${dateText.slice(6, 8)}`;
+  }
+
+  function syncDateControls(source) {
+    const group = source.closest('.d-flex');
+    if (!group) return;
+
+    const dateInput = group.querySelector('.date-fix-input');
+    const manualInput = group.querySelector('.date-special-select');
+    const picker = group.querySelector('.date-special-picker');
+
+    if (!dateInput || !manualInput || !picker) return;
+
+    if (source.classList.contains('date-fix-input')) {
+      const normalizedDate = normalizeDateInputValue(dateInput.value);
+      manualInput.value = normalizedDate;
+      picker.value = '';
+      return;
+    }
+
+    if (source.classList.contains('date-special-picker')) {
+      if (!picker.value) return;
+
+      manualInput.value = picker.value;
+      dateInput.value = '';
+      return;
+    }
+
+    if (source.classList.contains('date-special-select')) {
+      const manualDate = normalizeDateInputValue(manualInput.value);
+      manualInput.value = manualDate;
+
+      if (manualDate === '00000000' || manualDate === '99999999') {
+        picker.value = manualDate;
+        dateInput.value = '';
+        return;
+      }
+
+      picker.value = '';
+      dateInput.value = dateInputValueFromNormalized(manualDate);
+    }
+  }
+
   function renderDateErrorEditor(errors, limit) {
     const editor = $('#dateErrorEditor');
     if (!editor) return;
@@ -887,16 +936,17 @@ if (alertContainer && data.ok) {
   });
 
   document.addEventListener('change', (e) => {
-    const picker = e.target.closest('.date-special-picker');
-    if (!picker || !picker.value) return;
+    const control = e.target.closest('.date-fix-input, .date-special-select, .date-special-picker');
+    if (!control) return;
 
-    const manualInput = picker.closest('.d-flex')?.querySelector('.date-special-select');
-    if (manualInput) {
-      manualInput.value = picker.value;
-      manualInput.focus();
-    }
+    syncDateControls(control);
+  });
 
-    picker.value = '';
+  document.addEventListener('input', (e) => {
+    const manualInput = e.target.closest('.date-special-select');
+    if (!manualInput) return;
+
+    syncDateControls(manualInput);
   });
 
   document.addEventListener('click', (e) => {
