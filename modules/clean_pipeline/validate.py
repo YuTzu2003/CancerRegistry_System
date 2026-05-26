@@ -200,7 +200,8 @@ def validate_date_rules(row, alias_mapping):
                     )
 
                     if result is False:
-                        errors.append(error_msg)
+                        rule_text = f"{d1_field} {op} {d2_field}"
+                        errors.append(f"{rule_text}（{error_msg}）")
                         error_fields.add(std_to_orig[d1_field])
                         error_fields.add(std_to_orig[d2_field])
     return list(error_fields), errors

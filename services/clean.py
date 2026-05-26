@@ -1,18 +1,364 @@
 import os
+import io
+import csv
 import uuid
+import json
+import shutil
+import logging
+import zipfile
 import pandas as pd
-from flask import Blueprint, render_template, request, session, jsonify, send_file
-from werkzeug.utils import secure_filename
+from copy import copy
 from modules.db import get_conn
+from contextlib import redirect_stdout
 from modules.cleaner import cleanValidate
-from services.auth import login_required, admin_required
-from modules.field_mapping import detect_system, get_field_map
+from werkzeug.utils import secure_filename
 from openpyxl import load_workbook, Workbook
 from openpyxl.utils import get_column_letter
-from copy import copy
+from services.auth import login_required, admin_required
+from modules.field_mapping import detect_system, get_field_map
+from modules.clean_pipeline.validate import validate_date_rules
+from flask import Blueprint, render_template, request, session, jsonify, send_file
 
 clean_bp = Blueprint('clean', __name__)
 Jobs_FOLDER = 'static/Jobs'
+
+def run_clean_validate_with_clean_log(*args, **kwargs):
+
+    buffer = io.StringIO()
+
+    with redirect_stdout(buffer):
+        result = cleanValidate(*args, **kwargs)
+
+    printed_text = buffer.getvalue().strip()
+
+    for line in printed_text.splitlines():
+        if line.startswith("Data Clean Report file:"):
+            report_path = line.replace("Data Clean Report file:", "").strip()
+            logging.info(f"Data Clean Report file created: {os.path.basename(report_path)}")
+        elif line.strip():
+            logging.info(line.strip())
+
+    return result
+
+
+DATE_ERROR_LIMIT = 3
+
+
+def _job_files(project_path, original_filename, fmt_name):
+    base_name, _ = os.path.splitext(original_filename)
+
+    cleaned_file = os.path.join(project_path, f"fmt{fmt_name}_{base_name}_Clean.xlsx")
+    report_file = os.path.join(project_path, f"fmt{fmt_name}_{base_name}_Report.xlsx")
+    working_file = os.path.join(project_path, f"{base_name}_working.xlsx")
+    date_error_file = os.path.join(project_path, "date_errors.json")
+
+    return base_name, cleaned_file, report_file, working_file, date_error_file
+
+
+def _create_working_file(source_file, working_file):
+    if os.path.abspath(source_file) != os.path.abspath(working_file):
+        shutil.copy2(source_file, working_file)
+
+
+def _build_date_errors(sorted_df, sorted_mask, alias_mapping, date_error_file):
+    errors = []
+
+    for row_pos, (source_row_index, mask_row) in enumerate(sorted_mask.iterrows()):
+        date_cols = [
+            col for col, val in mask_row.items()
+            if val == "dateformat"
+        ]
+
+        if not date_cols:
+            continue
+
+        row_data = sorted_df.iloc[row_pos]
+        _, msgs = validate_date_rules(row_data, alias_mapping)
+
+        errors.append({
+            "row_index": row_pos,
+            "source_row_index": int(source_row_index),
+            "excel_row": int(source_row_index) + 2,
+            "fields": [
+                {
+                    "name": col,
+                    "value": "" if pd.isna(row_data.get(col, "")) else str(row_data.get(col, ""))
+                }
+                for col in date_cols
+            ],
+            "messages": msgs or ["日期邏輯錯誤"]
+        })
+
+    with open(date_error_file, "w", encoding="utf-8") as f:
+        json.dump(errors, f, ensure_ascii=False, indent=2)
+
+    return errors
+
+
+def _resolve_source_row_index(date_error_file, row_index):
+    if not os.path.exists(date_error_file):
+        return row_index
+
+    try:
+        with open(date_error_file, "r", encoding="utf-8") as f:
+            date_errors = json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return row_index
+
+    for item in date_errors:
+        if int(item.get("row_index", -1)) == int(row_index):
+            return int(item.get("source_row_index", row_index))
+
+    return row_index
+
+
+def _load_job(job_id):
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT 
+            Job.Path,
+            Job.FileName,
+            DataFormat.FmtName,
+            DataFormat.Version,
+            DataFormat.Revision_date
+        FROM [Job]
+        JOIN [DataFormat]
+            ON Job.FmtID = DataFormat.FmtID
+        WHERE Job.JobID = ?
+    """, (job_id,))
+
+    row = cursor.fetchone()
+    conn.close()
+
+    return row
+
+
+def _update_working_file_cell_only(working_file, row_index, updates):
+    wb = load_workbook(working_file)
+    ws = wb.active
+
+    headers = {}
+    for col_idx, cell in enumerate(ws[1], start=1):
+        if cell.value is not None:
+            headers[str(cell.value).strip()] = col_idx
+
+    excel_row = int(row_index) + 2
+
+    for field_name, new_value in updates.items():
+        if field_name not in headers:
+            continue
+
+        col_idx = headers[field_name]
+        cell = ws.cell(row=excel_row, column=col_idx)
+
+        cell.value = (
+            "" if new_value is None
+            else str(new_value).replace("-", "").replace("/", "").strip()
+        )
+
+        # 只把被修改的日期欄位設成文字格式
+        cell.number_format = "@"
+
+    wb.save(working_file)
+    wb.close()
+
+
+def _detect_text_file_format(file_path):
+    encodings = ["utf-8-sig", "utf-8", "cp950", "big5"]
+    content = None
+    used_encoding = "utf-8-sig"
+
+    for enc in encodings:
+        try:
+            with open(file_path, "r", encoding=enc, newline="") as f:
+                content = f.read(4096)
+            used_encoding = enc
+            break
+        except UnicodeDecodeError:
+            continue
+
+    if content is None:
+        content = ""
+
+    first_line = content.splitlines()[0] if content.splitlines() else ""
+
+    if "\t" in first_line:
+        delimiter = "\t"
+    elif "," in first_line:
+        delimiter = ","
+    elif ";" in first_line:
+        delimiter = ";"
+    else:
+        ext = os.path.splitext(file_path)[1].lower()
+        delimiter = "," if ext == ".csv" else "\t"
+
+    return used_encoding, delimiter
+
+
+def _cell_text(value):
+    if value is None:
+        return ""
+
+    text = str(value).strip()
+
+    if text.endswith(".0"):
+        text = text[:-2]
+
+    return text
+
+
+def _working_file_rows(working_file):
+    wb = load_workbook(working_file, data_only=False)
+    ws = wb.active
+
+    rows = [
+        [_cell_text(value) for value in row]
+        for row in ws.iter_rows(values_only=True)
+    ]
+
+    wb.close()
+    return rows
+
+
+def _truncate_to_encoded_width(text, width, encoding):
+    result = ""
+
+    for ch in text:
+        candidate = result + ch
+        if len(candidate.encode(encoding, errors="ignore")) > width:
+            break
+        result = candidate
+
+    return result
+
+
+def _format_fixed_width_value(value, width, encoding):
+    text = _truncate_to_encoded_width(_cell_text(value), width, encoding)
+    byte_len = len(text.encode(encoding, errors="ignore"))
+    return text + (" " * max(width - byte_len, 0))
+
+
+def _write_fixed_width_txt_from_working(working_file, source_file, fmt_name, encoding):
+    fmt_val = str(fmt_name).replace("fmt_", "")
+    field_spec = load_field_spec(fmt_val)
+    rows = _working_file_rows(working_file)
+
+    if not rows:
+        return
+
+    headers = rows[0]
+    header_index = {name: idx for idx, name in enumerate(headers)}
+    output_lines = []
+
+    for row in rows[1:]:
+        line_parts = []
+
+        for field_name, start, end in field_spec:
+            col_idx = header_index.get(field_name)
+            value = row[col_idx] if col_idx is not None and col_idx < len(row) else ""
+            line_parts.append(
+                _format_fixed_width_value(value, end - start + 1, encoding)
+            )
+
+        output_lines.append("".join(line_parts))
+
+    with open(source_file, "w", encoding=encoding, newline="") as f:
+        f.write("\n".join(output_lines))
+        if output_lines:
+            f.write("\n")
+
+
+def _write_csv_from_working(working_file, source_file, encoding, delimiter):
+    rows = _working_file_rows(working_file)
+
+    with open(source_file, "w", encoding=encoding, newline="") as f:
+        writer = csv.writer(
+            f,
+            delimiter=delimiter,
+            quoting=csv.QUOTE_MINIMAL,
+            lineterminator="\n",
+        )
+        writer.writerows(rows)
+
+
+def _sync_working_file_to_source_files(working_file, source_file, converted_file, fmt_name):
+    if not os.path.exists(working_file):
+        return
+
+    working_abs = os.path.abspath(working_file)
+
+    if converted_file and os.path.exists(converted_file):
+        converted_abs = os.path.abspath(converted_file)
+        if converted_abs != working_abs:
+            shutil.copy2(working_file, converted_file)
+
+    if not source_file or not os.path.exists(source_file):
+        return
+
+    source_abs = os.path.abspath(source_file)
+    ext = os.path.splitext(source_file)[1].lower()
+
+    if ext in [".xlsx", ".xlsm"] and source_abs != working_abs:
+        shutil.copy2(working_file, source_file)
+        return
+
+    if ext not in [".txt", ".csv"]:
+        return
+
+    encoding, delimiter = _detect_text_file_format(source_file)
+
+    if ext == ".csv":
+        _write_csv_from_working(working_file, source_file, encoding, delimiter)
+        return
+
+    _write_fixed_width_txt_from_working(
+        working_file,
+        source_file,
+        fmt_name,
+        encoding,
+    )
+
+
+def _build_cleaning_analysis(stats, sorted_mask):
+    by_field = []
+
+    for col in sorted_mask.columns:
+        err_count = (sorted_mask[col] != "").sum()
+
+        if err_count > 0:
+            by_field.append({
+                "name": col,
+                "format": "檢核不符",
+                "errors": int(err_count)
+            })
+
+    total_cells = stats["total"] * len(sorted_mask.columns)
+
+    by_type = [
+        {
+            "type": "A:遺漏值",
+            "count": int(stats["missing_cells"]),
+            "ratio": f"{(stats['missing_cells'] / total_cells * 100):.1f}%" if total_cells > 0 else "0%"
+        },
+        {
+            "type": "B:格式不符",
+            "count": int(stats["format_cells"]),
+            "ratio": f"{(stats['format_cells'] / total_cells * 100):.1f}%" if total_cells > 0 else "0%"
+        },
+        {
+            "type": "C:邏輯錯誤",
+            "count": int(stats["logic_cells"]),
+            "ratio": f"{(stats['logic_cells'] / total_cells * 100):.1f}%" if total_cells > 0 else "0%"
+        }
+    ]
+
+    return {
+        "by_field": by_field,
+        "by_type": by_type
+    }
+
 
 def copy_cell(source_cell, target_cell):
     target_cell.value = source_cell.value
@@ -414,10 +760,15 @@ def api_clean():
             conn.close()
             return jsonify({"ok": False, "error": f"TXT 解析失敗: {str(e)}"}), 500
 
-    out_path, rep_path = f"{project_folder}/fmt{fmt_name}_{base_name}_Clean.xlsx", f"{project_folder}/fmt{fmt_name}_{base_name}_Report.xlsx"
+    base_name, out_path, rep_path, working_file, date_error_file = _job_files(project_folder, filename, fmt_name)
     
     try:
+        _create_working_file(process_path, working_file)
+
         stats, alias_mapping, sorted_df, sorted_mask = cleanValidate(process_path, out_path, rep_path, f"fmt_{fmt_name}", version, rev_date)
+
+        date_errors = _build_date_errors(sorted_df, sorted_mask, alias_mapping, date_error_file)
+
         cursor.execute("INSERT INTO Job ([JobID],[UserID],[FmtID],[FileName],[TotalCount],[CompletenessScore],[CorrectScore],[ConsistencyScore],[DQI],[Path]) VALUES (?,?,?,?,?,?,?,?,?,?)",
                         (JobID, user_id, format_id, filename, int(stats['total']), float(stats['completeness']), float(stats['correctness']), float(stats['consistency']), float(stats['quality_score']), project_folder))
         conn.commit()
@@ -444,10 +795,27 @@ def api_clean():
     
     # 偵測資料體系
     detected_system, _ = detect_system(sorted_df.columns)
+
+    date_error_count = len(date_errors)
+
+    if date_error_count > DATE_ERROR_LIMIT:
+        message = (
+            f"日期邏輯錯誤共有 {date_error_count} 筆，"
+            f"已達系統限制 {DATE_ERROR_LIMIT} 筆，"
+            "請先修正錯誤的日期資料，完成修正後再進行後續資料清洗作業"
+        )
+        can_continue = False
+    else:
+        message = "清洗完成"
+        can_continue = True
+
     return jsonify({
-        "ok": True, 
+        "ok": True,
         "project_id": JobID,
+        "job_id": JobID,
         "detected_system": detected_system,
+        "message": message,
+        "can_continue": can_continue,
         "stats": {
             "total": int(stats['total']), 
             "passed": int(stats['total'] - stats['error_rows']), 
@@ -458,7 +826,158 @@ def api_clean():
             "dqi": float(stats['quality_score'])
         },
         "analysis": {"by_field": by_field,"by_type": by_type},
-        "output_fields": output_fields
+        "output_fields": output_fields,
+        "date_error_limit": DATE_ERROR_LIMIT,
+        "date_error_count": date_error_count,
+        "date_errors": date_errors
+    })
+
+
+@clean_bp.route("/api/date_errors", methods=["POST"])
+@login_required
+def api_date_errors():
+    data = request.get_json(silent=True) or {}
+    job_id = data.get("job_id")
+
+    if not job_id:
+        return jsonify({"ok": False, "error": "缺少 job_id"}), 400
+
+    row = _load_job(job_id)
+
+    if not row:
+        return jsonify({"ok": False, "error": "找不到該紀錄"}), 404
+
+    project_path, original_filename, fmt_name, version, rev_date = row
+
+    _, _, _, _, date_error_file = _job_files(project_path, original_filename, fmt_name)
+
+    if not os.path.exists(date_error_file):
+        return jsonify({
+            "ok": True,
+            "date_errors": [],
+            "date_error_count": 0,
+            "date_error_limit": DATE_ERROR_LIMIT
+        })
+
+    with open(date_error_file, "r", encoding="utf-8") as f:
+        date_errors = json.load(f)
+
+    return jsonify({
+        "ok": True,
+        "date_errors": date_errors,
+        "date_error_count": len(date_errors),
+        "date_error_limit": DATE_ERROR_LIMIT
+    })
+
+
+@clean_bp.route("/api/date_errors/update", methods=["POST"])
+@login_required
+def api_update_date_error():
+    data = request.get_json(silent=True) or {}
+
+    job_id = data.get("job_id")
+    row_index = data.get("row_index")
+    updates = data.get("updates") or {}
+
+    if not job_id:
+        return jsonify({"ok": False, "error": "缺少 job_id"}), 400
+
+    if row_index is None or not isinstance(updates, dict) or not updates:
+        return jsonify({"ok": False, "error": "缺少修正資料"}), 400
+
+    row = _load_job(job_id)
+
+    if not row:
+        return jsonify({"ok": False, "error": "找不到該紀錄"}), 404
+
+    project_path, original_filename, fmt_name, version, rev_date = row
+
+    _, cleaned_file, report_file, working_file, date_error_file = _job_files(
+        project_path,
+        original_filename,
+        fmt_name
+    )
+
+    if not os.path.exists(working_file):
+        return jsonify({"ok": False, "error": "找不到可修正的暫存資料"}), 404
+
+    try:
+        row_index = int(row_index)
+    except ValueError:
+        return jsonify({"ok": False, "error": "修正列格式錯誤"}), 400
+
+    try:
+        source_row_index = _resolve_source_row_index(date_error_file, row_index)
+
+        _update_working_file_cell_only(working_file, source_row_index, updates)
+
+        source_file = os.path.join(project_path, original_filename)
+        base_name, _ = os.path.splitext(original_filename)
+        converted_file = os.path.join(project_path, f"{base_name}.xlsx")
+
+        _sync_working_file_to_source_files(
+            working_file,
+            source_file,
+            converted_file,
+            fmt_name
+        )
+
+        stats, alias_mapping, sorted_df, sorted_mask = run_clean_validate_with_clean_log(
+            working_file,
+            cleaned_file,
+            report_file,
+            f"fmt_{fmt_name}",
+            version,
+            rev_date
+        )
+
+        date_errors = _build_date_errors(sorted_df, sorted_mask, alias_mapping, date_error_file)
+
+        conn = get_conn()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            UPDATE [Job]
+            SET 
+                TotalCount = ?,
+                CompletenessScore = ?,
+                CorrectScore = ?,
+                ConsistencyScore = ?,
+                DQI = ?
+            WHERE JobID = ?
+        """, (
+            int(stats["total"]),
+            float(stats["completeness"]),
+            float(stats["correctness"]),
+            float(stats["consistency"]),
+            float(stats["quality_score"]),
+            job_id
+        ))
+
+        conn.commit()
+        conn.close()
+
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+    return jsonify({
+        "ok": True,
+        "message": "修正完成，已重新檢核",
+        "job_id": job_id,
+        "project_id": job_id,
+        "date_error_limit": DATE_ERROR_LIMIT,
+        "date_error_count": len(date_errors),
+        "date_errors": date_errors,
+        "analysis": _build_cleaning_analysis(stats, sorted_mask),
+        "stats": {
+            "total": int(stats["total"]),
+            "passed": int(stats["total"] - stats["error_rows"]),
+            "error": int(stats["error_rows"]),
+            "completeness": float(stats["completeness"]),
+            "correctness": float(stats["correctness"]),
+            "consistency": float(stats["consistency"]),
+            "dqi": float(stats["quality_score"])
+        }
     })
 
 @clean_bp.route("/api/download/<file_type>/<job_id>")

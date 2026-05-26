@@ -166,10 +166,10 @@ def apply_class_case_rules(df, error_mask, rules, alias_mapping, fmt):
 
     作用：
     1. 當 class = 0 或 class = 3 時
-    2. 指定欄位範圍必須用 9 補滿
-    3. 指定欄位範圍必須填固定值，例如 988
-    4. 如果填對，清除原本一般欄位檢查造成的誤判錯誤
-    5. 如果填錯，標記為 dateformat
+    2. 指定欄位範圍如果用 9 補滿，視為特殊允許值
+    3. 指定欄位範圍如果填固定值，例如 988，視為特殊允許值
+    4. 符合特殊允許值時，清除原本一般欄位檢查造成的誤判錯誤
+    5. 不符合特殊允許值時，不額外標記錯誤，保留原本單欄位檢核結果
     """
 
     if fmt not in CLASS_CASE_RULES:
@@ -214,8 +214,6 @@ def apply_class_case_rules(df, error_mask, rules, alias_mapping, fmt):
                 if value == expected:
                     # 填對時，清掉一般格式檢查誤判
                     error_mask.at[idx, col] = ""
-                else:
-                    error_mask.at[idx, col] = "dateformat"
 
                 continue
 
@@ -225,26 +223,16 @@ def apply_class_case_rules(df, error_mask, rules, alias_mapping, fmt):
                     if value == expected:
                         # 填對時，清掉一般格式檢查誤判
                         error_mask.at[idx, col] = ""
-                    else:
-                        error_mask.at[idx, col] = "dateformat"
 
                     break
 
     return error_mask
 
 def stop_if_too_many_date_errors(error_mask, max_errors=3):
-    """
-    error_mask 裡面如果有 dateformat，代表日期格式或日期邏輯錯誤。
-    預設超過或等於 3 筆時，要求使用者先修正。
-    """
 
     if error_mask is None or error_mask.empty:
-        return
+        return 0
 
     date_error_count = (error_mask == "dateformat").sum().sum()
 
-    if date_error_count >= max_errors:
-        raise ValueError(
-            f"日期邏輯錯誤共有 {date_error_count} 筆，已達系統限制 ({max_errors} 筆)\n"
-            f"請先修正錯誤的日期資料，完成修正後再進行後續資料清洗作業"
-        )
+    return int(date_error_count)

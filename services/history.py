@@ -17,6 +17,36 @@ def remove_readonly(func, path, excinfo):
     os.chmod(path, stat.S_IWRITE)
     func(path)
 
+
+def _should_include_result_file(filename, original_filename=None):
+
+    if not filename:
+        return False
+ 
+    if filename.startswith("Results_") and filename.endswith(".zip"):
+        return False
+
+    if filename.endswith("_working.xlsx"):
+        return False
+
+    if filename == "date_errors.json":
+        return False
+
+    if filename.endswith("_Clean.xlsx") or filename.endswith("_Report.xlsx"):
+        return True
+
+    if original_filename and filename == original_filename:
+        return True
+
+    if original_filename:
+        original_base, _ = os.path.splitext(original_filename)
+        converted_xlsx = f"{original_base}.xlsx"
+
+        if filename == converted_xlsx:
+            return True
+
+    return False
+
 @history_bp.route("/history")
 @login_required
 def history():
@@ -97,13 +127,20 @@ def history_download_zip(job_id):
         if not row or not row[0]: return jsonify({"ok": False, "error": "Not found"}), 404
         
         project_path = row[0]
+        original_filename = row[1]
         zip_path = os.path.join(project_path, f"Results_{job_id}.zip")
-        with zipfile.ZipFile(zip_path, 'w') as zipf:
+
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
             for root, dirs, files in os.walk(project_path):
                 for file in files:
-                    if file == f"Results_{job_id}.zip":
+                    if not _should_include_result_file(file, original_filename):
                         continue
-                    zipf.write(os.path.join(root, file), file)
+
+                    file_path = os.path.join(root, file)
+                    if not os.path.isfile(file_path):
+                        continue
+
+                    zipf.write(file_path, file)
         
         return send_file(os.path.abspath(zip_path), as_attachment=True)
     except Exception as e: return jsonify({"ok": False, "error": str(e)}), 500
@@ -134,10 +171,17 @@ def batch_download_history():
             if row and row[0] and os.path.exists(row[0]):
                 project_path = row[0]
                 folder_name = f"Job_{job_id}"
+                original_filename = row[1]
                 for root, dirs, files in os.walk(project_path):
                     for file in files:
+                        if not _should_include_result_file(file, original_filename):
+                            continue
+
                         file_path = os.path.join(root, file)
-                        rel_path = os.path.join(folder_name, os.path.relpath(file_path, project_path))
+                        if not os.path.isfile(file_path):
+                            continue
+
+                        rel_path = os.path.join(folder_name, file)
                         zipf.write(file_path, rel_path)
     conn.close()
     memory_file.seek(0)

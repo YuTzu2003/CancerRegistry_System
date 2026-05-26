@@ -144,6 +144,9 @@
   </div>
 </section>
 
+<!-- 日期邏輯錯誤線上修正區 -->
+<div id="dateErrorEditor" class="mt-3"></div>
+
 <!-- ===================== 結果摘要 ===================== -->
 <div class="kpi-grid kpi-grid-3" id="kpiGrid">
   <div class="kpi">
@@ -168,7 +171,7 @@
         <h2><span class="dot"></span>清洗個案清單明細</h2>
         <div class="d-flex align-items-center gap-2">
         <button class="btn btn-outline-dark btn-sm" type="button" id="btnDownloadCleaned">
-          <i class="bi bi-file-earmark-excel"></i> 下載報告 XLSX
+          <i class="bi bi-file-earmark-excel"></i> 下載清洗結果 XLSX
         </button>
       </div>
       </div>
@@ -411,5 +414,5 @@
   <div class="text-muted small mt-1">這可能需要幾秒鐘的時間</div>
 </div>
   
-<script src="/static/js/clean.js"></script>
+<script src="/static/js/clean.js?v=20260525_1"></script>
 {% endblock %}
