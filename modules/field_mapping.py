@@ -27,7 +27,14 @@ def detect_system(excel_columns):
             if pd.notna(val):
                 clean_val = str(val).strip()
                 if clean_val:
-                    db_cols.add(f"{seq}{clean_val}")
+                    # 僅針對特定欄位 (4.2.1.8, 7.6) 支援斜線拆解匹配計分
+                    if seq in ['4.2.1.8', '7.6'] and '/' in clean_val:
+                        for v in clean_val.split('/'):
+                            v = v.strip()
+                            if v:
+                                db_cols.add(f"{seq}{v}")
+                    else:
+                        db_cols.add(f"{seq}{clean_val}")
         match_count = len(excel_cols_set.intersection(db_cols))
         scores[s] = match_count
 
@@ -51,13 +58,14 @@ def field_mapping(target_col):
     for _, row in df_mapping.iterrows():
         val = row[target_col]
         output_name = str(val).strip() if pd.notna(val) else ""
-
-        if output_name and output_name not in output_field_list:
-            output_field_list.append(output_name)
-
+        
         seq = str(row['序號']).strip()
         if seq.endswith('.0'):
             seq = seq[:-2]
+
+        # 1. 輸出清單：始終只加入原始的合併名稱 (如 A/B)，不加入拆解後的名稱
+        if output_name and output_name not in output_field_list:
+            output_field_list.append(output_name)
 
         aliases = [
             row['中文欄位名稱'], 
@@ -67,11 +75,26 @@ def field_mapping(target_col):
             row['台灣癌症登記中心']
         ]
 
+        # 2. 建立對應字典：支援拆解匹配
         for alias in aliases:
             if pd.notna(alias):
                 clean_alias = str(alias).strip()
                 if clean_alias:
-                    alias_dict[f"{seq}{clean_alias}"] = output_name
+                    # 僅針對特定欄位 (4.2.1.8, 7.6) 支援斜線拆解匹配
+                    if seq in ['4.2.1.8', '7.6'] and '/' in clean_alias:
+                        parts = [p.strip() for p in clean_alias.split('/') if p.strip()]
+                    else:
+                        parts = [clean_alias]
+
+                    for part in parts:
+                        final_target_val = output_name
+                        # 智慧對應：僅在輸出中文且包含斜線時，若別名是其中一部分，則對應到該單一名字
+                        if target_col == '中文欄位名稱' and '/' in output_name and seq in ['4.2.1.8', '7.6']:
+                            output_parts = [op.strip() for op in output_name.split('/')]
+                            if part in output_parts:
+                                final_target_val = part
+                        
+                        alias_dict[f"{seq}{part}"] = final_target_val
 
     return alias_dict, output_field_list
 
@@ -107,7 +130,7 @@ def get_field_map(target_scheme_key, fmt_name):
         if seq.endswith('.0'):
             seq = seq[:-2]
         
-        # Prepend sequence to the target name for the output header without symbols
+        # 統一目標名稱：始終使用完整的資料庫名稱作為 Key，避免 UI 出現重複欄位
         target_name = f"{seq}{target_base_name}"
 
         for col in columns:
@@ -116,8 +139,17 @@ def get_field_map(target_scheme_key, fmt_name):
             if pd.notna(val):
                 alias = str(val).strip()
                 if alias:
-                    # ONLY add prefixed version without symbols
-                    alias_to_target[f"{seq}{alias}"] = target_name
+                    # 支援斜線拆解匹配，但所有拆解後的別名都指向唯一的「完整標頭」
+                    if seq in ['4.2.1.8', '7.6'] and '/' in alias:
+                        parts = [p.strip() for p in alias.split('/') if p.strip()]
+                    else:
+                        parts = [alias]
+                        
+                    for part in parts:
+                        # 指向統一的目標名稱 (target_name)
+                        alias_to_target[f"{seq}{part}"] = target_name
+                    
+    return alias_to_target
                     
     return alias_to_target
 
