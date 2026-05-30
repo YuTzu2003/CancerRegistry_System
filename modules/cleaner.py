@@ -163,7 +163,7 @@ def cleanValidate(input_file,output_file,report_file,fmt,version,Revision_Date):
                     cell.fill = fill_missing
                 elif err_type == "format":
                     cell.fill = fill_format
-                elif err_type == "dateformat": 
+                elif err_type == "dateformat" or err_type == "special_logic": 
                     cell.fill = fill_dateformat
 
     wb.save(output_file)
