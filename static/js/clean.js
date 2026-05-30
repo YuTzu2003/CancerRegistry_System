@@ -200,7 +200,7 @@
           }
 
           alertContainer.innerHTML = `
-            <div class="alert alert-warning border shadow-sm mt-3 error-alert d-flex justify-content-between align-items-center" role="alert">
+            <div class="alert alert-danger border shadow-sm mt-3 error-alert d-flex justify-content-between align-items-center" role="alert">
               <div class="d-flex align-items-start">
                 <i class="bi bi-exclamation-triangle-fill alert-icon mt-1 me-2"></i>
                 <div class="alert-message">${errorMsg}</div>

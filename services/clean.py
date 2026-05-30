@@ -866,13 +866,13 @@ def api_clean():
                 total_errors = len(length_errors)
                 display_limit = 3
 
-                error_message_html += f"<b>檔案長度校驗失敗，總共發現 {total_errors} 筆長度不符的資料：</b><br>"
+                error_message_html += f"檔案長度校驗失敗，總共有 <b>{total_errors}</b> 筆長度不符的資料：<br>"
 
                 # 顯示前 N 筆
                 error_message_html += "<br>".join(length_errors[:display_limit])
                 
                 if total_errors > display_limit:
-                    error_message_html += f"<br>...以及其他 {total_errors - display_limit} 筆錯誤。"
+                    error_message_html += f"<br>...以及其他 {total_errors - display_limit} 筆錯誤"
 
             # 2. 不論長度是否正確，都進行初步切分並產生 Excel (供下載檢視)
             field_spec = load_field_spec(fmt_val)
