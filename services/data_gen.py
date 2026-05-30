@@ -1,6 +1,7 @@
 import os
 import random
 import string
+import re
 import pandas as pd
 import numpy as np
 from flask import Blueprint, request, jsonify, session, send_file
@@ -99,10 +100,18 @@ def analyze_file():
                 "AI_module": str(r[6]).strip() if pd.notna(r[6]) else "",
                 "aliases": [] # 初始化為 list，稍後填充
             }
-            # 收集所有可能的嚴格別名 (序號+名稱)
+            # 收集所有可能的嚴格別名 (序號+名稱)，支援斜線拆解 (僅限 4.2.1.8, 7.6)
             for alias in r[1:7]:
-                if pd.notna(alias) and str(alias).strip():
-                    field_db_map[seq]["aliases"].append(f"{seq}{str(alias).strip()}")
+                if pd.notna(alias):
+                    clean_val = str(alias).strip()
+                    if clean_val:
+                        if seq in ['4.2.1.8', '7.6'] and '/' in clean_val:
+                            for v in clean_val.split('/'):
+                                v = v.strip()
+                                if v:
+                                    field_db_map[seq]["aliases"].append(f"{seq}{v}")
+                        else:
+                            field_db_map[seq]["aliases"].append(f"{seq}{clean_val}")
 
         # 2. 分析上傳的欄位
         analyzed_columns = []
@@ -208,18 +217,49 @@ def process_file():
             target_val = r[target_idx]
 
             if pd.notna(target_val) and str(target_val).strip():
+                # 統一目標名稱：使用完整的資料庫名稱
                 target_header = f"{seq}{str(target_val).strip()}"
                 all_possible_target_headers.add(target_header)
                 scheme_target_for_seq[seq] = target_header
+                
                 for alias in r[1:7]:
-                    if pd.notna(alias) and str(alias).strip():
-                        alias_to_target[f"{seq}{str(alias).strip()}"] = target_header
+                    if pd.notna(alias):
+                        clean_alias = str(alias).strip()
+                        if clean_alias:
+                            # 支援斜線拆解匹配，但統一指向同一個 target_header
+                            if seq in ['4.2.1.8', '7.6'] and '/' in clean_alias:
+                                parts = [p.strip() for p in clean_alias.split('/') if p.strip()]
+                            else:
+                                parts = [clean_alias]
+                                
+                            for part in parts:
+                                alias_to_target[f"{seq}{part}"] = target_header
 
         # 執行重新命名 (僅針對有目標名稱的欄位)
         rename_map = {}
         for col in df.columns:
             if col in alias_to_target:
-                rename_map[col] = alias_to_target[col]
+                target_name = alias_to_target[col]
+                final_name = target_name
+                
+                # 智慧重命名：僅限中文方案且包含斜線
+                if naming_scheme == 'field_name_zh' and '/' in target_name:
+                    m_target = re.match(r'^(\d+(\.\d+)*)', target_name)
+                    if m_target:
+                        seq = m_target.group(1)
+                        if seq in ['4.2.1.8', '7.6'] and col.startswith(seq):
+                             # 拆分目標名稱為多個部分
+                             target_raw_name = target_name[len(seq):].strip()
+                             valid_parts = [p.strip() for p in target_raw_name.split('/') if p.strip()]
+                             
+                             # 取得目前來源欄位名稱部分
+                             source_raw_name = col[len(seq):].strip()
+                             
+                             # 精準匹配二選一：如果符合其中一邊，則保留原本的來源名稱作為新欄位名
+                             if source_raw_name in valid_parts:
+                                 final_name = col
+                
+                rename_map[col] = final_name
 
         # 轉換日期選取清單
         selected_date_cols_std = []
@@ -354,7 +394,7 @@ def process_file():
         for col in current_cols:
             if col in mapped_target_headers:
                 import re
-                m = re.match(r'^(\d+\.?\d*\.?\d*)', col)
+                m = re.match(r'^(\d+(\.\d+)*)', col)
                 seq_val = m.group(1) if m else "999"
                 try:
                     seq_parts = [int(x) for x in seq_val.split('.')]
