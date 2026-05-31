@@ -259,13 +259,13 @@ def apply_date_conditional_rules(df, error_mask, rules, alias_mapping, fmt):
         if not fv_val or not id_val:
             continue
             
-        # 條件 A: 個案分類為 0 或 1，兩者應相等
+        # 條件A:個案分類為 0 或 1，兩者應相等
         if class_val in ['0', '1']:
             if fv_val != id_val:
                 error_mask.at[idx, first_visit_col] = "special_logic"
                 error_mask.at[idx, init_diag_col] = "special_logic"
         
-        # 條件 B: 個案分類為 2 或 3，首次就診日期應晚於最初診斷日期
+        # 條件B:個案分類為 2 或 3，首次就診日期應晚於最初診斷日期
         elif class_val in ['2', '3']:
             # id_val <= fv_val 且 不能相等
             res = compare_cancer_date(row[init_diag_col], row[first_visit_col])

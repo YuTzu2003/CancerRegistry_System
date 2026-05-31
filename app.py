@@ -68,10 +68,16 @@ def index():
     
     return render_template("index.html", active="index", stats=stats)
 
-# ---- other ------------------------------------------
 @app.route("/dataGen")
 @login_required
-def dataGen(): return render_template("dataGen.html", active="dataGen")
+def dataGen():
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute("SELECT FmtID, FmtName, Version FROM [Hospital_data].[dbo].[DataFormat] ORDER BY FmtName ASC")
+    rows = cursor.fetchall()
+    formats = [{"id": str(r[0]), "name": str(r[1]), "version": str(r[2])} for r in rows]
+    conn.close()
+    return render_template("dataGen.html", active="dataGen", formats=formats)
 
 @app.route("/analytics")
 @login_required
