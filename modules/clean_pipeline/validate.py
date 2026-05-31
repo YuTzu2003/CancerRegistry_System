@@ -194,7 +194,6 @@ def validate_date_rules(row, alias_mapping):
     class_field = '個案分類'
     class_val = str(std_row.get(class_field, '')).strip().replace('.0', '')
 
-    # 組合最終要執行的規則
     active_rules = list(DATE_RULES_COMMON)
     if class_val == '1':
         active_rules.extend(DATE_RULES_ONLY_CLASS_1)
@@ -217,7 +216,7 @@ def validate_date_rules(row, alias_mapping):
                         error_fields.add(std_to_orig[d1_field])
                         error_fields.add(std_to_orig[d2_field])
 
-    # --- 個案分類與首次就診/最初診斷日期的連動規則 ---
+    # 個案分類與首次就診/最初診斷日期的連動規則
     class_field = '個案分類'
     first_visit = '首次就診日期'
     init_diag = '最初診斷日期'
@@ -232,12 +231,10 @@ def validate_date_rules(row, alias_mapping):
         if fv_val and id_val:
             if class_val in ['0', '1']:
                 if fv_val != id_val:
-                    #不增加特定訊息
                     error_fields.add(std_to_orig[first_visit])
                     error_fields.add(std_to_orig[init_diag])
             elif class_val in ['2', '3']:
                 if compare_cancer_date(std_row[init_diag], std_row[first_visit]) is False or fv_val == id_val:
-                    #不增加特定訊息
                     error_fields.add(std_to_orig[first_visit])
                     error_fields.add(std_to_orig[init_diag])
 

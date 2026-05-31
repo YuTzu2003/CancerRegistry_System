@@ -26,11 +26,15 @@ Jobs_FOLDER = 'static/Jobs'
 
 def _natural_sort_key(s):
     """
-    Generate a key for natural sorting.
-    Example: "7.10其他因子10" -> ['', 7, '.', 10, '其他因子10']
+    Generate a key for natural sorting, supporting hierarchical numbers like 2.3.1.
+    Example: "2.3.1" -> ['', (2, 3, 1), '']
     """
-    return [int(text) if text.isdigit() else text.lower()
-            for text in re.split('([0-9]+)', str(s))]
+    def convert(text, is_match):
+        if is_match:
+            return tuple(int(x) for x in text.split('.'))
+        return text.lower()
+    parts = re.split(r'(\d+(?:\.\d+)*)', str(s))
+    return [convert(text, i % 2 == 1) for i, text in enumerate(parts)]
 
 
 def run_clean_validate_with_clean_log(*args, **kwargs):
@@ -412,7 +416,6 @@ def api_categorize_fields():
         headers = [str(cell.value).strip() if cell.value else "" for cell in next(ws.iter_rows(max_row=1))]
         wb.close()
 
-        # 取得當前格式的規則
         from modules.cleaner import FORMAT_RULES_MAP
         fmt_key = f"fmt_{fmt_name}" if not str(fmt_name).startswith("fmt_") else str(fmt_name)
         rules = FORMAT_RULES_MAP.get(fmt_key, {})
@@ -428,21 +431,18 @@ def api_categorize_fields():
                 target_name = alias_to_target[h]
                 final_display = target_name
                 
-                # 智慧換名：針對特定欄位進行精準二選一匹配
                 if (scheme == 'field_name_zh' or scheme == '中文欄位名稱') and '/' in target_name:
                     m_target = re.match(r'^(\d+(\.\d+)*)', target_name)
                     if m_target:
                         seq = m_target.group(1)
                         if seq in ['4.2.1.8', '7.6']:
-                            # 優先：如果來源欄位(h)剛好是其中一個拆分後的名稱，則採用該名稱
                             target_raw = target_name[len(seq):].strip()
                             valid_parts = [p.strip() for p in target_raw.split('/') if p.strip()]
-                            source_raw = h[len(seq):].strip()
+                            source_raw = h[len(seq):].strip() if h.startswith(seq) else h
                             
-                            if h.startswith(seq) and source_raw in valid_parts:
-                                final_display = h
+                            if source_raw in valid_parts:
+                                final_display = f"{seq}{source_raw}"
                             else:
-                                # 次之：如果不是，則嘗試從 Python 規則中抓取該格式預設的中文名稱
                                 rule_name = id_to_rule_name.get(seq)
                                 if rule_name:
                                     final_display = f"{seq}{rule_name}"
@@ -451,7 +451,6 @@ def api_categorize_fields():
             else:
                 unmapped.append({"key": h, "label": h})
         
-        # 自然排序：確保 1.1, 1.2, ..., 1.10 的順序正確
         mapped.sort(key=lambda x: _natural_sort_key(x['label']))
         unmapped.sort(key=lambda x: _natural_sort_key(x['label']))
 
@@ -483,6 +482,12 @@ def api_export():
         return jsonify({"ok": False, "error": "清洗檔案不存在"}), 404
 
     alias_to_target = get_field_map(scheme, fmt_name)
+    
+    from modules.cleaner import FORMAT_RULES_MAP
+    fmt_key = f"fmt_{fmt_name}" if not str(fmt_name).startswith("fmt_") else str(fmt_name)
+    rules = FORMAT_RULES_MAP.get(fmt_key, {})
+    id_to_rule_name = {v.get("ID"): k for k, v in rules.items() if v.get("ID")}
+
     scheme_display = {
         "field_name_zh":"中文欄位名稱",
         "field_name_en":"英文欄位名稱",
@@ -500,7 +505,6 @@ def api_export():
         output_cols = []
         used_orig_indices = set()
 
-        # 1. ALWAYS include ALL fields defined for this module
         for target_name in unique_targets:
             source_idx = None
             final_display_name = target_name
@@ -509,29 +513,27 @@ def api_export():
                 if h in alias_to_target and alias_to_target[h] == target_name:
                     source_idx = i + 1
                     
-                    # 智慧對應：僅針對特定欄位 (4.2.1.8, 7.6) 進行斜線拆分精準匹配
                     if scheme_display == '中文欄位名稱' and '/' in target_name:
                         m_target = re.match(r'^(\d+(\.\d+)*)', target_name)
                         if m_target:
                             seq_prefix = m_target.group(1)
                             if seq_prefix in ['4.2.1.8', '7.6']:
-                                # 拆分資料庫全名為清單
                                 target_raw_name = target_name[len(seq_prefix):].strip()
                                 valid_parts = [p.strip() for p in target_raw_name.split('/') if p.strip()]
                                 
-                                # 取得來源欄位名稱部分
+                                rule_name = id_to_rule_name.get(seq_prefix)
+                                if rule_name:
+                                    final_display_name = f"{seq_prefix}{rule_name}"
+
                                 if h.startswith(seq_prefix):
                                     source_raw_name = h[len(seq_prefix):].strip()
-                                    # 精準比對：必須等於左邊或右邊的其中一個
                                     if source_raw_name in valid_parts:
                                         final_display_name = h
                     break
-            
+
             if source_idx:
                 output_cols.append((source_idx, final_display_name))
                 used_orig_indices.add(source_idx)
-            else:
-                output_cols.append((None, final_display_name))
 
         # 2. Add extra manually selected fields (that are NOT in the module)
         for field in selected_fields:
@@ -609,6 +611,11 @@ def api_preview():
     if not os.path.exists(cleaned_file):
         return jsonify({"ok": False, "error": "清洗檔案不存在"}), 404
     alias_to_target = get_field_map(scheme, fmt_name)
+    
+    from modules.cleaner import FORMAT_RULES_MAP
+    fmt_key = f"fmt_{fmt_name}" if not str(fmt_name).startswith("fmt_") else str(fmt_name)
+    rules = FORMAT_RULES_MAP.get(fmt_key, {})
+    id_to_rule_name = {v.get("ID"): k for k, v in rules.items() if v.get("ID")}
 
     try:
         wb = load_workbook(cleaned_file, data_only=True)
@@ -619,7 +626,6 @@ def api_preview():
         output_cols = []
         used_orig_indices = set()
 
-        # 1. ALWAYS include ALL fields defined for this module
         for target_name in unique_targets:
             source_idx = None
             final_display_name = target_name
@@ -628,7 +634,6 @@ def api_preview():
                 if h in alias_to_target and alias_to_target[h] == target_name:
                     source_idx = i + 1
                     
-                    # 智慧對應：僅針對特定欄位 (4.2.1.8, 7.6) 進行斜線拆分精準匹配
                     if (scheme == 'field_name_zh' or scheme == '中文欄位名稱') and '/' in target_name:
                         m_target = re.match(r'^(\d+(\.\d+)*)', target_name)
                         if m_target:
@@ -636,17 +641,20 @@ def api_preview():
                             if seq_prefix in ['4.2.1.8', '7.6']:
                                 target_raw_name = target_name[len(seq_prefix):].strip()
                                 valid_parts = [p.strip() for p in target_raw_name.split('/') if p.strip()]
+
+                                rule_name = id_to_rule_name.get(seq_prefix)
+                                if rule_name:
+                                    final_display_name = f"{seq_prefix}{rule_name}"
+
                                 if h.startswith(seq_prefix):
                                     source_raw_name = h[len(seq_prefix):].strip()
                                     if source_raw_name in valid_parts:
                                         final_display_name = h
-                    break
+                            break
             
             if source_idx:
                 output_cols.append((source_idx, final_display_name))
                 used_orig_indices.add(source_idx)
-            else:
-                output_cols.append((None, final_display_name))
         
         # 2. Add extra manually selected fields
         for f in selected_fields:
@@ -682,36 +690,30 @@ def load_field_spec(fmt_val):
     conn = get_conn()
     cursor = conn.cursor()
     
-    # 1. 取得該格式的所有欄位定義
     sql_fields = """SELECT [ChineseName], [Start], [End] FROM [CancerRegistry_Fields] 
                    WHERE [fmt]=? ORDER BY [Start]"""
     cursor.execute(sql_fields, fmt_val)
     field_rows = cursor.fetchall()
     
-    # 2. 取得所有的 Mapping 資料，建立 名稱 -> 序號 的對照字典
     sql_map = "SELECT [序號], [中文欄位名稱] FROM [CancerRegistry_FieldMap]"
     cursor.execute(sql_map)
     map_rows = cursor.fetchall()
     conn.close()
     
-    # 建立一個智慧對照字典：包含完整名稱以及拆解後的名稱
     name_to_seq = {}
     for r_seq, r_name in map_rows:
         if not r_seq or not r_name: continue
         seq_str = str(r_seq).strip().replace('.0', '')
         full_name = str(r_name).strip()
         
-        # 加入完整名稱
         name_to_seq[full_name] = seq_str
         
-        # 針對特定欄位處理斜線拆解
         if seq_str in ['4.2.1.8', '7.6'] and '/' in full_name:
             for part in full_name.split('/'):
                 part = part.strip()
                 if part:
                     name_to_seq[part] = seq_str
 
-    # 3. 取得 Python 規則定義
     from modules.cleaner import FORMAT_RULES_MAP
     fmt_key = f"fmt_{fmt_val}"
     rules = FORMAT_RULES_MAP.get(fmt_key, {})
@@ -721,17 +723,12 @@ def load_field_spec(fmt_val):
     for f_name, f_start, f_end in field_rows:
         orig_name = str(f_name).strip()
         
-        # 智慧尋找序號
         seq = name_to_seq.get(orig_name, "")
         
-        # 智慧決定顯示名稱
         target_name = orig_name
         if seq in ['4.2.1.8', '7.6']:
             rule_name = id_to_rule_name.get(seq)
             if rule_name:
-                # 如果 Python 規則名稱存在於 Mapping 的中文名稱中，則採用 Python 的簡短名稱
-                # 這裡需要找到對應的 Full Name 進行比對
-                # 為了效能與精準度，我們直接判斷 rule_name 是否在剛才配對到的 seq 對應的 full_name 裡
                 for m_seq, m_full in map_rows:
                     if str(m_seq).strip().replace('.0', '') == seq:
                         if rule_name in str(m_full):
@@ -851,7 +848,6 @@ def api_clean():
             expected_length = row[0] if row else 0
 
             length_errors = []
-            # 1. 預檢長度
             with open(path, 'r', encoding='big5', errors='ignore') as f:
                 for i, line in enumerate(f):
                     clean_line = line.rstrip('\n').rstrip('\r')
@@ -860,7 +856,6 @@ def api_clean():
                     if expected_length > 0 and length != expected_length:
                         length_errors.append(f"第 {i+1} 行: 實際 {length},預期 {expected_length}")
                         
-            # 整理錯誤訊息，避免畫面過長
             error_message_html = ""
             if length_errors:
                 total_errors = len(length_errors)
@@ -868,18 +863,15 @@ def api_clean():
 
                 error_message_html += f"檔案長度校驗失敗，總共有 <b>{total_errors}</b> 筆長度不符的資料：<br>"
 
-                # 顯示前 N 筆
                 error_message_html += "<br>".join(length_errors[:display_limit])
                 
                 if total_errors > display_limit:
                     error_message_html += f"<br>...以及其他 {total_errors - display_limit} 筆錯誤"
 
-            # 2. 不論長度是否正確，都進行初步切分並產生 Excel (供下載檢視)
             field_spec = load_field_spec(fmt_val)
             results = []
             with open(path, 'r', encoding='big5', errors='ignore') as f:
                 for line in f:
-                    # 即使該行長度有錯，parse_fixed_width_line 也會盡力切分
                     results.append(parse_fixed_width_line(line, field_spec))
 
             temp_xlsx = f"{project_folder}/{base_name}.xlsx"
@@ -892,7 +884,6 @@ def api_clean():
                 row_values = [row_dict.get(k, "") for k in keys]
                 ws_temp.append(row_values)
             
-            # 設定所有儲存格為文字格式，避免 Excel 自動轉換 (如 1.10 變 1.1)
             for row in ws_temp.iter_rows():
                 for cell in row:
                     cell.number_format = '@'
@@ -900,15 +891,12 @@ def api_clean():
             wb_temp.save(temp_xlsx)
             process_path = temp_xlsx
 
-            # 3. 如果有長度錯誤，立即回傳並提供下載按鈕所需的資訊
             if length_errors:
-                # 產生完整的錯誤 Log 檔
                 log_path = f"{project_folder}/length_errors.log"
                 with open(log_path, 'w', encoding='utf-8') as log_f:
                     log_f.write(f"檔案名稱: {filename}\n")
                     log_f.write("\n".join(length_errors))
                 
-                # 必須先在資料庫建立 Job 紀錄，下載 API 才能根據 JobID 找到路徑
                 cursor.execute("INSERT INTO Job ([JobID],[UserID],[FmtID],[FileName],[TotalCount],[CompletenessScore],[CorrectScore],[ConsistencyScore],[DQI],[Path]) VALUES (?,?,?,?,?,?,?,?,?,?)",
                                 (JobID, user_id, format_id, filename, 0, 0, 0, 0, 0, project_folder))
                 conn.commit()
@@ -957,7 +945,6 @@ def api_clean():
 
     output_fields = [{"key": col, "label": col} for col in sorted_df.columns if not col.startswith('_')]
     
-    # 偵測資料體系
     detected_system, _ = detect_system(sorted_df.columns)
 
     date_error_count = len(date_errors)
