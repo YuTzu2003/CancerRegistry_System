@@ -97,6 +97,17 @@
     </div>
   </div>
   <div class="section-body">
+    <div class="row g-4 mb-3">
+      <div class="col-md-12">
+        <label for="formatSelect" class="form-label fw-bold">參考資料格式 <span class="text-danger">*</span></label>
+        <select id="formatSelect" class="form-select" style="max-width: 400px;">
+          <option value="">請選擇格式</option>
+          {% for f in formats %}
+            <option value="{{ f.id }}">{{ f.name }}欄位（{{ f.version }}）</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
     <div class="uploader" id="uploadArea">
       <div class="ico"><i class="bi bi-cloud-arrow-up"></i></div>
       <div class="fw-bold">點擊或拖曳檔案至此處上傳</div>
@@ -190,7 +201,7 @@
           <h2><i class="bi bi-calendar-event me-2 text-primary"></i>日期欄位：自動隨機平移</h2>
         </div>
         <div class="section-body">
-          <label class="form-label fw-bold small text-muted mb-3">勾選要進行隨機平移的欄位</label>
+          <label class="form-label fw-bold small text-muted mb-3">勾選要進行隨機平移的欄位(預設勾選有日期的欄位)</label>
           <div class="field-scroll-container">
             <div class="column-grid" id="dateFields">
               <label class="field-chip"><input type="checkbox"> 生日</label>
@@ -218,11 +229,6 @@
               <label class="field-chip"><input type="checkbox" checked> 身分證字號</label>
               <label class="field-chip"><input type="checkbox" checked> 姓名</label>
               <label class="field-chip"><input type="checkbox"> 病歷號碼</label>
-              <label class="field-chip"><input type="checkbox"> 電話/手機</label>
-              <label class="field-chip"><input type="checkbox"> 電子郵件</label>
-              <label class="field-chip"><input type="checkbox"> 詳細住址</label>
-              <label class="field-chip"><input type="checkbox"> 家屬聯繫</label>
-              <label class="field-chip"><input type="checkbox"> 投保序號</label>
             </div>
           </div>
         </div>

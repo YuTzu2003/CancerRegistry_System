@@ -177,20 +177,39 @@
       const response = await fetch('/api/cleanJob', { method: 'POST', body: formData });
       const result = await response.json();
       
-     if (!response.ok || !result.ok) {
-       const errorMsg = result.message || result.error || '清洗失敗';
-       const alertContainer = $('#cleaningAlertContainer');
+      if (!response.ok || result.ok === false) {
+        const errorMsg = result.message || result.error || '清洗失敗';
+        const alertContainer = $('#cleaningAlertContainer');
 
-     if (alertContainer) {
-       alertContainer.innerHTML = `
-         <div class="alert alert-danger border shadow-sm mt-3 error-alert" role="alert">
-           <i class="bi bi-exclamation-triangle-fill alert-icon"></i>
-           <span class="alert-message">${errorMsg}</span>
-         </div>`;
+        if (alertContainer) {
+          let downloadBtn = '';
+          // 只要有 has_length_error，就顯示下載按鈕
+          if (result.has_length_error || (errorMsg && errorMsg.includes('長度不符'))) {
+            const jobId = result.job_id || currentJobId;
+            if (jobId) {
+              downloadBtn = `
+                <div class="d-flex flex-column gap-2 ms-3 flex-shrink-0 align-items-center">
+                  <a href="/api/download/preview/${jobId}" class="btn btn-sm btn-outline-dark shadow-sm w-100">
+                    <i class="bi bi-file-earmark-excel"></i> 下載欄位檢核表 XLSX
+                  </a>
+                  <a href="/api/download/length_log/${jobId}" class="btn btn-sm btn-outline-dark shadow-sm w-100">
+                    <i class="bi bi-file-earmark-text"></i> 下載完整錯誤檔 Log
+                  </a>
+                </div>`;
+            }
+          }
+
+          alertContainer.innerHTML = `
+            <div class="alert alert-danger border shadow-sm mt-3 error-alert d-flex justify-content-between align-items-center" role="alert">
+              <div class="d-flex align-items-start">
+                <i class="bi bi-exclamation-triangle-fill alert-icon mt-1 me-2"></i>
+                <div class="alert-message">${errorMsg}</div>
+              </div>
+              ${downloadBtn}
+            </div>`;
+        }
+        throw new Error(errorMsg);
       }
-
-      throw new Error(errorMsg);
-    } 
       
       renderResult(result);
       setStep(3);
@@ -208,7 +227,6 @@
 
   // ---------- 清洗結果 ----------
   function renderResult(data) {
-
     if (data.job_id || data.project_id) {
       currentJobId = data.job_id || data.project_id;
     }
@@ -232,9 +250,7 @@
       const targetValue = schemeValueMap[data.detected_system];
       if (targetValue) {
         const radio = $(`input[name="nameScheme"][value="${targetValue}"]`);
-        if (radio) {
-          radio.checked = true;
-        }
+        if (radio) radio.checked = true;
       }
     } else {
       if (systemBadge) systemBadge.style.display = 'none';
@@ -255,7 +271,11 @@ if (alertContainer && data.ok) {
   const dateErrorCount = data.date_error_count || 0;
   const dateErrorLimit = data.date_error_limit || 3;
 
+<<<<<<< HEAD
   if (dateErrorCount >= dateErrorLimit) {
+=======
+    if (dateErrorCount > dateErrorLimit) {
+>>>>>>> d68cf5f53b1e4363d8ca3971d5705cce5c89d4f3
     alertContainer.innerHTML = `
       <div class="alert alert-danger border shadow-sm mt-3 d-flex align-items-center justify-content-between" role="alert">
         <div class="d-flex align-items-center">

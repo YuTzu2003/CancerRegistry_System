@@ -27,7 +27,14 @@ def detect_system(excel_columns):
             if pd.notna(val):
                 clean_val = str(val).strip()
                 if clean_val:
-                    db_cols.add(f"{seq}{clean_val}")
+                    # 僅針對特定欄位 (4.2.1.8, 7.6) 支援斜線拆解匹配計分
+                    if seq in ['4.2.1.8', '7.6'] and '/' in clean_val:
+                        for v in clean_val.split('/'):
+                            v = v.strip()
+                            if v:
+                                db_cols.add(f"{seq}{v}")
+                    else:
+                        db_cols.add(f"{seq}{clean_val}")
         match_count = len(excel_cols_set.intersection(db_cols))
         scores[s] = match_count
 
@@ -51,13 +58,13 @@ def field_mapping(target_col):
     for _, row in df_mapping.iterrows():
         val = row[target_col]
         output_name = str(val).strip() if pd.notna(val) else ""
-
-        if output_name and output_name not in output_field_list:
-            output_field_list.append(output_name)
-
+        
         seq = str(row['序號']).strip()
         if seq.endswith('.0'):
             seq = seq[:-2]
+
+        if output_name and output_name not in output_field_list:
+            output_field_list.append(output_name)
 
         aliases = [
             row['中文欄位名稱'], 
@@ -71,7 +78,19 @@ def field_mapping(target_col):
             if pd.notna(alias):
                 clean_alias = str(alias).strip()
                 if clean_alias:
-                    alias_dict[f"{seq}{clean_alias}"] = output_name
+                    if seq in ['4.2.1.8', '7.6'] and '/' in clean_alias:
+                        parts = [p.strip() for p in clean_alias.split('/') if p.strip()]
+                    else:
+                        parts = [clean_alias]
+
+                    for part in parts:
+                        final_target_val = output_name
+                        if target_col == '中文欄位名稱' and '/' in output_name and seq in ['4.2.1.8', '7.6']:
+                            output_parts = [op.strip() for op in output_name.split('/')]
+                            if part in output_parts:
+                                final_target_val = part
+                        
+                        alias_dict[f"{seq}{part}"] = final_target_val
 
     return alias_dict, output_field_list
 
@@ -107,7 +126,6 @@ def get_field_map(target_scheme_key, fmt_name):
         if seq.endswith('.0'):
             seq = seq[:-2]
         
-        # Prepend sequence to the target name for the output header without symbols
         target_name = f"{seq}{target_base_name}"
 
         for col in columns:
@@ -116,8 +134,15 @@ def get_field_map(target_scheme_key, fmt_name):
             if pd.notna(val):
                 alias = str(val).strip()
                 if alias:
-                    # ONLY add prefixed version without symbols
-                    alias_to_target[f"{seq}{alias}"] = target_name
+                    if seq in ['4.2.1.8', '7.6'] and '/' in alias:
+                        parts = [p.strip() for p in alias.split('/') if p.strip()]
+                    else:
+                        parts = [alias]
+                        
+                    for part in parts:
+                        alias_to_target[f"{seq}{part}"] = target_name
+                    
+    return alias_to_target
                     
     return alias_to_target
 

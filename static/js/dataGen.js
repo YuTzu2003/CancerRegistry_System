@@ -13,24 +13,19 @@ let downloadUrl = '';
 
 uploadArea.onclick = () => fileInput.click();
 
-// 命名選擇邏輯 (優化效能：僅在 radio 改變時觸發，並使用較快的方式渲染)
 document.querySelectorAll('input[name="nameScheme"]').forEach(radio => {
     radio.addEventListener('change', function() {
-        // 更新 UI 樣式 (selected class)
         document.querySelectorAll('#namingScheme .naming-chip').forEach(c => c.classList.remove('selected'));
         this.closest('.naming-chip').classList.add('selected');
 
         const newSelected = this.value;
-        // 當切換命名格式時，只重新渲染「額外欄位」
         if (currentColumns.length > 0) {
             renderExtraFields(currentColumns, newSelected);
         }
     });
 });
 
-// 移除原本標籤上的 click 事件以避免重複觸發
 document.querySelectorAll('#namingScheme .naming-chip').forEach(chip => {
-    // 這裡我們不再需要綁定 click，因為 radio 的 change 就夠了
 });
 
 fileInput.onchange = async (e) => {
@@ -52,7 +47,6 @@ fileInput.onchange = async (e) => {
             if (res.ok) {
                 currentColumns = res.analyzed_columns;
                 
-                // 初次渲染所有區塊
                 renderFixedFields(currentColumns);
                 const selectedScheme = document.querySelector('input[name="nameScheme"]:checked')?.value || 'field_name_zh';
                 renderExtraFields(currentColumns, selectedScheme);
@@ -73,12 +67,10 @@ fileInput.onchange = async (e) => {
     }
 };
 
-// 渲染「固定」的區塊 (日期、特殊欄位) - 只有上傳檔案時跑一次
 function renderFixedFields(analyzedColumns) {
     const dateGrid = document.getElementById('dateFields');
     const specialGrid = document.getElementById('specialFields');
     
-    // 使用陣列組合字串，效能比 innerHTML += 更好
     const dateHtml = analyzedColumns.map(col => `
         <label class="field-chip ${col.is_date ? 'selected' : ''}">
             <input type="checkbox" value="${col.name}" ${col.is_date ? 'checked' : ''}> ${col.name}
@@ -86,7 +78,6 @@ function renderFixedFields(analyzedColumns) {
     `).join('');
     dateGrid.innerHTML = dateHtml;
 
-    // 2. 特殊
     const specialRules = [
         { key: 'cno', label: '病歷號', hint: '轉為TEST+編號' },
         { key: 'name', label: '姓名', hint: '遮罩為姓氏OO' },
@@ -113,7 +104,6 @@ function renderFixedFields(analyzedColumns) {
     }).join('');
     specialGrid.innerHTML = specialHtml;
 
-    // 綁定樣式事件
     document.querySelectorAll('.config-section .field-chip input').forEach(cb => {
         cb.addEventListener('change', function() {
             this.checked ? this.parentElement.classList.add('selected') : this.parentElement.classList.remove('selected');
@@ -121,7 +111,6 @@ function renderFixedFields(analyzedColumns) {
     });
 }
 
-// 渲染「動態」區塊 (額外欄位) - 優化效能與預設勾選
 function renderExtraFields(analyzedColumns, selectedScheme) {
     const outputFieldList = document.getElementById('outputFieldList');
 
@@ -142,7 +131,6 @@ function renderExtraFields(analyzedColumns, selectedScheme) {
         outputFieldList.innerHTML = extraHtml;
     }
 
-    // 綁定額外欄位的樣式事件
     outputFieldList.querySelectorAll('input').forEach(cb => {
         cb.addEventListener('change', function() {
             this.checked ? this.parentElement.classList.add('selected') : this.parentElement.classList.remove('selected');
@@ -151,6 +139,9 @@ function renderExtraFields(analyzedColumns, selectedScheme) {
 }
 
 async function generateMockData() {
+    const formatSelect = document.getElementById('formatSelect');
+    const formatId = formatSelect ? formatSelect.value : '';
+
     const dateCols = Array.from(document.querySelectorAll('#dateFields input:checked')).map(i => i.value);
     const extraCols = Array.from(document.querySelectorAll('.extra-field-checkbox:checked')).map(i => i.value);
     const specialConfigs = {};
@@ -168,6 +159,7 @@ async function generateMockData() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
+                format_id: formatId,
                 date_cols: dateCols, 
                 extra_cols: extraCols,
                 special_configs: specialConfigs,
@@ -197,7 +189,6 @@ function renderPreview(data, headers) {
     
     if (data.length === 0) return;
     
-    // 動態標頭：優先使用後端傳來的嚴格排序 headers
     if (!headers) {
         headers = Object.keys(data[0]);
     }
@@ -227,7 +218,6 @@ function resetUpload() {
     resultSection.style.display = 'none';
     actionGroup.style.display = 'none';
     
-    // 重置狀態與內容
     currentColumns = [];
     downloadUrl = '';
     document.getElementById('dateFields').innerHTML = '';
@@ -235,7 +225,6 @@ function resetUpload() {
     document.getElementById('outputFieldList').innerHTML = '<span class="field-chip disabled"><i class="bi bi-asterisk"></i> 尚未載入欄位，請先上傳檔案</span>';
     document.getElementById('previewBody').innerHTML = '';
 
-    // 重置命名選擇為預設
     document.querySelectorAll('#namingScheme .naming-chip').forEach(c => c.classList.remove('selected'));
     const defaultRadio = document.querySelector('input[name="nameScheme"][value="field_name_zh"]');
     if (defaultRadio) {
