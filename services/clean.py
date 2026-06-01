@@ -109,6 +109,7 @@ def _build_date_errors(sorted_df, sorted_mask, alias_mapping, date_error_file):
             "row_index": row_pos,
             "source_row_index": int(source_row_index),
             "excel_row": int(source_row_index) + 2,
+            "clean_excel_row": row_pos + 2,
             "fields": [
                 {
                     "name": col,
@@ -964,7 +965,7 @@ def api_clean():
 
     date_error_count = len(date_errors)
 
-    if date_error_count > DATE_ERROR_LIMIT:
+    if date_error_count > 0:
         message = (
             f"日期邏輯錯誤共有 {date_error_count} 筆，"
             f"已達系統限制 {DATE_ERROR_LIMIT} 筆，"

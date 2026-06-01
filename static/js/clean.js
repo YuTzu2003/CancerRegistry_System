@@ -264,48 +264,27 @@
       const dateErrorCount = data.date_error_count || 0;
       const dateErrorLimit = data.date_error_limit || 3;
 
-      if (dateErrorCount >= dateErrorLimit) {
-        const alertContainer = $('#cleaningAlertContainer');
+      if (dateErrorCount > 0) {
+        alertContainer.innerHTML = `
+          <div class="alert alert-danger border shadow-sm mt-3 d-flex align-items-center justify-content-between" role="alert">
+            <div class="d-flex align-items-center">
+              <i class="bi bi-exclamation-triangle-fill me-2"></i>
 
-if (alertContainer && data.ok) {
-  const dateErrorCount = data.date_error_count || 0;
-  const dateErrorLimit = data.date_error_limit || 3;
+              <span>
+                過多日期邏輯錯誤共有 <strong>${dateErrorCount}</strong> 筆，已達系統限制<br>
+                請先修正錯誤的日期資料，完成修正後再進行後續資料清洗作業
+              </span>
+            </div>
 
-<<<<<<< HEAD
-  if (dateErrorCount >= dateErrorLimit) {
-=======
-    if (dateErrorCount > dateErrorLimit) {
->>>>>>> d68cf5f53b1e4363d8ca3971d5705cce5c89d4f3
-    alertContainer.innerHTML = `
-      <div class="alert alert-danger border shadow-sm mt-3 d-flex align-items-center justify-content-between" role="alert">
-        <div class="d-flex align-items-center">
-          <i class="bi bi-exclamation-triangle-fill me-2"></i>
-
-          <span>
-            日期邏輯錯誤共有 <strong>${dateErrorCount}</strong> 筆，已達系統限制，<br>
-            請先修正錯誤的日期資料，完成修正後再進行後續資料清洗作業
-          </span>
-        </div>
-
-        <button
-          class="btn btn-sm btn-danger ms-3"
-          type="button"
-          id="btnShowDateEditor"
-        >
-          <i class="bi bi-pencil-square"></i> 線上修正錯誤資料
-        </button>
-      </div>
-    `;
-  } else {
-    alertContainer.innerHTML = `
-      <div class="alert alert-light border shadow-sm mt-3" role="alert">
-        <i class="bi bi-check-circle-fill text-success me-2"></i>資料清洗並存檔完成！
-      </div>
-    `;
-
-    if (window.autoHideAlerts) window.autoHideAlerts();
-  }
-}
+            <button
+              class="btn btn-sm btn-danger ms-3"
+              type="button"
+              id="btnShowDateEditor"
+            >
+              <i class="bi bi-pencil-square"></i> 線上修正錯誤資料
+            </button>
+          </div>
+        `;
       } else {
         alertContainer.innerHTML = `
           <div class="alert alert-light border shadow-sm mt-3" role="alert">
@@ -502,7 +481,7 @@ if (alertContainer && data.ok) {
 
       return `
         <tr data-row-index="${item.row_index}">
-          <td class="text-center align-middle">${index + 1}</td>
+          <td class="text-center align-middle">${item.clean_excel_row ?? (item.row_index + 2)}</td>
           <td>${fieldsHtml}</td>
           <td>${messagesHtml}</td>
           <td class="text-center align-middle">
@@ -516,13 +495,10 @@ if (alertContainer && data.ok) {
 
     editor.innerHTML = `
       <div class="card mt-3" id="dateErrorPanel">
-        <div class="card-header fw-bold d-flex justify-content-between align-items-center">
+        <div class="card-header fw-bold">
           <span>
             <i class="bi bi-pencil-square me-1"></i>
             線上修正日期邏輯錯誤
-          </span>
-          <span class="badge bg-danger">
-            ${errors.length} 筆 / 限制 ${limit} 筆
           </span>
         </div>
         <div class="card-body">
@@ -766,14 +742,15 @@ if (alertContainer && data.ok) {
 
   // ---------- 日期邏輯錯誤線上修正 ----------
   document.addEventListener('keydown', (e) => {
-    if (e.key !== 'Enter') return;
+    if (e.key !== 'Enter' && e.code !== 'NumpadEnter') return;
+    if (e.repeat) return;
 
-    const input = e.target.closest('.date-fix-input, .date-special-select, .date-special-picker');
-    if (!input) return;
+    const control = e.target.closest('.date-fix-input, .date-special-select, .date-special-picker');
+    if (!control) return;
 
     e.preventDefault();
 
-    const tr = input.closest('tr');
+    const tr = control.closest('tr');
     const btn = tr?.querySelector('.btnSaveDateFix');
 
     if (!btn || btn.disabled) return;
@@ -903,33 +880,17 @@ if (alertContainer && data.ok) {
       const alertContainer = $('#cleaningAlertContainer');
 
       if (alertContainer) {
-        if (dateErrorCount >= limit) {
+        if (dateErrorCount > 0) {
           alertContainer.innerHTML = `
             <div class="alert alert-danger border shadow-sm mt-3 d-flex align-items-center justify-content-between" role="alert">
 
               <div class="d-flex align-items-center">
                 <i class="bi bi-exclamation-triangle-fill me-2"></i>
 
-                <span>日期邏輯錯誤剩下 <strong>${dateErrorCount}</strong> 筆，仍超過系統限制。</span>
+                <span>過多日期邏輯錯誤剩下 <strong>${dateErrorCount}</strong> 筆，請繼續修正。</span>
               </div>
 
               <button class="btn btn-sm btn-danger ms-3" type="button" id="btnShowDateEditor">
-                <i class="bi bi-pencil-square"></i> 繼續修正錯誤資料
-              </button>
-
-            </div>
-          `;
-        } else if (dateErrorCount > 0) {
-          alertContainer.innerHTML = `
-            <div class="alert alert-warning border shadow-sm mt-3 d-flex align-items-center justify-content-between" role="alert">
-
-              <div class="d-flex align-items-center">
-                <i class="bi bi-exclamation-triangle-fill me-2"></i>
-
-                <span>日期邏輯錯誤剩下 <strong>${dateErrorCount}</strong> 筆，請繼續修正。</span>
-              </div>
-
-              <button class="btn btn-sm btn-warning ms-3" type="button" id="btnShowDateEditor">
                 <i class="bi bi-pencil-square"></i> 繼續修正錯誤資料
               </button>
 
