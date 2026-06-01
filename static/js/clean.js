@@ -248,14 +248,14 @@
       const dateErrorCount = data.date_error_count || 0;
       const dateErrorLimit = data.date_error_limit || 3;
 
-      if (dateErrorCount > dateErrorLimit) {
+      if (dateErrorCount >= dateErrorLimit) {
         const alertContainer = $('#cleaningAlertContainer');
 
 if (alertContainer && data.ok) {
   const dateErrorCount = data.date_error_count || 0;
   const dateErrorLimit = data.date_error_limit || 3;
 
-  if (dateErrorCount > dateErrorLimit) {
+  if (dateErrorCount >= dateErrorLimit) {
     alertContainer.innerHTML = `
       <div class="alert alert-danger border shadow-sm mt-3 d-flex align-items-center justify-content-between" role="alert">
         <div class="d-flex align-items-center">
@@ -883,7 +883,7 @@ if (alertContainer && data.ok) {
       const alertContainer = $('#cleaningAlertContainer');
 
       if (alertContainer) {
-        if (dateErrorCount > limit) {
+        if (dateErrorCount >= limit) {
           alertContainer.innerHTML = `
             <div class="alert alert-danger border shadow-sm mt-3 d-flex align-items-center justify-content-between" role="alert">
 
@@ -919,7 +919,7 @@ if (alertContainer && data.ok) {
           alertContainer.innerHTML = `
             <div class="alert alert-success border shadow-sm mt-3" role="alert">
               <i class="bi bi-check-circle-fill me-2"></i>
-                日期邏輯錯誤已修改完成，可繼續資料清洗作業。
+                過多的日期邏輯錯誤已修改完成，可繼續資料清洗作業。
             </div>
           `;
         }
