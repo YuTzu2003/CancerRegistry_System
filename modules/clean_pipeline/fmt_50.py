@@ -438,7 +438,7 @@ RULES = {
         'description': '記錄個案於最初診斷日前的喝酒行為。',
         'purpose': '喝酒是致癌的危險因子。'
     },
-    '其他因子 6':{
+    '其他因子6':{
         'ID':'7.6',
         'field': 'Other Factor 6',
         'length': 3,

@@ -5,6 +5,11 @@ from modules.special_rules.common import (
     make_all_9,
 )
 
+from modules.clean_pipeline.validate import (
+    parse_cancer_date,
+    compare_cancer_date,
+)
+
 
 CLASS_CASE_RULES = {
     # 適用 42 欄位
@@ -226,6 +231,48 @@ def apply_class_case_rules(df, error_mask, rules, alias_mapping, fmt):
 
                     break
 
+    return error_mask
+
+def apply_date_conditional_rules(df, error_mask, rules, alias_mapping, fmt):
+    """
+    特殊規則：個案分類(2.3) 與 首次就診(2.4)/最初診斷日期(2.5) 的連動。
+    
+    1. 個案分類為 0 或 1 時，首次就診日期應等於最初診斷日期。
+    2. 個案分類為 2 或 3 時，首次就診日期應晚於最初診斷日期。
+    """
+    id_to_col = build_id_to_column(df, rules, alias_mapping)
+    
+    class_col = id_to_col.get("2.3")
+    first_visit_col = id_to_col.get("2.4")
+    init_diag_col = id_to_col.get("2.5")
+    
+    if not all([class_col, first_visit_col, init_diag_col]):
+        return error_mask
+        
+    for idx, row in df.iterrows():
+        class_val = clean_value(row[class_col])
+        if class_val.endswith('.0'): class_val = class_val[:-2]
+        
+        fv_val = parse_cancer_date(row[first_visit_col])
+        id_val = parse_cancer_date(row[init_diag_col])
+        
+        if not fv_val or not id_val:
+            continue
+            
+        # 條件A:個案分類為 0 或 1，兩者應相等
+        if class_val in ['0', '1']:
+            if fv_val != id_val:
+                error_mask.at[idx, first_visit_col] = "special_logic"
+                error_mask.at[idx, init_diag_col] = "special_logic"
+        
+        # 條件B:個案分類為 2 或 3，首次就診日期應晚於最初診斷日期
+        elif class_val in ['2', '3']:
+            # id_val <= fv_val 且 不能相等
+            res = compare_cancer_date(row[init_diag_col], row[first_visit_col])
+            if res is False or fv_val == id_val:
+                error_mask.at[idx, first_visit_col] = "special_logic"
+                error_mask.at[idx, init_diag_col] = "special_logic"
+                
     return error_mask
 
 def stop_if_too_many_date_errors(error_mask, max_errors=3):

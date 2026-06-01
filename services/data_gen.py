@@ -1,40 +1,52 @@
 import os
 import random
 import string
+import re
 import pandas as pd
 import numpy as np
 from flask import Blueprint, request, jsonify, session, send_file
 from werkzeug.utils import secure_filename
 from datetime import datetime
 from modules.field_mapping import detect_system, field_mapping
+from services.clean import _natural_sort_key
 
 data_gen_bp = Blueprint('data_gen', __name__)
 
 # --- 核心邏輯配置 ---
 def get_custom_districts():
     districts = []
-    districts.extend([f"01{str(i).zfill(2)}" for i in range(1, 21)]) 
-    districts.extend([f"03{str(i).zfill(2)}" for i in range(1, 30)])
-    districts.extend([f"05{str(i).zfill(2)}" for i in range(1, 38)])
-    districts.extend([f"07{str(i).zfill(2)}" for i in range(1, 39)])
-    districts.extend([f"11{str(i).zfill(2)}" for i in range(1, 8)])
-    districts.extend([f"12{str(i).zfill(2)}" for i in range(1, 4)])
-    districts.extend([f"22{str(i).zfill(2)}" for i in range(1, 3)])
-    districts.extend([f"31{str(i).zfill(2)}" for i in range(1, 30)])
-    districts.extend([f"32{str(i).zfill(2)}" for i in range(1, 14)])
-    districts.extend([f"33{str(i).zfill(2)}" for i in range(1, 14)])
-    districts.extend([f"34{str(i).zfill(2)}" for i in range(1, 13)])
-    districts.extend([f"35{str(i).zfill(2)}" for i in range(1, 19)])
-    districts.extend([f"37{str(i).zfill(2)}" for i in range(1, 27)])
-    districts.extend([f"38{str(i).zfill(2)}" for i in range(1, 14)])
-    districts.extend([f"39{str(i).zfill(2)}" for i in range(1, 21)])
-    districts.extend([f"40{str(i).zfill(2)}" for i in range(1, 19)])
-    districts.extend([f"43{str(i).zfill(2)}" for i in range(1, 34)])
-    districts.extend([f"44{str(i).zfill(2)}" for i in range(1, 7)])
-    districts.extend([f"45{str(i).zfill(2)}" for i in range(1, 14)])
-    districts.extend([f"46{str(i).zfill(2)}" for i in range(1, 17)])
-    districts.extend([f"90{str(i).zfill(2)}" for i in range(1, 7)])
-    districts.extend([f"91{str(i).zfill(2)}" for i in range(1, 5)])
+    
+    district_rules = {
+        "01": [0, 1, 2, 9, 10, 11, 12, 15, 16, 17, 18, 19, 20],
+        "03": list(range(0, 30)),                # 0300 - 0329
+        "05": list(range(0, 34)) + [36, 37, 38], # 0500 - 0533, 0536 - 0538
+        "07": list(range(0, 39)),                # 0700 - 0738
+        "11": list(range(0, 8)),                 # 1100 - 1107
+        "12": [0, 1, 4, 5],                      # 1200, 1201, 1204, 1205
+        "22": list(range(0, 3)),                 # 2200 - 2202
+        "31": list(range(0, 30)),                # 3100 - 3129
+        "32": list(range(0, 14)),                # 3200 - 3213
+        "33": list(range(0, 15)),                # 3300 - 3314
+        "34": list(range(0, 13)),                # 3400 - 3412
+        "35": list(range(0, 19)),                # 3500 - 3518
+        "37": list(range(0, 27)),                # 3700 - 3726
+        "38": list(range(0, 14)),                # 3800 - 3813
+        "39": list(range(0, 21)),                # 3900 - 3920
+        "40": list(range(0, 19)),                # 4000 - 4018
+        "43": list(range(0, 34)),                # 4300 - 4333
+        "44": list(range(0, 7)),                 # 4400 - 4406
+        "45": list(range(0, 14)),                # 4500 - 4513
+        "46": list(range(0, 17)),                # 4600 - 4616
+        "90": list(range(0, 7)),                 # 9000 - 9006
+        "91": list(range(0, 5)),                 # 9100 - 9104
+        "99": list(range(1, 9))         # 9901 - 9908, 9999
+    }
+
+    for prefix, suffixes in district_rules.items():
+        districts.extend([f"{prefix}{str(s).zfill(2)}" for s in suffixes])
+
+    districts.append("9999")
+
     return districts
 
 ALL_TW_DISTRICT_CODES = get_custom_districts()
@@ -57,7 +69,6 @@ def format_date_special(date_val, format_str="%Y/%m/%d"):
     try: return date_val.strftime(format_str)
     except: return "0000/00/00"
 
-# --- API 路由 ---
 
 @data_gen_bp.route('/api/data_gen/analyze', methods=['POST'])
 def analyze_file():
@@ -78,8 +89,7 @@ def analyze_file():
             df = pd.read_excel(file_path, nrows=5, dtype=str)
         else:
             df = pd.read_csv(file_path, nrows=5, encoding='utf-8-sig', dtype=str)
-        
-        # 1. 取得 SQL Server 所有的完整對照資料
+
         from modules.db import get_conn
         conn = get_conn()
         cursor = conn.cursor()
@@ -97,14 +107,21 @@ def analyze_file():
                 "ntu_system": str(r[4]).strip() if pd.notna(r[4]) else "",
                 "taiwan_cancer_registry": str(r[5]).strip() if pd.notna(r[5]) else "",
                 "AI_module": str(r[6]).strip() if pd.notna(r[6]) else "",
-                "aliases": [] # 初始化為 list，稍後填充
+                "aliases": [] 
             }
-            # 收集所有可能的嚴格別名 (序號+名稱)
-            for alias in r[1:7]:
-                if pd.notna(alias) and str(alias).strip():
-                    field_db_map[seq]["aliases"].append(f"{seq}{str(alias).strip()}")
 
-        # 2. 分析上傳的欄位
+            for alias in r[1:7]:
+                if pd.notna(alias):
+                    clean_val = str(alias).strip()
+                    if clean_val:
+                        if seq in ['4.2.1.8', '7.6'] and '/' in clean_val:
+                            for v in clean_val.split('/'):
+                                v = v.strip()
+                                if v:
+                                    field_db_map[seq]["aliases"].append(f"{seq}{v}")
+                        else:
+                            field_db_map[seq]["aliases"].append(f"{seq}{clean_val}")
+
         analyzed_columns = []
         raw_cols = [str(c).strip() for c in df.columns if not str(c).startswith('Unnamed')]
         
@@ -118,7 +135,6 @@ def analyze_file():
         }
 
         for col in raw_cols:
-            # 尋找這個欄位屬於哪個序號 (嚴格比對)
             found_seq = None
             for seq, data in field_db_map.items():
                 if col in data["aliases"]:
@@ -135,12 +151,22 @@ def analyze_file():
             
             if found_seq:
                 std = field_db_map[found_seq]["field_name_zh"]
-                if "日期" in std or "日" in std or "生日" in std:
+                std_en = field_db_map[found_seq]["field_name_en"]
+                
+                date_keywords = ['日期', 'Date', '日', 'Birth', 'day']
+                
+                is_date_by_std = any(kw.lower() in std.lower() or kw.lower() in std_en.lower() for kw in date_keywords)
+                is_date_by_raw = any(kw.lower() in col.lower() for kw in date_keywords)
+
+                if is_date_by_std or is_date_by_raw:
                     info["is_date"] = True
+
                 if std in special_map:
                     info["special_key"] = special_map[std]
             
             analyzed_columns.append(info)
+
+        analyzed_columns.sort(key=lambda x: _natural_sort_key(x["name"]))
 
         system_name, _ = detect_system(raw_cols)
         session['last_gen_file'] = file_path
@@ -160,6 +186,7 @@ def analyze_file():
 def process_file():
     """執行去識別化處理"""
     data = request.json
+    format_id = data.get('format_id')
     selected_date_cols_raw = data.get('date_cols', [])
     extra_cols = data.get('extra_cols', []) 
     special_configs = data.get('special_configs', {}) 
@@ -180,7 +207,6 @@ def process_file():
         df.columns = df.columns.str.strip()
         row_count = len(df)
 
-        # --- A. 欄位標準化 (依據 naming_scheme 與 嚴格匹配 決定) ---
         from modules.db import get_conn
         conn = get_conn()
         cursor = conn.cursor()
@@ -188,10 +214,21 @@ def process_file():
         rows = cursor.fetchall()
         conn.close()
 
-        # 建立嚴格的 alias -> target_header 地圖
+        fmt_rules = {}
+        if format_id:
+             from modules.cleaner import FORMAT_RULES_MAP
+             fmt_key = f"fmt_{format_id}"
+             if fmt_key in FORMAT_RULES_MAP:
+                 # 建立 ID -> FriendlyName 的映射
+                 rules_def = FORMAT_RULES_MAP[fmt_key]
+                 for friendly_name, info in rules_def.items():
+                     fid = info.get('ID')
+                     if fid:
+                         fmt_rules[fid] = friendly_name
+
         alias_to_target = {}
-        all_possible_target_headers = set() # 記錄所有該體系定義過的標準名稱
-        scheme_target_for_seq = {} # 記錄每個序號對應的目標名稱
+        all_possible_target_headers = set() 
+        scheme_target_for_seq = {} 
         
         scheme_idx_map = {
             'field_name_zh': 1,
@@ -211,17 +248,53 @@ def process_file():
                 target_header = f"{seq}{str(target_val).strip()}"
                 all_possible_target_headers.add(target_header)
                 scheme_target_for_seq[seq] = target_header
+                
                 for alias in r[1:7]:
-                    if pd.notna(alias) and str(alias).strip():
-                        alias_to_target[f"{seq}{str(alias).strip()}"] = target_header
+                    if pd.notna(alias):
+                        clean_alias = str(alias).strip()
+                        if clean_alias:
+                            if seq in ['4.2.1.8', '7.6'] and '/' in clean_alias:
+                                parts = [p.strip() for p in clean_alias.split('/') if p.strip()]
+                            else:
+                                parts = [clean_alias]
+                                
+                            for part in parts:
+                                alias_to_target[f"{seq}{part}"] = target_header
 
-        # 執行重新命名 (僅針對有目標名稱的欄位)
         rename_map = {}
+        
+        DEFAULT_PREFERENCE = {
+            "4.2.1.8": fmt_rules.get("4.2.1.8", "放射治療執行狀態"),
+            "7.6": fmt_rules.get("7.6", "首次治療前生活功能狀態評估")
+        }
+
         for col in df.columns:
             if col in alias_to_target:
-                rename_map[col] = alias_to_target[col]
+                target_name = alias_to_target[col]
+                final_name = target_name
+                
+                if naming_scheme == 'field_name_zh' and '/' in target_name:
+                    m_target = re.match(r'^(\d+(\.\d+)*)', target_name)
+                    if m_target:
+                        seq = m_target.group(1)
+                        if seq in ['4.2.1.8', '7.6']:
 
-        # 轉換日期選取清單
+                             target_raw_name = target_name[len(seq):].strip()
+                             valid_parts = [p.strip() for p in target_raw_name.split('/') if p.strip()]
+                             
+                             found_part = None
+                             if col.startswith(seq):
+                                 source_raw_name = col[len(seq):].strip()
+                                 if source_raw_name in valid_parts:
+                                     found_part = source_raw_name
+
+                             if found_part:
+                                 final_name = f"{seq}{found_part}"
+                             elif seq in DEFAULT_PREFERENCE:
+                                 final_name = f"{seq}{DEFAULT_PREFERENCE[seq]}"
+                
+                rename_map[col] = final_name
+
         selected_date_cols_std = []
         for col in selected_date_cols_raw:
             if col in rename_map:
@@ -231,10 +304,7 @@ def process_file():
 
         df.rename(columns=rename_map, inplace=True)
         
-        # --- B. 執行處理邏輯 ---
 
-
-        # 1. 記錄 99
         is_originally_99 = {col: [False] * row_count for col in selected_date_cols_std}
         for col in selected_date_cols_std:
             if col in df.columns:
@@ -249,7 +319,6 @@ def process_file():
                 except:
                     df[col] = pd.to_datetime(df[col], errors='coerce')
 
-        # 2. 計算偏移 (尋找包含標準名稱的標籤)
         diag_col_name = next((c for c in df.columns if "最初診斷日期" in c or "診斷日期" in c), None)
         first_diag_col = next((c for c in df.columns if "首次就診日期" in c), None)
         
@@ -265,26 +334,21 @@ def process_file():
                 current_offset = random.randint(max((l_bound - dt_orig).days, -1500), min((u_bound - dt_orig).days, 1500))
             final_offsets.append(current_offset)
 
-        # 3. 執行平移
         offset_timedelta = pd.to_timedelta(final_offsets, unit='D')
         for col in selected_date_cols_std:
             if col in df.columns:
                 df[col] = df[col] + offset_timedelta
 
-        # 4. 邏輯校正
         if diag_col_name and first_diag_col and diag_col_name in df.columns and first_diag_col in df.columns:
             for i in range(row_count):
                 dt_init, dt_first = df.loc[i, diag_col_name], df.loc[i, first_diag_col]
                 if pd.notna(dt_init) and pd.notna(dt_first) and dt_init > dt_first:
                     df.loc[i, diag_col_name] = dt_first
 
-        # 5. 特殊欄位遮罩 (嚴格使用序號定位，確保與 Mapping 邏輯一致)
         def find_col_by_seq_or_key(seq_prefix):
-            # 優先找已經改名後的目標標頭，再找原始標頭
             target_name = scheme_target_for_seq.get(seq_prefix)
             if target_name and target_name in df.columns:
                 return target_name
-            # 尋找序號開頭的原始欄位
             for c in df.columns:
                 if c.startswith(seq_prefix):
                     return c
@@ -310,26 +374,20 @@ def process_file():
         if special_configs.get('district') and dist_col:
             df[dist_col] = np.random.choice(ALL_TW_DISTRICT_CODES, size=row_count)
 
-        # 6. 年齡與格式化
         birth_col = find_col_by_seq_or_key("1.6")
         diag_col_name = find_col_by_seq_or_key("2.5")
         
         if special_configs.get('age_calc') and birth_col and diag_col_name:
-            # 決定年齡欄位名稱：優先用體系名稱，若無則用預設
             age_col = scheme_target_for_seq.get("2.1") or find_col_by_seq_or_key("2.1") or "2.1診斷年齡"
-            # 確保日期是 datetime 格式才能計算
             temp_birth = pd.to_datetime(df[birth_col], errors='coerce')
             temp_diag = pd.to_datetime(df[diag_col_name], errors='coerce')
-            
-            # 重算年齡
+
             df[age_col] = [
                 (d.year - b.year) if pd.notna(d) and pd.notna(b) else np.nan 
                 for b, d in zip(temp_birth, temp_diag)
             ]
-            # 將出生日期遮蔽為僅年月
             df[birth_col] = temp_birth.apply(lambda x: format_date_special(x, "%Y/%m/01") if pd.notna(x) else "0000/00/00")
 
-        # 7. 最終所有日期欄位轉回字串格式 (包含還原 99)
         for col in selected_date_cols_std:
             if col in df.columns:
                 res = []
@@ -344,37 +402,37 @@ def process_file():
                         res.append(dt.strftime(fmt))
                 df[col] = res
 
-        # --- 最終順序調整：嚴格執行「標準欄位在左(依序號)，未匹配欄位在右」 ---
         current_cols = list(df.columns)
-        
-        # 1. 找出真正屬於「目標格式」且有定義名稱的標準名稱
+
         mapped_target_headers = set(rename_map.values())
-        
+
+        user_extra_targets = set()
+        for c in extra_cols:
+            user_extra_targets.add(rename_map.get(c, c))
+
         final_standard_cols = []
         for col in current_cols:
-            if col in mapped_target_headers:
-                import re
-                m = re.match(r'^(\d+\.?\d*\.?\d*)', col)
+            if col in mapped_target_headers and col not in user_extra_targets:
+                m = re.match(r'^(\d+(\.\d+)*)', col)
                 seq_val = m.group(1) if m else "999"
                 try:
                     seq_parts = [int(x) for x in seq_val.split('.')]
                 except:
                     seq_parts = [999]
                 final_standard_cols.append({"name": col, "seq_parts": seq_parts})
-        
-        # 依照序號排序標準欄位 (左側)
+
         final_standard_cols.sort(key=lambda x: x["seq_parts"])
         ordered_left = [x["name"] for x in final_standard_cols]
-        
-        # 2. 處理未匹配欄位 (排除掉已經在左側的欄位，其餘通通丟右側)
-        # 這裡要包含所有 extra_cols 中沒被 match 到的
-        ordered_right = [c for c in extra_cols if c in current_cols and c not in mapped_target_headers]
-        
-        # 3. 組合最終順序並重新選取 DataFrame 欄位
+
+        ordered_right = []
+        for c in extra_cols:
+            target = rename_map.get(c, c)
+            if target in current_cols and target not in ordered_right:
+                ordered_right.append(target)
+
         final_col_order = ordered_left + ordered_right
         df = df[final_col_order]
         
-        # 定義輸出的檔名
         base_name = os.path.basename(file_path)
         out_filename = f"Gen_{base_name}"
         out_path = os.path.join('data/temp', out_filename)
@@ -384,10 +442,8 @@ def process_file():
         
         session['last_gen_output'] = out_path
         
-        # --- 關鍵：確保預覽資料的欄位順序也是正確的 ---
         preview_data = []
         for _, row in df.head(20).iterrows():
-            # 使用 OrderedDict 或是依照 final_col_order 建立 dict 確保順序
             item = {}
             for col in final_col_order:
                 val = row[col]
