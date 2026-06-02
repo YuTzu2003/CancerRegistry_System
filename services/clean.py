@@ -59,6 +59,16 @@ def run_clean_validate_with_clean_log(*args, **kwargs):
 DATE_ERROR_LIMIT = 3
 
 
+def _date_field_display_name(field_name):
+    text = str(field_name or "").strip()
+    idx = 0
+
+    while idx < len(text) and (text[idx].isdigit() or text[idx] == "."):
+        idx += 1
+
+    return text[idx:] or text
+
+
 def _job_files(project_path, original_filename, fmt_name):
     base_name, _ = os.path.splitext(original_filename)
 
@@ -84,16 +94,22 @@ def _build_date_errors(sorted_df, sorted_mask, alias_mapping, date_error_file):
             if val == "dateformat"
         ]
 
-        if not date_cols:
+        if len(date_cols) < DATE_ERROR_LIMIT:
             continue
 
         row_data = sorted_df.iloc[row_pos]
         _, msgs = validate_date_rules(row_data, alias_mapping)
+        field_names = [_date_field_display_name(col) for col in date_cols]
+        display_msgs = [
+            msg for msg in msgs
+            if any(field_name and field_name in msg for field_name in field_names)
+        ]
 
         errors.append({
             "row_index": row_pos,
             "source_row_index": int(source_row_index),
             "excel_row": int(source_row_index) + 2,
+            "clean_excel_row": row_pos + 2,
             "fields": [
                 {
                     "name": col,
@@ -101,7 +117,7 @@ def _build_date_errors(sorted_df, sorted_mask, alias_mapping, date_error_file):
                 }
                 for col in date_cols
             ],
-            "messages": msgs or ["日期邏輯錯誤"]
+            "messages": display_msgs or msgs or ["日期邏輯錯誤"]
         })
 
     with open(date_error_file, "w", encoding="utf-8") as f:
@@ -949,7 +965,7 @@ def api_clean():
 
     date_error_count = len(date_errors)
 
-    if date_error_count > DATE_ERROR_LIMIT:
+    if date_error_count > 0:
         message = (
             f"日期邏輯錯誤共有 {date_error_count} 筆，"
             f"已達系統限制 {DATE_ERROR_LIMIT} 筆，"
@@ -1083,6 +1099,7 @@ def api_update_date_error():
         )
 
         date_errors = _build_date_errors(sorted_df, sorted_mask, alias_mapping, date_error_file)
+        date_error_count = len(date_errors)
 
         conn = get_conn()
         cursor = conn.cursor()
@@ -1117,7 +1134,7 @@ def api_update_date_error():
         "job_id": job_id,
         "project_id": job_id,
         "date_error_limit": DATE_ERROR_LIMIT,
-        "date_error_count": len(date_errors),
+        "date_error_count": date_error_count,
         "date_errors": date_errors,
         "analysis": _build_cleaning_analysis(stats, sorted_mask),
         "stats": {
