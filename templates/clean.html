@@ -127,6 +127,12 @@
             <div class="hint">Txt、CSV、Excel（xls / xlsx）</div>
             <input id="fileInput" name="data_file" type="file" accept=".csv,.xls,.xlsx,.txt" required />
           </label>
+          <div id="txtConvertOption" style="display: none; margin-top: 10px;">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="convert_txt" id="checkConvertTxt">
+              <label class="form-check-label" for="checkConvertTxt">檔案是否包含標頭</label>
+            </div>
+          </div>
           <div id="fileChosen" class="file-chosen" hidden>
             <i class="bi bi-file-earmark-spreadsheet"></i>
             <span id="fileName">尚未選擇檔案</span>

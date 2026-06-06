@@ -94,11 +94,23 @@
 
   function updateFilePreview() {
     const f = fileInput.files?.[0];
+    const txtOption = $('#txtConvertOption');
     if (f) {
       fileName.textContent = `${f.name} · ${(f.size / 1024).toFixed(1)} KB`;
       fileChosen.hidden = false;
+
+      if (f.name.toLowerCase().endsWith('.txt') && txtOption) {
+        txtOption.style.display = 'block';
+      } else if (txtOption) {
+        txtOption.style.display = 'none';
+        const cb = $('#checkConvertTxt');
+        if (cb) cb.checked = false;
+      }
     } 
-    else { fileChosen.hidden = true; }
+    else { 
+      fileChosen.hidden = true; 
+      if (txtOption) txtOption.style.display = 'none';
+    }
   }
   // ---------- 重置 ----------
   function resetUI() {
@@ -172,30 +184,66 @@
     const formData = new FormData();
     formData.append('format_id', formatId);
     formData.append('data_file', file);
+    
+    const convertTxt = $('#checkConvertTxt')?.checked;
+    formData.append('convert_txt', convertTxt ? 'true' : 'false');
 
     try {
       const response = await fetch('/api/cleanJob', { method: 'POST', body: formData });
       const result = await response.json();
-      
       if (!response.ok || result.ok === false) {
         const errorMsg = result.message || result.error || '清洗失敗';
-        const alertContainer = $('#cleaningAlertContainer');
 
+        // 標頭偵測失敗
+        if (result.error === "標頭偵測失敗") {
+            utils.alert(errorMsg, 'warning');
+            throw new Error(errorMsg);
+        }
+
+        const alertContainer = $('#cleaningAlertContainer');
         if (alertContainer) {
           let downloadBtn = '';
-          // 只要有 has_length_error，就顯示下載按鈕
-          if (result.has_length_error || (errorMsg && errorMsg.includes('長度不符'))) {
-            const jobId = result.job_id || currentJobId;
-            if (jobId) {
+          
+          if (result.has_length_error) {
+            if (result.log_data && result.xlsx_data) {
+              // 記憶體下載方式 (不存入檔案)
+              const baseName = result.filename ? result.filename.split('.')[0] : 'file';
+              window._downloadB64 = function(b64, filename, type) {
+                  const bin = atob(b64);
+                  const arr = new Uint8Array(bin.length);
+                  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+                  const blob = new Blob([arr], { type: type });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = filename;
+                  a.click();
+                  URL.revokeObjectURL(url);
+              };
+
               downloadBtn = `
                 <div class="d-flex flex-column gap-2 ms-3 flex-shrink-0 align-items-center">
-                  <a href="/api/download/preview/${jobId}" class="btn btn-sm btn-outline-dark shadow-sm w-100">
+                  <button type="button" onclick="_downloadB64('${result.xlsx_data}', '欄位檢核表_${baseName}.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')" class="btn btn-sm btn-outline-dark shadow-sm w-100">
                     <i class="bi bi-file-earmark-excel"></i> 下載欄位檢核表 XLSX
-                  </a>
-                  <a href="/api/download/length_log/${jobId}" class="btn btn-sm btn-outline-dark shadow-sm w-100">
+                  </button>
+                  <button type="button" onclick="_downloadB64('${result.log_data}', '長度錯誤_${baseName}.log', 'text/plain')" class="btn btn-sm btn-outline-dark shadow-sm w-100">
                     <i class="bi bi-file-earmark-text"></i> 下載完整錯誤檔 Log
-                  </a>
+                  </button>
                 </div>`;
+            } else {
+               // 原本的路徑 (存資料庫)
+               const jobId = result.job_id || currentJobId;
+               if (jobId) {
+                  downloadBtn = `
+                    <div class="d-flex flex-column gap-2 ms-3 flex-shrink-0 align-items-center">
+                      <a href="/api/download/preview/${jobId}" class="btn btn-sm btn-outline-dark shadow-sm w-100">
+                        <i class="bi bi-file-earmark-excel"></i> 下載欄位檢核表 XLSX
+                      </a>
+                      <a href="/api/download/length_log/${jobId}" class="btn btn-sm btn-outline-dark shadow-sm w-100">
+                        <i class="bi bi-file-earmark-text"></i> 下載完整錯誤檔 Log
+                      </a>
+                    </div>`;
+               }
             }
           }
 

@@ -7,6 +7,7 @@ import shutil
 import logging
 import zipfile
 import re
+import base64
 import pandas as pd
 from copy import copy
 from modules.db import get_conn
@@ -17,6 +18,7 @@ from openpyxl import load_workbook, Workbook
 from openpyxl.utils import get_column_letter
 from services.auth import login_required, admin_required
 from modules.field_mapping import detect_system, get_field_map
+from modules.text_converter import convert_txt_to_excel
 from modules.clean_pipeline.validate import validate_date_rules
 from flask import Blueprint, render_template, request, session, jsonify, send_file
 
@@ -819,12 +821,11 @@ def api_manage_format(fmt_id):
 @login_required
 def api_clean():
     user_id, format_id = session.get("id"), request.form.get("format_id")
+    convert_txt_flag = request.form.get("convert_txt") == "true"
     uploaded_file = request.files.get("data_file")
-    if not format_id or not uploaded_file or uploaded_file.filename == '': return jsonify({"ok": False, "error": "未選擇檔案"}), 400
-    JobID = str(uuid.uuid4())
-    project_folder = f"{Jobs_FOLDER}/{JobID}"
-    os.makedirs(project_folder, exist_ok=True)
-
+    if not format_id or not uploaded_file or uploaded_file.filename == '': 
+        return jsonify({"ok": False, "error": "未選擇檔案"}), 400
+    
     conn = get_conn()
     cursor = conn.cursor()
     cursor.execute("SELECT [FmtName], [Version], [Revision_date] FROM [DataFormat] WHERE [FmtID] = ?", (format_id,))
@@ -835,15 +836,95 @@ def api_clean():
         
     fmt_name, version, rev_date = fmt_data
     filename = os.path.basename(uploaded_file.filename)
-    if not filename:
-        filename = "uploaded_file"
-        
+    if not filename: filename = "uploaded_file"
+    file_ext = os.path.splitext(filename)[1].lower()
+    base_name = os.path.splitext(filename)[0]
+
+    # --- TXT 處理邏輯 ---
+    if file_ext == '.txt':
+        uploaded_file.seek(0)
+        content_bytes = uploaded_file.read()
+        uploaded_file.seek(0)
+
+        if convert_txt_flag:
+            # 勾選有標頭
+            try:
+                text_sample = content_bytes[:8192].decode('utf-8', errors='ignore')
+                first_line = text_sample.splitlines()[0] if text_sample else ""
+                delimiter = "\t" if "\t" in first_line else ("," if "," in first_line else ";")
+                
+                expected_map = get_field_map('field_name_zh', fmt_name)
+                expected_headers = set(expected_map.values())
+                found_headers = [h.strip() for h in first_line.split(delimiter)]
+                
+                if not any(h in expected_headers for h in found_headers):
+                    conn.close()
+                    return jsonify({
+                        "ok": False, 
+                        "error": "標頭偵測失敗",
+                        "message": "檔案可能不包含標頭列，請確認是否誤勾選「包含首行標頭」，或檔案內容格式不符。"
+                    }), 400
+            except Exception as e:
+                conn.close()
+                return jsonify({"ok": False, "error": f"標頭驗證失敗: {str(e)}"}), 500
+        else:
+            # --- 未勾選標頭：檢查長度 ---
+            fmt_val = str(fmt_name).replace("fmt_", "")
+            cursor.execute("SELECT MAX([End]) FROM CancerRegistry_Fields WHERE [fmt]=? GROUP BY [fmt]", (fmt_val,))
+            row = cursor.fetchone()
+            expected_length = row[0] if row else 0
+
+            length_errors = []
+            lines = content_bytes.splitlines()
+            for i, line_bytes in enumerate(lines):
+                if not line_bytes.strip(): continue
+                length = len(line_bytes)
+                if expected_length > 0 and length != expected_length:
+                    length_errors.append(f"第 {i+1} 行: 實際 {length}, 預期 {expected_length}")
+            if length_errors:
+                conn.close()
+                
+                # 產生錯誤 Log (Base64)
+                log_content = f"檔案名稱: {filename}\n" + "\n".join(length_errors)
+                log_base64 = base64.b64encode(log_content.encode('utf-8')).decode('utf-8')
+                
+                # 轉為 Excel 提供下載 (Base64)
+                field_spec = load_field_spec(fmt_val)
+                results = []
+                for line_bytes in lines:
+                    results.append(parse_fixed_width_line(line_bytes.decode('big5', errors='ignore'), field_spec))
+                
+                output_xlsx = io.BytesIO()
+                keys = [f[0] for f in field_spec]
+                wb = Workbook()
+                ws = wb.active
+                ws.append(keys)
+                for r in results: ws.append([r.get(k, "") for k in keys])
+                for row in ws.iter_rows():
+                    for cell in row: cell.number_format = '@'
+                wb.save(output_xlsx)
+                xlsx_base64 = base64.b64encode(output_xlsx.getvalue()).decode('utf-8')
+
+                error_message_html = f"檔案長度校驗失敗，總共有 <b>{len(length_errors)}</b> 筆長度不符的資料：<br>"
+                error_message_html += "<br>".join(length_errors[:3])
+                if len(length_errors) > 3: error_message_html += f"<br>...以及其他 {len(length_errors) - 3} 筆錯誤"
+                
+                return jsonify({
+                    "ok": False, 
+                    "error": error_message_html, 
+                    "has_length_error": True,
+                    "log_data": log_base64,
+                    "xlsx_data": xlsx_base64,
+                    "filename": filename
+                }), 400
+
+    JobID = str(uuid.uuid4())
+    project_folder = f"{Jobs_FOLDER}/{JobID}"
+    os.makedirs(project_folder, exist_ok=True)
+
     path = f"{project_folder}/{filename}"
     uploaded_file.save(path)
     uploaded_file.close()
-    
-    file_ext = os.path.splitext(filename)[1].lower()
-    base_name = os.path.splitext(filename)[0]
     process_path = path
 
     if file_ext == '.csv':
@@ -851,92 +932,48 @@ def api_clean():
             df_csv = pd.read_csv(path, dtype=str, encoding='utf-8-sig')
         except UnicodeDecodeError:
             df_csv = pd.read_csv(path, dtype=str, encoding='cp950')
-        
         temp_xlsx = f"{project_folder}/{base_name}.xlsx"
         df_csv.to_excel(temp_xlsx, index=False)
         process_path = temp_xlsx
 
     if file_ext == '.txt':
-        try:
-            fmt_val = str(fmt_name).replace("fmt_", "")
-            cursor.execute("SELECT MAX([End]) FROM CancerRegistry_Fields WHERE [fmt]=? GROUP BY [fmt]", (fmt_val,))
-            row = cursor.fetchone()
-            expected_length = row[0] if row else 0
-
-            length_errors = []
-            with open(path, 'r', encoding='big5', errors='ignore') as f:
-                for i, line in enumerate(f):
-                    clean_line = line.rstrip('\n').rstrip('\r')
-                    if not clean_line.strip(): continue
-                    length = len(clean_line.encode('big5', errors='ignore'))
-                    if expected_length > 0 and length != expected_length:
-                        length_errors.append(f"第 {i+1} 行: 實際 {length},預期 {expected_length}")
-                        
-            error_message_html = ""
-            if length_errors:
-                total_errors = len(length_errors)
-                display_limit = 3
-
-                error_message_html += f"檔案長度校驗失敗，總共有 <b>{total_errors}</b> 筆長度不符的資料：<br>"
-
-                error_message_html += "<br>".join(length_errors[:display_limit])
-                
-                if total_errors > display_limit:
-                    error_message_html += f"<br>...以及其他 {total_errors - display_limit} 筆錯誤"
-
-            field_spec = load_field_spec(fmt_val)
-            results = []
-            with open(path, 'r', encoding='big5', errors='ignore') as f:
-                for line in f:
-                    results.append(parse_fixed_width_line(line, field_spec))
-
-            temp_xlsx = f"{project_folder}/{base_name}.xlsx"
-            keys = [f[0] for f in field_spec]
-            wb_temp = Workbook()
-            ws_temp = wb_temp.active
-            ws_temp.append(keys)
-
-            for row_dict in results:
-                row_values = [row_dict.get(k, "") for k in keys]
-                ws_temp.append(row_values)
-            
-            for row in ws_temp.iter_rows():
-                for cell in row:
-                    cell.number_format = '@'
-            
-            wb_temp.save(temp_xlsx)
-            process_path = temp_xlsx
-
-            if length_errors:
-                log_path = f"{project_folder}/length_errors.log"
-                with open(log_path, 'w', encoding='utf-8') as log_f:
-                    log_f.write(f"檔案名稱: {filename}\n")
-                    log_f.write("\n".join(length_errors))
-                
-                cursor.execute("INSERT INTO Job ([JobID],[UserID],[FmtID],[FileName],[TotalCount],[CompletenessScore],[CorrectScore],[ConsistencyScore],[DQI],[Path]) VALUES (?,?,?,?,?,?,?,?,?,?)",
-                                (JobID, user_id, format_id, filename, 0, 0, 0, 0, 0, project_folder))
-                conn.commit()
-                conn.close()
-                return jsonify({
-                    "ok": False, 
-                    "error": error_message_html, 
-                    "has_length_error": True,
-                    "job_id": JobID
-                }), 400
-
-        except Exception as e:
-            if conn and not conn.closed: conn.close()
-            return jsonify({"ok": False, "error": f"TXT 解析失敗: {str(e)}"}), 500
+        if convert_txt_flag:
+            try:
+                temp_xlsx = f"{project_folder}/{base_name}.xlsx"
+                convert_txt_to_excel(path, temp_xlsx)
+                if os.path.exists(temp_xlsx):
+                    process_path = temp_xlsx
+                else: raise Exception("Excel conversion failed")
+            except Exception as e:
+                if conn and not conn.closed: conn.close()
+                return jsonify({"ok": False, "error": f"TXT 轉換失敗: {str(e)}"}), 500
+        else:
+            try:
+                fmt_val = str(fmt_name).replace("fmt_", "")
+                field_spec = load_field_spec(fmt_val)
+                results = []
+                with open(path, 'r', encoding='big5', errors='ignore') as f:
+                    for line in f: results.append(parse_fixed_width_line(line, field_spec))
+                temp_xlsx = f"{project_folder}/{base_name}.xlsx"
+                keys = [f[0] for f in field_spec]
+                wb = Workbook()
+                ws = wb.active
+                ws.append(keys)
+                for r in results: ws.append([r.get(k, "") for k in keys])
+                for row in ws.iter_rows():
+                    for cell in row: cell.number_format = '@'
+                wb.save(temp_xlsx)
+                process_path = temp_xlsx
+            except Exception as e:
+                if conn and not conn.closed: conn.close()
+                return jsonify({"ok": False, "error": f"TXT 解析失敗: {str(e)}"}), 500
 
     base_name, out_path, rep_path, working_file, date_error_file = _job_files(project_folder, filename, fmt_name)
     
     try:
         _create_working_file(process_path, working_file)
-
         stats, alias_mapping, sorted_df, sorted_mask = cleanValidate(process_path, out_path, rep_path, f"fmt_{fmt_name}", version, rev_date)
-
         date_errors = _build_date_errors(sorted_df, sorted_mask, alias_mapping, date_error_file)
-
         cursor.execute("INSERT INTO Job ([JobID],[UserID],[FmtID],[FileName],[TotalCount],[CompletenessScore],[CorrectScore],[ConsistencyScore],[DQI],[Path]) VALUES (?,?,?,?,?,?,?,?,?,?)",
                         (JobID, user_id, format_id, filename, int(stats['total']), float(stats['completeness']), float(stats['correctness']), float(stats['consistency']), float(stats['quality_score']), project_folder))
         conn.commit()
@@ -1053,17 +1090,11 @@ def api_update_date_error():
         return jsonify({"ok": False, "error": "缺少修正資料"}), 400
 
     row = _load_job(job_id)
-
     if not row:
         return jsonify({"ok": False, "error": "找不到該紀錄"}), 404
 
     project_path, original_filename, fmt_name, version, rev_date = row
-
-    _, cleaned_file, report_file, working_file, date_error_file = _job_files(
-        project_path,
-        original_filename,
-        fmt_name
-    )
+    _, cleaned_file, report_file, working_file, date_error_file = _job_files(project_path,original_filename,fmt_name)
 
     if not os.path.exists(working_file):
         return jsonify({"ok": False, "error": "找不到可修正的暫存資料"}), 404
@@ -1075,45 +1106,20 @@ def api_update_date_error():
 
     try:
         source_row_index = _resolve_source_row_index(date_error_file, row_index)
-
         _update_working_file_cell_only(working_file, source_row_index, updates)
-
         source_file = os.path.join(project_path, original_filename)
         base_name, _ = os.path.splitext(original_filename)
         converted_file = os.path.join(project_path, f"{base_name}.xlsx")
 
-        _sync_working_file_to_source_files(
-            working_file,
-            source_file,
-            converted_file,
-            fmt_name
-        )
-
+        _sync_working_file_to_source_files(working_file,source_file,converted_file,fmt_name)
         stats, alias_mapping, sorted_df, sorted_mask = run_clean_validate_with_clean_log(
-            working_file,
-            cleaned_file,
-            report_file,
-            f"fmt_{fmt_name}",
-            version,
-            rev_date
-        )
-
+            working_file,cleaned_file,report_file,f"fmt_{fmt_name}",version,rev_date)
         date_errors = _build_date_errors(sorted_df, sorted_mask, alias_mapping, date_error_file)
         date_error_count = len(date_errors)
 
         conn = get_conn()
         cursor = conn.cursor()
-
-        cursor.execute("""
-            UPDATE [Job]
-            SET 
-                TotalCount = ?,
-                CompletenessScore = ?,
-                CorrectScore = ?,
-                ConsistencyScore = ?,
-                DQI = ?
-            WHERE JobID = ?
-        """, (
+        cursor.execute("""UPDATE [Job] SET TotalCount = ?,CompletenessScore = ?,CorrectScore = ?,ConsistencyScore = ?,DQI = ?WHERE JobID = ?""", (
             int(stats["total"]),
             float(stats["completeness"]),
             float(stats["correctness"]),
@@ -1121,7 +1127,6 @@ def api_update_date_error():
             float(stats["quality_score"]),
             job_id
         ))
-
         conn.commit()
         conn.close()
 
@@ -1147,6 +1152,34 @@ def api_update_date_error():
             "dqi": float(stats["quality_score"])
         }
     })
+
+@clean_bp.route("/api/download_temp/<file_type>/<temp_id>/<filename>")
+@login_required
+def download_temp_file(file_type, temp_id, filename):
+    try:
+        base_name = os.path.splitext(filename)[0]
+        temp_folder = f"data/temp/{temp_id}"
+        
+        if file_type == "length_log":
+            target_filename = "length_errors.log"
+            display_name = f"長度錯誤_{base_name}.log"
+        elif file_type == "xlsx":
+            target_filename = f"{base_name}.xlsx"
+            display_name = f"欄位檢核表_{base_name}.xlsx"
+        else:
+            return jsonify({"ok": False, "error": "無效的下載類型"}), 400
+
+        file_path = os.path.join(temp_folder, target_filename)
+        if not os.path.exists(file_path):
+            return jsonify({"ok": False, "error": "檔案不存在或已過期"}), 404
+            
+        return send_file(
+            os.path.abspath(file_path), 
+            as_attachment=True, 
+            download_name=display_name
+        )
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 @clean_bp.route("/api/download/<file_type>/<job_id>")
 @login_required
