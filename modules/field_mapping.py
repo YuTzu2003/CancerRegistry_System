@@ -1,4 +1,6 @@
 import pandas as pd
+import re
+from openpyxl import load_workbook
 from modules.db import get_conn
 
 def detect_system(excel_columns):
@@ -162,6 +164,150 @@ def process_data(excel_path, mapping_dict, AImodule_list, target_sheet=0):
             df_transformed[ai_name] = "" 
     df_final = df_transformed[AImodule_list]
     return df_final
+
+def validate_and_rename_headers(headers, fmt_name):
+    """
+    驗證並重新命名上傳檔案的標頭。
+    規則：
+    1. 不可只有序號（如 1.2），必須序號+欄位名稱。
+    2. 欄位名稱必須與 SQL Server 對照表吻合。
+    3. 只有欄位名稱、序號+欄位名稱、序號+空格+欄位名稱都是合規的。
+    4. 輸出統一格式為「序號+標準中文欄位名稱」（無空格，如 1.2病歷號碼）。
+    5. 4.2.1.8 與 7.6 欄位只要能與其中一邊匹配即可。
+    6. 其他無關的自訂欄位，若無法匹配且非忽略欄位，則拋出詳細的 ValueError 錯誤。
+    """
+    
+    from modules.cleaner import FORMAT_RULES_MAP
+    norm_fmt = f"fmt_{str(fmt_name).replace('fmt_', '')}"
+    rules = FORMAT_RULES_MAP.get(norm_fmt, {})
+
+    seq_to_std_name = {}
+    for rule_name, rule_val in rules.items():
+        r_id = str(rule_val.get("ID", "")).strip()
+        if r_id:
+            seq_to_std_name[r_id] = rule_name
+
+    conn = get_conn()
+    clean_fmt = str(fmt_name).replace("fmt_", "")
+    query = f"""
+        SELECT [序號], [中文欄位名稱], [英文欄位名稱], [台大雲林欄位名稱], [台大體系醫整庫欄位名稱], [台灣癌症登記中心], [雲醫癌AI模組]
+        FROM [Hospital_data].[dbo].[v_FieldMap_WithFmt]
+        WHERE [{clean_fmt}欄位] = 1
+    """
+    cursor = conn.cursor()
+    cursor.execute(query)
+    rows = cursor.fetchall()
+    conn.close()
+
+    seq_to_aliases = {}  # seq -> set of normalized aliases
+    alias_to_seqs = {}   # normalized_alias -> list of (seq, std_name)
+
+    for row in rows:
+        seq = str(row[0]).strip()
+        if seq.endswith('.0'):
+            seq = seq[:-2]
+        
+        std_name = seq_to_std_name.get(seq)
+        if not std_name:
+            continue
+
+        if seq not in seq_to_aliases:
+            seq_to_aliases[seq] = set()
+
+        aliases = []
+        for val in row[1:]:
+            if val is not None:
+                aliases.append(str(val).strip())
+        
+        for alias in aliases:
+            if not alias:
+                continue
+            if seq in ['4.2.1.8', '7.6'] and '/' in alias:
+                parts = [p.strip() for p in alias.split('/') if p.strip()]
+            else:
+                parts = [alias]
+            
+            for part in parts:
+                norm_part = re.sub(r'\s+', '', part)
+                if norm_part:
+                    seq_to_aliases[seq].add(norm_part)
+                    if norm_part not in alias_to_seqs:
+                        alias_to_seqs[norm_part] = []
+                    if (seq, std_name) not in alias_to_seqs[norm_part]:
+                        alias_to_seqs[norm_part].append((seq, std_name))
+
+    renamed_headers = []
+    ignored_headers = {
+        '錯誤註記說明(A:遺漏值 B:格式不符 C:邏輯錯誤 D:完全正確)',
+        '錯誤註記說明'
+    }
+
+    for col in headers:
+        col_str = str(col).strip()
+        if not col_str or col_str.startswith('_') or col_str in ignored_headers:
+            renamed_headers.append(col)
+            continue
+
+        match = re.match(r"^(\d+(?:\.\d+)*)(.*)$", col_str)
+        if match:
+            seq = match.group(1).strip()
+            rest = match.group(2)  
+
+            if seq in seq_to_std_name:
+                if not rest or re.match(r"^\s", rest):
+                    renamed_headers.append(col)
+                    continue
+                
+                clean_rest = re.sub(r'\s+', '', rest)
+                if clean_rest not in seq_to_aliases[seq]:
+                    renamed_headers.append(col)
+                    continue
+                
+                std_name = seq_to_std_name[seq]
+                renamed_headers.append(f"{seq}{std_name}")
+                continue
+
+        clean_col = re.sub(r'\s+', '', col_str)
+        if clean_col in alias_to_seqs:
+            matches = alias_to_seqs[clean_col]
+            if matches:
+                seq, std_name = matches[0]
+                renamed_headers.append(f"{seq}{std_name}")
+                continue
+        
+        renamed_headers.append(col)
+
+    seen = set()
+    duplicates = []
+    for h in renamed_headers:
+        if h in ignored_headers or not h or str(h).startswith('_'):
+            continue
+        if h in seen:
+            duplicates.append(h)
+        seen.add(h)
+    if duplicates:
+        raise ValueError(f"欄位標頭錯誤：重複的欄位對應「{', '.join(duplicates)}」，請確認上傳的欄位是否重複。")
+
+    return renamed_headers
+
+def validate_and_unify_headers_in_file(file_path, fmt_name):
+    """
+    讀取 Excel 檔案的第一行標頭並執行驗證與統一重組，接著寫回原 Excel 檔案以保留原始樣式。
+    """
+    wb = load_workbook(file_path)
+    ws = wb.active
+    
+    headers = []
+    for cell in ws[1]:
+        headers.append(str(cell.value).strip() if cell.value is not None else "")
+        
+    new_headers = validate_and_rename_headers(headers, fmt_name)
+    
+    for idx, new_val in enumerate(new_headers, start=1):
+        ws.cell(row=1, column=idx).value = new_val
+        
+    wb.save(file_path)
+    wb.close()
 
 if __name__ == "__main__": 
     data_path = "data/20260318測試.xlsx"  
