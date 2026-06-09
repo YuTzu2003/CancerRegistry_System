@@ -17,7 +17,7 @@ from werkzeug.utils import secure_filename
 from openpyxl import load_workbook, Workbook
 from openpyxl.utils import get_column_letter
 from services.auth import login_required, admin_required
-from modules.field_mapping import detect_system, get_field_map
+from modules.field_mapping import detect_system, get_field_map, validate_and_rename_headers, validate_and_unify_headers_in_file
 from modules.text_converter import convert_txt_to_excel
 from modules.clean_pipeline.validate import validate_date_rules
 from flask import Blueprint, render_template, request, session, jsonify, send_file
@@ -853,11 +853,28 @@ def api_clean():
                 first_line = text_sample.splitlines()[0] if text_sample else ""
                 delimiter = "\t" if "\t" in first_line else ("," if "," in first_line else ";")
                 
-                expected_map = get_field_map('field_name_zh', fmt_name)
-                expected_headers = set(expected_map.values())
                 found_headers = [h.strip() for h in first_line.split(delimiter)]
                 
-                if not any(h in expected_headers for h in found_headers):
+                from modules.cleaner import FORMAT_RULES_MAP
+                norm_fmt = f"fmt_{str(fmt_name).replace('fmt_', '')}"
+                rules = FORMAT_RULES_MAP.get(norm_fmt, {})
+                valid_std_headers = set()
+                for rule_name, rule_val in rules.items():
+                    r_id = str(rule_val.get("ID", "")).strip()
+                    if r_id:
+                        valid_std_headers.add(f"{r_id}{rule_name}")
+
+                has_any_match = False
+                for h in found_headers:
+                    try:
+                        renamed = validate_and_rename_headers([h], fmt_name)
+                        if renamed and renamed[0] in valid_std_headers:
+                            has_any_match = True
+                            break
+                    except ValueError:
+                        continue
+                
+                if not has_any_match:
                     conn.close()
                     return jsonify({
                         "ok": False, 
@@ -971,12 +988,17 @@ def api_clean():
     base_name, out_path, rep_path, working_file, date_error_file = _job_files(project_folder, filename, fmt_name)
     
     try:
+        validate_and_unify_headers_in_file(process_path, fmt_name)
+        
         _create_working_file(process_path, working_file)
         stats, alias_mapping, sorted_df, sorted_mask = cleanValidate(process_path, out_path, rep_path, f"fmt_{fmt_name}", version, rev_date)
         date_errors = _build_date_errors(sorted_df, sorted_mask, alias_mapping, date_error_file)
         cursor.execute("INSERT INTO Job ([JobID],[UserID],[FmtID],[FileName],[TotalCount],[CompletenessScore],[CorrectScore],[ConsistencyScore],[DQI],[Path]) VALUES (?,?,?,?,?,?,?,?,?,?)",
                         (JobID, user_id, format_id, filename, int(stats['total']), float(stats['completeness']), float(stats['correctness']), float(stats['consistency']), float(stats['quality_score']), project_folder))
         conn.commit()
+    except ValueError as e:
+        if conn and not conn.closed: conn.close()
+        return jsonify({"ok": False, "error": str(e)}), 400
     except Exception as e:
         if conn and not conn.closed: conn.rollback()
         return jsonify({"ok": False, "error":str(e)}), 500
