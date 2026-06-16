@@ -177,7 +177,7 @@ def validate_and_rename_headers(headers, fmt_name):
     6. 其他無關的自訂欄位，若無法匹配且非忽略欄位，則拋出詳細的 ValueError 錯誤。
     """
     
-    from modules.cleaner import FORMAT_RULES_MAP
+    from modules.clean_pipeline.cleaner import FORMAT_RULES_MAP
     norm_fmt = f"fmt_{str(fmt_name).replace('fmt_', '')}"
     rules = FORMAT_RULES_MAP.get(norm_fmt, {})
 

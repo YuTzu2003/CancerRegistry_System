@@ -43,5 +43,5 @@ uv run app.py
 ---
 
 ## 備註
--   如需調整資料庫連接字串，請至 `modules/db.py` 進行修改。
--   資料清洗邏輯在 `modules/clean_pipeline/` 目錄下。
+-   如需調整資料庫連接字串，請至 `modules/clean_pipeline/db.py` 進行修改。
+-   資料清洗邏輯在 `modules/clean_pipeline/rules/` 目錄下。
