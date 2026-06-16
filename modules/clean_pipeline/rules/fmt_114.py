@@ -73,7 +73,7 @@ RULES = {
             '代碼應視為四碼字串並保留前導零，例如0101不得簡寫為101。'
         ),
         'reference': 'appendix_a_residence_codes',
-        'reference_file': 'modules/reference_data/residence.json'
+        'reference_file': 'modules/clean_pipeline/reference_data/residence.json'
     },
     '診斷年齡': {
         'ID':'2.1',

@@ -7,7 +7,7 @@ import numpy as np
 from flask import Blueprint, request, jsonify, session, send_file
 from werkzeug.utils import secure_filename
 from datetime import datetime
-from modules.field_mapping import detect_system, field_mapping
+from modules.clean_pipeline.field_mapping import detect_system, field_mapping
 from services.clean import _natural_sort_key
 
 data_gen_bp = Blueprint('data_gen', __name__)
@@ -216,7 +216,7 @@ def process_file():
 
         fmt_rules = {}
         if format_id:
-             from modules.cleaner import FORMAT_RULES_MAP
+             from modules.clean_pipeline.cleaner import FORMAT_RULES_MAP
              fmt_key = f"fmt_{format_id}"
              if fmt_key in FORMAT_RULES_MAP:
                  # 建立 ID -> FriendlyName 的映射
