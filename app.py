@@ -1,7 +1,9 @@
-from flask import Flask,render_template,session
+from flask import Flask,render_template,session,request,jsonify,flash
 import os
 import logging
 import sys
+import datetime
+from werkzeug.utils import secure_filename
 from services.auth import auth_bp, login_required, admin_required
 from services.member import member_bp
 from services.history import history_bp
@@ -9,19 +11,13 @@ from services.clean import clean_bp
 from services.data_gen import data_gen_bp
 from modules.db import get_conn
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s | %(levelname)s | %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S',
-    handlers=[logging.StreamHandler(sys.stdout)]
-)
+logging.basicConfig(level=logging.INFO,format='%(asctime)s | %(levelname)s | %(message)s',datefmt='%Y-%m-%d %H:%M:%S',handlers=[logging.StreamHandler(sys.stdout)])
 werkzeug_logger = logging.getLogger('werkzeug')
 werkzeug_logger.handlers = []
 werkzeug_logger.propagate = True
 
 app = Flask(__name__)
 app.secret_key = "your_secret_key"
-
 app.register_blueprint(auth_bp)
 app.register_blueprint(member_bp)
 app.register_blueprint(history_bp)
@@ -29,8 +25,10 @@ app.register_blueprint(clean_bp)
 app.register_blueprint(data_gen_bp)
 
 BASE_DIR = os.path.dirname(__file__)
-Jobs_FOLDER = 'static/Jobs'
+Jobs_FOLDER = 'work/Jobs'
+DASHBOARD_DATA = os.path.join(BASE_DIR, 'work', 'data')
 os.makedirs(Jobs_FOLDER, exist_ok=True)
+os.makedirs(DASHBOARD_DATA, exist_ok=True)
 
 
 def allowed_file(filename: str) -> bool:
@@ -42,7 +40,7 @@ def inject_nav():
         {"endpoint":"clean.clean","title":"資料清洗模組","icon":"bi-funnel"},
         {"endpoint":"history.history","title":"資料審核紀錄","icon":"bi-file-earmark-text"},
         {"endpoint":"dataGen","title":"虛擬資料生成","icon":"bi-database-add"},
-        {"endpoint":"analytics","title":"統計分析","icon":"bi-bar-chart"},
+        {"endpoint":"dashboard","title":"年報分析","icon":"bi-bar-chart"},
     ]
     if session.get("position") == "Admin":
         # NAV_ITEMS.append({"endpoint":"rag_config", "title": "RAG知識庫", "icon": "bi-robot"})
@@ -79,13 +77,71 @@ def dataGen():
     conn.close()
     return render_template("dataGen.html", active="dataGen", formats=formats)
 
-@app.route("/analytics")
+
+def _list_dashboard_files():
+    """List Excel files in work/data, sorted by modification time descending."""
+    files = []
+    if os.path.isdir(DASHBOARD_DATA):
+        for fname in os.listdir(DASHBOARD_DATA):
+            if fname.lower().endswith(('.xls', '.xlsx')):
+                fpath = os.path.join(DASHBOARD_DATA, fname)
+                mtime = os.path.getmtime(fpath)
+                files.append({
+                    "name": fname,
+                    "time": datetime.datetime.fromtimestamp(mtime).strftime("%Y/%m/%d %H:%M"),
+                })
+        files.sort(key=lambda x: x["time"], reverse=True)
+    return files
+
+
+@app.route("/dashboard")
 @login_required
-def analytics(): return render_template("analytics.html", active="analytics")
+def dashboard():
+    uploaded_files = _list_dashboard_files() if session.get("position") == "Admin" else []
+    return render_template("dashboard.html", active="dashboard", uploaded_files=uploaded_files)
+
+
+@app.route("/dashboard/upload", methods=["POST"])
+@login_required
+@admin_required
+def dashboard_upload():
+    f = request.files.get("file")
+    if not f or not f.filename:
+        return jsonify({"ok": False, "error": "未選擇檔案"}), 400
+    ext = f.filename.rsplit(".", 1)[-1].lower() if "." in f.filename else ""
+    if ext not in ("xls", "xlsx"):
+        return jsonify({"ok": False, "error": "僅接受 .xls 或 .xlsx 格式"}), 400
+    filename = secure_filename(f.filename)
+    # 若 secure_filename 清空中文名，保留原名但替換危險字元
+    if not filename or filename == f".{ext}":
+        import re
+        safe = re.sub(r'[\\/:*?"<>|]', '_', f.filename)
+        filename = safe
+    save_path = os.path.join(DASHBOARD_DATA, filename)
+    f.save(save_path)
+    logging.info(f"Dashboard upload: {filename} saved to {save_path}")
+    return jsonify({"ok": True, "filename": filename})
+
+
+@app.route("/dashboard/delete", methods=["POST"])
+@login_required
+@admin_required
+def dashboard_delete():
+    data = request.json or {}
+    filename = data.get("filename", "")
+    if not filename:
+        return jsonify({"ok": False, "error": "未指定檔案名稱"}), 400
+    fpath = os.path.join(DASHBOARD_DATA, filename)
+    if not os.path.isfile(fpath):
+        return jsonify({"ok": False, "error": "檔案不存在"}), 404
+    os.remove(fpath)
+    logging.info(f"Dashboard delete: {filename}")
+    return jsonify({"ok": True})
+
 
 # @app.route("/rag_config")
 # @admin_required
 # def rag_config(): return render_template("rag_config.html", active="rag_config")
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True)
