@@ -23,7 +23,7 @@ from modules.clean_pipeline.rules.validate import validate_date_rules
 from flask import Blueprint, render_template, request, session, jsonify, send_file
 
 clean_bp = Blueprint('clean', __name__)
-Jobs_FOLDER = 'static/Jobs'
+Jobs_FOLDER = 'work/Jobs'
 
 
 def _natural_sort_key(s):

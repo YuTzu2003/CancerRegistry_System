@@ -1,0 +1,99 @@
+.filter-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 18px 20px;
+}
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 180px;
+}
+.filter-group label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gray-600);
+  letter-spacing: .3px;
+}
+.filter-group select {
+  width: 100%;
+  padding: 8px 32px 8px 12px;
+  font-size: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color .15s ease, box-shadow .15s ease;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M2.5 4.5L6 8l3.5-3.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+}
+.filter-group select:focus {
+  outline: none;
+  border-color: var(--blue-500);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, .12);
+}
+.filter-actions {
+  display: flex;
+  gap: 8px;
+  padding-bottom: 1px;
+}
+/* ── Buttons ───────────────────────────────────────────── */
+.btn-black {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 20px; font-size: 14px; font-weight: 600;
+  color: var(--white); background: #212529;
+  border: 1px solid #212529; border-radius: var(--radius-sm);
+  cursor: pointer; transition: background .15s ease;
+}
+.btn-black:hover { background: #000; color: #fff; }
+
+.btn-black-outline {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px; font-size: 14px; font-weight: 500;
+  color: #212529; background: transparent;
+  border: 1px solid #212529; border-radius: var(--radius-sm);
+  cursor: pointer; transition: all .15s ease;
+}
+.btn-black-outline:hover { background: #212529; color: #fff; }
+
+/* ── Modal Checkbox Colors ─────────────────────────────── */
+#cancerPickerModal .form-check-input:checked {
+  background-color: #212529;
+  border-color: #212529;
+}
+#cancerPickerModal .form-check-input:focus {
+  border-color: #212529;
+  box-shadow: 0 0 0 0.25rem rgba(33, 37, 41, 0.25);
+}
+
+/* ── Upload Section ────────────────────────────────────── */
+.upload-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px;
+}
+.file-list-empty {
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+.file-list-empty i {
+  font-size: 24px;
+  display: block;
+  margin-bottom: 6px;
+  color: var(--gray-300);
+}
+@media (max-width: 900px) {
+  .upload-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+  .filter-bar { flex-direction: column; align-items: stretch; }
+  .filter-group { min-width: 0; }
+}
