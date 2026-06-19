@@ -279,27 +279,41 @@
       currentJobId = data.job_id || data.project_id;
     }
 
+    // 預設切換至「全國癌登手冊欄位序號+中文欄位名稱」
+    const zhRadio = $('input[name="nameScheme"][value="field_name_zh"]');
+    if (zhRadio) {
+      zhRadio.checked = true;
+    }
+
+    // 依據是否為無標頭固定長度 TXT 動態停用或啟用「原始匯入資料欄位名稱」選項
+    const originalRadio = $('input[name="nameScheme"][value="original"]');
+    if (originalRadio) {
+      if (data.has_no_headers) {
+        originalRadio.disabled = true;
+        const chip = originalRadio.closest('.naming-chip');
+        if (chip) {
+          chip.style.opacity = '0.5';
+          chip.style.cursor = 'not-allowed';
+          chip.setAttribute('title', '無標頭的固定長度文字檔不支援還原原始欄位名稱');
+        }
+      } else {
+        originalRadio.disabled = false;
+        const chip = originalRadio.closest('.naming-chip');
+        if (chip) {
+          chip.style.opacity = '';
+          chip.style.cursor = '';
+          chip.removeAttribute('title');
+        }
+      }
+    }
+    syncNamingSelection();
+
     // 顯示偵測到的體系
     const systemBadge = $('#detectedSystemBadge');
     const systemName = $('#detectedSystemName');
     if (data.detected_system && data.detected_system !== 'unknown') {
       if (systemBadge) systemBadge.style.display = 'inline-block';
       if (systemName) systemName.textContent = data.detected_system;
-      
-      // 自動勾選對應的命名方案
-      const schemeValueMap = {
-        "中文欄位名稱": "field_name_zh",
-        "英文欄位名稱": "field_name_en",
-        "台大雲林欄位名稱": "ntu_yunlin",
-        "台大體系醫整庫欄位名稱": "ntu_system",
-        "台灣癌症登記中心": "taiwan_cancer_registry",
-        "雲醫癌AI模組": "AI_module"
-      };
-      const targetValue = schemeValueMap[data.detected_system];
-      if (targetValue) {
-        const radio = $(`input[name="nameScheme"][value="${targetValue}"]`);
-        if (radio) radio.checked = true;
-      }
     } else {
       if (systemBadge) systemBadge.style.display = 'none';
     }
