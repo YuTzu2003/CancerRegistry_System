@@ -9,6 +9,7 @@ from services.member import member_bp
 from services.history import history_bp
 from services.clean import clean_bp
 from services.data_gen import data_gen_bp
+from services.dashboard import favorites_bp
 from modules.db import get_conn
 
 logging.basicConfig(level=logging.INFO,format='%(asctime)s | %(levelname)s | %(message)s',datefmt='%Y-%m-%d %H:%M:%S',handlers=[logging.StreamHandler(sys.stdout)])
@@ -23,6 +24,7 @@ app.register_blueprint(member_bp)
 app.register_blueprint(history_bp)
 app.register_blueprint(clean_bp)
 app.register_blueprint(data_gen_bp)
+app.register_blueprint(favorites_bp)
 
 BASE_DIR = os.path.dirname(__file__)
 Jobs_FOLDER = 'work/Jobs'
@@ -97,13 +99,12 @@ def _list_dashboard_files():
 @app.route("/dashboard")
 @login_required
 def dashboard():
-    uploaded_files = _list_dashboard_files() if session.get("position") == "Admin" else []
+    uploaded_files = _list_dashboard_files()
     return render_template("dashboard.html", active="dashboard", uploaded_files=uploaded_files)
 
 
 @app.route("/dashboard/upload", methods=["POST"])
 @login_required
-@admin_required
 def dashboard_upload():
     f = request.files.get("file")
     if not f or not f.filename:
@@ -111,12 +112,12 @@ def dashboard_upload():
     ext = f.filename.rsplit(".", 1)[-1].lower() if "." in f.filename else ""
     if ext not in ("xls", "xlsx"):
         return jsonify({"ok": False, "error": "僅接受 .xls 或 .xlsx 格式"}), 400
-    filename = secure_filename(f.filename)
-    # 若 secure_filename 清空中文名，保留原名但替換危險字元
-    if not filename or filename == f".{ext}":
-        import re
-        safe = re.sub(r'[\\/:*?"<>|]', '_', f.filename)
-        filename = safe
+    import re
+    raw_filename = f.filename or ""
+    basename = os.path.basename(raw_filename)
+    filename = re.sub(r'[\\/:*?"<>|\s]', '_', basename)
+    if not filename.strip() or filename == f".{ext}":
+        filename = f"uploaded_file.{ext}"
     save_path = os.path.join(DASHBOARD_DATA, filename)
     f.save(save_path)
     logging.info(f"Dashboard upload: {filename} saved to {save_path}")
@@ -125,7 +126,6 @@ def dashboard_upload():
 
 @app.route("/dashboard/delete", methods=["POST"])
 @login_required
-@admin_required
 def dashboard_delete():
     data = request.json or {}
     filename = data.get("filename", "")
@@ -144,4 +144,4 @@ def dashboard_delete():
 # def rag_config(): return render_template("rag_config.html", active="rag_config")
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True)

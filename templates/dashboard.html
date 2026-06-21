@@ -14,7 +14,6 @@
   </div>
 </div>
 
-{% if session.get('position') == 'Admin' %}
 <section class="card-flat" style="margin-bottom: 22px;">
   <div class="section-head">
     <h2><span class="dot" style="background:var(--warning)"></span> 資料上傳</h2>
@@ -78,10 +77,27 @@
     </div>
   </div>
 </section>
-{% endif %}
 
 <!-- ── 篩選條件 ──────────────────────────── -->
 <section style="margin-bottom: 22px;">
+  <!-- 我的最愛預設範本管理列 -->
+  <div class="d-flex flex-wrap align-items-center gap-3 mb-3 bg-light p-3 rounded border border-secondary border-opacity-10 shadow-sm">
+    <div class="d-flex align-items-center gap-2">
+      <label class="fw-bold text-dark mb-0" style="font-size: 14.5px;" for="favPresetSelect">
+        <i class="bi bi-star-fill text-warning me-1"></i>我的最愛範本：
+      </label>
+      <select id="favPresetSelect" class="form-select form-select-sm" style="width: 240px; font-size: 13.5px; padding: 5px 10px;">
+        <option value="">— 載入中... —</option>
+      </select>
+      <button type="button" id="btnRenamePreset" class="btn btn-sm btn-outline-secondary px-2" style="display: none; font-size: 13px;" title="重新命名範本">
+        <i class="bi bi-pencil"></i>
+      </button>
+      <button type="button" id="btnDeletePreset" class="btn btn-sm btn-outline-danger px-2" style="display: none; font-size: 13px;" title="刪除範本">
+        <i class="bi bi-trash"></i>
+      </button>
+    </div>
+  </div>
+
   <div class="filter-bar border rounded shadow-sm bg-white">
     <div class="filter-group">
       <label>性態碼</label>
@@ -106,8 +122,11 @@
       </div>
     </div>
     <div class="filter-actions ms-md-auto">
+      <button type="button" id="btnSavePreset" class="btn btn-warning text-dark fw-bold shadow-sm d-flex align-items-center gap-1.5" style="padding: 8px 16px; font-size: 14px; border: none; background: #ffc107; border-radius: var(--radius-sm);">
+        <i class="bi bi-star"></i> 將目前條件加入最愛
+      </button>
       <button class="btn-black" type="button"><i class="bi bi-search"></i> 查詢資料</button>
-      <button class="btn-black-outline" type="button"><i class="bi bi-arrow-counterclockwise"></i> 重置</button>
+      <button id="btnResetFilters" class="btn-black-outline" type="button"><i class="bi bi-arrow-counterclockwise"></i> 重置</button>
     </div>
   </div>
 </section>
