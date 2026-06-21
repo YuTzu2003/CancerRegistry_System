@@ -16,7 +16,7 @@ def detect_system(excel_columns):
     df_mapping = pd.DataFrame.from_records(rows, columns=columns)
     conn.close()
 
-    excel_cols_set = set(str(col).strip() for col in excel_columns)
+    excel_cols_set = set(re.sub(r'\s+', '', str(col)).strip().lower() for col in excel_columns if col)
     scores = {}
     for s in systems:
         db_cols = set()
@@ -29,14 +29,18 @@ def detect_system(excel_columns):
             if pd.notna(val):
                 clean_val = str(val).strip()
                 if clean_val:
-                    # 僅針對特定欄位 (4.2.1.8, 7.6) 支援斜線拆解匹配計分
                     if seq in ['4.2.1.8', '7.6'] and '/' in clean_val:
-                        for v in clean_val.split('/'):
-                            v = v.strip()
-                            if v:
-                                db_cols.add(f"{seq}{v}")
+                        parts = [p.strip() for p in clean_val.split('/') if p.strip()]
                     else:
-                        db_cols.add(f"{seq}{clean_val}")
+                        parts = [clean_val]
+                        
+                    for part in parts:
+                        norm_part = re.sub(r'\s+', '', part).lower()
+                        # 支援有序號前置的寫法 (如 1.2personid2)
+                        db_cols.add(f"{seq.lower()}{norm_part}")
+                        # 支援無序號前置的寫法 (如 personid2)
+                        db_cols.add(norm_part)
+                        
         match_count = len(excel_cols_set.intersection(db_cols))
         scores[s] = match_count
 
@@ -248,21 +252,10 @@ def validate_and_rename_headers(headers, fmt_name):
             renamed_headers.append(col)
             continue
 
-        match = re.match(r"^(\d+(?:\.\d+)*)(.*)$", col_str)
+        match = re.match(r"^(\d+(?:\.\d+)+)(.*)$", col_str)
         if match:
             seq = match.group(1).strip()
-            rest = match.group(2)  
-
             if seq in seq_to_std_name:
-                if not rest or re.match(r"^\s", rest):
-                    renamed_headers.append(col)
-                    continue
-                
-                clean_rest = re.sub(r'\s+', '', rest)
-                if clean_rest not in seq_to_aliases[seq]:
-                    renamed_headers.append(col)
-                    continue
-                
                 std_name = seq_to_std_name[seq]
                 renamed_headers.append(f"{seq}{std_name}")
                 continue

@@ -5,7 +5,12 @@
 {% block content %}
 <div class="page-head">
   <div>
-    <h1>癌症登記資料清洗模組</h1>
+    <div class="d-flex align-items-center gap-3">
+      <h1>癌症登記資料清洗模組</h1>
+      <a href="/static/document/資料清洗模組執行條件.pdf" target="_blank" class="btn btn-outline-dark btn-sm">
+        <i class="bi bi-file-earmark-pdf"></i> 模組使用注意事項
+      </a>
+    </div>
     <p class="lead">
       依據《醫療機構提報癌症防治資料作業辦法》，醫療機構須定期提報癌症個案資料，以建立全國癌症登記資料庫，支援防治政策與臨床分析。<br>
       本模組旨在建立標準化資料檢核與清洗機制，提升癌登資料之完整性與正確性，並支援不同年度之癌症登記申報格式，依版本套用對應檢核規則
@@ -283,6 +288,14 @@
         </div>
       </div>
       <div class="naming-grid" id="namingScheme">
+        <label class="naming-chip">
+          <input type="radio" name="nameScheme" value="original" />
+          <span class="nc-mark"></span>
+          <span class="nc-body">
+            <span class="nc-title">原始匯入資料欄位名稱</span>
+            <span class="nc-desc">還原為上傳時的原始欄位</span>
+          </span>
+        </label>
         <label class="naming-chip selected">
           <input type="radio" name="nameScheme" value="field_name_zh" checked />
           <span class="nc-mark"></span>

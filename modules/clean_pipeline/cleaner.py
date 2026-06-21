@@ -59,17 +59,12 @@ def _extract_field_id(col_name):
 
 
 def _resolve_rule_for_column(col_name, rules, clean_alias_mapping, rule_id_map, rule_name_map):
-    valid_std_headers = {}
-    for rule_name, rule_val in rules.items():
-        r_id = str(rule_val.get("ID", "")).strip()
-        if r_id:
-            valid_std_headers[f"{r_id}{rule_name}"] = rule_val
-
     col_str = str(col_name).strip()
-    seq_match = re.match(r"^(\d+(?:\.\d+)*)", col_str)
+    seq_match = re.match(r"^(\d+(?:\.\d+)+)", col_str)
     if seq_match:
-        if col_str in valid_std_headers:
-            return valid_std_headers[col_str]
+        seq = seq_match.group(1)
+        if seq in rule_id_map:
+            return rule_id_map[seq]
         return None
 
     clean_col = _normalize_text(col_name)
