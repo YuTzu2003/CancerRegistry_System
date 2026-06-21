@@ -207,7 +207,9 @@
           if (result.has_length_error) {
             if (result.log_data && result.xlsx_data) {
               // 記憶體下載方式 (不存入檔案)
-              const baseName = result.filename ? result.filename.split('.')[0] : 'file';
+              const baseName = result.filename && result.filename.includes('.') 
+                  ? result.filename.substring(0, result.filename.lastIndexOf('.')) 
+                  : (result.filename || 'file');
               window._downloadB64 = function(b64, filename, type) {
                   const bin = atob(b64);
                   const arr = new Uint8Array(bin.length);
