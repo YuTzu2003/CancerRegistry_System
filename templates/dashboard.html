@@ -84,31 +84,25 @@
 <section style="margin-bottom: 22px;">
   <div class="filter-bar border rounded shadow-sm bg-white">
     <div class="filter-group">
+      <label>性態碼</label>
+      <select id="filterBehavior" style="min-width: 130px;">
+        <option value="all">全部</option>
+        <option value="in_situ">原位癌</option>
+        <option value="invasive">侵襲癌</option>
+      </select>
+    </div>
+    <div class="filter-group">
       <label>癌別</label>
       <button type="button" class="form-select text-start d-flex justify-content-between align-items-center" data-bs-toggle="modal" data-bs-target="#cancerPickerModal" style="width: 100%; min-width: 220px;" id="btnCancerPicker">
-        <span id="btnCancerPickerText">預設：全選 (所有癌別)</span>
+        <span id="btnCancerPickerText">所有癌別</span>
       </button>
     </div>
     <div class="filter-group">
-      <label>年度區間</label>
+      <label>年度</label>
       <div class="d-flex align-items-center gap-2">
-        <select id="filterYearStart" style="min-width: 130px;">
-          <option value="">起始年度</option>
-          <option value="2024">2024</option>
-          <option value="2023">2023</option>
-          <option value="2022">2022</option>
-          <option value="2021">2021</option>
-          <option value="2020">2020</option>
-        </select>
-        <span class="text-secondary" style="font-size: 14px;">至</span>
-        <select id="filterYearEnd" style="min-width: 130px;">
-          <option value="">結束年度</option>
-          <option value="2024">2024</option>
-          <option value="2023">2023</option>
-          <option value="2022">2022</option>
-          <option value="2021">2021</option>
-          <option value="2020">2020</option>
-        </select>
+        <input type="number" id="filterYearStart" class="form-control px-2" placeholder="起始" style="width: 80px; text-align: center; min-width: 0;">
+        <span class="text-secondary" style="font-size: 14px;">-</span>
+        <input type="number" id="filterYearEnd" class="form-control px-2" placeholder="結束" style="width: 80px; text-align: center; min-width: 0;">
       </div>
     </div>
     <div class="filter-actions ms-md-auto">
@@ -152,7 +146,62 @@
     </div>
   </div>
 </div>
-
+<div id="main" style="width: 100%; height: 500px; margin: 20px auto;"></div>
 <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+      var chartDom = document.getElementById('main');
+      var myChart = echarts.init(chartDom);
+      var option = {
+        title: {
+          text: 'Referer of a Website',
+          subtext: 'Fake Data',
+          left: 'center'
+        },
+        tooltip: {
+          trigger: 'item'
+        },
+        legend: {
+          orient: 'vertical',
+          left: 'left'
+        },
+        toolbox: {
+          show: true,
+          feature: {
+            dataView: {show: true,readOnly: false},
+            restore: {show: true},
+            saveAsImage: {show: true}
+          }
+        },
 
+        series: [
+          {
+            name: 'Access From',
+            type: 'pie',
+            radius: '50%',
+            data: [
+              { value: 1048, name: 'Search Engine' },
+              { value: 735, name: 'Direct' },
+              { value: 580, name: 'Email' },
+              { value: 484, name: 'Union Ads' },
+              { value: 300, name: 'Video Ads' }
+            ],
+            emphasis: {
+              itemStyle: {
+                shadowBlur: 10,
+                shadowOffsetX: 0,
+                shadowColor: 'rgba(0, 0, 0, 0.5)'
+              }
+            }
+          }
+        ]
+      };
+      
+      myChart.setOption(option);
+      
+      window.addEventListener('resize', function() {
+          myChart.resize();
+      });
+  });
+</script>
 {% endblock %}

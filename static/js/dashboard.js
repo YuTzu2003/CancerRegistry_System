@@ -188,7 +188,7 @@
     const btnText = document.getElementById('btnCancerPickerText');
     if (btnText) {
       if (selectedCancers.size === allLeafIds.length) {
-        btnText.textContent = '預設：全選 (所有癌別)';
+        btnText.textContent = '所有癌別';
       } else if (selectedCancers.size === 0) {
         btnText.textContent = '— 尚未選擇癌別 —';
       } else {
