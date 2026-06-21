@@ -1,6 +1,6 @@
 import logging
 from functools import wraps
-from flask import Blueprint, request, session, redirect, url_for, render_template, flash
+from flask import Blueprint, request, session, redirect, url_for, render_template, flash, jsonify
 from modules.db import get_conn 
 
 auth_bp = Blueprint('auth', __name__)
@@ -10,6 +10,12 @@ def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if "id" not in session:
+            if (request.path.startswith('/api/') or 
+                request.path.startswith('/dashboard/upload') or 
+                request.path.startswith('/dashboard/delete') or
+                request.headers.get('X-Requested-With') == 'XMLHttpRequest' or
+                'application/json' in request.headers.get('Accept', '')):
+                return jsonify({"ok": False, "error": "請先登入系統"}), 401
             return redirect(url_for("auth.login"))
         return f(*args, **kwargs)
     return decorated_function
@@ -19,6 +25,12 @@ def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if session.get("position") != "Admin":
+            if (request.path.startswith('/api/') or 
+                request.path.startswith('/dashboard/upload') or 
+                request.path.startswith('/dashboard/delete') or
+                request.headers.get('X-Requested-With') == 'XMLHttpRequest' or
+                'application/json' in request.headers.get('Accept', '')):
+                return jsonify({"ok": False, "error": "權限不足，需要管理員權限"}), 403
             flash("權限不足，無法存取此頁面", "danger")
             return redirect(url_for("index"))
         return f(*args, **kwargs)

@@ -1,5 +1,6 @@
 (function() {
   const cancerData = [
+    {id:'All_Cancers',name:'全癌別(C00-C80)'},
     {id:'oral_group',name:'口腔癌症(含口腔、口咽、下咽)', 
         children: [
                   { id:'Oral_Cavity',name:'口腔 Oral Cavity'},
@@ -84,7 +85,7 @@
   });
   
   // Default: Select all cancers
-  allLeafIds.forEach(id => selectedCancers.add(id));
+  //allLeafIds.forEach(id => selectedCancers.add(id));
   let currentCategory = cancerData[0];
 
   /* ── UI Rendering ── */
@@ -103,12 +104,49 @@
     const list = document.getElementById('cancerCategoryList');
     if (!list) return;
     
-    list.innerHTML = cancerData.map(cat => {
+    let html = '';
+    
+    // 1. Render "不分癌別" divider header
+    html += `
+      <div class="list-group-item bg-light border-0 py-2 fw-bold text-secondary text-uppercase" 
+           style="font-size: 11px; letter-spacing: 0.5px; cursor: default; pointer-events: none; margin-bottom: 5px;">
+        不分癌別
+      </div>
+    `;
+    
+    // 2. Render "全癌別(C00-C80)" clickable item
+    const allCancersCat = cancerData.find(c => c.id === 'All_Cancers');
+    if (allCancersCat) {
+      const isActive = currentCategory.id === allCancersCat.id;
+      const cls = isActive ? 'active fw-bold text-primary bg-white' : 'text-secondary';
+      const border = isActive ? '4px solid #0d6efd' : '4px solid transparent';
+      html += `
+        <a href="#" class="list-group-item list-group-item-action bg-transparent border-0 py-3 cat-nav-btn ${cls}" 
+           style="border-left: ${border};" data-cat-id="${allCancersCat.id}">
+          <div class="d-flex justify-content-between align-items-center">
+            <span>${allCancersCat.name}</span>
+            ${getBadgeHtml(allCancersCat)}
+          </div>
+        </a>
+      `;
+    }
+    
+    // 3. Render "常見癌別" divider header
+    html += `
+      <div class="list-group-item bg-light border-0 py-2 fw-bold text-secondary text-uppercase" 
+           style="font-size: 11px; letter-spacing: 0.5px; cursor: default; pointer-events: none; margin-top: 10px; margin-bottom: 5px;">
+        常見癌別
+      </div>
+    `;
+    
+    // 3. Render all other specific cancers
+    cancerData.forEach(cat => {
+      if (cat.id === 'All_Cancers') return;
       const isActive = currentCategory.id === cat.id;
       const cls = isActive ? 'active fw-bold text-primary bg-white' : 'text-secondary';
       const border = isActive ? '4px solid #0d6efd' : '4px solid transparent';
       
-      return `
+      html += `
         <a href="#" class="list-group-item list-group-item-action bg-transparent border-0 py-3 cat-nav-btn ${cls}" 
            style="border-left: ${border};" data-cat-id="${cat.id}">
           <div class="d-flex justify-content-between align-items-center">
@@ -117,7 +155,9 @@
           </div>
         </a>
       `;
-    }).join('');
+    });
+    
+    list.innerHTML = html;
   }
 
   function renderNodesHTML(nodes, padding) {
@@ -181,18 +221,21 @@
 
   function updateStatus() {
     const status = document.getElementById('cancerPickerStatus');
+    const specificSelectedCount = Array.from(selectedCancers).filter(id => id !== 'All_Cancers').length;
+    const totalSpecificCount = allLeafIds.filter(id => id !== 'All_Cancers').length;
+    
     if (status) {
-      status.innerHTML = `<i class="bi bi-info-circle me-1"></i>已選取：<span class="fw-bold text-primary">${selectedCancers.size}</span> / ${allLeafIds.length} 項癌別`;
+      status.innerHTML = `<i class="bi bi-info-circle me-1"></i>已選取：<span class="fw-bold text-primary">${specificSelectedCount}</span> / ${totalSpecificCount} 項癌別`;
     }
     
     const btnText = document.getElementById('btnCancerPickerText');
     if (btnText) {
-      if (selectedCancers.size === allLeafIds.length) {
-        btnText.textContent = '所有癌別';
-      } else if (selectedCancers.size === 0) {
+      if (selectedCancers.has('All_Cancers') || (specificSelectedCount === totalSpecificCount && totalSpecificCount > 0)) {
+        btnText.textContent = '不分癌別 全癌別(C00-C80)';
+      } else if (specificSelectedCount === 0) {
         btnText.textContent = '— 尚未選擇癌別 —';
       } else {
-        btnText.innerHTML = `<span class="text-primary fw-bold">已選取 ${selectedCancers.size} 項</span>`;
+        btnText.innerHTML = `<span class="text-primary fw-bold">已選取 ${specificSelectedCount} 項</span>`;
       }
     }
   }
@@ -214,10 +257,29 @@
     const node = idToNode[e.target.getAttribute('data-node-id')];
     const isChecked = e.target.checked;
     
-    getLeafIds(node).forEach(id => {
-      if (isChecked) selectedCancers.add(id);
-      else selectedCancers.delete(id);
-    });
+    if (node.id === 'All_Cancers') {
+      // Toggle all cancers
+      if (isChecked) {
+        allLeafIds.forEach(id => selectedCancers.add(id));
+      } else {
+        selectedCancers.clear();
+      }
+    } else {
+      // Toggle specific cancer
+      getLeafIds(node).forEach(id => {
+        if (isChecked) selectedCancers.add(id);
+        else selectedCancers.delete(id);
+      });
+      
+      // Check if all other specific leaf IDs are selected
+      const otherLeaves = allLeafIds.filter(id => id !== 'All_Cancers');
+      const allOthersChecked = otherLeaves.every(id => selectedCancers.has(id));
+      if (allOthersChecked) {
+        selectedCancers.add('All_Cancers');
+      } else {
+        selectedCancers.delete('All_Cancers');
+      }
+    }
     
     renderCategories();
     renderDetails();
@@ -232,6 +294,270 @@
     }
   });
   
+  /* ── 我的最愛預設範本邏輯 ── */
+  let userPresets = [];
+
+  function loadPresets() {
+    const select = document.getElementById('favPresetSelect');
+    if (!select) return;
+
+    fetch('/api/favorites')
+      .then(r => r.json())
+      .then(data => {
+        if (data.ok) {
+          userPresets = data.favorites || [];
+          populatePresetSelect();
+        } else {
+          console.error("無法載入最愛範本: " + data.error);
+          select.innerHTML = '<option value="">— 載入失敗 —</option>';
+        }
+      })
+      .catch(err => {
+        console.error("載入最愛範本出錯", err);
+        select.innerHTML = '<option value="">— 載入失敗 —</option>';
+      });
+  }
+
+  function populatePresetSelect() {
+    const select = document.getElementById('favPresetSelect');
+    if (!select) return;
+
+    if (userPresets.length === 0) {
+      select.innerHTML = '<option value="">— 尚無已儲存的範本 —</option>';
+      togglePresetActionButtons(false);
+      return;
+    }
+
+    let html = '<option value="">— 選擇最愛範本套用 —</option>';
+    userPresets.forEach(preset => {
+      html += `<option value="${preset.id}">${preset.name}</option>`;
+    });
+    select.innerHTML = html;
+    togglePresetActionButtons(false);
+  }
+
+  function togglePresetActionButtons(show) {
+    const btnRename = document.getElementById('btnRenamePreset');
+    const btnDelete = document.getElementById('btnDeletePreset');
+    if (btnRename && btnDelete) {
+      const displayStyle = show ? 'inline-block' : 'none';
+      btnRename.style.display = displayStyle;
+      btnDelete.style.display = displayStyle;
+    }
+  }
+
+  // 套用範本
+  document.getElementById('favPresetSelect')?.addEventListener('change', function(e) {
+    const presetId = parseInt(e.target.value, 10);
+    if (!presetId) {
+      togglePresetActionButtons(false);
+      return;
+    }
+
+    const preset = userPresets.find(p => p.id === presetId);
+    if (!preset) return;
+
+    // 1. 設定性態碼
+    const behaviorSelect = document.getElementById('filterBehavior');
+    if (behaviorSelect) {
+      behaviorSelect.value = preset.behavior;
+    }
+
+    // 2. 套用癌別
+    selectedCancers.clear();
+    if (preset.cancers && preset.cancers.length > 0) {
+      preset.cancers.forEach(id => selectedCancers.add(id));
+    }
+
+    // 3. 更新介面
+    renderCategories();
+    renderDetails();
+    updateStatus();
+    togglePresetActionButtons(true);
+  });
+
+  // 新增範本
+  document.getElementById('btnSavePreset')?.addEventListener('click', function() {
+    const behaviorSelect = document.getElementById('filterBehavior');
+    const behavior = behaviorSelect ? behaviorSelect.value : 'all';
+    const cancers = Array.from(selectedCancers);
+
+    if (cancers.length === 0) {
+      Swal.fire({ icon: 'warning', title: '請先選擇癌別', text: '最愛範本必須包含至少一項癌別設定。', confirmButtonColor: '#2563eb' });
+      return;
+    }
+
+    Swal.fire({
+      title: '將目前條件加入最愛',
+      input: 'text',
+      inputPlaceholder: '請輸入範本名稱（例如：口鼻、大腸分析等）',
+      showCancelButton: true,
+      confirmButtonText: '儲存',
+      cancelButtonText: '取消',
+      confirmButtonColor: '#2563eb',
+      inputValidator: (value) => {
+        if (!value || !value.trim()) {
+          return '範本名稱不能為空！';
+        }
+        if (userPresets.some(p => p.name === value.trim())) {
+          return '已存在相同名稱的範本！';
+        }
+      }
+    }).then(result => {
+      if (result.isConfirmed) {
+        const name = result.value.trim();
+        fetch('/api/favorites', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, behavior, cancers })
+        })
+        .then(r => r.json())
+        .then(data => {
+          if (data.ok) {
+            Swal.fire({ icon: 'success', title: '儲存成功', text: `範本「${name}」已加入我的最愛。`, confirmButtonColor: '#2563eb' });
+            loadPresets();
+          } else {
+            Swal.fire({ icon: 'error', title: '儲存失敗', text: data.error || '未知錯誤', confirmButtonColor: '#2563eb' });
+          }
+        })
+        .catch(err => {
+          Swal.fire({ icon: 'error', title: '儲存失敗', text: '網路或伺服器出錯。', confirmButtonColor: '#2563eb' });
+        });
+      }
+    });
+  });
+
+  // 重新命名範本
+  document.getElementById('btnRenamePreset')?.addEventListener('click', function() {
+    const select = document.getElementById('favPresetSelect');
+    const presetId = parseInt(select ? select.value : '', 10);
+    if (!presetId) return;
+
+    const preset = userPresets.find(p => p.id === presetId);
+    if (!preset) return;
+
+    Swal.fire({
+      title: '重新命名最愛範本',
+      input: 'text',
+      inputValue: preset.name,
+      inputPlaceholder: '請輸入新的範本名稱',
+      showCancelButton: true,
+      confirmButtonText: '修改',
+      cancelButtonText: '取消',
+      confirmButtonColor: '#2563eb',
+      inputValidator: (value) => {
+        if (!value || !value.trim()) {
+          return '範本名稱不能為空！';
+        }
+        if (userPresets.some(p => p.name === value.trim() && p.id !== presetId)) {
+          return '已存在相同名稱的範本！';
+        }
+      }
+    }).then(result => {
+      if (result.isConfirmed) {
+        const name = result.value.trim();
+        fetch(`/api/favorites/${presetId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name })
+        })
+        .then(r => r.json())
+        .then(data => {
+          if (data.ok) {
+            Swal.fire({ icon: 'success', title: '修改成功', text: `已重新命名為「${name}」。`, confirmButtonColor: '#2563eb' });
+            fetch('/api/favorites')
+              .then(r => r.json())
+              .then(data => {
+                if (data.ok) {
+                  userPresets = data.favorites || [];
+                  populatePresetSelect();
+                  // 重新選取該項目
+                  const newSelect = document.getElementById('favPresetSelect');
+                  if (newSelect) {
+                    newSelect.value = presetId;
+                    togglePresetActionButtons(true);
+                  }
+                }
+              });
+          } else {
+            Swal.fire({ icon: 'error', title: '修改失敗', text: data.error || '未知錯誤', confirmButtonColor: '#2563eb' });
+          }
+        })
+        .catch(err => {
+          Swal.fire({ icon: 'error', title: '修改失敗', text: '網路或伺服器出錯。', confirmButtonColor: '#2563eb' });
+        });
+      }
+    });
+  });
+
+  // 刪除範本
+  document.getElementById('btnDeletePreset')?.addEventListener('click', function() {
+    const select = document.getElementById('favPresetSelect');
+    const presetId = parseInt(select ? select.value : '', 10);
+    if (!presetId) return;
+
+    const preset = userPresets.find(p => p.id === presetId);
+    if (!preset) return;
+
+    Swal.fire({
+      title: '確定刪除此最愛範本？',
+      text: `將刪除「${preset.name}」範本`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: '刪除',
+      cancelButtonText: '取消',
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#6c757d'
+    }).then(result => {
+      if (result.isConfirmed) {
+        fetch(`/api/favorites/${presetId}`, {
+          method: 'DELETE'
+        })
+        .then(r => r.json())
+        .then(data => {
+          if (data.ok) {
+            Swal.fire({ icon: 'success', title: '已刪除', text: `範本「${preset.name}」已被刪除。`, confirmButtonColor: '#2563eb' });
+            loadPresets();
+          } else {
+            Swal.fire({ icon: 'error', title: '刪除失敗', text: data.error || '未知錯誤', confirmButtonColor: '#2563eb' });
+          }
+        })
+        .catch(err => {
+          Swal.fire({ icon: 'error', title: '刪除失敗', text: '網路或伺服器出錯。', confirmButtonColor: '#2563eb' });
+        });
+      }
+    });
+  });
+
+  // 載入我的最愛列表
+  loadPresets();
+
+  // 重置按鈕邏輯
+  document.getElementById('btnResetFilters')?.addEventListener('click', function() {
+    // 1. 性態碼恢復預設
+    const behaviorSelect = document.getElementById('filterBehavior');
+    if (behaviorSelect) behaviorSelect.value = 'all';
+
+    // 2. 清空年度輸入框
+    const yearStart = document.getElementById('filterYearStart');
+    const yearEnd = document.getElementById('filterYearEnd');
+    if (yearStart) yearStart.value = '';
+    if (yearEnd) yearEnd.value = '';
+
+    // 3. 清空最愛選單並隱藏操作按鈕
+    const presetSelect = document.getElementById('favPresetSelect');
+    if (presetSelect) presetSelect.value = '';
+    togglePresetActionButtons(false);
+
+    // 4. 清空已選癌別
+    selectedCancers.clear();
+
+    // 5. 重新渲染畫面
+    renderCategories();
+    renderDetails();
+    updateStatus();
+  });
+
   // Initialize
   renderCategories();
   renderDetails();
@@ -273,7 +599,7 @@
         }
       })
       .catch(() => {
-        Swal.fire({ icon: 'error', title: '上傳失敗', text: '網路錯誤', allowOutsideClick: false, confirmButtonColor: '#2563eb' });
+        Swal.fire({ icon: 'error', title: '上傳失敗', allowOutsideClick: false, confirmButtonColor: '#2563eb' });
       })
       .finally(() => {
         btn.disabled = false;
