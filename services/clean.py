@@ -431,7 +431,12 @@ def api_categorize_fields():
     try:
         wb = load_workbook(cleaned_file, read_only=True)
         ws = wb.active
-        headers = [str(cell.value).strip() if cell.value else "" for cell in next(ws.iter_rows(max_row=1))]
+        rows_gen = ws.iter_rows(max_row=1)
+        first_row = next(rows_gen, None)
+        if first_row is None:
+            headers = []
+        else:
+            headers = [str(cell.value).strip() if cell.value else "" for cell in first_row]
         wb.close()
 
         from modules.clean_pipeline.cleaner import FORMAT_RULES_MAP
@@ -442,32 +447,58 @@ def api_categorize_fields():
         alias_to_target = get_field_map(scheme, fmt_name)
         mapped = []
         unmapped = []
-        for h in headers:
-            if not h or h.startswith('_') or h == '錯誤註記說明(A:遺漏值 B:格式不符 C:邏輯錯誤 D:完全正確)':
-                continue
-            if h in alias_to_target:
-                target_name = alias_to_target[h]
-                final_display = target_name
-                
-                if (scheme == 'field_name_zh' or scheme == '中文欄位名稱') and '/' in target_name:
-                    m_target = re.match(r'^(\d+(\.\d+)*)', target_name)
-                    if m_target:
-                        seq = m_target.group(1)
-                        if seq in ['4.2.1.8', '7.6']:
-                            target_raw = target_name[len(seq):].strip()
-                            valid_parts = [p.strip() for p in target_raw.split('/') if p.strip()]
-                            source_raw = h[len(seq):].strip() if h.startswith(seq) else h
-                            
-                            if source_raw in valid_parts:
-                                final_display = f"{seq}{source_raw}"
-                            else:
-                                rule_name = id_to_rule_name.get(seq)
-                                if rule_name:
-                                    final_display = f"{seq}{rule_name}"
-                
-                mapped.append({"key": h, "label": final_display, "target": final_display})
+
+        if scheme == 'original':
+            import json
+            orig_headers_path = os.path.join(project_path, "original_headers.json")
+            if os.path.exists(orig_headers_path):
+                with open(orig_headers_path, "r", encoding="utf-8") as f_orig:
+                    orig_headers = json.load(f_orig)
             else:
-                unmapped.append({"key": h, "label": h})
+                orig_headers = headers
+
+            alias_to_target_zh = get_field_map("field_name_zh", fmt_name)
+            for idx, h in enumerate(headers):
+                if not h or h.startswith('_') or h == '錯誤註記說明(A:遺漏值 B:格式不符 C:邏輯錯誤 D:完全正確)':
+                    continue
+                orig_label = orig_headers[idx] if idx < len(orig_headers) else h
+                if h in alias_to_target_zh:
+                    mapped.append({"key": h, "label": orig_label, "target": orig_label})
+                else:
+                    unmapped.append({"key": h, "label": orig_label})
+        else:
+            from modules.clean_pipeline.cleaner import FORMAT_RULES_MAP
+            fmt_key = f"fmt_{fmt_name}" if not str(fmt_name).startswith("fmt_") else str(fmt_name)
+            rules = FORMAT_RULES_MAP.get(fmt_key, {})
+            id_to_rule_name = {v.get("ID"): k for k, v in rules.items() if v.get("ID")}
+
+            alias_to_target = get_field_map(scheme, fmt_name)
+            for h in headers:
+                if not h or h.startswith('_') or h == '錯誤註記說明(A:遺漏值 B:格式不符 C:邏輯錯誤 D:完全正確)':
+                    continue
+                if h in alias_to_target:
+                    target_name = alias_to_target[h]
+                    final_display = target_name
+                    
+                    if (scheme == 'field_name_zh' or scheme == '中文欄位名稱') and '/' in target_name:
+                        m_target = re.match(r'^(\d+(\.\d+)*)', target_name)
+                        if m_target:
+                            seq = m_target.group(1)
+                            if seq in ['4.2.1.8', '7.6']:
+                                target_raw = target_name[len(seq):].strip()
+                                valid_parts = [p.strip() for p in target_raw.split('/') if p.strip()]
+                                source_raw = h[len(seq):].strip() if h.startswith(seq) else h
+                                
+                                if source_raw in valid_parts:
+                                    final_display = f"{seq}{source_raw}"
+                                else:
+                                    rule_name = id_to_rule_name.get(seq)
+                                    if rule_name:
+                                        final_display = f"{seq}{rule_name}"
+                    
+                    mapped.append({"key": h, "label": final_display, "target": final_display})
+                else:
+                    unmapped.append({"key": h, "label": h})
         
         mapped.sort(key=lambda x: _natural_sort_key(x['label']))
         unmapped.sort(key=lambda x: _natural_sort_key(x['label']))
@@ -507,6 +538,7 @@ def api_export():
     id_to_rule_name = {v.get("ID"): k for k, v in rules.items() if v.get("ID")}
 
     scheme_display = {
+        "original":"原始匯入資料欄位名稱",
         "field_name_zh":"中文欄位名稱",
         "field_name_en":"英文欄位名稱",
         "ntu_yunlin":"台大雲林欄位名稱",
@@ -519,48 +551,89 @@ def api_export():
         ws = wb.active
         headers = [str(cell.value).strip() if cell.value else "" for cell in ws[1]]
         
-        unique_targets = sorted(list(set(alias_to_target.values())), key=_natural_sort_key)
         output_cols = []
         used_orig_indices = set()
 
-        for target_name in unique_targets:
-            source_idx = None
-            final_display_name = target_name
+        if scheme == 'original':
+            import json
+            orig_headers_path = os.path.join(project_path, "original_headers.json")
+            if os.path.exists(orig_headers_path):
+                with open(orig_headers_path, "r", encoding="utf-8") as f_orig:
+                    orig_headers = json.load(f_orig)
+            else:
+                orig_headers = headers
+
+            alias_to_target_zh = get_field_map("field_name_zh", fmt_name)
+            unique_targets = sorted(list(set(alias_to_target_zh.values())), key=_natural_sort_key)
+
+            for target_name in unique_targets:
+                source_idx = None
+                for i, h in enumerate(headers):
+                    if h == target_name or (h in alias_to_target_zh and alias_to_target_zh[h] == target_name):
+                        source_idx = i + 1
+                        break
+                if source_idx:
+                    orig_label = orig_headers[source_idx - 1] if (source_idx - 1) < len(orig_headers) else target_name
+                    output_cols.append((source_idx, orig_label))
+                    used_orig_indices.add(source_idx)
+
+            # 2. Add extra manually selected fields
+            for field in selected_fields:
+                if field in headers:
+                    orig_idx = headers.index(field) + 1
+                    if orig_idx not in used_orig_indices:
+                        orig_label = orig_headers[orig_idx - 1] if (orig_idx - 1) < len(orig_headers) else field
+                        output_cols.append((orig_idx, orig_label))
+                        used_orig_indices.add(orig_idx)
+        else:
+            alias_to_target = get_field_map(scheme, fmt_name)
             
-            for i, h in enumerate(headers):
-                if h in alias_to_target and alias_to_target[h] == target_name:
-                    source_idx = i + 1
-                    
-                    if scheme_display == '中文欄位名稱' and '/' in target_name:
-                        m_target = re.match(r'^(\d+(\.\d+)*)', target_name)
-                        if m_target:
-                            seq_prefix = m_target.group(1)
-                            if seq_prefix in ['4.2.1.8', '7.6']:
-                                target_raw_name = target_name[len(seq_prefix):].strip()
-                                valid_parts = [p.strip() for p in target_raw_name.split('/') if p.strip()]
-                                
-                                rule_name = id_to_rule_name.get(seq_prefix)
-                                if rule_name:
-                                    final_display_name = f"{seq_prefix}{rule_name}"
+            from modules.clean_pipeline.cleaner import FORMAT_RULES_MAP
+            fmt_key = f"fmt_{fmt_name}" if not str(fmt_name).startswith("fmt_") else str(fmt_name)
+            rules = FORMAT_RULES_MAP.get(fmt_key, {})
+            id_to_rule_name = {v.get("ID"): k for k, v in rules.items() if v.get("ID")}
 
-                                if h.startswith(seq_prefix):
-                                    source_raw_name = h[len(seq_prefix):].strip()
-                                    if source_raw_name in valid_parts:
-                                        final_display_name = h
-                    break
+            unique_targets = sorted(list(set(alias_to_target.values())), key=_natural_sort_key)
 
-            if source_idx:
-                output_cols.append((source_idx, final_display_name))
-                used_orig_indices.add(source_idx)
+            for target_name in unique_targets:
+                source_idx = None
+                final_display_name = target_name
+                
+                for i, h in enumerate(headers):
+                    if h in alias_to_target and alias_to_target[h] == target_name:
+                        source_idx = i + 1
+                        
+                        if scheme_display == '中文欄位名稱' and '/' in target_name:
+                            m_target = re.match(r'^(\d+(\.\d+)*)', target_name)
+                            if m_target:
+                                seq_prefix = m_target.group(1)
+                                if seq_prefix in ['4.2.1.8', '7.6']:
+                                    target_raw_name = target_name[len(seq_prefix):].strip()
+                                    valid_parts = [p.strip() for p in target_raw_name.split('/') if p.strip()]
+                                    
+                                    rule_name = id_to_rule_name.get(seq_prefix)
+                                    if rule_name:
+                                        final_display_name = f"{seq_prefix}{rule_name}"
 
-        # 2. Add extra manually selected fields (that are NOT in the module)
-        for field in selected_fields:
-            if field in headers:
-                orig_idx = headers.index(field) + 1
-                if orig_idx not in used_orig_indices:
-                    output_cols.append((orig_idx, field))
-                    used_orig_indices.add(orig_idx)
+                                    if h.startswith(seq_prefix):
+                                        source_raw_name = h[len(seq_prefix):].strip()
+                                        if source_raw_name in valid_parts:
+                                            final_display_name = h
+                        break
 
+                if source_idx:
+                    output_cols.append((source_idx, final_display_name))
+                    used_orig_indices.add(source_idx)
+
+            # 2. Add extra manually selected fields
+            for field in selected_fields:
+                if field in headers:
+                    orig_idx = headers.index(field) + 1
+                    if orig_idx not in used_orig_indices:
+                        output_cols.append((orig_idx, field))
+                        used_orig_indices.add(orig_idx)
+
+        # 3. Add error annotation column
         err_col_name = '錯誤註記說明(A:遺漏值 B:格式不符 C:邏輯錯誤 D:完全正確)'
         if err_col_name in headers:
             err_idx = headers.index(err_col_name) + 1
@@ -639,49 +712,90 @@ def api_preview():
         wb = load_workbook(cleaned_file, data_only=True)
         ws = wb.active
         headers = [str(cell.value).strip() if cell.value else "" for cell in ws[1]]
-        
-        unique_targets = sorted(list(set(alias_to_target.values())), key=_natural_sort_key)
+
         output_cols = []
         used_orig_indices = set()
 
-        for target_name in unique_targets:
-            source_idx = None
-            final_display_name = target_name
+        if scheme == 'original':
+            import json
+            orig_headers_path = os.path.join(project_path, "original_headers.json")
+            if os.path.exists(orig_headers_path):
+                with open(orig_headers_path, "r", encoding="utf-8") as f_orig:
+                    orig_headers = json.load(f_orig)
+            else:
+                orig_headers = headers
+
+            alias_to_target_zh = get_field_map("field_name_zh", fmt_name)
+            unique_targets = sorted(list(set(alias_to_target_zh.values())), key=_natural_sort_key)
+
+            for target_name in unique_targets:
+                source_idx = None
+                for i, h in enumerate(headers):
+                    if h == target_name or (h in alias_to_target_zh and alias_to_target_zh[h] == target_name):
+                        source_idx = i + 1
+                        break
+                if source_idx:
+                    orig_label = orig_headers[source_idx - 1] if (source_idx - 1) < len(orig_headers) else target_name
+                    output_cols.append((source_idx, orig_label))
+                    used_orig_indices.add(source_idx)
+
+            # 2. Add extra manually selected fields
+            for f in selected_fields:
+                if f in headers:
+                    idx = headers.index(f) + 1
+                    if idx not in used_orig_indices:
+                        orig_label = orig_headers[idx - 1] if (idx - 1) < len(orig_headers) else f
+                        output_cols.append((idx, orig_label))
+                        used_orig_indices.add(idx)
+        else:
+            alias_to_target = get_field_map(scheme, fmt_name)
             
-            for i, h in enumerate(headers):
-                if h in alias_to_target and alias_to_target[h] == target_name:
-                    source_idx = i + 1
-                    
-                    if (scheme == 'field_name_zh' or scheme == '中文欄位名稱') and '/' in target_name:
-                        m_target = re.match(r'^(\d+(\.\d+)*)', target_name)
-                        if m_target:
-                            seq_prefix = m_target.group(1)
-                            if seq_prefix in ['4.2.1.8', '7.6']:
-                                target_raw_name = target_name[len(seq_prefix):].strip()
-                                valid_parts = [p.strip() for p in target_raw_name.split('/') if p.strip()]
+            from modules.clean_pipeline.cleaner import FORMAT_RULES_MAP
+            fmt_key = f"fmt_{fmt_name}" if not str(fmt_name).startswith("fmt_") else str(fmt_name)
+            rules = FORMAT_RULES_MAP.get(fmt_key, {})
+            id_to_rule_name = {v.get("ID"): k for k, v in rules.items() if v.get("ID")}
 
-                                rule_name = id_to_rule_name.get(seq_prefix)
-                                if rule_name:
-                                    final_display_name = f"{seq_prefix}{rule_name}"
+            unique_targets = sorted(list(set(alias_to_target.values())), key=_natural_sort_key)
 
-                                if h.startswith(seq_prefix):
-                                    source_raw_name = h[len(seq_prefix):].strip()
-                                    if source_raw_name in valid_parts:
-                                        final_display_name = h
+            for target_name in unique_targets:
+                source_idx = None
+                final_display_name = target_name
+                
+                for i, h in enumerate(headers):
+                    if h in alias_to_target and alias_to_target[h] == target_name:
+                        source_idx = i + 1
+                        
+                        if (scheme == 'field_name_zh' or scheme == '中文欄位名稱') and '/' in target_name:
+                            m_target = re.match(r'^(\d+(\.\d+)*)', target_name)
+                            if m_target:
+                                seq_prefix = m_target.group(1)
+                                if seq_prefix in ['4.2.1.8', '7.6']:
+                                    target_raw_name = target_name[len(seq_prefix):].strip()
+                                    valid_parts = [p.strip() for p in target_raw_name.split('/') if p.strip()]
+                                    
+                                    rule_name = id_to_rule_name.get(seq_prefix)
+                                    if rule_name:
+                                        final_display_name = f"{seq_prefix}{rule_name}"
+
+                                    if h.startswith(seq_prefix):
+                                        source_raw_name = h[len(seq_prefix):].strip()
+                                        if source_raw_name in valid_parts:
+                                            final_display_name = h
                             break
-            
-            if source_idx:
-                output_cols.append((source_idx, final_display_name))
-                used_orig_indices.add(source_idx)
-        
-        # 2. Add extra manually selected fields
-        for f in selected_fields:
-            if f in headers:
-                idx = headers.index(f) + 1
-                if idx not in used_orig_indices:
-                    output_cols.append((idx, f))
-                    used_orig_indices.add(idx)
+                
+                if source_idx:
+                    output_cols.append((source_idx, final_display_name))
+                    used_orig_indices.add(source_idx)
 
+            # 2. Add extra manually selected fields
+            for f in selected_fields:
+                if f in headers:
+                    idx = headers.index(f) + 1
+                    if idx not in used_orig_indices:
+                        output_cols.append((idx, f))
+                        used_orig_indices.add(idx)
+
+        # 3. Add error annotation column
         err_f = '錯誤註記說明(A:遺漏值 B:格式不符 C:邏輯錯誤 D:完全正確)'
         if err_f in headers:
             idx = headers.index(err_f) + 1
@@ -839,6 +953,7 @@ def api_clean():
     if not filename: filename = "uploaded_file"
     file_ext = os.path.splitext(filename)[1].lower()
     base_name = os.path.splitext(filename)[0]
+    has_no_headers = (file_ext == '.txt' and not convert_txt_flag)
 
     # --- TXT 處理邏輯 ---
     if file_ext == '.txt':
@@ -885,7 +1000,7 @@ def api_clean():
                 conn.close()
                 return jsonify({"ok": False, "error": f"標頭驗證失敗: {str(e)}"}), 500
         else:
-            # --- 未勾選標頭：檢查長度 ---
+            # 未勾選標頭：檢查長度
             fmt_val = str(fmt_name).replace("fmt_", "")
             cursor.execute("SELECT MAX([End]) FROM CancerRegistry_Fields WHERE [fmt]=? GROUP BY [fmt]", (fmt_val,))
             row = cursor.fetchone()
@@ -988,6 +1103,20 @@ def api_clean():
     base_name, out_path, rep_path, working_file, date_error_file = _job_files(project_folder, filename, fmt_name)
     
     try:
+        wb_orig = load_workbook(process_path, read_only=True)
+        orig_ws = wb_orig.active
+        orig_rows_gen = orig_ws.iter_rows(max_row=1)
+        orig_first_row = next(orig_rows_gen, None)
+        if orig_first_row is None:
+            orig_headers = []
+        else:
+            orig_headers = [str(cell.value).strip() if cell.value is not None else "" for cell in orig_first_row]
+        wb_orig.close()
+        
+        import json
+        with open(os.path.join(project_folder, "original_headers.json"), "w", encoding="utf-8") as f_orig:
+            json.dump(orig_headers, f_orig, ensure_ascii=False)
+
         validate_and_unify_headers_in_file(process_path, fmt_name)
         
         _create_working_file(process_path, working_file)
@@ -1020,7 +1149,7 @@ def api_clean():
 
     output_fields = [{"key": col, "label": col} for col in sorted_df.columns if not col.startswith('_')]
     
-    detected_system, _ = detect_system(sorted_df.columns)
+    detected_system, _ = detect_system(orig_headers)
 
     date_error_count = len(date_errors)
 
@@ -1040,6 +1169,7 @@ def api_clean():
         "project_id": JobID,
         "job_id": JobID,
         "detected_system": detected_system,
+        "has_no_headers": has_no_headers,
         "message": message,
         "can_continue": can_continue,
         "stats": {

@@ -238,7 +238,7 @@ def process_file():
             'taiwan_cancer_registry': 5,
             'AI_module': 6
         }
-        target_idx = scheme_idx_map.get(naming_scheme, 1)
+        target_idx = 1 if naming_scheme == 'original' else scheme_idx_map.get(naming_scheme, 1)
 
         for r in rows:
             seq = str(r[0]).strip().replace('.0', '')
@@ -270,28 +270,31 @@ def process_file():
 
         for col in df.columns:
             if col in alias_to_target:
-                target_name = alias_to_target[col]
-                final_name = target_name
-                
-                if naming_scheme == 'field_name_zh' and '/' in target_name:
-                    m_target = re.match(r'^(\d+(\.\d+)*)', target_name)
-                    if m_target:
-                        seq = m_target.group(1)
-                        if seq in ['4.2.1.8', '7.6']:
+                if naming_scheme == 'original':
+                    final_name = col
+                else:
+                    target_name = alias_to_target[col]
+                    final_name = target_name
+                    
+                    if naming_scheme == 'field_name_zh' and '/' in target_name:
+                        m_target = re.match(r'^(\d+(\.\d+)*)', target_name)
+                        if m_target:
+                            seq = m_target.group(1)
+                            if seq in ['4.2.1.8', '7.6']:
 
-                             target_raw_name = target_name[len(seq):].strip()
-                             valid_parts = [p.strip() for p in target_raw_name.split('/') if p.strip()]
-                             
-                             found_part = None
-                             if col.startswith(seq):
-                                 source_raw_name = col[len(seq):].strip()
-                                 if source_raw_name in valid_parts:
-                                     found_part = source_raw_name
+                                 target_raw_name = target_name[len(seq):].strip()
+                                 valid_parts = [p.strip() for p in target_raw_name.split('/') if p.strip()]
+                                 
+                                 found_part = None
+                                 if col.startswith(seq):
+                                     source_raw_name = col[len(seq):].strip()
+                                     if source_raw_name in valid_parts:
+                                         found_part = source_raw_name
 
-                             if found_part:
-                                 final_name = f"{seq}{found_part}"
-                             elif seq in DEFAULT_PREFERENCE:
-                                 final_name = f"{seq}{DEFAULT_PREFERENCE[seq]}"
+                                 if found_part:
+                                     final_name = f"{seq}{found_part}"
+                                 elif seq in DEFAULT_PREFERENCE:
+                                     final_name = f"{seq}{DEFAULT_PREFERENCE[seq]}"
                 
                 rename_map[col] = final_name
 
@@ -352,6 +355,10 @@ def process_file():
             for c in df.columns:
                 if c.startswith(seq_prefix):
                     return c
+                # Check alias mapping for original scheme
+                for orig_c, target_h in alias_to_target.items():
+                    if orig_c == c and target_h.startswith(seq_prefix):
+                        return c
             return None
 
         cno_col = find_col_by_seq_or_key("1.2")
