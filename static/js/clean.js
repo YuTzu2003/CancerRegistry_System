@@ -4,7 +4,7 @@
   const $$ = (sel, ctx = document) => Array.from(ctx.querySelectorAll(sel));
   let currentJobId = null;
 
-  // ----------Step控制 ----------
+  // Step控制
   function setStep(n) {
     $$('#stepper .step').forEach((el) => {
       const s = Number(el.dataset.step);
@@ -13,7 +13,7 @@
     });
   }
 
-  // ---------- 格式管理(CRUD) ----------
+  // 格式管理(CRUD)
   document.addEventListener('DOMContentLoaded', () => {
     const modal = document.getElementById('formatModal');
     const btnAdd = document.getElementById('btnAddFormat');
@@ -86,7 +86,7 @@
     });
   });
 
-  // ---------- 檔案上傳與預覽 ----------
+  // 檔案上傳與預覽
   const fileInput = $('#fileInput');
   const fileChosen = $('#fileChosen');
   const fileName = $('#fileName');
@@ -112,7 +112,7 @@
       if (txtOption) txtOption.style.display = 'none';
     }
   }
-  // ---------- 重置 ----------
+  // 重置 
   function resetUI() {
     currentJobId = null;
     setStep(1);
@@ -156,7 +156,7 @@
     setTimeout(updateFilePreview, 10);
   });
 
-  // ---------- 表單提交與Loading控制 ----------
+  // 表單提交與Loading控制
   $('#cleanForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const formatId = $('#formatSelect').value;
@@ -273,19 +273,19 @@
     }
   });
 
-  // ---------- 清洗結果 ----------
+  // 清洗結果
   function renderResult(data) {
     if (data.job_id || data.project_id) {
       currentJobId = data.job_id || data.project_id;
     }
 
-    // 預設切換至「全國癌登手冊欄位序號+中文欄位名稱」
+    // 預設切換至中文欄位名稱
     const zhRadio = $('input[name="nameScheme"][value="field_name_zh"]');
     if (zhRadio) {
       zhRadio.checked = true;
     }
 
-    // 依據是否為無標頭固定長度 TXT 動態停用或啟用「原始匯入資料欄位名稱」選項
+    // 依據是否為無標頭固定長度 TXT 動態停用或啟用原始匯入資料欄位名稱選項
     const originalRadio = $('input[name="nameScheme"][value="original"]');
     if (originalRadio) {
       if (data.has_no_headers) {
@@ -584,7 +584,7 @@
     `;
   }
 
-  // ---------- 欄位輸出設定 ----------
+  // 欄位輸出設定
   async function updateFieldCategorization() {
     if (!currentJobId) return;
     
@@ -646,7 +646,7 @@
   $$('#namingScheme input[type="radio"]').forEach(r => r.addEventListener('change', syncNamingSelection));
   syncNamingSelection();
 
-  // ---------- 下載清洗結果 ----------
+  // 下載清洗結果 
   $('#btnDownloadCleaned')?.addEventListener('click', () => {
     if (!currentJobId) return utils.alert('尚未執行清洗任務', 'warning');
     window.location.href = `/api/download/cleaned/${currentJobId}`;
@@ -657,7 +657,7 @@
     window.location.href = `/api/download/report/${currentJobId}`;
   });
 
-  // ---------- 匯出 XLSX ----------
+  // 匯出 XLSX
   $('#btnExportXlsx')?.addEventListener('click', async () => {
     if (!currentJobId) return utils.alert('尚未執行清洗任務', 'warning');
     
@@ -715,7 +715,7 @@
     }
   });
 
-  // ---------- 預覽功能 ----------
+  // 預覽功能
   $('#btnPreviewOutput')?.addEventListener('click', async () => {
     if (!currentJobId) return utils.alert('尚未執行清洗任務', 'warning');
     
@@ -802,7 +802,7 @@
     return null;
   }
 
-  // ---------- 日期邏輯錯誤線上修正 ----------
+  // 日期邏輯錯誤線上修正
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Enter' && e.code !== 'NumpadEnter') return;
     if (e.repeat) return;

@@ -16,7 +16,6 @@ def detect_system(excel_columns):
     df_mapping = pd.DataFrame.from_records(rows, columns=columns)
     conn.close()
 
-    # 去除空格並轉小寫，以便進行不分大小寫與空白的對照
     excel_cols_set = set(re.sub(r'\s+', '', str(col)).strip().lower() for col in excel_columns if col)
     scores = {}
     for s in systems:
@@ -256,7 +255,6 @@ def validate_and_rename_headers(headers, fmt_name):
         match = re.match(r"^(\d+(?:\.\d+)+)(.*)$", col_str)
         if match:
             seq = match.group(1).strip()
-            # 以序號作為優先判定條件：只要序號存在於該格式中，就直接匹配為統一格式 {序號}{標準中文欄位名稱}
             if seq in seq_to_std_name:
                 std_name = seq_to_std_name[seq]
                 renamed_headers.append(f"{seq}{std_name}")

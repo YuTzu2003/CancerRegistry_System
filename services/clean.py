@@ -1000,7 +1000,7 @@ def api_clean():
                 conn.close()
                 return jsonify({"ok": False, "error": f"標頭驗證失敗: {str(e)}"}), 500
         else:
-            # --- 未勾選標頭：檢查長度 ---
+            # 未勾選標頭：檢查長度
             fmt_val = str(fmt_name).replace("fmt_", "")
             cursor.execute("SELECT MAX([End]) FROM CancerRegistry_Fields WHERE [fmt]=? GROUP BY [fmt]", (fmt_val,))
             row = cursor.fetchone()
@@ -1103,7 +1103,6 @@ def api_clean():
     base_name, out_path, rep_path, working_file, date_error_file = _job_files(project_folder, filename, fmt_name)
     
     try:
-        # 讀取並儲存原始標頭，供後續以「原始匯入名稱」匯出與預覽時使用
         wb_orig = load_workbook(process_path, read_only=True)
         orig_ws = wb_orig.active
         orig_rows_gen = orig_ws.iter_rows(max_row=1)
