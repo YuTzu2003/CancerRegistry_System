@@ -4,12 +4,7 @@ import logging
 import sys
 from dotenv import load_dotenv
 import datetime
-from werkzeug.utils import secure_filename
-from modules.services import (
-    auth_bp, login_required, admin_required,
-    member_bp, history_bp, clean_bp, 
-    data_gen_bp, favorites_bp
-)
+from modules.services import auth_bp, login_required, member_bp, history_bp, clean_bp, data_gen_bp, dashboard_bp
 from modules.services.db import get_conn
 
 load_dotenv()
@@ -26,7 +21,7 @@ app.register_blueprint(member_bp)
 app.register_blueprint(history_bp)
 app.register_blueprint(clean_bp)
 app.register_blueprint(data_gen_bp)
-app.register_blueprint(favorites_bp)
+app.register_blueprint(dashboard_bp)
 
 BASE_DIR = os.path.dirname(__file__)
 Jobs_FOLDER = 'work/Jobs'
@@ -83,7 +78,6 @@ def dataGen():
 
 
 def _list_dashboard_files():
-    """List Excel files in work/data, sorted by modification time descending."""
     files = []
     if os.path.isdir(DASHBOARD_DATA):
         for fname in os.listdir(DASHBOARD_DATA):

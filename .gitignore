@@ -18,6 +18,5 @@ test/
 *.pptx
 *.doc
 *.txt
-*.pdf
 .env
 *.json
