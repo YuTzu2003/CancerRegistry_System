@@ -1,11 +1,11 @@
-from modules.clean_pipeline.special_rules.common import (
+from modules.blueprint.clean.special_rules.common import (
     clean_value,
     build_id_to_column,
     id_between,
     make_all_9,
 )
 
-from modules.clean_pipeline.rules.validate import (
+from modules.blueprint.clean.rules.validate import (
     parse_cancer_date,
     compare_cancer_date,
 )

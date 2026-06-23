@@ -2,7 +2,7 @@ import os
 import json
 import logging
 from flask import Blueprint, request, session, jsonify
-from services.auth import login_required
+from modules.services.auth import login_required
 
 favorites_bp = Blueprint('favorites', __name__)
 

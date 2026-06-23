@@ -3,17 +3,17 @@ import os
 import logging
 import sys
 from dotenv import load_dotenv
-
-load_dotenv()
 import datetime
 from werkzeug.utils import secure_filename
-from services.auth import auth_bp, login_required, admin_required
-from services.member import member_bp
-from services.history import history_bp
-from services.clean import clean_bp
-from services.data_gen import data_gen_bp
-from services.dashboard import favorites_bp
-from modules.db import get_conn
+from modules.services.auth import auth_bp, login_required, admin_required
+from modules.services.member import member_bp
+from modules.services.history import history_bp
+from modules.services.clean import clean_bp
+from modules.services.data_gen import data_gen_bp
+from modules.services.dashboard import favorites_bp
+from modules.services.db import get_conn
+
+load_dotenv()
 
 logging.basicConfig(level=logging.INFO,format='%(asctime)s | %(levelname)s | %(message)s',datefmt='%Y-%m-%d %H:%M:%S',handlers=[logging.StreamHandler(sys.stdout)])
 werkzeug_logger = logging.getLogger('werkzeug')

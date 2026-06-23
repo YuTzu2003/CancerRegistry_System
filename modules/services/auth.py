@@ -1,7 +1,7 @@
 import logging
 from functools import wraps
 from flask import Blueprint, request, session, redirect, url_for, render_template, flash, jsonify
-from modules.db import get_conn 
+from modules.services.db import get_conn 
 
 auth_bp = Blueprint('auth', __name__)
 
