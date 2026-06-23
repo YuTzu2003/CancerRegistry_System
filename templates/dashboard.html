@@ -130,7 +130,7 @@
         <button type="button" id="btnSavePreset" class="btn btn-warning text-dark fw-bold d-flex align-items-center gap-1.5" style="padding: 7px 16px; font-size: 14px; border: none; background: #ffc107; border-radius: var(--radius-sm);">
           <i class="bi bi-star"></i> 加入最愛
         </button>
-        <button class="btn-black" type="button" style="padding: 7px 16px;"><i class="bi bi-search"></i> 查詢</button>
+        <button id="btnRunQuery" class="btn-black" type="button" style="padding: 7px 16px;"><i class="bi bi-search"></i> 查詢</button>
         <button id="btnResetFilters" class="btn-black-outline" type="button" style="padding: 7px 16px;"><i class="bi bi-arrow-counterclockwise"></i> 重置</button>
       </div>
     </div>
@@ -345,8 +345,8 @@
       var myChart = echarts.init(chartDom);
       var option = {
         title: {
-          text: 'Referer of a Website',
-          subtext: 'Fake Data',
+          text: '性別與年齡分佈',
+          subtext: '請點擊查詢載入資料',
           left: 'center'
         },
         tooltip: {
@@ -364,19 +364,12 @@
             saveAsImage: {show: true}
           }
         },
-
         series: [
           {
-            name: 'Access From',
+            name: '人數',
             type: 'pie',
             radius: '50%',
-            data: [
-              { value: 1048, name: 'Search Engine' },
-              { value: 735, name: 'Direct' },
-              { value: 580, name: 'Email' },
-              { value: 484, name: 'Union Ads' },
-              { value: 300, name: 'Video Ads' }
-            ],
+            data: [],
             emphasis: {
               itemStyle: {
                 shadowBlur: 10,
@@ -394,25 +387,12 @@
       var barChartDom = document.getElementById('barChart');
       var myBarChart = echarts.init(barChartDom);
       var barOption = {
-          xAxis: {
-              type: 'category',
-              data: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-          },
-          yAxis: {
-              type: 'value'
-          },
-          series: [
-              {
-                  data: [120, 200, 150, 80, 70, 110, 130],
-                  type: 'bar'
-              }
-          ],
           title: {
-          text: 'Referer of a Website',
-          subtext: 'Fake Data',
-          left: 'center'
-        },
-        tooltip: {
+              text: '本院常見癌症 (Top 10)',
+              subtext: '請點擊查詢載入資料',
+              left: 'center'
+          },
+          tooltip: {
           trigger: 'item'
         },
         legend: {
@@ -427,6 +407,19 @@
             saveAsImage: {show: true}
           }
         },
+          xAxis: {
+              type: 'category',
+              data: []
+          },
+          yAxis: {
+              type: 'value'
+          },
+          series: [
+              {
+                  data: [],
+                  type: 'bar'
+              }
+          ]
       };
       myBarChart.setOption(barOption);
 
@@ -434,6 +427,73 @@
           myChart.resize();
           myBarChart.resize();
       });
+
+      // --- File Selection Logic ---
+      const fileRows = document.querySelectorAll('#dashFileListBody tr');
+      fileRows.forEach(row => {
+          if (row.querySelector('a')) {
+              row.addEventListener('click', function(e) {
+                  if (e.target.closest('.btn-del-file')) return;                 
+                  e.preventDefault();
+                  fileRows.forEach(r => {
+                      r.classList.remove('table-active');
+                      const link = r.querySelector('a');
+                      if(link) link.classList.replace('text-primary', 'text-dark');
+                  });
+                  this.classList.add('table-active');
+                  const activeLink = this.querySelector('a');
+                  if(activeLink) activeLink.classList.replace('text-dark', 'text-primary');
+              });
+          }
+      });
+
+      // --- Fetch Real Data on Query Button Click ---
+      const btnRunQuery = document.getElementById('btnRunQuery');
+      if (btnRunQuery) {
+          btnRunQuery.addEventListener('click', function() {
+              
+              let selectedFile = '';
+              const activeRow = document.querySelector('#dashFileListBody tr.table-active');
+              if (activeRow) {
+                  const link = activeRow.querySelector('a');
+                  if (link) selectedFile = link.innerText.trim();
+              }
+
+              if (!selectedFile) {
+                  alert('請先從上方檔案列表點選要分析的檔案！');
+                  return;
+              }
+
+              fetch('/api/dashboard/analyze_file', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ filename: selectedFile })
+              })
+              .then(res => res.json())
+              .then(data => {
+                  if (data.ok) {
+                      const chartData = data.data;
+                      // Update Pie Chart
+                      myChart.setOption({
+                          title: { text: '性別與年齡分佈', subtext: selectedFile },
+                          series: [{ data: chartData.genderAgeData }]
+                      });
+                      // Update Bar Chart
+                      myBarChart.setOption({
+                          title: { text: '本院常見癌症 (Top 10)', subtext: selectedFile },
+                          xAxis: { data: chartData.topCancersData.labels },
+                          series: [{ data: chartData.topCancersData.values }]
+                      });
+                  } else {
+                      alert('資料分析失敗: ' + data.error);
+                  }
+              })
+              .catch(err => {
+                  console.error('API 錯誤:', err);
+                  alert('發生系統錯誤，請稍後再試。');
+              });
+          });
+      }
   });
 
   

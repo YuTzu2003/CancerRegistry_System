@@ -61,3 +61,21 @@ def delete_favorite(fav_id):
         return jsonify({"ok": False, "error": "找不到該最愛範本"}), 404      
     save_user_favorites(db_id, new_user_favs)
     return jsonify({"ok": True}), 200
+
+@dashboard_bp.route('/api/dashboard/analyze_file', methods=['POST'])
+@login_required
+def analyze_dashboard_file_route():
+    data = request.json or {}
+    filename = data.get("filename", "")
+    
+    if not filename:
+        return jsonify({"ok": False, "error": "未提供檔案名稱"}), 400
+        
+    try:
+        from modules.blueprint.dashboard.chart_analytics import analyze_dashboard_file
+        chart_data = analyze_dashboard_file(filename)
+        return jsonify({"ok": True, "data": chart_data}), 200
+    except Exception as e:
+        import logging
+        logging.error(f"Error analyzing dashboard file: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
