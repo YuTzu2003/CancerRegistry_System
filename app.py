@@ -5,12 +5,11 @@ import sys
 from dotenv import load_dotenv
 import datetime
 from werkzeug.utils import secure_filename
-from modules.services.auth import auth_bp, login_required, admin_required
-from modules.services.member import member_bp
-from modules.services.history import history_bp
-from modules.services.clean import clean_bp
-from modules.services.data_gen import data_gen_bp
-from modules.services.dashboard import favorites_bp
+from modules.services import (
+    auth_bp, login_required, admin_required,
+    member_bp, history_bp, clean_bp, 
+    data_gen_bp, favorites_bp
+)
 from modules.services.db import get_conn
 
 load_dotenv()
