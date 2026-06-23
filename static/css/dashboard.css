@@ -89,6 +89,31 @@
   margin-bottom: 6px;
   color: var(--gray-300);
 }
+.naming-chip.checkbox-chip {
+    align-items: center;
+}
+.naming-chip.checkbox-chip .nc-mark {
+  border-radius: 4px; /* Square box instead of circle */
+  top: auto;
+  margin-top: 0;
+}
+.naming-chip.checkbox-chip .nc-body {
+  margin-top: 0;
+}
+.naming-chip.checkbox-chip .nc-title {
+  font-weight: normal;
+}
+.naming-chip.checkbox-chip.selected .nc-mark::after {
+  content: '';
+  width: 5px;
+  height: 10px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  background: transparent;
+  border-radius: 0;
+  margin-top: -2px;
+}
 @media (max-width: 900px) {
   .upload-grid { grid-template-columns: 1fr; }
 }

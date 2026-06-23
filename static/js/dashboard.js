@@ -642,3 +642,76 @@
     });
   });
 })();
+
+/* ── Analysis Items Checkbox Logic ── */
+(function() {
+  const table = document.getElementById('analysisItemsTable');
+  if (!table) return;
+
+  // Handle Group Checkbox (Check all items under it)
+  table.querySelectorAll('.group-checkbox').forEach(groupChk => {
+    groupChk.addEventListener('change', function() {
+      const groupName = this.dataset.group;
+      const isChecked = this.checked;
+      
+      // Toggle selected class on group checkbox
+      const groupChip = this.closest('.field-chip') || this.closest('.naming-chip');
+      if (groupChip) groupChip.classList.toggle('selected', isChecked);
+      
+      // Select all item checkboxes belonging to this group
+      const items = table.querySelectorAll(`.item-checkbox[data-parent="${groupName}"]`);
+      items.forEach(item => {
+        item.checked = isChecked;
+        const chip = item.closest('.field-chip') || item.closest('.naming-chip');
+        if (chip) chip.classList.toggle('selected', isChecked);
+      });
+
+      // Toggle visibility of sub-items container
+      const subItemsContainer = document.getElementById(`subItems-${groupName}`);
+      if (subItemsContainer) {
+        if (isChecked) {
+          subItemsContainer.classList.remove('d-none');
+        } else {
+          subItemsContainer.classList.add('d-none');
+        }
+      }
+    });
+  });
+
+  // Handle Item Checkbox (Update parent group)
+  table.querySelectorAll('.item-checkbox').forEach(itemChk => {
+    itemChk.addEventListener('change', function() {
+      const chip = this.closest('.field-chip') || this.closest('.naming-chip');
+      if (chip) chip.classList.toggle('selected', this.checked);
+
+      const parentGroup = this.dataset.parent;
+      updateGroupCheckbox(parentGroup);
+    });
+  });
+
+  function updateGroupCheckbox(groupName) {
+    const groupChk = table.querySelector(`.group-checkbox[data-group="${groupName}"]`);
+    if (!groupChk) return;
+    
+    const items = table.querySelectorAll(`.item-checkbox[data-parent="${groupName}"]`);
+    const allChecked = items.length > 0 && Array.from(items).every(item => item.checked);
+    const someChecked = items.length > 0 && Array.from(items).some(item => item.checked);
+    
+    groupChk.checked = allChecked;
+    groupChk.indeterminate = someChecked && !allChecked;
+    
+    const chip = groupChk.closest('.field-chip') || groupChk.closest('.naming-chip');
+    if (chip) chip.classList.toggle('selected', someChecked);
+
+    // Toggle visibility of sub-items container
+    const subItemsContainer = document.getElementById(`subItems-${groupName}`);
+    if (subItemsContainer) {
+      if (someChecked) {
+        subItemsContainer.classList.remove('d-none');
+      } else {
+        subItemsContainer.classList.add('d-none');
+      }
+    }
+  }
+})();
+// ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
