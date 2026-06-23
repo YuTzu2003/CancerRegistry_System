@@ -78,55 +78,213 @@
   </div>
 </section>
 
-<!-- ── 篩選條件 ──────────────────────────── -->
-<section style="margin-bottom: 22px;">
-  <!-- 我的最愛預設範本管理列 -->
-  <div class="d-flex flex-wrap align-items-center gap-3 mb-3 bg-light p-3 rounded border border-secondary border-opacity-10 shadow-sm">
-    <div class="d-flex align-items-center gap-2">
-      <label class="fw-bold text-dark mb-0" style="font-size: 14.5px;" for="favPresetSelect">
-        <i class="bi bi-star-fill text-warning me-1"></i>我的最愛範本：
-      </label>
-      <select id="favPresetSelect" class="form-select form-select-sm" style="width: 240px; font-size: 13.5px; padding: 5px 10px;">
-        <option value="">— 載入中... —</option>
-      </select>
-      <button type="button" id="btnRenamePreset" class="btn btn-sm btn-outline-secondary px-2" style="display: none; font-size: 13px;" title="重新命名範本">
-        <i class="bi bi-pencil"></i>
-      </button>
-      <button type="button" id="btnDeletePreset" class="btn btn-sm btn-outline-danger px-2" style="display: none; font-size: 13px;" title="刪除範本">
-        <i class="bi bi-trash"></i>
-      </button>
+<!-- ── 分析條件設定卡片 ──────────────────────────── -->
+<section class="card-flat" style="margin-bottom: 22px;">
+  <div class="section-head">
+    <div class="d-flex align-items-center">
+      <h2 class="mb-0"><span class="dot" style="background:var(--primary)"></span> 篩選條件設定</h2>
+      <small class="text-muted ms-3 border-start ps-3 border-2">設定說明：請先設定您的資料範圍與查詢條件。</small>
     </div>
   </div>
+  <div class="section-body p-4">
 
-  <div class="filter-bar border rounded shadow-sm bg-white">
-    <div class="filter-group">
-      <label>性態碼</label>
-      <select id="filterBehavior" style="min-width: 130px;">
-        <option value="all">全部</option>
-        <option value="in_situ">原位癌</option>
-        <option value="invasive">侵襲癌</option>
-      </select>
-    </div>
-    <div class="filter-group">
-      <label>癌別</label>
-      <button type="button" class="form-select text-start d-flex justify-content-between align-items-center" data-bs-toggle="modal" data-bs-target="#cancerPickerModal" style="width: 100%; min-width: 220px;" id="btnCancerPicker">
-        <span id="btnCancerPickerText">所有癌別</span>
-      </button>
-    </div>
-    <div class="filter-group">
-      <label>年度</label>
-      <div class="d-flex align-items-center gap-2">
-        <input type="number" id="filterYearStart" class="form-control px-2" placeholder="起始" style="width: 80px; text-align: center; min-width: 0;">
-        <span class="text-secondary" style="font-size: 14px;">-</span>
-        <input type="number" id="filterYearEnd" class="form-control px-2" placeholder="結束" style="width: 80px; text-align: center; min-width: 0;">
+    <!-- 篩選條件列 -->
+    <div class="filter-bar" style="padding: 0;">
+      <div class="filter-group">
+        <label>性態碼</label>
+        <select id="filterBehavior" style="min-width: 130px;">
+          <option value="all">全部</option>
+          <option value="in_situ">原位癌</option>
+          <option value="invasive">侵襲癌</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>癌別</label>
+        <button type="button" class="form-select text-start d-flex justify-content-between align-items-center" data-bs-toggle="modal" data-bs-target="#cancerPickerModal" style="width: 100%; min-width: 220px;" id="btnCancerPicker">
+          <span id="btnCancerPickerText">所有癌別</span>
+        </button>
+      </div>
+      <div class="filter-group">
+        <label>年度</label>
+        <div class="d-flex align-items-center gap-2">
+          <input type="number" id="filterYearStart" class="form-control px-2" placeholder="起始" style="width: 80px; text-align: center; min-width: 0;">
+          <span class="text-secondary" style="font-size: 14px;">-</span>
+          <input type="number" id="filterYearEnd" class="form-control px-2" placeholder="結束" style="width: 80px; text-align: center; min-width: 0;">
+        </div>
+      </div>
+      <div class="filter-actions ms-md-auto d-flex align-items-center gap-2 flex-wrap">
+        <div class="d-flex align-items-center gap-1 bg-light px-2 py-1 rounded border border-secondary-subtle">
+          <label class="fw-bold text-dark mb-0 me-1" style="font-size: 13px;" for="favPresetSelect">
+            <i class="bi bi-star-fill text-warning"></i> 我的最愛：
+          </label>
+          <select id="favPresetSelect" class="form-select form-select-sm border-0 bg-transparent" style="width: 160px; font-size: 13px; padding: 2px 5px; box-shadow: none;">
+            <option value="">— 載入中... —</option>
+          </select>
+          <button type="button" id="btnRenamePreset" class="btn btn-sm btn-light text-secondary rounded-circle" style="display: none; width: 26px; height: 26px; padding: 0;" title="重新命名範本">
+            <i class="bi bi-pencil" style="font-size: 12px;"></i>
+          </button>
+          <button type="button" id="btnDeletePreset" class="btn btn-sm btn-light text-danger rounded-circle" style="display: none; width: 26px; height: 26px; padding: 0;" title="刪除範本">
+            <i class="bi bi-trash" style="font-size: 12px;"></i>
+          </button>
+        </div>
+        <button type="button" id="btnSavePreset" class="btn btn-warning text-dark fw-bold d-flex align-items-center gap-1.5" style="padding: 7px 16px; font-size: 14px; border: none; background: #ffc107; border-radius: var(--radius-sm);">
+          <i class="bi bi-star"></i> 加入最愛
+        </button>
+        <button class="btn-black" type="button" style="padding: 7px 16px;"><i class="bi bi-search"></i> 查詢</button>
+        <button id="btnResetFilters" class="btn-black-outline" type="button" style="padding: 7px 16px;"><i class="bi bi-arrow-counterclockwise"></i> 重置</button>
       </div>
     </div>
-    <div class="filter-actions ms-md-auto">
-      <button type="button" id="btnSavePreset" class="btn btn-warning text-dark fw-bold shadow-sm d-flex align-items-center gap-1.5" style="padding: 8px 16px; font-size: 14px; border: none; background: #ffc107; border-radius: var(--radius-sm);">
-        <i class="bi bi-star"></i> 將目前條件加入最愛
-      </button>
-      <button class="btn-black" type="button"><i class="bi bi-search"></i> 查詢資料</button>
-      <button id="btnResetFilters" class="btn-black-outline" type="button"><i class="bi bi-arrow-counterclockwise"></i> 重置</button>
+  </div>
+</section>
+
+<section class="card-flat" style="margin-bottom: 22px;">
+  <div class="section-body p-4 bg-light bg-opacity-50">
+    <div id="analysisItemsTable">
+      <!-- 主類別列 (標題按鈕) -->
+      <div class="d-flex flex-wrap gap-2 mb-2">
+        <label class="field-chip mb-0 px-3 py-1 shadow-sm bg-white" style="font-size: 14px; border-color: #adb5bd; cursor: pointer;">
+          <input class="group-checkbox" type="checkbox" id="chkGroupIncidence" data-group="incidence">
+          <span class="ms-1">發生率</span>
+        </label>
+        
+        <label class="field-chip mb-0 px-3 py-1 shadow-sm bg-white" style="font-size: 14px; border-color: #adb5bd; cursor: pointer;">
+          <input class="group-checkbox" type="checkbox" id="chkGroupDiagnosis" data-group="diagnosis">
+          <span class="ms-1">診斷</span>
+        </label>
+        
+        <label class="field-chip mb-0 px-3 py-1 shadow-sm bg-white" style="font-size: 14px; border-color: #adb5bd; cursor: pointer;">
+          <input class="group-checkbox" type="checkbox" id="chkGroupStage" data-group="stage">
+          <span class="ms-1">期別</span>
+        </label>
+        
+        <label class="field-chip mb-0 px-3 py-1 shadow-sm bg-white" style="font-size: 14px; border-color: #adb5bd; cursor: pointer;">
+          <input class="group-checkbox" type="checkbox" id="chkGroupTreatment" data-group="treatment">
+          <span class="ms-1">治療方式</span>
+        </label>
+        
+        <label class="field-chip mb-0 px-3 py-1 shadow-sm bg-white" style="font-size: 14px; border-color: #adb5bd; cursor: pointer; display: flex; align-items: center;">
+          <input class="group-checkbox" type="checkbox" id="chkGroupCrossYear" data-group="cross_year">
+          <span class="ms-1 d-flex flex-column align-items-start">跨年度分析<span>
+        </label>
+      </div>
+
+      <!-- 細項展開區 (卡片全寬排列) -->
+      <div class="d-flex flex-column gap-2">
+        <!-- 發生率 細項 -->
+        <div id="subItems-incidence" class="d-none bg-white border border-secondary-subtle rounded shadow-sm p-2">
+          <div class="d-flex flex-wrap" style="gap: 8px;">
+            <label class="naming-chip checkbox-chip">
+              <input class="item-checkbox" type="checkbox" id="chkIncidenceAge" data-parent="incidence" value="性別年齡分佈">
+              <span class="nc-mark"></span>
+              <span class="nc-body">
+                <span class="nc-title">性別年齡分佈</span>
+              </span>
+            </label>
+            <label class="naming-chip checkbox-chip">
+              <input class="item-checkbox" type="checkbox" id="chkIncidenceCommon" data-parent="incidence" value="本院常見癌症">
+              <span class="nc-mark"></span>
+              <span class="nc-body">
+                <span class="nc-title">本院常見癌症</span>
+              </span>
+            </label>
+            <label class="naming-chip checkbox-chip">
+              <input class="item-checkbox" type="checkbox" id="chkIncidenceMedian" data-parent="incidence" value="年齡中位數">
+              <span class="nc-mark"></span>
+              <span class="nc-body">
+                <span class="nc-title">年齡中位數</span>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 診斷 細項 -->
+        <div id="subItems-diagnosis" class="d-none bg-white border border-secondary-subtle rounded shadow-sm p-2">
+          <div class="d-flex flex-wrap" style="gap: 8px;">
+            <label class="naming-chip checkbox-chip">
+              <input class="item-checkbox" type="checkbox" id="chkDiagnosisAnalyzable" data-parent="diagnosis" value="可分析個案與確診個案">
+              <span class="nc-mark"></span>
+              <span class="nc-body">
+                <span class="nc-title">可分析個案與確診個案</span>
+              </span>
+            </label>
+            <label class="naming-chip checkbox-chip">
+              <input class="item-checkbox" type="checkbox" id="chkDiagnosisHistology" data-parent="diagnosis" value="組織型態">
+              <span class="nc-mark"></span>
+              <span class="nc-body">
+                <span class="nc-title">組織型態</span>
+              </span>
+            </label>
+            <label class="naming-chip checkbox-chip">
+              <input class="item-checkbox" type="checkbox" id="chkDiagnosisClassification" data-parent="diagnosis" value="個案分類">
+              <span class="nc-mark"></span>
+              <span class="nc-body">
+                <span class="nc-title">個案分類</span>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 期別 細項 -->
+        <div id="subItems-stage" class="d-none bg-white border border-secondary-subtle rounded shadow-sm p-2">
+          <div class="d-flex flex-wrap" style="gap: 8px;">
+            <label class="naming-chip checkbox-chip">
+              <input class="item-checkbox" type="checkbox" id="chkStageDistribution" data-parent="stage" value="期別分佈">
+              <span class="nc-mark"></span>
+              <span class="nc-body">
+                <span class="nc-title">期別分佈</span>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 治療方式 細項 -->
+        <div id="subItems-treatment" class="d-none bg-white border border-secondary-subtle rounded shadow-sm p-2">
+          <div class="d-flex flex-wrap" style="gap: 8px;">
+            <label class="naming-chip checkbox-chip">
+              <input class="item-checkbox" type="checkbox" id="chkTreatmentStats" data-parent="treatment" value="治療方式統計">
+              <span class="nc-mark"></span>
+              <span class="nc-body">
+                <span class="nc-title">治療方式統計</span>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 跨年度分析 細項 -->
+        <div id="subItems-cross_year" class="d-none bg-white border border-secondary-subtle rounded shadow-sm p-2">
+          <div class="d-flex flex-wrap" style="gap: 8px;">
+            <label class="naming-chip checkbox-chip">
+              <input class="item-checkbox" type="checkbox" id="chkCrossYearSurvival" data-parent="cross_year" value="存活率">
+              <span class="nc-mark"></span>
+              <span class="nc-body">
+                <span class="nc-title">存活率</span>
+              </span>
+            </label>
+            <label class="naming-chip checkbox-chip">
+              <input class="item-checkbox" type="checkbox" id="chkCrossYearMedianAge" data-parent="cross_year" value="歷年年齡中位數">
+              <span class="nc-mark"></span>
+              <span class="nc-body">
+                <span class="nc-title">歷年年齡中位數</span>
+              </span>
+            </label>
+            <label class="naming-chip checkbox-chip">
+              <input class="item-checkbox" type="checkbox" id="chkCrossYearStage" data-parent="cross_year" value="歷年期別分佈">
+              <span class="nc-mark"></span>
+              <span class="nc-body">
+                <span class="nc-title">歷年期別分佈</span>
+              </span>
+            </label>
+            <label class="naming-chip checkbox-chip">
+              <input class="item-checkbox" type="checkbox" id="chkCrossYearNewCases" data-parent="cross_year" value="歷年新診斷件數">
+              <span class="nc-mark"></span>
+              <span class="nc-body">
+                <span class="nc-title">歷年新診斷件數</span>
+              </span>
+            </label>
+          </div>
+        </div>
+
+      </div>
     </div>
   </div>
 </section>
@@ -165,7 +323,21 @@
     </div>
   </div>
 </div>
-<div id="main" style="width: 100%; height: 500px; margin: 20px auto;"></div>
+
+<!-- 圖表區塊 -->
+<div class="row g-4 my-4">
+  <div class="col-12 col-xl-6">
+    <div class="bg-white border border-secondary-subtle rounded shadow-sm p-4">
+      <div id="main" style="width: 100%; height: 450px;"></div>
+    </div>
+  </div>
+  <div class="col-12 col-xl-6">
+    <div class="bg-white border border-secondary-subtle rounded shadow-sm p-4">
+      <div id="barChart" style="width: 100%; height: 450px;"></div>
+    </div>
+  </div>
+</div>
+
 <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 <script>
   document.addEventListener('DOMContentLoaded', function() {
@@ -218,9 +390,52 @@
       
       myChart.setOption(option);
       
+      // --- Bar Chart ---
+      var barChartDom = document.getElementById('barChart');
+      var myBarChart = echarts.init(barChartDom);
+      var barOption = {
+          xAxis: {
+              type: 'category',
+              data: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+          },
+          yAxis: {
+              type: 'value'
+          },
+          series: [
+              {
+                  data: [120, 200, 150, 80, 70, 110, 130],
+                  type: 'bar'
+              }
+          ],
+          title: {
+          text: 'Referer of a Website',
+          subtext: 'Fake Data',
+          left: 'center'
+        },
+        tooltip: {
+          trigger: 'item'
+        },
+        legend: {
+          orient: 'vertical',
+          left: 'left'
+        },
+        toolbox: {
+          show: true,
+          feature: {
+            dataView: {show: true,readOnly: false},
+            restore: {show: true},
+            saveAsImage: {show: true}
+          }
+        },
+      };
+      myBarChart.setOption(barOption);
+
       window.addEventListener('resize', function() {
           myChart.resize();
+          myBarChart.resize();
       });
   });
+
+  
 </script>
 {% endblock %}
