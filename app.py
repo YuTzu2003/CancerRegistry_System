@@ -2,6 +2,9 @@ from flask import Flask,render_template,session,request,jsonify,flash
 import os
 import logging
 import sys
+from dotenv import load_dotenv
+
+load_dotenv()
 import datetime
 from werkzeug.utils import secure_filename
 from services.auth import auth_bp, login_required, admin_required
@@ -144,4 +147,5 @@ def dashboard_delete():
 # def rag_config(): return render_template("rag_config.html", active="rag_config")
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    flask_port = int(os.environ.get("FLASK_PORT"))
+    app.run(host="0.0.0.0", port=flask_port, debug=True)

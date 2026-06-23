@@ -19,3 +19,5 @@ test/
 *.doc
 *.txt
 *.pdf
+.env
+*.json
