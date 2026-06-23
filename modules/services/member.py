@@ -1,7 +1,7 @@
 import datetime
 from flask import Blueprint, render_template, request, redirect, url_for, flash
-from modules.db import get_conn
-from services.auth import login_required, admin_required
+from modules.services.db import get_conn
+from modules.services.auth import login_required, admin_required
 
 member_bp = Blueprint('member', __name__)
 

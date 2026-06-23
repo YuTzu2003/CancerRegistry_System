@@ -10,16 +10,16 @@ import re
 import base64
 import pandas as pd
 from copy import copy
-from modules.db import get_conn
+from modules.services.db import get_conn
 from contextlib import redirect_stdout
-from modules.clean_pipeline.cleaner import cleanValidate
+from modules.blueprint.clean.cleaner import cleanValidate
 from werkzeug.utils import secure_filename
 from openpyxl import load_workbook, Workbook
 from openpyxl.utils import get_column_letter
-from services.auth import login_required, admin_required
-from modules.clean_pipeline.field_mapping import detect_system, get_field_map, validate_and_rename_headers, validate_and_unify_headers_in_file
-from modules.clean_pipeline.text_converter import convert_txt_to_excel
-from modules.clean_pipeline.rules.validate import validate_date_rules
+from modules.services.auth import login_required, admin_required
+from modules.blueprint.clean.field_mapping import detect_system, get_field_map, validate_and_rename_headers, validate_and_unify_headers_in_file
+from modules.blueprint.clean.text_converter import convert_txt_to_excel
+from modules.blueprint.clean.rules.validate import validate_date_rules
 from flask import Blueprint, render_template, request, session, jsonify, send_file
 
 clean_bp = Blueprint('clean', __name__)
@@ -439,7 +439,7 @@ def api_categorize_fields():
             headers = [str(cell.value).strip() if cell.value else "" for cell in first_row]
         wb.close()
 
-        from modules.clean_pipeline.cleaner import FORMAT_RULES_MAP
+        from modules.blueprint.clean.cleaner import FORMAT_RULES_MAP
         fmt_key = f"fmt_{fmt_name}" if not str(fmt_name).startswith("fmt_") else str(fmt_name)
         rules = FORMAT_RULES_MAP.get(fmt_key, {})
         id_to_rule_name = {v.get("ID"): k for k, v in rules.items() if v.get("ID")}
@@ -467,7 +467,7 @@ def api_categorize_fields():
                 else:
                     unmapped.append({"key": h, "label": orig_label})
         else:
-            from modules.clean_pipeline.cleaner import FORMAT_RULES_MAP
+            from modules.blueprint.clean.cleaner import FORMAT_RULES_MAP
             fmt_key = f"fmt_{fmt_name}" if not str(fmt_name).startswith("fmt_") else str(fmt_name)
             rules = FORMAT_RULES_MAP.get(fmt_key, {})
             id_to_rule_name = {v.get("ID"): k for k, v in rules.items() if v.get("ID")}
@@ -532,7 +532,7 @@ def api_export():
 
     alias_to_target = get_field_map(scheme, fmt_name)
     
-    from modules.clean_pipeline.cleaner import FORMAT_RULES_MAP
+    from modules.blueprint.clean.cleaner import FORMAT_RULES_MAP
     fmt_key = f"fmt_{fmt_name}" if not str(fmt_name).startswith("fmt_") else str(fmt_name)
     rules = FORMAT_RULES_MAP.get(fmt_key, {})
     id_to_rule_name = {v.get("ID"): k for k, v in rules.items() if v.get("ID")}
@@ -588,7 +588,7 @@ def api_export():
         else:
             alias_to_target = get_field_map(scheme, fmt_name)
             
-            from modules.clean_pipeline.cleaner import FORMAT_RULES_MAP
+            from modules.blueprint.clean.cleaner import FORMAT_RULES_MAP
             fmt_key = f"fmt_{fmt_name}" if not str(fmt_name).startswith("fmt_") else str(fmt_name)
             rules = FORMAT_RULES_MAP.get(fmt_key, {})
             id_to_rule_name = {v.get("ID"): k for k, v in rules.items() if v.get("ID")}
@@ -703,7 +703,7 @@ def api_preview():
         return jsonify({"ok": False, "error": "清洗檔案不存在"}), 404
     alias_to_target = get_field_map(scheme, fmt_name)
     
-    from modules.clean_pipeline.cleaner import FORMAT_RULES_MAP
+    from modules.blueprint.clean.cleaner import FORMAT_RULES_MAP
     fmt_key = f"fmt_{fmt_name}" if not str(fmt_name).startswith("fmt_") else str(fmt_name)
     rules = FORMAT_RULES_MAP.get(fmt_key, {})
     id_to_rule_name = {v.get("ID"): k for k, v in rules.items() if v.get("ID")}
@@ -750,7 +750,7 @@ def api_preview():
         else:
             alias_to_target = get_field_map(scheme, fmt_name)
             
-            from modules.clean_pipeline.cleaner import FORMAT_RULES_MAP
+            from modules.blueprint.clean.cleaner import FORMAT_RULES_MAP
             fmt_key = f"fmt_{fmt_name}" if not str(fmt_name).startswith("fmt_") else str(fmt_name)
             rules = FORMAT_RULES_MAP.get(fmt_key, {})
             id_to_rule_name = {v.get("ID"): k for k, v in rules.items() if v.get("ID")}
@@ -846,7 +846,7 @@ def load_field_spec(fmt_val):
                 if part:
                     name_to_seq[part] = seq_str
 
-    from modules.clean_pipeline.cleaner import FORMAT_RULES_MAP
+    from modules.blueprint.clean.cleaner import FORMAT_RULES_MAP
     fmt_key = f"fmt_{fmt_val}"
     rules = FORMAT_RULES_MAP.get(fmt_key, {})
     id_to_rule_name = {r_val.get('ID'): r_key for r_key, r_val in rules.items() if r_val.get('ID')}
@@ -970,7 +970,7 @@ def api_clean():
                 
                 found_headers = [h.strip() for h in first_line.split(delimiter)]
                 
-                from modules.clean_pipeline.cleaner import FORMAT_RULES_MAP
+                from modules.blueprint.clean.cleaner import FORMAT_RULES_MAP
                 norm_fmt = f"fmt_{str(fmt_name).replace('fmt_', '')}"
                 rules = FORMAT_RULES_MAP.get(norm_fmt, {})
                 valid_std_headers = set()

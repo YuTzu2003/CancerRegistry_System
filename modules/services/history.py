@@ -5,8 +5,8 @@ import zipfile
 import stat
 import io
 from flask import Blueprint, render_template, session, redirect, url_for, flash, jsonify, send_file, request
-from modules.db import get_conn
-from services.auth import login_required
+from modules.services.db import get_conn
+from modules.services.auth import login_required
 
 history_bp = Blueprint('history', __name__)
 

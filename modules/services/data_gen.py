@@ -6,9 +6,8 @@ import pandas as pd
 import numpy as np
 from flask import Blueprint, request, jsonify, session, send_file
 from werkzeug.utils import secure_filename
-from datetime import datetime
-from modules.clean_pipeline.field_mapping import detect_system, field_mapping
-from services.clean import _natural_sort_key
+from modules.blueprint.clean.field_mapping import detect_system, field_mapping
+from modules.services.clean import _natural_sort_key
 
 data_gen_bp = Blueprint('data_gen', __name__)
 
@@ -90,7 +89,7 @@ def analyze_file():
         else:
             df = pd.read_csv(file_path, nrows=5, encoding='utf-8-sig', dtype=str)
 
-        from modules.db import get_conn
+        from modules.services.db import get_conn
         conn = get_conn()
         cursor = conn.cursor()
         cursor.execute("SELECT [序號], [中文欄位名稱], [英文欄位名稱], [台大雲林欄位名稱], [台大體系醫整庫欄位名稱], [台灣癌症登記中心], [雲醫癌AI模組] FROM [Hospital_data].[dbo].[CancerRegistry_FieldMap]")
@@ -207,7 +206,7 @@ def process_file():
         df.columns = df.columns.str.strip()
         row_count = len(df)
 
-        from modules.db import get_conn
+        from modules.services.db import get_conn
         conn = get_conn()
         cursor = conn.cursor()
         cursor.execute("SELECT [序號], [中文欄位名稱], [英文欄位名稱], [台大雲林欄位名稱], [台大體系醫整庫欄位名稱], [台灣癌症登記中心], [雲醫癌AI模組] FROM [Hospital_data].[dbo].[CancerRegistry_FieldMap]")
@@ -216,7 +215,7 @@ def process_file():
 
         fmt_rules = {}
         if format_id:
-             from modules.clean_pipeline.cleaner import FORMAT_RULES_MAP
+             from modules.blueprint.clean.cleaner import FORMAT_RULES_MAP
              fmt_key = f"fmt_{format_id}"
              if fmt_key in FORMAT_RULES_MAP:
                  # 建立 ID -> FriendlyName 的映射

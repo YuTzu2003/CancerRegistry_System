@@ -1,4 +1,4 @@
-from modules.clean_pipeline.special_rules.special_validate_rules import (
+from modules.blueprint.clean.special_rules.special_validate_rules import (
     apply_class_case_rules,
     stop_if_too_many_date_errors,
 )

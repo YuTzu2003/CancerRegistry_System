@@ -1,10 +1,10 @@
 import os
 import pandas as pd
 import re
-from modules.db import get_conn
-from modules.clean_pipeline.field_mapping import field_mapping,detect_system
+from modules.services.db import get_conn
+from modules.blueprint.clean.field_mapping import field_mapping,detect_system
 from modules.clean_pipeline.cleaner.cleanValidate import validate_date_rules
-from modules.clean_pipeline.field_mapping import field_mapping, process_data
+from modules.blueprint.clean.field_mapping import field_mapping, process_data
 
 CANCER_RULES = {
     '口腔癌': {
