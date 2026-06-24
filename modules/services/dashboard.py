@@ -1,8 +1,58 @@
 from flask import Blueprint, request, session, jsonify
 from modules.services.auth import login_required
 from modules.blueprint.dashboard import load_user_favorites, save_user_favorites
+import os
+import re
+import logging
 
 dashboard_bp = Blueprint('dashboard', __name__)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+DASHBOARD_DATA = os.path.join(BASE_DIR, 'tasks', 'data')
+os.makedirs(DASHBOARD_DATA, exist_ok=True)
+
+@dashboard_bp.route("/dashboard/upload", methods=["POST"])
+@login_required
+def dashboard_upload():
+    f = request.files.get("file")
+    if not f or not f.filename:
+        return jsonify({"ok": False, "error": "未選擇檔案"}), 400
+    ext = f.filename.rsplit(".", 1)[-1].lower() if "." in f.filename else ""
+    if ext not in ("xls", "xlsx"):
+        return jsonify({"ok": False, "error": "僅接受 .xls 或 .xlsx 格式"}), 400
+    raw_filename = f.filename or ""
+    basename = os.path.basename(raw_filename)
+    filename = re.sub(r'[\\/:*?"<>|\s]', '_', basename)
+    if not filename.strip() or filename == f".{ext}":
+        filename = f"uploaded_file.{ext}"
+    save_path = os.path.join(DASHBOARD_DATA, filename)
+    f.save(save_path)
+    logging.info(f"Dashboard upload: {filename} saved to {save_path}")
+    return jsonify({"ok": True, "filename": filename})
+
+@dashboard_bp.route("/dashboard/delete", methods=["POST"])
+@login_required
+def dashboard_delete():
+    data = request.json or {}
+    filename = data.get("filename", "")
+    if not filename:
+        return jsonify({"ok": False, "error": "未指定檔案名稱"}), 400
+    fpath = os.path.join(DASHBOARD_DATA, filename)
+    if not os.path.isfile(fpath):
+        return jsonify({"ok": False, "error": "檔案不存在"}), 404
+    os.remove(fpath)
+    logging.info(f"Dashboard delete: {filename}")
+    return jsonify({"ok": True})
+
+@dashboard_bp.route("/api/chart_insight", methods=["POST"])
+@login_required
+def chart_insight_route():
+    data = request.json or {}
+    from modules.blueprint.dashboard.reply import get_chart_insight_logic
+    result = get_chart_insight_logic(data)
+    if not result.get("success"):
+        return jsonify(result), 500
+    return jsonify(result), 200
+
 @dashboard_bp.route('/api/favorites', methods=['GET'])
 @login_required
 def get_favorites():
