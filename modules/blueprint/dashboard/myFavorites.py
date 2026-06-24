@@ -1,7 +1,7 @@
 import os
 import json
 
-FAVORITES_DIR = os.path.join('work', 'favorites')
+FAVORITES_DIR = os.path.join('tasks', 'favorites')
 
 def get_user_fav_file(db_id):
     return os.path.join(FAVORITES_DIR, f"{db_id}_favorites.json")
