@@ -82,7 +82,7 @@
 <section class="card-flat" style="margin-bottom: 22px;">
   <div class="section-head">
     <div class="d-flex align-items-center">
-      <h2 class="mb-0"><span class="dot" style="background:var(--primary)"></span> 篩選條件設定</h2>
+      <h2 class="mb-0"><span class="dot" style="background:var(--warning)"></span> 篩選條件設定</h2>
       <small class="text-muted ms-3 border-start ps-3 border-2">設定說明：請先設定您的資料範圍與查詢條件。</small>
     </div>
   </div>
@@ -114,9 +114,7 @@
       </div>
       <div class="filter-actions ms-md-auto d-flex align-items-center gap-2 flex-wrap">
         <div class="d-flex align-items-center gap-1 bg-light px-2 py-1 rounded border border-secondary-subtle">
-          <label class="fw-bold text-dark mb-0 me-1" style="font-size: 13px;" for="favPresetSelect">
-            <i class="bi bi-star-fill text-warning"></i> 我的最愛：
-          </label>
+          <label class="fw-bold text-dark mb-0 me-1" style="font-size: 13px;" for="favPresetSelect"><i class="bi bi-star-fill text-warning"></i> 我的最愛：</label>
           <select id="favPresetSelect" class="form-select form-select-sm border-0 bg-transparent" style="width: 160px; font-size: 13px; padding: 2px 5px; box-shadow: none;">
             <option value="">— 載入中... —</option>
           </select>
@@ -140,51 +138,53 @@
     </div>
 
     <!-- 主類別列 (標題按鈕) -->
-    <hr class="my-4 border-secondary-subtle">
-    <div class="d-flex align-items-center mb-1">
-      <h6 class="mb-0 fw-bold text-dark me-3"><i class="bi bi-bar-chart-steps text-primary me-2"></i>分析主題：</h6>
-      <style>
-        .cat-btn-label {
-          background-color: #f8f9fa;
-          color: #495057;
-          border: 1px solid #dee2e6;
-          border-radius: 8px;
-          padding: 8px 20px;
-          font-size: 14.5px;
-          font-weight: 500;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          user-select: none;
-          box-shadow: 0 1px 2px rgba(0,0,0,0.02);
-          margin-bottom: 0;
-        }
-        .cat-btn-label:hover {
-          background-color: #e9ecef;
-          color: #212529;
-        }
-        .btn-check.group-checkbox:checked + .cat-btn-label {
-          background-color: #ebf3ff;
-          color: #0d6efd;
-          border-color: #0d6efd;
-          box-shadow: 0 2px 6px rgba(13, 110, 253, 0.15);
-          font-weight: 600;
-        }
-      </style>
-      <div class="d-flex flex-wrap gap-2">
-        <input class="btn-check group-checkbox" type="radio" name="mainCategoryTab" id="chkGroupIncidence" data-group="incidence" checked>
-        <label class="cat-btn-label" for="chkGroupIncidence">發生率</label>
-        
-        <input class="btn-check group-checkbox" type="radio" name="mainCategoryTab" id="chkGroupDiagnosis" data-group="diagnosis">
-        <label class="cat-btn-label" for="chkGroupDiagnosis">診斷</label>
-        
-        <input class="btn-check group-checkbox" type="radio" name="mainCategoryTab" id="chkGroupStage" data-group="stage">
-        <label class="cat-btn-label" for="chkGroupStage">期別</label>
-        
-        <input class="btn-check group-checkbox" type="radio" name="mainCategoryTab" id="chkGroupTreatment" data-group="treatment">
-        <label class="cat-btn-label" for="chkGroupTreatment">治療方式</label>
-        
-        <input class="btn-check group-checkbox" type="radio" name="mainCategoryTab" id="chkGroupCrossYear" data-group="cross_year">
-        <label class="cat-btn-label" for="chkGroupCrossYear">跨年度分析</label>
+    <div id="mainCategoryArea" class="d-none">
+      <hr class="my-4 border-secondary-subtle">
+      <div class="d-flex align-items-center mb-1">
+        <h6 class="mb-0 fw-bold text-dark me-3"><i class="bi bi-bar-chart-steps text-primary me-2"></i>分析主題：</h6>
+        <style>
+          .cat-btn-label {
+            background-color: #f8f9fa;
+            color: #495057;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 8px 20px;
+            font-size: 14.5px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+            margin-bottom: 0;
+          }
+          .cat-btn-label:hover {
+            background-color: #e9ecef;
+            color: #212529;
+          }
+          .btn-check.group-checkbox:checked + .cat-btn-label {
+            background-color: #ebf3ff;
+            color: #0d6efd;
+            border-color: #0d6efd;
+            box-shadow: 0 2px 6px rgba(13, 110, 253, 0.15);
+            font-weight: 600;
+          }
+        </style>
+        <div class="d-flex flex-wrap gap-2">
+          <input class="btn-check group-checkbox" type="radio" name="mainCategoryTab" id="chkGroupIncidence" data-group="incidence" checked>
+          <label class="cat-btn-label" for="chkGroupIncidence"><i class="bi bi-graph-up-arrow me-1"></i> 發生率</label>
+          
+          <input class="btn-check group-checkbox" type="radio" name="mainCategoryTab" id="chkGroupDiagnosis" data-group="diagnosis">
+          <label class="cat-btn-label" for="chkGroupDiagnosis"><i class="bi bi-clipboard2-pulse me-1"></i> 診斷</label>
+          
+          <input class="btn-check group-checkbox" type="radio" name="mainCategoryTab" id="chkGroupStage" data-group="stage">
+          <label class="cat-btn-label" for="chkGroupStage"><i class="bi bi-layers me-1"></i> 期別</label>
+          
+          <input class="btn-check group-checkbox" type="radio" name="mainCategoryTab" id="chkGroupTreatment" data-group="treatment">
+          <label class="cat-btn-label" for="chkGroupTreatment"><i class="bi bi-capsule me-1"></i> 治療方式</label>
+          
+          <input class="btn-check group-checkbox" type="radio" name="mainCategoryTab" id="chkGroupCrossYear" data-group="cross_year">
+          <label class="cat-btn-label" for="chkGroupCrossYear"><i class="bi bi-calendar3 me-1"></i> 跨年度分析</label>
+        </div>
       </div>
     </div>
   </div>
@@ -230,20 +230,20 @@
 
 
 <!-- 圖表區塊 -->
-<div class="row g-4 my-4">
+<div id="chartsArea" class="row g-4 my-4 d-none">
   <div class="col-12">
     <!-- 細項工作列 (Toolbar) 置中放在圖表正上方 -->
     <div class="d-flex justify-content-center mb-3 w-100">
       
       <!-- 發生率 細項 -->
       <div id="subItems-incidence" class="d-flex flex-wrap justify-content-center gap-2">
-        <input class="btn-check item-checkbox" type="radio" name="subTab_incidence" id="chkIncidenceAge" data-parent="incidence" value="性別年齡分佈" checked>
+        <input class="btn-check item-checkbox" type="radio" name="subTab_incidence" id="chkIncidenceAge" data-parent="incidence" value="性別年齡分佈" data-target="#chartPane-IncidenceAge" checked>
         <label class="btn btn-outline-secondary rounded-pill px-4 py-2 fw-bold border-1" for="chkIncidenceAge">性別年齡分佈</label>
 
-        <input class="btn-check item-checkbox" type="radio" name="subTab_incidence" id="chkIncidenceCommon" data-parent="incidence" value="本院常見癌症">
+        <input class="btn-check item-checkbox" type="radio" name="subTab_incidence" id="chkIncidenceCommon" data-parent="incidence" value="本院常見癌症" data-target="#chartPane-IncidenceCommon">
         <label class="btn btn-outline-secondary rounded-pill px-4 py-2 fw-bold border-1" for="chkIncidenceCommon">本院常見癌症</label>
 
-        <input class="btn-check item-checkbox" type="radio" name="subTab_incidence" id="chkIncidenceMedian" data-parent="incidence" value="年齡中位數">
+        <input class="btn-check item-checkbox" type="radio" name="subTab_incidence" id="chkIncidenceMedian" data-parent="incidence" value="年齡中位數" data-target="#chartPane-Empty">
         <label class="btn btn-outline-secondary rounded-pill px-4 py-2 fw-bold border-1" for="chkIncidenceMedian">年齡中位數</label>
       </div>
 
@@ -287,36 +287,51 @@
       </div>
     </div>
 
-    <div class="bg-white border border-secondary-subtle rounded shadow-sm p-4 mt-2">
-      <div id="main" style="width: 100%; height: 450px;"></div>
-      <!-- LLM 分析結果文字框 -->
-      <div class="mt-4 p-3 bg-light rounded border border-secondary-subtle">
-        <div class="d-flex align-items-center mb-2 justify-content-between">
-          <div class="d-flex align-items-center">
-            <i class="bi bi-robot text-primary me-2"></i>
-            <h6 class="mb-0 fw-bold text-dark">AI 分析說明</h6>
+    <!-- 圖表顯示區域 (Tab Panes) -->
+    
+    <!-- 1. 性別年齡分佈 (Pie Chart) -->
+    <div id="chartPane-IncidenceAge" class="chart-pane">
+      <div class="bg-white border border-secondary-subtle rounded shadow-sm p-4 mt-2">
+        <div id="main" style="width: 100%; height: 450px;"></div>
+        <!-- LLM 分析結果文字框 -->
+        <div class="mt-4 p-3 rounded" style="background-color: rgba(209, 231, 221, 0.5); border: 1px solid #a3cfbb;">
+          <div class="d-flex align-items-center mb-2 justify-content-between">
+            <div class="d-flex align-items-center">
+              <h6 class="mb-0 fw-bold text-dark">語言模型敘述</h6>
+            </div>
+            <button id="btnAiMain" class="btn btn-sm" style="display: none; background-color: transparent; border: 1px solid #495057; color: #212529; font-weight: 500;">重新產生敘述</button>
           </div>
-          <button id="btnAiMain" class="btn btn-sm btn-outline-primary" style="display: none;">產生 AI 敘述</button>
+          <div id="llmResponseMain" class="text-dark" style="font-size: 14px; white-space: pre-wrap;">（請先載入圖表，系統將自動產生分析敘述）</div>
         </div>
-        <div id="llmResponseMain" class="text-secondary" style="font-size: 14px; white-space: pre-wrap;">（請先載入圖表，並按下按鈕產生分析）</div>
       </div>
     </div>
-  </div>
-  <div class="col-12">
-    <div class="bg-white border border-secondary-subtle rounded shadow-sm p-4">
-      <div id="barChart" style="width: 100%; height: 450px;"></div>
-      <!-- LLM 分析結果文字框 -->
-      <div class="mt-4 p-3 bg-light rounded border border-secondary-subtle">
-        <div class="d-flex align-items-center mb-2 justify-content-between">
-          <div class="d-flex align-items-center">
-            <i class="bi bi-robot text-primary me-2"></i>
-            <h6 class="mb-0 fw-bold text-dark">AI 分析說明</h6>
+
+    <!-- 2. 本院常見癌症 (Bar Chart) -->
+    <div id="chartPane-IncidenceCommon" class="chart-pane d-none">
+      <div class="bg-white border border-secondary-subtle rounded shadow-sm p-4 mt-2">
+        <div id="barChart" style="width: 100%; height: 450px;"></div>
+        <!-- LLM 分析結果文字框 -->
+        <div class="mt-4 p-3 rounded" style="background-color: rgba(209, 231, 221, 0.5); border: 1px solid #a3cfbb;">
+          <div class="d-flex align-items-center mb-2 justify-content-between">
+            <div class="d-flex align-items-center">
+              <h6 class="mb-0 fw-bold text-dark">語言模型敘述</h6>
+            </div>
+            <button id="btnAiBar" class="btn btn-sm" style="display: none; background-color: transparent; border: 1px solid #495057; color: #212529; font-weight: 500;">重新產生敘述</button>
           </div>
-          <button id="btnAiBar" class="btn btn-sm btn-outline-primary" style="display: none;">產生 AI 敘述</button>
+          <div id="llmResponseBar" class="text-dark" style="font-size: 14px; white-space: pre-wrap;">（請先載入圖表，系統將自動產生分析敘述）</div>
         </div>
-        <div id="llmResponseBar" class="text-secondary" style="font-size: 14px; white-space: pre-wrap;">（請先載入圖表，並按下按鈕產生分析）</div>
       </div>
     </div>
+
+    <!-- 3. 空白佔位區 (尚未實作圖表) -->
+    <div id="chartPane-Empty" class="chart-pane d-none">
+      <div class="bg-white border border-secondary-subtle rounded shadow-sm p-5 mt-2 text-center text-muted">
+        <i class="bi bi-bar-chart fs-1 opacity-50 mb-3 d-block"></i>
+        <h6 class="fw-bold text-dark mb-2">此項目圖表尚未實作</h6>
+        <p class="mb-0" style="font-size: 14px;">請選擇「性別年齡分佈」或「本院常見癌症」以檢視現有圖表。</p>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -456,13 +471,30 @@
                       const chartData = data.data;
                       window.lastChartData = chartData;
 
+                      // 顯示主類別與圖表區塊
+                      const mainCategoryArea = document.getElementById('mainCategoryArea');
+                      const chartsArea = document.getElementById('chartsArea');
+                      if (mainCategoryArea) mainCategoryArea.classList.remove('d-none');
+                      if (chartsArea) chartsArea.classList.remove('d-none');
+
                       // 顯示 AI 分析按鈕
-                      document.getElementById('btnAiMain').style.display = 'block';
-                      document.getElementById('btnAiBar').style.display = 'block';
-                      document.getElementById('llmResponseMain').innerText = '（按下按鈕以產生 AI 敘述）';
-                      document.getElementById('llmResponseBar').innerText = '（按下按鈕以產生 AI 敘述）';
-                      document.getElementById('btnAiMain').innerHTML = '產生 AI 敘述';
-                      document.getElementById('btnAiBar').innerHTML = '產生 AI 敘述';
+                      const btnAiMain = document.getElementById('btnAiMain');
+                      const btnAiBar = document.getElementById('btnAiBar');
+                      btnAiMain.style.display = 'block';
+                      btnAiBar.style.display = 'block';
+                      document.getElementById('llmResponseMain').innerText = '（系統將自動產生分析敘述）';
+                      document.getElementById('llmResponseBar').innerText = '（系統將自動產生分析敘述）';
+                      btnAiMain.innerHTML = '重新產生敘述';
+                      btnAiBar.innerHTML = '重新產生敘述';
+
+                      // 自動觸發目前可見的圖表的 AI 產生
+                      setTimeout(() => {
+                         const activePane = document.querySelector('.chart-pane:not(.d-none)');
+                         if (activePane) {
+                             const activeAiBtn = activePane.querySelector('button[id^="btnAi"]');
+                             if (activeAiBtn) activeAiBtn.click();
+                         }
+                      }, 100);
 
                       // Update Pie Chart
                       myChart.setOption({
@@ -475,6 +507,12 @@
                           xAxis: { data: chartData.topCancersData.labels },
                           series: [{ data: chartData.topCancersData.values }]
                       });
+                      
+                      // 強制重新計算大小，避免一開始隱藏導致的比例跑版問題
+                      setTimeout(() => {
+                          myChart.resize();
+                          myBarChart.resize();
+                      }, 50);
                   } else {
                       alert('資料分析失敗: ' + data.error);
                   }

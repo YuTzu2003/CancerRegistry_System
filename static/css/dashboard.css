@@ -5,18 +5,21 @@
   flex-wrap: wrap;
   padding: 18px 20px;
 }
+
 .filter-group {
   display: flex;
   flex-direction: column;
   gap: 5px;
   min-width: 180px;
 }
+
 .filter-group label {
   font-size: 12px;
   font-weight: 600;
   color: var(--gray-600);
-  letter-spacing: .3px;
+  letter-spacing: 0.3px;
 }
+
 .filter-group select {
   width: 100%;
   padding: 8px 32px 8px 12px;
@@ -26,42 +29,63 @@
   background: var(--white);
   color: var(--text);
   cursor: pointer;
-  transition: border-color .15s ease, box-shadow .15s ease;
   appearance: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M2.5 4.5L6 8l3.5-3.5'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 10px center;
 }
+
 .filter-group select:focus {
   outline: none;
   border-color: var(--blue-500);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, .12);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
+
 .filter-actions {
   display: flex;
   gap: 8px;
   padding-bottom: 1px;
 }
-/* ── Buttons ───────────────────────────────────────────── */
+
 .btn-black {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 8px 20px; font-size: 14px; font-weight: 600;
-  color: var(--white); background: #212529;
-  border: 1px solid #212529; border-radius: var(--radius-sm);
-  cursor: pointer; transition: background .15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--white);
+  background: #212529;
+  border: 1px solid #212529;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s ease;
 }
-.btn-black:hover { background: #000; color: #fff; }
+.btn-black:hover { 
+  background: #000; 
+  color: #fff; }
 
 .btn-black-outline {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 8px 14px; font-size: 14px; font-weight: 500;
-  color: #212529; background: transparent;
-  border: 1px solid #212529; border-radius: var(--radius-sm);
-  cursor: pointer; transition: all .15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #212529;
+  background: transparent;
+  border: 1px solid #212529;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
 }
-.btn-black-outline:hover { background: #212529; color: #fff; }
 
-/* ── Modal Checkbox Colors ─────────────────────────────── */
+.btn-black-outline:hover { 
+  background: #212529; 
+  color: #fff; 
+}
+
 #cancerPickerModal .form-check-input:checked {
   background-color: #212529;
   border-color: #212529;
@@ -71,12 +95,12 @@
   box-shadow: 0 0 0 0.25rem rgba(33, 37, 41, 0.25);
 }
 
-/* ── Upload Section ────────────────────────────────────── */
 .upload-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 22px;
 }
+
 .file-list-empty {
   padding: 28px 16px;
   text-align: center;
@@ -89,24 +113,23 @@
   margin-bottom: 6px;
   color: var(--gray-300);
 }
-.naming-chip.checkbox-chip {
-    align-items: center;
+
+.naming-chip.checkbox-chip { 
+  align-items: center; 
 }
-.naming-chip.checkbox-chip .nc-mark {
-  border-radius: 4px; /* Square box instead of circle */
-  top: auto;
-  margin-top: 0;
+.naming-chip.checkbox-chip .nc-mark { 
+  border-radius: 4px; 
+  top: auto; margin-top: 0; 
 }
-.naming-chip.checkbox-chip .nc-body {
-  margin-top: 0;
+.naming-chip.checkbox-chip .nc-body { 
+  margin-top: 0; 
 }
-.naming-chip.checkbox-chip .nc-title {
-  font-weight: normal;
+.naming-chip.checkbox-chip .nc-title { 
+  font-weight: normal; 
 }
 .naming-chip.checkbox-chip.selected .nc-mark::after {
   content: '';
-  width: 5px;
-  height: 10px;
+  width: 5px; height: 10px;
   border: solid white;
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
@@ -114,6 +137,34 @@
   border-radius: 0;
   margin-top: -2px;
 }
+
+.cat-btn-label {
+  background-color: #f8f9fa;
+  color: #495057;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 8px 20px;
+  font-size: 14.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+  margin-bottom: 0;
+}
+.cat-btn-label:hover { 
+  background-color: #e9ecef; 
+  color: #212529; 
+}
+
+.btn-check.group-checkbox:checked + .cat-btn-label {
+  background-color: #ebf3ff;
+  color: #0d6efd;
+  border-color: #0d6efd;
+  box-shadow: 0 2px 6px rgba(13, 110, 253, 0.15);
+  font-weight: 600;
+}
+
 @media (max-width: 900px) {
   .upload-grid { grid-template-columns: 1fr; }
 }
