@@ -8,7 +8,6 @@
 
 ## 環境建置與執行流程
 ### 1. 環境準備
-請確保電腦已安裝：
 -   Python3.12 或更高版本
 -   [uv](https://github.com/astral-sh/uv)
 -   SQL Server
@@ -25,7 +24,7 @@ uv sync
 ```
 
 ### 3. 資料庫及環境變數配置
-1. **還原資料庫**：請在 SQL Server 中還原 `data/Hospital_data.bak` 備份檔。
+1. **還原資料庫**：請在SQL Server中還原 `data/Hospital_data.bak` 備份檔。
 2. **設定環境變數**：設定新增`.env`
    ```env
    FLASK_PORT=5000
@@ -34,6 +33,17 @@ uv sync
    DB_NAME=Hospital_data
    DB_USER=YLH
    DB_PASSWORD=YLH
+
+   # LLM Configuration (Ollama)
+   LLM_PROVIDER= ollama
+   LLM_BASE_URL= your API_URL
+   LLM_API_KEY= your API_KEY
+   LLM_MODEL= your LLM Model
+
+   # LLM Configuration (使用OpenAI，LLM_PROVIDER改為openai)
+   # LLM_PROVIDER= openai
+   # OPENAI_API_KEY= your openai_api_key
+   # OPENAI_MODEL= Openai Model
    ```
 
 ### 4. 執行應用程式

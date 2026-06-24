@@ -72,9 +72,10 @@
           <span>{% block page_title %}{% endblock %}</span>
         </div>
         <div class="topbar-actions">
-          <button class="top-btn" aria-label="Notifications">
-            <i class="bi bi-bell"></i>
-          </button>
+          <div class="d-none d-md-flex align-items-center me-3 text-secondary" style="font-size: 13px;">
+            <strong>目前模型：{{ llm_model }}</strong>
+          </div>
+          
           <button class="top-btn" aria-label="Help" data-bs-toggle="modal" data-bs-target="#helpModal">
             <i class="bi bi-question-circle"></i>
           </button>

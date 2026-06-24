@@ -645,36 +645,30 @@
 
 /* ── Analysis Items Checkbox Logic ── */
 (function() {
-  const table = document.getElementById('analysisItemsTable');
-  if (!table) return;
+  // Use document instead of a specific table container so elements can be placed anywhere
+  const table = document;
 
   // Handle Group Checkbox (Check all items under it)
   table.querySelectorAll('.group-checkbox').forEach(groupChk => {
     groupChk.addEventListener('change', function() {
-      const groupName = this.dataset.group;
-      const isChecked = this.checked;
       
-      // Toggle selected class on group checkbox
-      const groupChip = this.closest('.field-chip') || this.closest('.naming-chip');
-      if (groupChip) groupChip.classList.toggle('selected', isChecked);
-      
-      // Select all item checkboxes belonging to this group
-      const items = table.querySelectorAll(`.item-checkbox[data-parent="${groupName}"]`);
-      items.forEach(item => {
-        item.checked = isChecked;
-        const chip = item.closest('.field-chip') || item.closest('.naming-chip');
-        if (chip) chip.classList.toggle('selected', isChecked);
+      // For radio buttons, the browser might not fire 'change' on the one that gets unchecked.
+      // So we loop through ALL group checkboxes and update their respective sub-items containers.
+      table.querySelectorAll('.group-checkbox').forEach(chk => {
+        const gName = chk.dataset.group;
+        const subContainer = document.getElementById(`subItems-${gName}`);
+        if (subContainer) {
+          if (chk.checked) {
+            subContainer.classList.remove('d-none');
+            subContainer.style.display = 'flex';
+          } else {
+            subContainer.classList.add('d-none');
+            subContainer.style.display = 'none';
+          }
+        }
       });
 
-      // Toggle visibility of sub-items container
-      const subItemsContainer = document.getElementById(`subItems-${groupName}`);
-      if (subItemsContainer) {
-        if (isChecked) {
-          subItemsContainer.classList.remove('d-none');
-        } else {
-          subItemsContainer.classList.add('d-none');
-        }
-      }
+      // (Removed auto-check logic so they can act as independent toolbar options)
     });
   });
 
@@ -713,5 +707,63 @@
       }
     }
   }
+})();
+
+/* ── AI Insight Generation Logic ── */
+(function() {
+  window.lastChartData = null;
+
+  function fetchInsight(fieldKey, dataObj, resultDivId, btnId) {
+      const btn = document.getElementById(btnId);
+      const resultDiv = document.getElementById(resultDivId);
+      if (!btn || !resultDiv) return;
+      
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 產生中...';
+      resultDiv.innerText = '正在呼叫 AI 分析...';
+      
+      fetch('/api/chart_insight', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+              field_key: fieldKey,
+              data: dataObj
+          })
+      })
+      .then(res => res.json())
+      .then(data => {
+          btn.disabled = false;
+          btn.innerHTML = '重新產生 AI 敘述';
+          if (data.success) {
+              resultDiv.innerText = data.insight;
+          } else {
+              resultDiv.innerText = '分析失敗: ' + (data.error || '發生錯誤');
+          }
+      })
+      .catch(err => {
+          btn.disabled = false;
+          btn.innerHTML = '重新產生 AI 敘述';
+          console.error(err);
+          resultDiv.innerText = '系統錯誤，無法取得分析結果。';
+      });
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+      const btnAiMain = document.getElementById('btnAiMain');
+      if (btnAiMain) {
+          btnAiMain.addEventListener('click', function() {
+              if (!window.lastChartData) return;
+              fetchInsight('診斷年齡', window.lastChartData.genderAgeData, 'llmResponseMain', 'btnAiMain');
+          });
+      }
+
+      const btnAiBar = document.getElementById('btnAiBar');
+      if (btnAiBar) {
+          btnAiBar.addEventListener('click', function() {
+              if (!window.lastChartData) return;
+              fetchInsight('原發部位', window.lastChartData.topCancersData, 'llmResponseBar', 'btnAiBar');
+          });
+      }
+  });
 })();
 // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

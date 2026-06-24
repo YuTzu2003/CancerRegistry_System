@@ -44,7 +44,18 @@ def inject_nav():
     if session.get("position") == "Admin":
         # NAV_ITEMS.append({"endpoint":"rag_config", "title": "RAG知識庫", "icon": "bi-robot"})
         NAV_ITEMS.append({"endpoint":"member.member", "title": "使用者管理", "icon": "bi-people"})
-    return {"nav_items": NAV_ITEMS}
+        
+    provider = os.environ.get("LLM_PROVIDER", "ollama")
+    if provider and provider.lower() == "openai":
+        model = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+    else:
+        model = os.environ.get("LLM_MODEL", "gemma4:26b")
+        
+    return {
+        "nav_items": NAV_ITEMS,
+        "llm_provider": provider or "ollama",
+        "llm_model": model
+    }
 
 @app.route("/")
 @login_required
@@ -76,64 +87,18 @@ def dataGen():
     conn.close()
     return render_template("dataGen.html", active="dataGen", formats=formats)
 
-
-def _list_dashboard_files():
-    files = []
-    if os.path.isdir(DASHBOARD_DATA):
-        for fname in os.listdir(DASHBOARD_DATA):
-            if fname.lower().endswith(('.xls', '.xlsx')):
-                fpath = os.path.join(DASHBOARD_DATA, fname)
-                mtime = os.path.getmtime(fpath)
-                files.append({
-                    "name": fname,
-                    "time": datetime.datetime.fromtimestamp(mtime).strftime("%Y/%m/%d %H:%M"),
-                })
-        files.sort(key=lambda x: x["time"], reverse=True)
-    return files
-
-
 @app.route("/dashboard")
 @login_required
 def dashboard():
-    uploaded_files = _list_dashboard_files()
-    return render_template("dashboard.html", active="dashboard", uploaded_files=uploaded_files)
-
-
-@app.route("/dashboard/upload", methods=["POST"])
-@login_required
-def dashboard_upload():
-    f = request.files.get("file")
-    if not f or not f.filename:
-        return jsonify({"ok": False, "error": "未選擇檔案"}), 400
-    ext = f.filename.rsplit(".", 1)[-1].lower() if "." in f.filename else ""
-    if ext not in ("xls", "xlsx"):
-        return jsonify({"ok": False, "error": "僅接受 .xls 或 .xlsx 格式"}), 400
-    import re
-    raw_filename = f.filename or ""
-    basename = os.path.basename(raw_filename)
-    filename = re.sub(r'[\\/:*?"<>|\s]', '_', basename)
-    if not filename.strip() or filename == f".{ext}":
-        filename = f"uploaded_file.{ext}"
-    save_path = os.path.join(DASHBOARD_DATA, filename)
-    f.save(save_path)
-    logging.info(f"Dashboard upload: {filename} saved to {save_path}")
-    return jsonify({"ok": True, "filename": filename})
-
-
-@app.route("/dashboard/delete", methods=["POST"])
-@login_required
-def dashboard_delete():
-    data = request.json or {}
-    filename = data.get("filename", "")
-    if not filename:
-        return jsonify({"ok": False, "error": "未指定檔案名稱"}), 400
-    fpath = os.path.join(DASHBOARD_DATA, filename)
-    if not os.path.isfile(fpath):
-        return jsonify({"ok": False, "error": "檔案不存在"}), 404
-    os.remove(fpath)
-    logging.info(f"Dashboard delete: {filename}")
-    return jsonify({"ok": True})
-
+    uploaded_files = []
+    if os.path.isdir(DASHBOARD_DATA):
+        for fname in os.listdir(DASHBOARD_DATA):
+            if fname.lower().endswith((".xls", ".xlsx")):
+                fpath = os.path.join(DASHBOARD_DATA, fname)
+                mtime = os.path.getmtime(fpath)
+                uploaded_files.append({"name": fname,"time": datetime.datetime.fromtimestamp(mtime).strftime("%Y/%m/%d %H:%M")})
+        uploaded_files.sort(key=lambda x: x["time"],reverse=True)
+    return render_template("dashboard.html", active="dashboard",uploaded_files=uploaded_files)
 
 # @app.route("/rag_config")
 # @admin_required
