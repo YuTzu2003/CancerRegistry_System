@@ -6,7 +6,6 @@ dist/
 wheels/
 other/
 Jobs/
-test/
 *.egg-info
 
 # Virtual environments
