@@ -552,7 +552,13 @@
     // 4. 清空已選癌別
     selectedCancers.clear();
 
-    // 5. 重新渲染畫面
+    // 5. 隱藏主類別與圖表區塊
+    const mainCategoryArea = document.getElementById('mainCategoryArea');
+    const chartsArea = document.getElementById('chartsArea');
+    if (mainCategoryArea) mainCategoryArea.classList.add('d-none');
+    if (chartsArea) chartsArea.classList.add('d-none');
+
+    // 6. 重新渲染畫面
     renderCategories();
     renderDetails();
     updateStatus();
@@ -661,6 +667,11 @@
           if (chk.checked) {
             subContainer.classList.remove('d-none');
             subContainer.style.display = 'flex';
+            // Ensure the chart switches to the active sub-item in this group
+            const activeItem = subContainer.querySelector('.item-checkbox:checked');
+            if (activeItem) {
+               activeItem.dispatchEvent(new Event('change'));
+            }
           } else {
             subContainer.classList.add('d-none');
             subContainer.style.display = 'none';
@@ -672,14 +683,48 @@
     });
   });
 
-  // Handle Item Checkbox (Update parent group)
+  // Handle Item Checkbox (Switching Chart Panes)
   table.querySelectorAll('.item-checkbox').forEach(itemChk => {
     itemChk.addEventListener('change', function() {
+      // Toggle selected class on chip (if any remains)
       const chip = this.closest('.field-chip') || this.closest('.naming-chip');
       if (chip) chip.classList.toggle('selected', this.checked);
 
-      const parentGroup = this.dataset.parent;
-      updateGroupCheckbox(parentGroup);
+      if (this.checked) {
+        // Hide all chart panes
+        table.querySelectorAll('.chart-pane').forEach(pane => {
+           pane.classList.add('d-none');
+        });
+        
+        // Find target pane or fallback to empty
+        const targetSelector = this.getAttribute('data-target');
+        let targetPane = targetSelector ? document.querySelector(targetSelector) : null;
+        if (!targetPane) targetPane = document.getElementById('chartPane-Empty');
+        if (targetPane) {
+            targetPane.classList.remove('d-none');
+            
+            // Re-render ECharts in the new visible pane to avoid sizing issues
+            if (typeof echarts !== 'undefined') {
+                setTimeout(() => {
+                    const chartDoms = targetPane.querySelectorAll('div[_echarts_instance_], #main, #barChart');
+                    chartDoms.forEach(c => {
+                       const inst = echarts.getInstanceByDom(c);
+                       if (inst) inst.resize();
+                    });
+                    
+                    // Auto-generate AI narrative if data is loaded but narrative is empty
+                    if (window.lastChartData) {
+                        const aiBtn = targetPane.querySelector('button[id^="btnAi"]');
+                        const llmDiv = targetPane.querySelector('div[id^="llmResponse"]');
+                        if (aiBtn && llmDiv && llmDiv.innerText.includes('自動產生')) {
+                            aiBtn.click();
+                        }
+                    }
+                }, 50);
+            }
+        }
+      }
+      updateGroupCheckbox(this.dataset.parent);
     });
   });
 
@@ -719,8 +764,7 @@
       if (!btn || !resultDiv) return;
       
       btn.disabled = true;
-      btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 產生中...';
-      resultDiv.innerText = '正在呼叫 AI 分析...';
+      resultDiv.innerText = '產生敘述中...';
       
       fetch('/api/chart_insight', {
           method: 'POST',
@@ -733,7 +777,7 @@
       .then(res => res.json())
       .then(data => {
           btn.disabled = false;
-          btn.innerHTML = '重新產生 AI 敘述';
+          btn.innerHTML = '重新產生敘述';
           if (data.success) {
               resultDiv.innerText = data.insight;
           } else {
@@ -742,7 +786,7 @@
       })
       .catch(err => {
           btn.disabled = false;
-          btn.innerHTML = '重新產生 AI 敘述';
+          btn.innerHTML = '重新產生敘述';
           console.error(err);
           resultDiv.innerText = '系統錯誤，無法取得分析結果。';
       });
