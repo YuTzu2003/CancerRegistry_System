@@ -984,7 +984,7 @@ def clean_job_logic(user_id, format_id, convert_txt_flag, uploaded_file):
                 }, 400
 
     JobID = str(uuid.uuid4())
-    Jobs_FOLDER = 'work/Jobs'
+    Jobs_FOLDER = 'tasks/Jobs'
     project_folder = f"{Jobs_FOLDER}/{JobID}"
     os.makedirs(project_folder, exist_ok=True)
 

@@ -24,8 +24,8 @@ app.register_blueprint(data_gen_bp)
 app.register_blueprint(dashboard_bp)
 
 BASE_DIR = os.path.dirname(__file__)
-Jobs_FOLDER = 'work/Jobs'
-DASHBOARD_DATA = os.path.join(BASE_DIR, 'work', 'data')
+Jobs_FOLDER = 'tasks/Jobs'
+DASHBOARD_DATA = os.path.join(BASE_DIR, 'tasks', 'data')
 os.makedirs(Jobs_FOLDER, exist_ok=True)
 os.makedirs(DASHBOARD_DATA, exist_ok=True)
 
