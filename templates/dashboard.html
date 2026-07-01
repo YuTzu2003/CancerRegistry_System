@@ -95,19 +95,6 @@
       box-shadow: none !important;
     }
 
-    .annual-report-title {
-      color: #0f172a;
-      font-size: 1.5rem;
-      font-weight: 800;
-      margin-bottom: 18px;
-    }
-
-    .annual-report-section-title {
-      color: #111827;
-      font-size: 18px;
-      margin: 10px 0 8px;
-    }
-
     .annual-report-table-wrap {
       overflow-x: auto;
       margin-bottom: 26px;
@@ -166,31 +153,22 @@
 
 {% include "dashboard/control.html" %}
 
-
-
 <!-- 圖表區塊 -->
 <div id="chartsArea" class="row g-4 my-4">
   <div class="col-12">
-    <!-- 細項工作列已被移至 control.html 中 -->
-
-    <!-- 圖表顯示區域 (Tab Panes) -->
-    
-    <!-- 1. 性別年齡分佈 -->
+    <!-- 1. 性別年齡分佈 (Pie Chart) -->
     <div id="chartPane-IncidenceAge" class="chart-pane d-none">
       <div class="bg-white border border-secondary-subtle rounded shadow-sm p-4 mt-2">
-        <div class="annual-report-title">性別年齡分佈</div>
         <div class="annual-data-content d-none">
-          <div class="annual-report-section-title">性別年齡分佈表</div>
           <div class="annual-report-table-wrap">
             <table class="annual-report-table">
-              <caption id="annualSexAgeCaption">表、XXXX年新診斷XX癌病患性別及年齡分佈表</caption>
+              <caption id="annualSexAgeCaption">表、XXXX年新診斷XX病患性別及年齡分佈表</caption>
               <thead id="annualSexAgeTableHead"></thead>
               <tbody id="annualSexAgeTableBody"></tbody>
             </table>
           </div>
-          <div class="annual-report-section-title">性別年齡分佈圖</div>
           <div id="main" style="width: 100%; height: 450px;"></div>
-          <div id="annualSexAgeChartCaption" class="annual-chart-caption">圖、XXXX年新診斷XX癌病患性別及年齡分佈圖</div>
+          <div id="annualSexAgeChartCaption" class="annual-chart-caption">圖、XXXX年新診斷XX病患性別及年齡分佈圖</div>
         </div>
         <!-- LLM 分析結果文字框 -->
         <div class="mt-4 p-3 rounded" style="background-color: rgba(209, 231, 221, 0.5); border: 1px solid #a3cfbb;">
@@ -205,14 +183,14 @@
       </div>
     </div>
 
-    <!-- 2. 本院常見癌症 (Bar Chart) -->
+    <!-- 2. 年齡中位數 -->
     <div id="chartPane-IncidenceMedian" class="chart-pane d-none">
       <div class="bg-white border border-secondary-subtle rounded shadow-sm p-4 mt-2">
         <div class="annual-report-title">年齡中位數</div>
         <div class="annual-data-content d-none">
           <div class="annual-report-table-wrap">
             <table class="annual-report-table annual-median-table">
-              <caption id="annualAgeMedianCaption">表、XXXX年新診斷XX癌病患年齡中位數表</caption>
+              <caption id="annualAgeMedianCaption">表、XXXX年新診斷XX病患年齡中位數表</caption>
               <thead id="annualAgeMedianTableHead"></thead>
               <tbody id="annualAgeMedianTableBody"></tbody>
             </table>
@@ -231,7 +209,7 @@
       </div>
     </div>
 
-    <!-- 2. 本院常見癌症 (Bar Chart) -->
+    <!-- 3. 本院常見癌症 (Bar Chart) -->
     <div id="chartPane-IncidenceCommon" class="chart-pane d-none">
       <div class="bg-white border border-secondary-subtle rounded shadow-sm p-4 mt-2">
         <div id="barChart" style="width: 100%; height: 450px;"></div>
@@ -267,51 +245,69 @@
       var myChart = echarts.init(chartDom);
       var option = {
         title: {
-          text: 'XX癌年齡性別分佈圖',
+          text: '性別與年齡分佈',
           subtext: '請點擊查詢載入資料',
-          left: 'center',
-          textStyle: {
-            fontSize: 18,
-            fontWeight: 400,
-            color: '#595959'
-          },
-          subtextStyle: {
-            fontSize: 0
-          }
-        },
-        tooltip: {
-          trigger: 'axis'
-        },
-        legend: {
-          top: 36,
           left: 'center'
         },
+        tooltip: {
+          trigger: 'axis',
+          axisPointer: { type: 'cross' }
+        },
+        legend: {
+          data: ['男性', '女性', '總數'],
+          bottom: 10
+        },
         toolbox: {
-          show: true,
-          feature: {
-            dataView: {show: true,readOnly: false},
-            restore: {show: true},
-            saveAsImage: {show: true}
+            feature: {
+              dataView: { show: true, readOnly: false },
+              magicType: { show: true, type: ['line', 'bar'] },
+              restore: { show: true },
+              saveAsImage: { show: true }
+            }
+        },
+        xAxis: [
+          {
+            type: 'category',
+            data: ['<=19', '20-24', '25-29', '30-34', '35-39', '40-44', '45-49', '50-54', '55-59', '60-64', '65-69', '70-74', '75-79', '80-84', '>=85'],
+            axisPointer: { type: 'shadow' }
           }
-        },
-        grid: {
-          top: 90,
-          left: 45,
-          right: 35,
-          bottom: 55
-        },
-        xAxis: {
-          type: 'category',
-          data: []
-        },
-        yAxis: {
-          type: 'value'
-        },
-        series: []
+        ],
+        yAxis: [
+          {
+            type: 'value',
+            name: '各別數',
+            axisLabel: { formatter: '{value}' }
+          },
+          {
+            type: 'value',
+            name: '總數',
+            axisLabel: { formatter: '{value}' }
+          }
+        ],
+        series: [
+          {
+            name: '男性',
+            type: 'bar',
+            data: [],
+            itemStyle: { color: '#5470C6' }
+          },
+          {
+            name: '女性',
+            type: 'bar',
+            data: [],
+            itemStyle: { color: '#EE6666' }
+          },
+          {
+            name: '總數',
+            type: 'line',
+            yAxisIndex: 1,
+            data: [],
+            itemStyle: { color: '#91CC75' },
+            smooth: false
+          }
+        ]
       };
       
-      myChart.setOption(option);
-
       function getSelectedYearTitle() {
           const startYear = document.getElementById('filterYearStart')?.value.trim();
           const endYear = document.getElementById('filterYearEnd')?.value.trim();
@@ -329,26 +325,25 @@
 
           const btnText = document.getElementById('btnCancerPickerText')?.innerText.trim();
           if (!btnText || btnText.includes('尚未選擇')) return 'XX';
-          if (btnText.includes('全癌別')) return '全癌別';
+          if (btnText.includes('全部癌症')) return '全部癌症';
 
           return btnText;
       }
 
       function getCancerTitleForSentence(cancerTitle) {
           if (!cancerTitle || cancerTitle === 'XX') return 'XX癌';
-          if (cancerTitle.includes('癌') || cancerTitle.includes('全癌別')) return cancerTitle;
+          if (cancerTitle.includes('癌') || cancerTitle.includes('全部癌症')) return cancerTitle;
           return `${cancerTitle}癌`;
       }
 
-      function renderSexAgeTable(tableData, yearTitle, cancerTitle) {
+      function renderSexAgeTable(genderAgeData, yearTitle, cancerTitle) {
           const head = document.getElementById('annualSexAgeTableHead');
           const body = document.getElementById('annualSexAgeTableBody');
           const caption = document.getElementById('annualSexAgeCaption');
           if (!head || !body) return;
 
-          const ageLabels = tableData?.ageLabels || [];
-          const rows = tableData?.rows || [];
-
+          const ageLabels = genderAgeData.categories || [];
+          
           if (caption) {
               caption.innerText = `表、${yearTitle}年新診斷${getCancerTitleForSentence(cancerTitle)}病患性別及年齡分佈表`;
           }
@@ -356,7 +351,7 @@
           head.innerHTML = `
               <tr>
                 <th rowspan="2">性別</th>
-                <th colspan="${ageLabels.length}">年齡層</th>
+                <th colspan="${ageLabels.length}">年齡層次</th>
                 <th rowspan="2">總計</th>
               </tr>
               <tr>
@@ -364,23 +359,36 @@
               </tr>
           `;
 
-          body.innerHTML = rows.map(row => `
+          const sumMale = genderAgeData.male.reduce((a, b) => a + b, 0);
+          const sumFemale = genderAgeData.female.reduce((a, b) => a + b, 0);
+          const sumTotal = genderAgeData.total.reduce((a, b) => a + b, 0);
+
+          body.innerHTML = `
               <tr>
-                <td>${row.label}</td>
-                ${(row.values || []).map(value => `<td>${value}</td>`).join('')}
-                <td>${row.total}</td>
+                <td>男</td>
+                ${genderAgeData.male.map(value => `<td>${value}</td>`).join('')}
+                <td>${sumMale}</td>
               </tr>
-          `).join('');
+              <tr>
+                <td>女</td>
+                ${genderAgeData.female.map(value => `<td>${value}</td>`).join('')}
+                <td>${sumFemale}</td>
+              </tr>
+              <tr>
+                <td>總計</td>
+                ${genderAgeData.total.map(value => `<td>${value}</td>`).join('')}
+                <td>${sumTotal}</td>
+              </tr>
+          `;
       }
 
-      function renderAgeMedianTable(tableData, yearTitle, cancerTitle) {
+      function renderAgeMedianTable(medianData, yearTitle, cancerTitle) {
           const head = document.getElementById('annualAgeMedianTableHead');
           const body = document.getElementById('annualAgeMedianTableBody');
           const caption = document.getElementById('annualAgeMedianCaption');
-          if (!head || !body) return;
+          if (!head || !body || !medianData) return;
 
-          const columns = tableData?.columns || ['男性', '女性'];
-          const rows = tableData?.rows || [];
+          const columns = ['男性', '女性', '總計'];
 
           if (caption) {
               caption.innerText = `表、${yearTitle}年新診斷${getCancerTitleForSentence(cancerTitle)}病患年齡中位數表`;
@@ -396,12 +404,14 @@
               </tr>
           `;
 
-          body.innerHTML = rows.map(row => `
+          body.innerHTML = `
               <tr>
-                <td>${row.label}</td>
-                ${(row.values || []).map(value => `<td>${value}</td>`).join('')}
+                <td>年齡中位數</td>
+                <td>${medianData.male}</td>
+                <td>${medianData.female}</td>
+                <td>${medianData.total}</td>
               </tr>
-          `).join('');
+          `;
       }
 
       function showAnnualDataContent() {
@@ -409,6 +419,8 @@
               el.classList.remove('d-none');
           });
       }
+      
+      myChart.setOption(option);
       
       // --- Bar Chart ---
       var barChartDom = document.getElementById('barChart');
@@ -508,9 +520,12 @@
               fetch('/api/dashboard/analyze_file', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
+                  body: JSON.stringify({ 
                       filename: selectedFile,
-                      cancerIds: window.dashboardSelectedCancerIds || []
+                      cancers: Array.from(window.selectedCancers || []),
+                      year_start: yearStartVal,
+                      year_end: yearEndVal,
+                      behavior: behaviorVal
                   })
               })
               .then(res => res.json())
@@ -544,37 +559,26 @@
                       }, 100);
 
                       // Update Sex/Age Table and Chart
-                      const sexAgeTable = chartData.sexAgeTable || {};
-                      const ageMedianTable = chartData.ageMedianTable || {};
                       const yearTitle = getSelectedYearTitle();
                       const cancerTitle = getSelectedCancerTitle();
                       showAnnualDataContent();
-                      renderSexAgeTable(sexAgeTable, yearTitle, cancerTitle);
-                      renderAgeMedianTable(ageMedianTable, yearTitle, cancerTitle);
+                      renderSexAgeTable(chartData.genderAgeData, yearTitle, cancerTitle);
+                      renderAgeMedianTable(chartData.ageMedianData, yearTitle, cancerTitle);
                       const chartCaption = document.getElementById('annualSexAgeChartCaption');
                       if (chartCaption) {
                           chartCaption.innerText = `圖、${yearTitle}年新診斷${getCancerTitleForSentence(cancerTitle)}病患性別及年齡分佈圖`;
                       }
+
+                      // Update Mix Line-Bar Chart
                       myChart.setOption({
-                          title: {
-                              text: `${getCancerTitleForSentence(cancerTitle)}年齡性別分佈圖`,
-                              subtext: '',
-                              left: 'center',
-                              textStyle: {
-                                  fontSize: 18,
-                                  fontWeight: 400,
-                                  color: '#595959'
-                              },
-                              subtextStyle: {
-                                  fontSize: 0
-                              }
-                          },
-                          tooltip: { trigger: 'axis' },
-                          legend: { top: 36, left: 'center' },
-                          xAxis: { type: 'category', data: sexAgeTable.ageLabels || [] },
-                          yAxis: { type: 'value' },
-                          series: sexAgeTable.chartSeries || []
-                      }, true);
+                          title: { text: '性別與年齡分佈', subtext: selectedFile },
+                          xAxis: [{ data: chartData.genderAgeData.categories }],
+                          series: [
+                              { name: '男性', data: chartData.genderAgeData.male },
+                              { name: '女性', data: chartData.genderAgeData.female },
+                              { name: '總數', data: chartData.genderAgeData.total }
+                          ]
+                      });
                       // Update Bar Chart
                       myBarChart.setOption({
                           title: { text: '本院常見癌症 (Top 10)', subtext: selectedFile },
