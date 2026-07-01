@@ -105,5 +105,5 @@ def dashboard():
 # def rag_config(): return render_template("rag_config.html", active="rag_config")
 
 if __name__ == "__main__":
-    flask_port = int(os.environ.get("FLASK_PORT"))
+    flask_port = int(os.environ.get("FLASK_PORT", 5000))
     app.run(host="0.0.0.0", port=flask_port, debug=True)
