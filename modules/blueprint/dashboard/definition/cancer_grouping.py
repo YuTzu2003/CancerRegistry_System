@@ -53,7 +53,7 @@ def classify_cancer_group(site, hist, rules=None):
 
     Current supported groups:
     - 結直腸癌: site C18/C19/C20, excluding hist 9140 and 9590-9993.
-    - 肺癌: site C34, excluding hist 9140 and 9590-9993.
+    - 肺癌: site C33/C34, excluding hist 9140 and 9590-9993.
     """
     selected_rules = rules or CANCER_GROUP_RULES
 
