@@ -46,12 +46,7 @@ def dashboard_delete():
 @dashboard_bp.route("/api/chart_insight", methods=["POST"])
 @login_required
 def chart_insight_route():
-    data = request.json or {}
-    from modules.blueprint.dashboard.reply import get_chart_insight_logic
-    result = get_chart_insight_logic(data)
-    if not result.get("success"):
-        return jsonify(result), 500
-    return jsonify(result), 200
+    return jsonify({"success": True, "insight": "定義還沒串接使用。"}), 200
 
 @dashboard_bp.route('/api/favorites', methods=['GET'])
 @login_required
@@ -119,14 +114,17 @@ def delete_favorite(fav_id):
 def analyze_dashboard_file_route():
     data = request.json or {}
     filename = data.get("filename", "")
-    cancer_ids = data.get("cancerIds", [])
+    cancers = data.get("cancers", [])
+    year_start = data.get("year_start", "")
+    year_end = data.get("year_end", "")
+    behavior = data.get("behavior", "")
     
     if not filename:
         return jsonify({"ok": False, "error": "未提供檔案名稱"}), 400
         
     try:
         from modules.blueprint.dashboard.chart_analytics import analyze_dashboard_file
-        chart_data = analyze_dashboard_file(filename, cancer_ids=cancer_ids)
+        chart_data = analyze_dashboard_file(filename, cancers, year_start, year_end, behavior)
         return jsonify({"ok": True, "data": chart_data}), 200
     except Exception as e:
         import logging

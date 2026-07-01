@@ -15,8 +15,8 @@
     {id:'Pancreas',name:'胰臟 Pancreas'},
     {id:'Colorectal',name:'結腸、直腸及肛門', 
         children: [
-                  {id:'Colon',name:'結腸癌 Colon'},
-                  {id:'Rectum',name:'直腸癌 Rectum'},
+                  {id:'colon',name:'結腸癌 Colon'},
+                  {id:'rectum',name:'直腸癌 Rectum'},
                   {id:'Anus',name:'肛門癌 Anus'}]},
 
     {id:'liver_group',name:'肝及肝內膽管', 
@@ -64,6 +64,7 @@
 
   /* ── State Management ── */
   const selectedCancers = new Set();
+  window.selectedCancers = selectedCancers;
   const allLeafIds = [];
   const idToNode = {};
 
@@ -83,11 +84,9 @@
     allLeafIds.push(...getLeafIds(c));
     buildIndex(c);
   });
-  
-  // Default: Select all cancers
-  //allLeafIds.forEach(id => selectedCancers.add(id));
-  let currentCategory = cancerData[0];
 
+  let currentCategory = cancerData[0];
+  
   /* ── UI Rendering ── */
   function getBadgeHtml(cat) {
     const leafIds = getLeafIds(cat);
@@ -443,6 +442,9 @@
     updateStatus();
     togglePresetActionButtons(true);
     checkFiltersState();
+    
+    // 自動執行查詢以顯示對應圖表
+    document.getElementById('btnRunQuery')?.click();
   });
 
   // 新增範本
