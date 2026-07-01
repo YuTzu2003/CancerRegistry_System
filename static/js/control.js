@@ -223,6 +223,39 @@
     const status = document.getElementById('cancerPickerStatus');
     const specificSelectedCount = Array.from(selectedCancers).filter(id => id !== 'All_Cancers').length;
     const totalSpecificCount = allLeafIds.filter(id => id !== 'All_Cancers').length;
+    window.dashboardSelectedCancerIds = Array.from(selectedCancers);
+    const getChineseCancerName = (name) => {
+      return String(name || '')
+        .replace(/\s*\([^)]*\)/g, '')
+        .replace(/\s+[A-Za-z][A-Za-z0-9\s,./&+-]*$/g, '')
+        .trim();
+    };
+
+    const getSelectedCancerTitle = () => {
+      if (selectedCancers.has('All_Cancers') || (specificSelectedCount === totalSpecificCount && totalSpecificCount > 0)) {
+        return '全癌別';
+      }
+
+      const names = [];
+      cancerData.forEach(category => {
+        if (category.id === 'All_Cancers') return;
+
+        const leafIds = getLeafIds(category);
+        const selectedLeafIds = leafIds.filter(id => selectedCancers.has(id));
+        if (selectedLeafIds.length === 0) return;
+
+        if (selectedLeafIds.length === leafIds.length && leafIds.length > 1) {
+          names.push(getChineseCancerName(category.name));
+          return;
+        }
+
+        selectedLeafIds.forEach(id => {
+          if (idToNode[id]) names.push(getChineseCancerName(idToNode[id].name));
+        });
+      });
+
+      return names.length ? names.join('、') : 'XX';
+    };
     
     if (status) {
       status.innerHTML = `<i class="bi bi-info-circle me-1"></i>已選取：<span class="fw-bold text-primary">${specificSelectedCount}</span> / ${totalSpecificCount} 項癌別`;
@@ -232,10 +265,13 @@
     if (btnText) {
       if (selectedCancers.has('All_Cancers') || (specificSelectedCount === totalSpecificCount && totalSpecificCount > 0)) {
         btnText.textContent = '不分癌別 全癌別(C00-C80)';
+        window.dashboardSelectedCancerTitle = '全癌別';
       } else if (specificSelectedCount === 0) {
         btnText.textContent = '— 尚未選擇癌別 —';
+        window.dashboardSelectedCancerTitle = 'XX';
       } else {
         btnText.innerHTML = `<span class="text-primary fw-bold">已選取 ${specificSelectedCount} 項</span>`;
+        window.dashboardSelectedCancerTitle = getSelectedCancerTitle();
       }
     }
   }
