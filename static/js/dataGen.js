@@ -211,6 +211,10 @@ function downloadResult() {
 
 function resetUpload() {
     fileInput.value = '';
+    const formatSelect = document.getElementById('formatSelect');
+    if (formatSelect) {
+        formatSelect.value = '';
+    }
     uploadArea.style.display = 'block';
     fileInfo.style.display = 'none';
     namingSection.style.display = 'none';
