@@ -116,6 +116,7 @@ function renderExtraFields(analyzedColumns, selectedScheme) {
 
     const extraCols = analyzedColumns.filter(col => {
         if (!col.seq) return true;
+        if (selectedScheme === 'original') return false;
         const targetName = col.mappings[selectedScheme];
         return !targetName || targetName.trim() === '';
     });
