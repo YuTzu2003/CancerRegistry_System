@@ -174,33 +174,60 @@
           left: 'center'
         },
         tooltip: {
-          trigger: 'item'
+          trigger: 'axis',
+          axisPointer: { type: 'cross' }
         },
         legend: {
-          orient: 'vertical',
-          left: 'left'
+          data: ['男性', '女性', '總數'],
+          bottom: 10
         },
         toolbox: {
-          show: true,
-          feature: {
-            dataView: {show: true,readOnly: false},
-            restore: {show: true},
-            saveAsImage: {show: true}
-          }
+            feature: {
+              dataView: { show: true, readOnly: false },
+              magicType: { show: true, type: ['line', 'bar'] },
+              restore: { show: true },
+              saveAsImage: { show: true }
+            }
         },
+        xAxis: [
+          {
+            type: 'category',
+            data: ['<=19', '20-24', '25-29', '30-34', '35-39', '40-44', '45-49', '50-54', '55-59', '60-64', '65-69', '70-74', '75-79', '80-84', '>=85'],
+            axisPointer: { type: 'shadow' }
+          }
+        ],
+        yAxis: [
+          {
+            type: 'value',
+            name: '各別數',
+            axisLabel: { formatter: '{value}' }
+          },
+          {
+            type: 'value',
+            name: '總數',
+            axisLabel: { formatter: '{value}' }
+          }
+        ],
         series: [
           {
-            name: '人數',
-            type: 'pie',
-            radius: '50%',
+            name: '男性',
+            type: 'bar',
             data: [],
-            emphasis: {
-              itemStyle: {
-                shadowBlur: 10,
-                shadowOffsetX: 0,
-                shadowColor: 'rgba(0, 0, 0, 0.5)'
-              }
-            }
+            itemStyle: { color: '#5470C6' }
+          },
+          {
+            name: '女性',
+            type: 'bar',
+            data: [],
+            itemStyle: { color: '#EE6666' }
+          },
+          {
+            name: '總數',
+            type: 'line',
+            yAxisIndex: 1,
+            data: [],
+            itemStyle: { color: '#91CC75' },
+            smooth: false
           }
         ]
       };
@@ -305,7 +332,13 @@
               fetch('/api/dashboard/analyze_file', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ filename: selectedFile })
+                  body: JSON.stringify({ 
+                      filename: selectedFile,
+                      cancers: Array.from(window.selectedCancers || []),
+                      year_start: yearStartVal,
+                      year_end: yearEndVal,
+                      behavior: behaviorVal
+                  })
               })
               .then(res => res.json())
               .then(data => {
@@ -332,10 +365,15 @@
                          }
                       }, 100);
 
-                      // Update Pie Chart
+                      // Update Mix Line-Bar Chart
                       myChart.setOption({
                           title: { text: '性別與年齡分佈', subtext: selectedFile },
-                          series: [{ data: chartData.genderAgeData }]
+                          xAxis: [{ data: chartData.genderAgeData.categories }],
+                          series: [
+                              { name: '男性', data: chartData.genderAgeData.male },
+                              { name: '女性', data: chartData.genderAgeData.female },
+                              { name: '總數', data: chartData.genderAgeData.total }
+                          ]
                       });
                       // Update Bar Chart
                       myBarChart.setOption({
