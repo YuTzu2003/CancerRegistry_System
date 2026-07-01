@@ -63,6 +63,30 @@ def format_date_special(date_val, format_str="%Y/%m/%d"):
     except: return "0000/00/00"
 
 
+
+def find_seq_for_header(col_name, field_db_map):
+    col_str = str(col_name).strip()
+    if not col_str:
+        return None
+        
+    # 規則一：開頭包含有效的欄位序號 (例如 2.2, 2.2 癌症順序, 2.2癌症順序)
+    match = re.match(r"^(\d+(?:\.\d+)+)(.*)$", col_str)
+    if match:
+        seq = match.group(1).strip()
+        if seq in field_db_map:
+            return seq
+            
+    # 規則二：忽略中文字間空格後，與標準名稱或別名相符 (不包含序號開頭)
+    clean_col = re.sub(r'\s+', '', col_str).lower()
+    for seq, data in field_db_map.items():
+        for alias in data.get("raw_aliases", []):
+            clean_alias = re.sub(r'\s+', '', alias).lower()
+            if clean_alias == clean_col:
+                return seq
+                
+    return None
+
+
 def analyze_file_logic(file_path, filename):
     try:
         ext = os.path.splitext(filename)[1].lower()
@@ -87,7 +111,8 @@ def analyze_file_logic(file_path, filename):
                 "ntu_system": str(r[4]).strip() if pd.notna(r[4]) else "",
                 "taiwan_cancer_registry": str(r[5]).strip() if pd.notna(r[5]) else "",
                 "AI_module": str(r[6]).strip() if pd.notna(r[6]) else "",
-                "aliases": [] 
+                "aliases": [],
+                "raw_aliases": []
             }
 
             for alias in r[1:7]:
@@ -95,12 +120,13 @@ def analyze_file_logic(file_path, filename):
                     clean_val = str(alias).strip()
                     if clean_val:
                         if seq in ['4.2.1.8', '7.6'] and '/' in clean_val:
-                            for v in clean_val.split('/'):
-                                v = v.strip()
-                                if v:
-                                    field_db_map[seq]["aliases"].append(f"{seq}{v}")
+                            parts = [p.strip() for p in clean_val.split('/') if p.strip()]
                         else:
-                            field_db_map[seq]["aliases"].append(f"{seq}{clean_val}")
+                            parts = [clean_val]
+                            
+                        for part in parts:
+                            field_db_map[seq]["aliases"].append(f"{seq}{part}")
+                            field_db_map[seq]["raw_aliases"].append(part)
 
         analyzed_columns = []
         raw_cols = [str(c).strip() for c in df.columns if not str(c).startswith('Unnamed')]
@@ -115,11 +141,7 @@ def analyze_file_logic(file_path, filename):
         }
 
         for col in raw_cols:
-            found_seq = None
-            for seq, data in field_db_map.items():
-                if col in data["aliases"]:
-                    found_seq = seq
-                    break
+            found_seq = find_seq_for_header(col, field_db_map)
             
             info = {
                 "name": col,
@@ -185,8 +207,17 @@ def process_file_logic(file_path, format_id, selected_date_cols_raw, extra_cols,
 
         fmt_rules = {}
         if format_id:
+             # 透過資料庫查詢 FmtID 對應的 FmtName (如 50, 115, 129)
+             conn_gen = get_conn()
+             cursor_gen = conn_gen.cursor()
+             cursor_gen.execute("SELECT FmtName FROM [Hospital_data].[dbo].[DataFormat] WHERE FmtID = ?", (str(format_id).strip(),))
+             row_gen = cursor_gen.fetchone()
+             conn_gen.close()
+             
+             fmt_name = str(row_gen[0]).strip() if row_gen else str(format_id).strip()
+             
              from modules.blueprint.clean.cleaner import FORMAT_RULES_MAP
-             fmt_key = f"fmt_{format_id}"
+             fmt_key = f"fmt_{fmt_name}"
              if fmt_key in FORMAT_RULES_MAP:
                  rules_def = FORMAT_RULES_MAP[fmt_key]
                  for friendly_name, info in rules_def.items():
@@ -208,9 +239,21 @@ def process_file_logic(file_path, format_id, selected_date_cols_raw, extra_cols,
         }
         target_idx = 1 if naming_scheme == 'original' else scheme_idx_map.get(naming_scheme, 1)
 
+        field_db_map = {}
         for r in rows:
             seq = str(r[0]).strip().replace('.0', '')
             target_val = r[target_idx]
+
+            field_db_map[seq] = {
+                "field_name_zh": str(r[1]).strip() if pd.notna(r[1]) else "",
+                "field_name_en": str(r[2]).strip() if pd.notna(r[2]) else "",
+                "ntu_yunlin": str(r[3]).strip() if pd.notna(r[3]) else "",
+                "ntu_system": str(r[4]).strip() if pd.notna(r[4]) else "",
+                "taiwan_cancer_registry": str(r[5]).strip() if pd.notna(r[5]) else "",
+                "AI_module": str(r[6]).strip() if pd.notna(r[6]) else "",
+                "aliases": [],
+                "raw_aliases": []
+            }
 
             if pd.notna(target_val) and str(target_val).strip():
                 target_header = f"{seq}{str(target_val).strip()}"
@@ -228,6 +271,8 @@ def process_file_logic(file_path, format_id, selected_date_cols_raw, extra_cols,
                                 
                             for part in parts:
                                 alias_to_target[f"{seq}{part}"] = target_header
+                                field_db_map[seq]["aliases"].append(f"{seq}{part}")
+                                field_db_map[seq]["raw_aliases"].append(part)
 
         rename_map = {}
         
@@ -237,32 +282,39 @@ def process_file_logic(file_path, format_id, selected_date_cols_raw, extra_cols,
         }
 
         for col in df.columns:
-            if col in alias_to_target:
+            seq = find_seq_for_header(col, field_db_map)
+            if seq:
                 if naming_scheme == 'original':
                     final_name = col
                 else:
-                    target_name = alias_to_target[col]
-                    final_name = target_name
-                    
-                    if naming_scheme == 'field_name_zh' and '/' in target_name:
-                        m_target = re.match(r'^(\d+(\.\d+)*)', target_name)
-                        if m_target:
-                            seq = m_target.group(1)
-                            if seq in ['4.2.1.8', '7.6']:
-
-                                 target_raw_name = target_name[len(seq):].strip()
-                                 valid_parts = [p.strip() for p in target_raw_name.split('/') if p.strip()]
-                                 
-                                 found_part = None
-                                 if col.startswith(seq):
-                                     source_raw_name = col[len(seq):].strip()
-                                     if source_raw_name in valid_parts:
-                                         found_part = source_raw_name
-
-                                 if found_part:
-                                     final_name = f"{seq}{found_part}"
-                                 elif seq in DEFAULT_PREFERENCE:
-                                     final_name = f"{seq}{DEFAULT_PREFERENCE[seq]}"
+                    target_name = scheme_target_for_seq.get(seq)
+                    if target_name:
+                        final_name = target_name
+                        
+                        if naming_scheme == 'field_name_zh' and '/' in target_name:
+                            m_target = re.match(r'^(\d+(\.\d+)*)', target_name)
+                            if m_target:
+                                seq_val = m_target.group(1)
+                                if seq_val in ['4.2.1.8', '7.6']:
+                                     target_raw_name = target_name[len(seq_val):].strip()
+                                     valid_parts = [p.strip() for p in target_raw_name.split('/') if p.strip()]
+                                     
+                                     found_part = None
+                                     if col.startswith(seq_val):
+                                         source_raw_name = col[len(seq_val):].strip()
+                                         if source_raw_name in valid_parts:
+                                             found_part = source_raw_name
+                                     else:
+                                         clean_col = re.sub(r'\s+', '', col).lower()
+                                         for part in valid_parts:
+                                             if re.sub(r'\s+', '', part).lower() == clean_col:
+                                                 found_part = part
+                                                 break
+    
+                                     if found_part:
+                                         final_name = f"{seq_val}{found_part}"
+                                     elif seq_val in DEFAULT_PREFERENCE:
+                                         final_name = f"{seq_val}{DEFAULT_PREFERENCE[seq_val]}"
                 
                 rename_map[col] = final_name
 

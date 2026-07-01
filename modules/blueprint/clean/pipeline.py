@@ -578,7 +578,7 @@ def export_logic(job_id, scheme, selected_fields):
     id_to_rule_name = {v.get("ID"): k for k, v in rules.items() if v.get("ID")}
 
     scheme_display = {
-        "original":"原始匯入資料欄位名稱",
+        "original":"原始匯入欄位名稱",
         "field_name_zh":"中文欄位名稱",
         "field_name_en":"英文欄位名稱",
         "ntu_yunlin":"台大雲林欄位名稱",
