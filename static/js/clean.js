@@ -287,7 +287,7 @@
       zhRadio.checked = true;
     }
 
-    // 依據是否為無標頭固定長度 TXT 動態停用或啟用原始匯入資料欄位名稱選項
+    // 依據是否為無標頭固定長度 TXT 動態停用或啟用原始匯入欄位名稱選項
     const originalRadio = $('input[name="nameScheme"][value="original"]');
     if (originalRadio) {
       if (data.has_no_headers) {
