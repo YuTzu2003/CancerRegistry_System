@@ -5,7 +5,7 @@ import os
 import re
 import logging
 
-dashboard_bp = Blueprint('dashboard', __name__)
+dashboard_bp = Blueprint('dashboard', __name__, template_folder='../blueprint/dashboard/templates')
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DASHBOARD_DATA = os.path.join(BASE_DIR, 'tasks', 'data')
 os.makedirs(DASHBOARD_DATA, exist_ok=True)
