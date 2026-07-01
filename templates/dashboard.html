@@ -4,6 +4,97 @@
 {% block extra_head %}
   <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
   <link rel="stylesheet" href="/static/css/dashboard.css">
+  <style>
+    /* 現代化檔案上傳區與列表樣式 */
+    .upload-container-box {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      background: var(--white);
+      height: 100%;
+    }
+    
+    .upload-input-zone {
+      border: 1.5px dashed var(--border) !important;
+      background: var(--gray-50);
+      transition: all 0.2s ease-in-out;
+    }
+    .upload-input-zone:hover {
+      border-color: var(--blue-500) !important;
+      background: #f5f9ff;
+    }
+
+    #btnDashUpload {
+      background-color: #212529 !important;
+      border-color: #212529 !important;
+      color: var(--white) !important;
+      transition: background-color 0.15s ease, border-color 0.15s ease;
+    }
+    #btnDashUpload:hover {
+      background-color: #000 !important;
+      border-color: #000 !important;
+    }
+    
+    .file-list-card {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--white);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      height: 100%;
+    }
+    .file-list-header {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      background: var(--gray-50);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .file-list-container {
+      padding: 0;
+      overflow-y: auto;
+      max-height: 250px;
+    }
+
+    #dashFileListBody tr {
+      cursor: pointer;
+      transition: background-color 0.15s ease;
+    }
+    #dashFileListBody tr:hover {
+      background-color: var(--gray-50);
+    }
+    #dashFileListBody tr.table-active {
+      background-color: #f0f7ff !important;
+    }
+    #dashFileListBody tr .file-display-name {
+      font-weight: normal;
+    }
+    #dashFileListBody tr.table-active .file-display-name {
+      color: var(--blue-700) !important;
+      font-weight: bold !important;
+    }
+    #dashFileListBody tr.table-active .status-badge-selected {
+      display: inline-block !important;
+    }
+    
+    /* 篩選條件未啟用（年度未填寫）時的灰階樣式 */
+    #filterBehavior:disabled,
+    #btnCancerPicker:disabled,
+    #favPresetSelect:disabled,
+    #btnSavePreset:disabled,
+    .btn-check:disabled + .cat-btn-label,
+    .btn-check:disabled + .btn-outline-secondary {
+      opacity: 0.5;
+      background-color: var(--gray-100) !important;
+      border-color: var(--border) !important;
+      color: var(--muted) !important;
+      cursor: not-allowed !important;
+      pointer-events: none !important;
+      box-shadow: none !important;
+    }
+  </style>
 {% endblock %}
 
 {% block content %}
@@ -14,283 +105,19 @@
   </div>
 </div>
 
-<section class="card-flat" style="margin-bottom: 22px;">
-  <div class="section-head">
-    <h2><span class="dot" style="background:var(--warning)"></span> 資料上傳</h2>
-  </div>
-  <div class="section-body">
-    <div class="upload-grid">
-      <div>
-        <form id="dashUploadForm" enctype="multipart/form-data" class="d-flex flex-column gap-2">
-          <div class="input-group">
-            <input type="file" class="form-control" id="dashFileInput" name="file" accept=".xls,.xlsx" aria-describedby="btnDashUpload" style="font-size: 14px;">
-            <button class="btn btn-primary" type="submit" id="btnDashUpload" style="font-size: 14px; padding: 6px 16px;">上傳檔案</button>
-          </div>
-          <div class="d-flex align-items-center gap-2 px-3 py-2 border border-secondary border-opacity-25 bg-secondary bg-opacity-10 .text-secondary-emphasis rounded" style="font-size: 13px;">
-            <span>僅接受.xls/.xlsx格式的 Excel 檔案</span>
-          </div>
-        </form>
-      </div>
-
-      <div>
-        <div class="card shadow-sm border-secondary-subtle">
-          <div class="card-header bg-white border-bottom-0 pt-3 pb-2">
-            <h6 class="mb-0 fw-bold text-dark">FILE</h6>
-          </div>
-          <div class="card-body p-0 border-top">
-            <div class="table-responsive" style="max-height: 250px;">
-              <table class="table table-hover table-striped align-middle mb-0" id="dashFileList" style="font-size: 13.5px;">
-                <thead class="table-light sticky-top">
-                  <tr>
-                    <th class="border-bottom fw-normal text-secondary">檔案名稱</th>
-                    <th class="border-bottom fw-normal text-secondary" style="width: 180px;">上傳時間</th>
-                    <th class="border-bottom fw-normal text-secondary text-end pe-3" style="width: 100px;">操作</th>
-                  </tr>
-                </thead>
-                <tbody id="dashFileListBody">
-                  {% if uploaded_files %}
-                    {% for f in uploaded_files %}
-                    <tr>
-                      <td class="ps-3">
-                        <i class="bi bi-file-earmark-text text-secondary me-2"></i>
-                        <a href="#" class="text-dark text-decoration-none">{{ f.name }}</a>
-                      </td>
-                      <td class="text-secondary">{{ f.time }}</td>
-                      <td class="text-end pe-3">
-                        <button type="button" class="btn btn-danger btn-sm btn-del-file" data-name="{{ f.name }}">刪除</button>
-                      </td>
-                    </tr>
-                    {% endfor %}
-                  {% else %}
-                    <tr id="noFileRow">
-                      <td colspan="3" class="text-center text-muted py-5">
-                        <i class="bi bi-inbox fs-2 d-block mb-2 opacity-50"></i>尚無已上傳的資料檔案
-                      </td>
-                    </tr>
-                  {% endif %}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ── 分析條件設定卡片 ──────────────────────────── -->
-<section class="card-flat" style="margin-bottom: 22px;">
-  <div class="section-head">
-    <div class="d-flex align-items-center">
-      <h2 class="mb-0"><span class="dot" style="background:var(--warning)"></span> 篩選條件設定</h2>
-      <small class="text-muted ms-3 border-start ps-3 border-2">設定說明：請先設定您的資料範圍與查詢條件。</small>
-    </div>
-  </div>
-  <div class="section-body p-4">
-
-    <!-- 篩選條件列 -->
-    <div class="filter-bar" style="padding: 0;">
-      <div class="filter-group">
-        <label>性態碼</label>
-        <select id="filterBehavior" style="min-width: 130px;">
-          <option value="all">全部</option>
-          <option value="in_situ">原位癌</option>
-          <option value="invasive">侵襲癌</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label>癌別</label>
-        <button type="button" class="form-select text-start d-flex justify-content-between align-items-center" data-bs-toggle="modal" data-bs-target="#cancerPickerModal" style="width: 100%; min-width: 220px;" id="btnCancerPicker">
-          <span id="btnCancerPickerText">所有癌別</span>
-        </button>
-      </div>
-      <div class="filter-group">
-        <label>年度</label>
-        <div class="d-flex align-items-center gap-2">
-          <input type="number" id="filterYearStart" class="form-control px-2" placeholder="起始" style="width: 80px; text-align: center; min-width: 0;">
-          <span class="text-secondary" style="font-size: 14px;">-</span>
-          <input type="number" id="filterYearEnd" class="form-control px-2" placeholder="結束" style="width: 80px; text-align: center; min-width: 0;">
-        </div>
-      </div>
-      <div class="filter-actions ms-md-auto d-flex align-items-center gap-2 flex-wrap">
-        <div class="d-flex align-items-center gap-1 bg-light px-2 py-1 rounded border border-secondary-subtle">
-          <label class="fw-bold text-dark mb-0 me-1" style="font-size: 13px;" for="favPresetSelect"><i class="bi bi-star-fill text-warning"></i> 我的最愛：</label>
-          <select id="favPresetSelect" class="form-select form-select-sm border-0 bg-transparent" style="width: 160px; font-size: 13px; padding: 2px 5px; box-shadow: none;">
-            <option value="">— 載入中... —</option>
-          </select>
-          <button type="button" id="btnRenamePreset" class="btn btn-sm btn-light text-secondary rounded-circle" style="display: none; width: 26px; height: 26px; padding: 0;" title="重新命名範本">
-            <i class="bi bi-pencil" style="font-size: 12px;"></i>
-          </button>
-          <button type="button" id="btnDeletePreset" class="btn btn-sm btn-light text-danger rounded-circle" style="display: none; width: 26px; height: 26px; padding: 0;" title="刪除範本">
-            <i class="bi bi-trash" style="font-size: 12px;"></i>
-          </button>
-        </div>
-        <button type="button" id="btnSavePreset" class="btn btn-warning text-dark d-flex justify-content-center align-items-center gap-2" style="padding: 7px 16px; font-size: 14px; height: 38px; border: none; border-radius: var(--radius-sm);">
-          <i class="bi bi-star"></i> 加入最愛
-        </button>
-        <button id="btnRunQuery" class="btn-black d-flex justify-content-center align-items-center gap-2" type="button" style="padding: 7px 16px; font-size: 14px; height: 38px; border-radius: var(--radius-sm);">
-          <i class="bi bi-search"></i> 查詢
-        </button>
-        <button id="btnResetFilters" class="btn-black-outline d-flex justify-content-center align-items-center gap-2" type="button" style="padding: 7px 16px; font-size: 14px; height: 38px; border-radius: var(--radius-sm);">
-          <i class="bi bi-arrow-counterclockwise"></i> 重置
-        </button>
-      </div>
-    </div>
-
-    <!-- 主類別列 (標題按鈕) -->
-    <div id="mainCategoryArea" class="d-none">
-      <hr class="my-4 border-secondary-subtle">
-      <div class="d-flex align-items-center mb-1">
-        <h6 class="mb-0 fw-bold text-dark me-3"><i class="bi bi-bar-chart-steps text-primary me-2"></i>分析主題：</h6>
-        <style>
-          .cat-btn-label {
-            background-color: #f8f9fa;
-            color: #495057;
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            padding: 8px 20px;
-            font-size: 14.5px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            user-select: none;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.02);
-            margin-bottom: 0;
-          }
-          .cat-btn-label:hover {
-            background-color: #e9ecef;
-            color: #212529;
-          }
-          .btn-check.group-checkbox:checked + .cat-btn-label {
-            background-color: #ebf3ff;
-            color: #0d6efd;
-            border-color: #0d6efd;
-            box-shadow: 0 2px 6px rgba(13, 110, 253, 0.15);
-            font-weight: 600;
-          }
-        </style>
-        <div class="d-flex flex-wrap gap-2">
-          <input class="btn-check group-checkbox" type="radio" name="mainCategoryTab" id="chkGroupIncidence" data-group="incidence" checked>
-          <label class="cat-btn-label" for="chkGroupIncidence"><i class="bi bi-graph-up-arrow me-1"></i> 發生率</label>
-          
-          <input class="btn-check group-checkbox" type="radio" name="mainCategoryTab" id="chkGroupDiagnosis" data-group="diagnosis">
-          <label class="cat-btn-label" for="chkGroupDiagnosis"><i class="bi bi-clipboard2-pulse me-1"></i> 診斷</label>
-          
-          <input class="btn-check group-checkbox" type="radio" name="mainCategoryTab" id="chkGroupStage" data-group="stage">
-          <label class="cat-btn-label" for="chkGroupStage"><i class="bi bi-layers me-1"></i> 期別</label>
-          
-          <input class="btn-check group-checkbox" type="radio" name="mainCategoryTab" id="chkGroupTreatment" data-group="treatment">
-          <label class="cat-btn-label" for="chkGroupTreatment"><i class="bi bi-capsule me-1"></i> 治療方式</label>
-          
-          <input class="btn-check group-checkbox" type="radio" name="mainCategoryTab" id="chkGroupCrossYear" data-group="cross_year">
-          <label class="cat-btn-label" for="chkGroupCrossYear"><i class="bi bi-calendar3 me-1"></i> 跨年度分析</label>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-
-
-<!-- ── Cancer Picker Modal ──────────────────────────────── -->
-<div class="modal fade" id="cancerPickerModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
-    <div class="modal-content border-0 shadow-lg">
-      <div class="modal-header bg-light border-bottom">
-        <h5 class="modal-title fw-bold" style="font-size: 16px;"><i class="bi bi-ui-checks-grid me-2 text-primary"></i>選擇癌別</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body p-0">
-        <div class="row g-0 h-100" style="min-height: 450px;">
-          <!-- Left Pane (Categories) -->
-          <div class="col-md-4 border-end bg-light">
-            <div class="list-group list-group-flush" id="cancerCategoryList" style="max-height: 60vh; overflow-y: auto; font-size: 14px;">
-              <!-- Categories injected via JS -->
-            </div>
-          </div>
-          <!-- Right Pane (Details) -->
-          <div class="col-md-8 bg-white">
-            <div class="p-4" id="cancerDetailList" style="max-height: 60vh; overflow-y: auto; font-size: 14px;">
-              <!-- Checkboxes injected via JS -->
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="modal-footer bg-light border-top d-flex justify-content-between align-items-center">
-        <div class="text-muted fw-medium" id="cancerPickerStatus" style="font-size: 14px;">已選取：0 項</div>
-        <div>
-          <button type="button" class="btn btn-light border-secondary-subtle" data-bs-dismiss="modal">取消</button>
-          <button type="button" class="btn btn-primary px-4 ms-2" id="btnConfirmCancer">確認選取</button>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
+{% include "dashboard/control.html" %}
 
 
 
 <!-- 圖表區塊 -->
-<div id="chartsArea" class="row g-4 my-4 d-none">
+<div id="chartsArea" class="row g-4 my-4">
   <div class="col-12">
-    <!-- 細項工作列 (Toolbar) 置中放在圖表正上方 -->
-    <div class="d-flex justify-content-center mb-3 w-100">
-      
-      <!-- 發生率 細項 -->
-      <div id="subItems-incidence" class="d-flex flex-wrap justify-content-center gap-2">
-        <input class="btn-check item-checkbox" type="radio" name="subTab_incidence" id="chkIncidenceAge" data-parent="incidence" value="性別年齡分佈" data-target="#chartPane-IncidenceAge" checked>
-        <label class="btn btn-outline-secondary rounded-pill px-4 py-2 fw-bold border-1" for="chkIncidenceAge">性別年齡分佈</label>
-
-        <input class="btn-check item-checkbox" type="radio" name="subTab_incidence" id="chkIncidenceCommon" data-parent="incidence" value="本院常見癌症" data-target="#chartPane-IncidenceCommon">
-        <label class="btn btn-outline-secondary rounded-pill px-4 py-2 fw-bold border-1" for="chkIncidenceCommon">本院常見癌症</label>
-
-        <input class="btn-check item-checkbox" type="radio" name="subTab_incidence" id="chkIncidenceMedian" data-parent="incidence" value="年齡中位數" data-target="#chartPane-Empty">
-        <label class="btn btn-outline-secondary rounded-pill px-4 py-2 fw-bold border-1" for="chkIncidenceMedian">年齡中位數</label>
-      </div>
-
-      <!-- 診斷 細項 -->
-      <div id="subItems-diagnosis" class="d-none d-flex flex-wrap justify-content-center gap-2">
-        <input class="btn-check item-checkbox" type="radio" name="subTab_diagnosis" id="chkDiagnosisAnalyzable" data-parent="diagnosis" value="可分析個案與確診個案" checked>
-        <label class="btn btn-outline-secondary rounded-pill px-4 py-2 fw-bold border-1" for="chkDiagnosisAnalyzable">可分析個案與確診個案</label>
-
-        <input class="btn-check item-checkbox" type="radio" name="subTab_diagnosis" id="chkDiagnosisHistology" data-parent="diagnosis" value="組織型態">
-        <label class="btn btn-outline-secondary rounded-pill px-4 py-2 fw-bold border-1" for="chkDiagnosisHistology">組織型態</label>
-
-        <input class="btn-check item-checkbox" type="radio" name="subTab_diagnosis" id="chkDiagnosisClassification" data-parent="diagnosis" value="個案分類">
-        <label class="btn btn-outline-secondary rounded-pill px-4 py-2 fw-bold border-1" for="chkDiagnosisClassification">個案分類</label>
-      </div>
-
-      <!-- 期別 細項 -->
-      <div id="subItems-stage" class="d-none d-flex flex-wrap justify-content-center gap-2">
-        <input class="btn-check item-checkbox" type="radio" name="subTab_stage" id="chkStageDistribution" data-parent="stage" value="期別分佈" checked>
-        <label class="btn btn-outline-secondary rounded-pill px-4 py-2 fw-bold border-1" for="chkStageDistribution">期別分佈</label>
-      </div>
-
-      <!-- 治療方式 細項 -->
-      <div id="subItems-treatment" class="d-none d-flex flex-wrap justify-content-center gap-2">
-        <input class="btn-check item-checkbox" type="radio" name="subTab_treatment" id="chkTreatmentStats" data-parent="treatment" value="治療方式統計" checked>
-        <label class="btn btn-outline-secondary rounded-pill px-4 py-2 fw-bold border-1" for="chkTreatmentStats">治療方式統計</label>
-      </div>
-
-      <!-- 跨年度分析 細項 -->
-      <div id="subItems-cross_year" class="d-none d-flex flex-wrap justify-content-center gap-2">
-        <input class="btn-check item-checkbox" type="radio" name="subTab_cross" id="chkCrossYearSurvival" data-parent="cross_year" value="存活率" checked>
-        <label class="btn btn-outline-secondary rounded-pill px-4 py-2 fw-bold border-1" for="chkCrossYearSurvival">存活率</label>
-
-        <input class="btn-check item-checkbox" type="radio" name="subTab_cross" id="chkCrossYearMedianAge" data-parent="cross_year" value="歷年年齡中位數">
-        <label class="btn btn-outline-secondary rounded-pill px-4 py-2 fw-bold border-1" for="chkCrossYearMedianAge">歷年年齡中位數</label>
-
-        <input class="btn-check item-checkbox" type="radio" name="subTab_cross" id="chkCrossYearStage" data-parent="cross_year" value="歷年期別分佈">
-        <label class="btn btn-outline-secondary rounded-pill px-4 py-2 fw-bold border-1" for="chkCrossYearStage">歷年期別分佈</label>
-
-        <input class="btn-check item-checkbox" type="radio" name="subTab_cross" id="chkCrossYearNewCases" data-parent="cross_year" value="歷年新診斷件數">
-        <label class="btn btn-outline-secondary rounded-pill px-4 py-2 fw-bold border-1" for="chkCrossYearNewCases">歷年新診斷件數</label>
-      </div>
-    </div>
+    <!-- 細項工作列已被移至 control.html 中 -->
 
     <!-- 圖表顯示區域 (Tab Panes) -->
     
     <!-- 1. 性別年齡分佈 (Pie Chart) -->
-    <div id="chartPane-IncidenceAge" class="chart-pane">
+    <div id="chartPane-IncidenceAge" class="chart-pane d-none">
       <div class="bg-white border border-secondary-subtle rounded shadow-sm p-4 mt-2">
         <div id="main" style="width: 100%; height: 450px;"></div>
         <!-- LLM 分析結果文字框 -->
@@ -444,6 +271,8 @@
           }
       });
 
+
+
       const btnRunQuery = document.getElementById('btnRunQuery');
       if (btnRunQuery) {
           btnRunQuery.addEventListener('click', function() {
@@ -453,6 +282,19 @@
               if (activeRow) {
                   const link = activeRow.querySelector('a');
                   if (link) selectedFile = link.innerText.trim();
+              }
+
+              const yearStartVal = document.getElementById('filterYearStart')?.value.trim();
+              const yearEndVal = document.getElementById('filterYearEnd')?.value.trim();
+              if (!yearStartVal || !yearEndVal || yearStartVal.length !== 4 || yearEndVal.length !== 4) {
+                  alert('請先輸入四位數的年度！');
+                  return;
+              }
+              
+              const behaviorVal = document.getElementById('filterBehavior')?.value;
+              if (!behaviorVal) {
+                  alert('請先選擇性態碼！');
+                  return;
               }
 
               if (!selectedFile) {
@@ -470,12 +312,6 @@
                   if (data.ok) {
                       const chartData = data.data;
                       window.lastChartData = chartData;
-
-                      // 顯示主類別與圖表區塊
-                      const mainCategoryArea = document.getElementById('mainCategoryArea');
-                      const chartsArea = document.getElementById('chartsArea');
-                      if (mainCategoryArea) mainCategoryArea.classList.remove('d-none');
-                      if (chartsArea) chartsArea.classList.remove('d-none');
 
                       // 顯示 AI 分析按鈕
                       const btnAiMain = document.getElementById('btnAiMain');
