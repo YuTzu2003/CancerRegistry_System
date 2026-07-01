@@ -19,3 +19,4 @@ Jobs/
 *.txt
 .env
 *.json
+AGENTS.md
