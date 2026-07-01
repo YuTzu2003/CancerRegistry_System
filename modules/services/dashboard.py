@@ -119,13 +119,14 @@ def delete_favorite(fav_id):
 def analyze_dashboard_file_route():
     data = request.json or {}
     filename = data.get("filename", "")
+    cancer_ids = data.get("cancerIds", [])
     
     if not filename:
         return jsonify({"ok": False, "error": "未提供檔案名稱"}), 400
         
     try:
         from modules.blueprint.dashboard.chart_analytics import analyze_dashboard_file
-        chart_data = analyze_dashboard_file(filename)
+        chart_data = analyze_dashboard_file(filename, cancer_ids=cancer_ids)
         return jsonify({"ok": True, "data": chart_data}), 200
     except Exception as e:
         import logging
