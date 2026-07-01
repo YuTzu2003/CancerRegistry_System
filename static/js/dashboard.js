@@ -170,5 +170,13 @@
               fetchInsight('原發部位', window.lastChartData.topCancersData, 'llmResponseBar', 'btnAiBar');
           });
       }
+
+      const btnAiMedian = document.getElementById('btnAiMedian');
+      if (btnAiMedian) {
+          btnAiMedian.addEventListener('click', function() {
+              if (!window.lastChartData) return;
+              fetchInsight('年齡中位數', window.lastChartData.ageMedianTable, 'llmResponseMedian', 'btnAiMedian');
+          });
+      }
   });
 })();
