@@ -1,9 +1,26 @@
 import logging
 from functools import wraps
 from flask import Blueprint, request, session, redirect, url_for, render_template, flash, jsonify
-from modules.services.db import get_conn 
+from modules.services.db import get_conn
+import os, json, datetime
 
 auth_bp = Blueprint('auth', __name__)
+
+def login_log(user_id, ip, success, reason=""):
+    log_dir = "tasks/cache"
+    os.makedirs(log_dir, exist_ok=True) 
+
+    log_entry = {
+        "userid": user_id,
+        "ip": ip,
+        "login_time": datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S"),
+        "success": success,
+        "reason": reason
+    }
+    
+    with open(f"{log_dir}/login_logs.json", "a", encoding="utf-8") as f:
+        f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+
 
 # ---- 登入驗證 ----
 def login_required(f):
@@ -51,6 +68,7 @@ def login():
         
         if user:
             logging.info(f"使用者 {user_id} 登入成功")
+            login_log(user_id, request.remote_addr, True, "登入成功")
             session["id"] = str(user.ID)
             session["userid"] = user.UserID
             session["name"] = user.Name
@@ -61,6 +79,7 @@ def login():
             conn.close()
             return redirect("/")          
         conn.close()
+        login_log(user_id, request.remote_addr, False, "帳號或密碼錯誤")
         return render_template("login.html", error="帳號或密碼錯誤")
     return render_template("login.html")
 

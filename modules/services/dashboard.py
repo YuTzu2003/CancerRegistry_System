@@ -68,6 +68,8 @@ def add_favorite():
     name = data.get("name", "").strip()
     behavior = data.get("behavior", "")
     cancers = data.get("cancers", [])
+    main_category = data.get("main_category", "")
+    sub_category = data.get("sub_category", "")
     user_favs = load_user_favorites(db_id)
     
     if any(f.get("name") == name for f in user_favs):
@@ -75,7 +77,7 @@ def add_favorite():
         
     max_id = max([f.get("id", 0) for f in user_favs], default=0)
     new_id = max_id + 1
-    new_fav = {"id": new_id,"name": name,"behavior": behavior,"cancers": cancers}
+    new_fav = {"id": new_id,"name": name,"behavior": behavior,"cancers": cancers, "main_category": main_category, "sub_category": sub_category}
     user_favs.append(new_fav)
     save_user_favorites(db_id, user_favs)
     return jsonify({"ok": True, "favorite": new_fav}), 200

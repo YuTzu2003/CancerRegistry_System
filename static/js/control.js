@@ -369,11 +369,44 @@
       preset.cancers.forEach(id => selectedCancers.add(id));
     }
 
-    // 3. 更新介面
+    // 3. 套用分析主題與子項目
+    // 先清空所有已勾選的主題與子項目
+    document.querySelectorAll('input[name="mainCategoryTab"]:checked').forEach(el => {
+      el.checked = false;
+      el.dispatchEvent(new Event('change'));
+    });
+    document.querySelectorAll('.item-checkbox:checked').forEach(el => {
+      el.checked = false;
+      el.dispatchEvent(new Event('change'));
+    });
+
+    if (preset.main_category) {
+      const mainCatIds = preset.main_category.split(',');
+      mainCatIds.forEach(id => {
+        const mainCat = document.getElementById(id);
+        if (mainCat) {
+          mainCat.checked = true;
+          mainCat.dispatchEvent(new Event('change'));
+        }
+      });
+    }
+    if (preset.sub_category) {
+      const subCatIds = preset.sub_category.split(',');
+      subCatIds.forEach(id => {
+        const subCat = document.getElementById(id);
+        if (subCat) {
+          subCat.checked = true;
+          subCat.dispatchEvent(new Event('change'));
+        }
+      });
+    }
+
+    // 4. 更新介面
     renderCategories();
     renderDetails();
     updateStatus();
     togglePresetActionButtons(true);
+    checkFiltersState();
   });
 
   // 新增範本
@@ -381,6 +414,37 @@
     const behaviorSelect = document.getElementById('filterBehavior');
     const behavior = behaviorSelect ? behaviorSelect.value : 'all';
     const cancers = Array.from(selectedCancers);
+
+    let main_category = '';
+    let sub_category = '';
+    
+    // Determine which main categories have checked sub-items
+    const activeMainCats = new Set();
+    document.querySelectorAll('.item-checkbox:checked').forEach(el => {
+      if (el.dataset.parent) {
+        let chkId = '';
+        if (el.dataset.parent === 'incidence') chkId = 'chkGroupIncidence';
+        else if (el.dataset.parent === 'diagnosis') chkId = 'chkGroupDiagnosis';
+        else if (el.dataset.parent === 'stage') chkId = 'chkGroupStage';
+        else if (el.dataset.parent === 'treatment') chkId = 'chkGroupTreatment';
+        else if (el.dataset.parent === 'cross_year') chkId = 'chkGroupCrossYear';
+        if (chkId) activeMainCats.add(chkId);
+      }
+    });
+    
+    // Also include the currently active tab
+    const currentTab = document.querySelector('input[name="mainCategoryTab"]:checked');
+    if (currentTab) activeMainCats.add(currentTab.id);
+    
+    if (activeMainCats.size > 0) {
+      main_category = Array.from(activeMainCats).join(',');
+    }
+    
+    // Save ALL checked sub-items across all tabs
+    const subCatEls = document.querySelectorAll('.item-checkbox:checked');
+    if (subCatEls.length > 0) {
+      sub_category = Array.from(subCatEls).map(el => el.id).join(',');
+    }
 
     if (cancers.length === 0) {
       Swal.fire({ icon: 'warning', title: '請先選擇癌別', text: '最愛範本必須包含至少一項癌別設定。', confirmButtonColor: '#2563eb' });
@@ -409,7 +473,7 @@
         fetch('/api/favorites', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, behavior, cancers })
+          body: JSON.stringify({ name, behavior, cancers, main_category, sub_category })
         })
         .then(r => r.json())
         .then(data => {
@@ -534,41 +598,7 @@
 
   // 重置按鈕邏輯
   document.getElementById('btnResetFilters')?.addEventListener('click', function() {
-    // 1. 性態碼恢復預設
-    const behaviorSelect = document.getElementById('filterBehavior');
-    if (behaviorSelect) behaviorSelect.value = '';
-
-    // 2. 清空年度輸入框
-    const yearStart = document.getElementById('filterYearStart');
-    const yearEnd = document.getElementById('filterYearEnd');
-    if (yearStart) yearStart.value = '';
-    if (yearEnd) yearEnd.value = '';
-
-    // 3. 清空最愛選單並隱藏操作按鈕
-    const presetSelect = document.getElementById('favPresetSelect');
-    if (presetSelect) presetSelect.value = '';
-    togglePresetActionButtons(false);
-
-    // 4. 清空已選癌別
-    selectedCancers.clear();
-
-    // 5. 取消選擇分析主題，並隱藏對應的細項與圖表
-    const categoryRadios = document.querySelectorAll('input[name="mainCategoryTab"]');
-    if (categoryRadios.length > 0) {
-      categoryRadios.forEach(radio => radio.checked = false);
-      categoryRadios[0].dispatchEvent(new Event('change'));
-    }
-    document.querySelectorAll('.chart-pane').forEach(pane => {
-      pane.classList.add('d-none');
-    });
-
-    // 6. 重新渲染畫面
-    renderCategories();
-    renderDetails();
-    updateStatus();
-
-    // 7. 更新輸入欄位狀態
-    checkFiltersState();
+    window.location.reload();
   });
 
   /* ── 篩選欄位依序解鎖邏輯 ── */
@@ -591,18 +621,22 @@
       }
     }
 
-    // Step 2: Unlock cancer picker and presets if behavior is valid
-    const elementsToUnlock = [
-      document.getElementById('btnCancerPicker'),
+    // Step 2: Unlock presets if year is valid
+    const presetElements = [
       document.getElementById('favPresetSelect'),
       document.getElementById('btnSavePreset')
     ];
-
-    elementsToUnlock.forEach(el => {
+    presetElements.forEach(el => {
       if (el) {
-        el.disabled = !isBehaviorValid;
+        el.disabled = !isYearValid;
       }
     });
+
+    // Step 3: Unlock cancer picker if behavior is valid
+    const cancerPickerEl = document.getElementById('btnCancerPicker');
+    if (cancerPickerEl) {
+      cancerPickerEl.disabled = !isBehaviorValid;
+    }
 
     const categoryRadios = document.querySelectorAll('input[name="mainCategoryTab"]');
     categoryRadios.forEach(radio => {

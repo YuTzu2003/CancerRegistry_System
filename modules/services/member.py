@@ -18,8 +18,37 @@ def member():
         u['ID'] = str(u['ID'])
         if u['Last_login'] and isinstance(u['Last_login'], datetime.datetime):
             u['Last_login'] = u['Last_login'].strftime("%Y/%m/%d %H:%M:%S")
+            
+    # Read login logs
+    import os, json
+    log_file = r"D:\YLH\CancerRegistry_System\tasks\cache\login_logs.json"
+    login_logs = []
+    if os.path.exists(log_file):
+        with open(log_file, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    try:
+                        login_logs.append(json.loads(line))
+                    except:
+                        pass
+                        
+    # Join user data (Name, Position) into logs using userid
+    user_dict = {u['UserID']: u for u in users}
+    for log in login_logs:
+        uid = log.get('userid', '')
+        if uid in user_dict:
+            log['Name'] = user_dict[uid].get('Name', '未知')
+            log['Position'] = user_dict[uid].get('Position', '未知')
+        else:
+            log['Name'] = '未知使用者'
+            log['Position'] = '未知角色'
+            
+    # Sort logs by login_time descending
+    login_logs.sort(key=lambda x: x.get('login_time', ''), reverse=True)
+            
     conn.close()
-    return render_template("member.html", active="member", users=users)
+    return render_template("member.html", active="member", users=users, login_logs=login_logs)
 
 @member_bp.route("/member/tool", methods=["POST"])
 @login_required

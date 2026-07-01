@@ -108,6 +108,50 @@
             <p>請嘗試更換關鍵字重新搜尋</p>
         </div>
     </div>
+
+    <!-- 登入紀錄區塊 -->
+    <div class="card-flat mt-4">
+        <div class="section-head">
+            <h2><span class="dot" style="background: var(--bs-info);"></span> 系統登入紀錄</h2>
+            <span class="hint">最近的登入活動與狀態</span>
+        </div>
+        <div class="table-wrap" style="max-height: 400px; overflow-y: auto;">
+            <table class="table-flat" id="loginLogTable">
+                <thead style="position: sticky; top: 0; background: white; z-index: 1;">
+                    <tr>
+                        <th style="padding-left: 24px;">登入時間</th>
+                        <th>使用者帳號</th>
+                        <th>姓名</th>
+                        <th>IP 位址</th>
+                        <th>狀態</th>
+                        <th>備註說明</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in login_logs %}
+                    <tr>
+                        <td style="padding-left: 24px;"><span class="text-secondary">{{ log.login_time }}</span></td>
+                        <td><span class="u-id fw-bold text-dark">@{{ log.userid }}</span></td>
+                        <td>{{ log.Name }}</td>
+                        <td><span class="badge text-bg-light border text-dark">{{ log.ip }}</span></td>
+                        <td>
+                            {% if log.success %}
+                            <span class="badge text-bg-success fw-normal"><i class="bi bi-check-circle me-1"></i>成功</span>
+                            {% else %}
+                            <span class="badge text-bg-danger fw-normal"><i class="bi bi-x-circle me-1"></i>失敗</span>
+                            {% endif %}
+                        </td>
+                        <td><span class="text-secondary">{{ log.reason }}</span></td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4">目前尚無登入紀錄</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
 </div>
 
 <div class="modal fade" id="userModal" tabindex="-1" aria-labelledby="modalTitle" aria-hidden="true">
