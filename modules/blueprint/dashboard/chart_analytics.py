@@ -3,7 +3,7 @@ import pandas as pd
 import logging
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-DASHBOARD_DATA = os.path.join(BASE_DIR, 'tasks', 'data')
+DASHBOARD_DATA = os.path.join(BASE_DIR, 'work', 'data')
 
 def analyze_dashboard_file(filename):
     fpath = os.path.join(DASHBOARD_DATA, filename)

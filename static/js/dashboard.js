@@ -16,11 +16,10 @@
           if (chk.checked) {
             subContainer.classList.remove('d-none');
             subContainer.style.display = 'flex';
-            // Ensure the chart switches to the active sub-item in this group
-            const activeItem = subContainer.querySelector('.item-checkbox:checked');
-            if (activeItem) {
-               activeItem.dispatchEvent(new Event('change'));
-            }
+            // Ensure the charts switch to the active sub-items in this group
+            subContainer.querySelectorAll('.item-checkbox:checked').forEach(item => {
+               item.dispatchEvent(new Event('change'));
+            });
           } else {
             subContainer.classList.add('d-none');
             subContainer.style.display = 'none';
@@ -39,18 +38,18 @@
       const chip = this.closest('.field-chip') || this.closest('.naming-chip');
       if (chip) chip.classList.toggle('selected', this.checked);
 
-      if (this.checked) {
-        // Hide all chart panes
-        table.querySelectorAll('.chart-pane').forEach(pane => {
-           pane.classList.add('d-none');
-        });
-        
-        // Find target pane or fallback to empty
-        const targetSelector = this.getAttribute('data-target');
-        let targetPane = targetSelector ? document.querySelector(targetSelector) : null;
-        if (!targetPane) targetPane = document.getElementById('chartPane-Empty');
+      const targetSelector = this.getAttribute('data-target');
+      if (targetSelector) {
+        const targetPane = document.querySelector(targetSelector);
         if (targetPane) {
+          if (this.checked) {
             targetPane.classList.remove('d-none');
+            
+            // Hide empty pane if showing a real chart
+            if (targetPane.id !== 'chartPane-Empty') {
+                const emptyPane = document.getElementById('chartPane-Empty');
+                if (emptyPane) emptyPane.classList.add('d-none');
+            }
             
             // Re-render ECharts in the new visible pane to avoid sizing issues
             if (typeof echarts !== 'undefined') {
@@ -71,6 +70,16 @@
                     }
                 }, 50);
             }
+          } else {
+            targetPane.classList.add('d-none');
+            
+            // If no items are checked anywhere, show empty pane
+            const anyChecked = document.querySelector('.item-checkbox:checked');
+            if (!anyChecked) {
+                const emptyPane = document.getElementById('chartPane-Empty');
+                if (emptyPane) emptyPane.classList.remove('d-none');
+            }
+          }
         }
       }
       updateGroupCheckbox(this.dataset.parent);
@@ -78,27 +87,31 @@
   });
 
   function updateGroupCheckbox(groupName) {
-    const groupChk = table.querySelector(`.group-checkbox[data-group="${groupName}"]`);
-    if (!groupChk) return;
+    if (!groupName) return;
     
-    const items = table.querySelectorAll(`.item-checkbox[data-parent="${groupName}"]`);
-    const allChecked = items.length > 0 && Array.from(items).every(item => item.checked);
-    const someChecked = items.length > 0 && Array.from(items).some(item => item.checked);
+    let chkId = '';
+    if (groupName === 'incidence') chkId = 'chkGroupIncidence';
+    else if (groupName === 'diagnosis') chkId = 'chkGroupDiagnosis';
+    else if (groupName === 'stage') chkId = 'chkGroupStage';
+    else if (groupName === 'treatment') chkId = 'chkGroupTreatment';
+    else if (groupName === 'cross_year') chkId = 'chkGroupCrossYear';
     
-    groupChk.checked = allChecked;
-    groupChk.indeterminate = someChecked && !allChecked;
+    if (!chkId) return;
     
-    const chip = groupChk.closest('.field-chip') || groupChk.closest('.naming-chip');
-    if (chip) chip.classList.toggle('selected', someChecked);
-
-    // Toggle visibility of sub-items container
-    const subItemsContainer = document.getElementById(`subItems-${groupName}`);
-    if (subItemsContainer) {
-      if (someChecked) {
-        subItemsContainer.classList.remove('d-none');
-      } else {
-        subItemsContainer.classList.add('d-none');
+    const container = document.getElementById(`subItems-${groupName}`);
+    if (!container) return;
+    
+    const label = document.querySelector(`label[for="${chkId}"]`);
+    if (label) {
+      const checkedCount = container.querySelectorAll('.item-checkbox:checked').length;
+      
+      let text = label.innerHTML;
+      // Remove existing badge
+      text = text.replace(/\s*<span class="badge.*<\/span>$/, '');
+      if (checkedCount > 0) {
+        text += ` <span class="badge bg-primary rounded-pill ms-1" style="font-size:0.75rem;">${checkedCount}</span>`;
       }
+      label.innerHTML = text;
     }
   }
 })();
