@@ -407,6 +407,9 @@
     updateStatus();
     togglePresetActionButtons(true);
     checkFiltersState();
+    
+    // 自動執行查詢以顯示對應圖表
+    document.getElementById('btnRunQuery')?.click();
   });
 
   // 新增範本

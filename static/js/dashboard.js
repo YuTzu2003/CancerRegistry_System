@@ -37,20 +37,29 @@
       // Toggle selected class on chip (if any remains)
       const chip = this.closest('.field-chip') || this.closest('.naming-chip');
       if (chip) chip.classList.toggle('selected', this.checked);
+      updateGroupCheckbox(this.dataset.parent);
+    });
+  });
 
-      const targetSelector = this.getAttribute('data-target');
-      if (targetSelector) {
-        const targetPane = document.querySelector(targetSelector);
-        if (targetPane) {
-          if (this.checked) {
+  // Apply chart visibility only when Run Query is clicked
+  const btnRunQuery = document.getElementById('btnRunQuery');
+  if (btnRunQuery) {
+    btnRunQuery.addEventListener('click', function() {
+      // Hide all chart panes first
+      document.querySelectorAll('.chart-pane').forEach(pane => {
+        pane.classList.add('d-none');
+      });
+
+      let anyChecked = false;
+
+      table.querySelectorAll('.item-checkbox').forEach(itemChk => {
+        const targetSelector = itemChk.getAttribute('data-target');
+        if (targetSelector && itemChk.checked) {
+          const targetPane = document.querySelector(targetSelector);
+          if (targetPane) {
+            anyChecked = true;
             targetPane.classList.remove('d-none');
-            
-            // Hide empty pane if showing a real chart
-            if (targetPane.id !== 'chartPane-Empty') {
-                const emptyPane = document.getElementById('chartPane-Empty');
-                if (emptyPane) emptyPane.classList.add('d-none');
-            }
-            
+
             // Re-render ECharts in the new visible pane to avoid sizing issues
             if (typeof echarts !== 'undefined') {
                 setTimeout(() => {
@@ -70,21 +79,17 @@
                     }
                 }, 50);
             }
-          } else {
-            targetPane.classList.add('d-none');
-            
-            // If no items are checked anywhere, show empty pane
-            const anyChecked = document.querySelector('.item-checkbox:checked');
-            if (!anyChecked) {
-                const emptyPane = document.getElementById('chartPane-Empty');
-                if (emptyPane) emptyPane.classList.remove('d-none');
-            }
           }
         }
+      });
+
+      // If no items are checked, show empty pane
+      if (!anyChecked) {
+          const emptyPane = document.getElementById('chartPane-Empty');
+          if (emptyPane) emptyPane.classList.remove('d-none');
       }
-      updateGroupCheckbox(this.dataset.parent);
     });
-  });
+  }
 
   function updateGroupCheckbox(groupName) {
     if (!groupName) return;
