@@ -135,6 +135,7 @@
     .annual-median-table {
       width: auto;
       min-width: 320px;
+      margin: 0 auto;
     }
 
     .annual-data-content.d-none {
@@ -209,29 +210,14 @@
       </div>
     </div>
 
-    <!-- 3. 本院常見癌症 (Bar Chart) -->
-    <div id="chartPane-IncidenceCommon" class="chart-pane d-none">
-      <div class="bg-white border border-secondary-subtle rounded shadow-sm p-4 mt-2">
-        <div id="barChart" style="width: 100%; height: 450px;"></div>
-        <!-- LLM 分析結果文字框 -->
-        <div class="mt-4 p-3 rounded" style="background-color: rgba(209, 231, 221, 0.5); border: 1px solid #a3cfbb;">
-          <div class="d-flex align-items-center mb-2 justify-content-between">
-            <div class="d-flex align-items-center">
-              <h6 class="mb-0 fw-bold text-dark">語言模型敘述</h6>
-            </div>
-            <button id="btnAiBar" class="btn btn-sm" style="display: none; background-color: transparent; border: 1px solid #495057; color: #212529; font-weight: 500;">重新產生敘述</button>
-          </div>
-          <div id="llmResponseBar" class="text-dark" style="font-size: 14px; white-space: pre-wrap;">（請先載入圖表，系統將自動產生分析敘述）</div>
-        </div>
-      </div>
-    </div>
+
 
     <!-- 3. 空白佔位區 (尚未實作圖表) -->
     <div id="chartPane-Empty" class="chart-pane d-none">
       <div class="bg-white border border-secondary-subtle rounded shadow-sm p-5 mt-2 text-center text-muted">
         <i class="bi bi-bar-chart fs-1 opacity-50 mb-3 d-block"></i>
         <h6 class="fw-bold text-dark mb-2">此項目圖表尚未實作</h6>
-        <p class="mb-0" style="font-size: 14px;">請選擇「性別年齡分佈」或「本院常見癌症」以檢視現有圖表。</p>
+        <p class="mb-0" style="font-size: 14px;">請選擇「性別年齡分佈」或「年齡中位數」以檢視現有圖表。</p>
       </div>
     </div>
 
@@ -254,7 +240,7 @@
           axisPointer: { type: 'cross' }
         },
         legend: {
-          data: ['男性', '女性', '總數'],
+          data: ['男性', '女性', '總計'],
           bottom: 10
         },
         toolbox: {
@@ -280,7 +266,7 @@
           },
           {
             type: 'value',
-            name: '總數',
+            name: '總計',
             axisLabel: { formatter: '{value}' }
           }
         ],
@@ -298,7 +284,7 @@
             itemStyle: { color: '#EE6666' }
           },
           {
-            name: '總數',
+            name: '總計',
             type: 'line',
             yAxisIndex: 1,
             data: [],
@@ -388,7 +374,7 @@
           const caption = document.getElementById('annualAgeMedianCaption');
           if (!head || !body || !medianData) return;
 
-          const columns = ['男性', '女性', '總計'];
+          const columns = ['男性', '女性'];
 
           if (caption) {
               caption.innerText = `表、${yearTitle}年新診斷${getCancerTitleForSentence(cancerTitle)}病患年齡中位數表`;
@@ -396,7 +382,7 @@
 
           head.innerHTML = `
               <tr>
-                <th rowspan="2">項目</th>
+                <th rowspan="2" style="vertical-align: middle;">項目</th>
                 <th colspan="${columns.length}">發生個案</th>
               </tr>
               <tr>
@@ -406,10 +392,19 @@
 
           body.innerHTML = `
               <tr>
+                <td>個案數(人)</td>
+                <td>${medianData.male_count}</td>
+                <td>${medianData.female_count}</td>
+              </tr>
+              <tr>
                 <td>年齡中位數</td>
                 <td>${medianData.male}</td>
                 <td>${medianData.female}</td>
-                <td>${medianData.total}</td>
+              </tr>
+              <tr>
+                <td>性別比</td>
+                <td>${medianData.male_ratio}</td>
+                <td>${medianData.female_ratio}</td>
               </tr>
           `;
       }
@@ -422,49 +417,10 @@
       
       myChart.setOption(option);
       
-      // --- Bar Chart ---
-      var barChartDom = document.getElementById('barChart');
-      var myBarChart = echarts.init(barChartDom);
-      var barOption = {
-          title: {
-              text: '本院常見癌症 (Top 10)',
-              subtext: '請點擊查詢載入資料',
-              left: 'center'
-          },
-          tooltip: {
-          trigger: 'item'
-        },
-        legend: {
-          orient: 'vertical',
-          left: 'left'
-        },
-        toolbox: {
-          show: true,
-          feature: {
-            dataView: {show: true,readOnly: false},
-            restore: {show: true},
-            saveAsImage: {show: true}
-          }
-        },
-          xAxis: {
-              type: 'category',
-              data: []
-          },
-          yAxis: {
-              type: 'value'
-          },
-          series: [
-              {
-                  data: [],
-                  type: 'bar'
-              }
-          ]
-      };
-      myBarChart.setOption(barOption);
+
 
       window.addEventListener('resize', function() {
           myChart.resize();
-          myBarChart.resize();
       });
 
       // --- File Selection Logic ---
@@ -517,6 +473,14 @@
                   return;
               }
 
+              myChart.showLoading({
+                  text: '資料載入中...',
+                  color: '#2563eb',
+                  textColor: '#212529',
+                  maskColor: 'rgba(255, 255, 255, 0.8)',
+                  zlevel: 0
+              });
+
               fetch('/api/dashboard/analyze_file', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
@@ -530,23 +494,20 @@
               })
               .then(res => res.json())
               .then(data => {
+                  myChart.hideLoading();
                   if (data.ok) {
                       const chartData = data.data;
                       window.lastChartData = chartData;
 
                       // 顯示 AI 分析按鈕
                       const btnAiMain = document.getElementById('btnAiMain');
-                      const btnAiBar = document.getElementById('btnAiBar');
                       const btnAiMedian = document.getElementById('btnAiMedian');
                       btnAiMain.style.display = 'block';
-                      btnAiBar.style.display = 'block';
                       if (btnAiMedian) btnAiMedian.style.display = 'block';
                       document.getElementById('llmResponseMain').innerText = '（系統將自動產生分析敘述）';
-                      document.getElementById('llmResponseBar').innerText = '（系統將自動產生分析敘述）';
                       const llmResponseMedian = document.getElementById('llmResponseMedian');
                       if (llmResponseMedian) llmResponseMedian.innerText = '（系統將自動產生分析敘述）';
                       btnAiMain.innerHTML = '重新產生敘述';
-                      btnAiBar.innerHTML = '重新產生敘述';
                       if (btnAiMedian) btnAiMedian.innerHTML = '重新產生敘述';
 
                       // 自動觸發目前可見的圖表的 AI 產生
@@ -576,26 +537,21 @@
                           series: [
                               { name: '男性', data: chartData.genderAgeData.male },
                               { name: '女性', data: chartData.genderAgeData.female },
-                              { name: '總數', data: chartData.genderAgeData.total }
+                              { name: '總計', data: chartData.genderAgeData.total }
                           ]
                       });
-                      // Update Bar Chart
-                      myBarChart.setOption({
-                          title: { text: '本院常見癌症 (Top 10)', subtext: selectedFile },
-                          xAxis: { data: chartData.topCancersData.labels },
-                          series: [{ data: chartData.topCancersData.values }]
-                      });
+
                       
                       // 強制重新計算大小，避免一開始隱藏導致的比例跑版問題
                       setTimeout(() => {
                           myChart.resize();
-                          myBarChart.resize();
                       }, 50);
                   } else {
                       alert('資料分析失敗: ' + data.error);
                   }
               })
               .catch(err => {
+                  myChart.hideLoading();
                   console.error('API 錯誤:', err);
                   alert('發生系統錯誤，請稍後再試。');
               });
