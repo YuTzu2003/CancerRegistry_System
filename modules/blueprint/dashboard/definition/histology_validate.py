@@ -14,10 +14,8 @@ def normalize_code(value):
     except (ValueError, TypeError):
         return clean_value(value)
 
-
 def normalize_site_for_compare(value):
     return clean_value(value).upper().replace(".", "")
-
 
 def to_list(value):
     if not value:
@@ -28,7 +26,6 @@ def to_list(value):
 
     return value
 
-
 def site_match(site, pattern):
     site = normalize_site_for_compare(site)
     pattern = normalize_site_for_compare(pattern)
@@ -38,10 +35,8 @@ def site_match(site, pattern):
 
     return site == pattern
 
-
 def site_match_any(site, patterns):
     return any(site_match(site, pattern) for pattern in to_list(patterns))
-
 
 def validate_year(value, rule):
     year_text = normalize_code(value)
@@ -61,7 +56,6 @@ def validate_year(value, rule):
 
     return True
 
-
 def validate_histology_rule(case_row, rule):
     # 驗證單筆個案是否符合某一條 1.3 組織型態規則
 
@@ -79,7 +73,6 @@ def validate_histology_rule(case_row, rule):
 
     return True
 
-
 def rule_specificity(rule):
     # 條件越多，代表規則越特殊，越優先使用
     special_fields = [
@@ -91,7 +84,6 @@ def rule_specificity(rule):
 
     return sum(1 for field in special_fields if field in rule)
 
-
 def unknown_histology_result(icdo_code):
     # 找不到符合規則時，統一回傳 Unknown
     return {
@@ -100,7 +92,6 @@ def unknown_histology_result(icdo_code):
         "report_name": "Unknown / 未對應組織型態",
         "warning": "找不到符合的 1.3 組織型態規則"
     }
-
 
 def match_histology(case_row, rules):
     # 根據 hist + behavior 找候選規則，再依照 site、didiag 判斷應該套用哪一條
