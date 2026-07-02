@@ -3,7 +3,22 @@ import re
 from flask import Blueprint, request, jsonify, session, send_file
 from modules.blueprint.data_gen import analyze_file_logic, process_file_logic
 
-data_gen_bp = Blueprint('data_gen', __name__)
+from modules.services.auth import login_required
+from modules.services.db import get_conn
+from flask import render_template
+
+data_gen_bp = Blueprint('data_gen', __name__, template_folder='../blueprint/data_gen/templates')
+
+@data_gen_bp.route("/dataGen")
+@login_required
+def dataGen():
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute("SELECT FmtID, FmtName, Version FROM [Hospital_data].[dbo].[DataFormat] ORDER BY FmtName ASC")
+    rows = cursor.fetchall()
+    formats = [{"id": str(r[0]), "name": str(r[1]), "version": str(r[2])} for r in rows]
+    conn.close()
+    return render_template("dataGen.html", active="dataGen", formats=formats)
 @data_gen_bp.route('/api/data_gen/analyze', methods=['POST'])
 def analyze_file():
     if 'file' not in request.files:

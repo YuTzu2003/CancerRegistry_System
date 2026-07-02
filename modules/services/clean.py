@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, request, session, jsonify, send_fi
 from modules.services.auth import login_required, admin_required
 from modules.blueprint.clean import categorize_fields_logic,export_logic,preview_logic,get_formats_logic,add_format_logic,manage_format_logic,clean_job_logic,get_date_errors_logic,update_date_error_logic,download_temp_file_logic,download_file_logic
 
-clean_bp = Blueprint('clean', __name__)
+clean_bp = Blueprint('clean', __name__, template_folder='../blueprint/clean/templates')
 
 @clean_bp.route("/api/categorize_fields", methods=["POST"])
 @login_required

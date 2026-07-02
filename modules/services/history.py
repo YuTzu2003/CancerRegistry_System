@@ -8,18 +8,13 @@ from flask import Blueprint, render_template, session, redirect, url_for, flash,
 from modules.services.db import get_conn
 from modules.services.auth import login_required
 
-history_bp = Blueprint('history', __name__)
+history_bp = Blueprint('history', __name__, template_folder='../blueprint/clean/templates')
 
 def remove_readonly(func, path, excinfo):
-    """
-    Error handler for shutil.rmtree to handle read-only files on Windows.
-    """
     os.chmod(path, stat.S_IWRITE)
     func(path)
 
-
 def _should_include_result_file(filename, original_filename=None):
-
     if not filename:
         return False
  
@@ -71,8 +66,13 @@ def delete_history(job_id):
     cursor.execute("SELECT [Path] FROM [Job] WHERE [JobID]=? AND [UserID]=?", (job_id, user_id))
     row = cursor.fetchone()
     
-    if row and row[0] and os.path.exists(row[0]): 
-        shutil.rmtree(row[0], onerror=remove_readonly)      
+    if row and row[0]:
+        fixed_path = row[0].replace('work/', 'tasks/').replace('work\\', 'tasks\\')
+        if os.path.exists(fixed_path):
+            try:
+                shutil.rmtree(fixed_path, onerror=remove_readonly)
+            except Exception:
+                pass
     cursor.execute("DELETE FROM [Job] WHERE [JobID] = ? AND [UserID] = ?", (job_id, user_id))
     conn.commit()
     conn.close()
@@ -93,13 +93,17 @@ def batch_delete_history():
     for job_id in job_ids:
         cursor.execute("SELECT [Path] FROM [Job] WHERE [JobID]=? AND [UserID]=?", (job_id, user_id))
         row = cursor.fetchone()
-        if row and row[0] and os.path.exists(row[0]):
-            shutil.rmtree(row[0], onerror=remove_readonly)
+        if row and row[0]:
+            fixed_path = row[0].replace('work/', 'tasks/').replace('work\\', 'tasks\\')
+            if os.path.exists(fixed_path):
+                try:
+                    shutil.rmtree(fixed_path, onerror=remove_readonly)
+                except Exception:
+                    pass
         cursor.execute("DELETE FROM [Job] WHERE [JobID] = ? AND [UserID] = ?", (job_id, user_id))
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
-
 
 @history_bp.route("/history/detail/<job_id>")
 @login_required
@@ -126,7 +130,7 @@ def history_download_zip(job_id):
         conn.close()
         if not row or not row[0]: return jsonify({"ok": False, "error": "Not found"}), 404
         
-        project_path = row[0]
+        project_path = row[0].replace('work/', 'tasks/').replace('work\\', 'tasks\\')
         original_filename = row[1]
         zip_path = os.path.join(project_path, f"Results_{job_id}.zip")
 
@@ -168,21 +172,22 @@ def batch_download_history():
         for job_id in job_ids:
             cursor.execute("SELECT [Path], [FileName] FROM [Job] WHERE [JobID]=? AND [UserID]=?", (job_id, user_id))
             row = cursor.fetchone()
-            if row and row[0] and os.path.exists(row[0]):
-                project_path = row[0]
-                folder_name = f"Job_{job_id}"
-                original_filename = row[1]
-                for root, dirs, files in os.walk(project_path):
-                    for file in files:
-                        if not _should_include_result_file(file, original_filename):
-                            continue
+            if row and row[0]:
+                project_path = row[0].replace('work/', 'tasks/').replace('work\\', 'tasks\\')
+                if os.path.exists(project_path):
+                    folder_name = f"Job_{job_id}"
+                    original_filename = row[1]
+                    for root, dirs, files in os.walk(project_path):
+                        for file in files:
+                            if not _should_include_result_file(file, original_filename):
+                                continue
 
-                        file_path = os.path.join(root, file)
-                        if not os.path.isfile(file_path):
-                            continue
+                            file_path = os.path.join(root, file)
+                            if not os.path.isfile(file_path):
+                                continue
 
-                        rel_path = os.path.join(folder_name, file)
-                        zipf.write(file_path, rel_path)
+                            rel_path = os.path.join(folder_name, file)
+                            zipf.write(file_path, rel_path)
     conn.close()
     memory_file.seek(0)
     return send_file(memory_file,mimetype='application/zip',as_attachment=True,download_name=f"Batch_Download_{datetime.datetime.now().strftime('%Y%m%d%H%M')}.zip")
