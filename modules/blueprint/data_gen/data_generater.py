@@ -168,7 +168,17 @@ def analyze_file_logic(file_path, filename):
             
             analyzed_columns.append(info)
 
-        analyzed_columns.sort(key=lambda x: _natural_sort_key(x["name"]))
+        def get_sort_key(col_info):
+            seq = col_info.get("seq")
+            if seq:
+                try:
+                    parts = [int(x) for x in seq.split('.')]
+                    return (0, parts, _natural_sort_key(col_info["name"]))
+                except:
+                    pass
+            return (1, [999], _natural_sort_key(col_info["name"]))
+            
+        analyzed_columns.sort(key=get_sort_key)
 
         system_name, _ = detect_system(raw_cols)
         
@@ -275,6 +285,7 @@ def process_file_logic(file_path, format_id, selected_date_cols_raw, extra_cols,
                                 field_db_map[seq]["raw_aliases"].append(part)
 
         rename_map = {}
+        renamed_col_to_seq = {}
         
         DEFAULT_PREFERENCE = {
             "4.2.1.8": fmt_rules.get("4.2.1.8", "放射治療執行狀態"),
@@ -317,6 +328,7 @@ def process_file_logic(file_path, format_id, selected_date_cols_raw, extra_cols,
                                          final_name = f"{seq_val}{DEFAULT_PREFERENCE[seq_val]}"
                 
                 rename_map[col] = final_name
+                renamed_col_to_seq[final_name] = seq
 
         selected_date_cols_std = []
         for col in selected_date_cols_raw:
@@ -368,6 +380,10 @@ def process_file_logic(file_path, format_id, selected_date_cols_raw, extra_cols,
                     df.loc[i, diag_col_name] = dt_first
 
         def find_col_by_seq_or_key(seq_prefix):
+            # 優先從已對齊的序號映射表中查找欄位
+            for c, s in renamed_col_to_seq.items():
+                if s == seq_prefix and c in df.columns:
+                    return c
             target_name = scheme_target_for_seq.get(seq_prefix)
             if target_name and target_name in df.columns:
                 return target_name
@@ -438,8 +454,7 @@ def process_file_logic(file_path, format_id, selected_date_cols_raw, extra_cols,
         final_standard_cols = []
         for col in current_cols:
             if col in mapped_target_headers and col not in user_extra_targets:
-                m = re.match(r'^(\d+(\.\d+)*)', col)
-                seq_val = m.group(1) if m else "999"
+                seq_val = renamed_col_to_seq.get(col, "999")
                 try:
                     seq_parts = [int(x) for x in seq_val.split('.')]
                 except:
@@ -458,8 +473,21 @@ def process_file_logic(file_path, format_id, selected_date_cols_raw, extra_cols,
         final_col_order = ordered_left + ordered_right
         df = df[final_col_order]
         
-        base_name = os.path.basename(file_path)
-        out_filename = f"Gen_{base_name}"
+        orig_base, orig_ext = os.path.splitext(os.path.basename(file_path))
+        
+        scheme_display_map = {
+            "original": "原始匯入欄位名稱",
+            "field_name_zh": "中文欄位名稱",
+            "field_name_en": "英文欄位名稱",
+            "ntu_yunlin": "台大雲林欄位名稱",
+            "ntu_system": "台大體系醫整庫欄位名稱",
+            "taiwan_cancer_registry": "台灣癌症登記中心",
+            "AI_module": "雲醫癌AI模組"
+        }
+        scheme_display = scheme_display_map.get(naming_scheme, naming_scheme)
+        fmt_prefix = f"fmt{fmt_name}_" if (format_id and 'fmt_name' in locals() and fmt_name) else ""
+        
+        out_filename = f"Gen_{fmt_prefix}{orig_base}_{scheme_display}{orig_ext}"
         out_path = os.path.join('data/temp', out_filename)
         
         if ext == ".xlsx": df.to_excel(out_path, index=False)

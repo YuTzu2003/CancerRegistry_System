@@ -63,7 +63,7 @@
             // Re-render ECharts in the new visible pane to avoid sizing issues
             if (typeof echarts !== 'undefined') {
                 setTimeout(() => {
-                    const chartDoms = targetPane.querySelectorAll('div[_echarts_instance_], #main, #barChart');
+                    const chartDoms = targetPane.querySelectorAll('div[_echarts_instance_], #main');
                     chartDoms.forEach(c => {
                        const inst = echarts.getInstanceByDom(c);
                        if (inst) inst.resize();
@@ -151,12 +151,6 @@
               resultDiv.innerText = '分析失敗: ' + (data.error || '發生錯誤');
           }
       })
-      .catch(err => {
-          btn.disabled = false;
-          btn.innerHTML = '重新產生敘述';
-          console.error(err);
-          resultDiv.innerText = '系統錯誤，無法取得分析結果。';
-      });
   }
 
   document.addEventListener('DOMContentLoaded', function() {
@@ -168,11 +162,11 @@
           });
       }
 
-      const btnAiBar = document.getElementById('btnAiBar');
-      if (btnAiBar) {
-          btnAiBar.addEventListener('click', function() {
+      const btnAiMedian = document.getElementById('btnAiMedian');
+      if (btnAiMedian) {
+          btnAiMedian.addEventListener('click', function() {
               if (!window.lastChartData) return;
-              fetchInsight('原發部位', window.lastChartData.topCancersData, 'llmResponseBar', 'btnAiBar');
+              fetchInsight('年齡中位數', window.lastChartData.ageMedianTable, 'llmResponseMedian', 'btnAiMedian');
           });
       }
   });
