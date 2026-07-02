@@ -29,9 +29,15 @@ CANCER_GROUP_RULES = [
         "key": "lung_and_bronchus",
         "name_zh": "肺癌",
         "name_en": "Lung and Bronchus",
-        "site_prefixes": ["C34"],
+        "site_prefixes": ["C33", "C34"],
         "hist_exclude": ["9140", "9590-9993"],
         "subgroups": [
+            {
+                "key": "trachea",
+                "name_zh": "氣管",
+                "name_en": "Trachea",
+                "site_prefixes": ["C33"],
+            },
             {
                 "key": "small_cell_carcinoma",
                 "name_zh": "肺小細胞癌",

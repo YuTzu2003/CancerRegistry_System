@@ -1,15 +1,36 @@
 import os
+import re
 from flask import Blueprint, request, jsonify, session, send_file
-from werkzeug.utils import secure_filename
 from modules.blueprint.data_gen import analyze_file_logic, process_file_logic
 
-data_gen_bp = Blueprint('data_gen', __name__)
+from modules.services.auth import login_required
+from modules.services.db import get_conn
+from flask import render_template
+
+data_gen_bp = Blueprint('data_gen', __name__, template_folder='../blueprint/data_gen/templates')
+
+@data_gen_bp.route("/dataGen")
+@login_required
+def dataGen():
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute("SELECT FmtID, FmtName, Version FROM [Hospital_data].[dbo].[DataFormat] ORDER BY FmtName ASC")
+    rows = cursor.fetchall()
+    formats = [{"id": str(r[0]), "name": str(r[1]), "version": str(r[2])} for r in rows]
+    conn.close()
+    return render_template("dataGen.html", active="dataGen", formats=formats)
 @data_gen_bp.route('/api/data_gen/analyze', methods=['POST'])
 def analyze_file():
     if 'file' not in request.files:
         return jsonify({"ok": False, "error": "無檔案"}), 400
     file = request.files['file']
-    filename = secure_filename(file.filename)
+    
+    raw_filename = file.filename or ""
+    basename = os.path.basename(raw_filename)
+    filename = re.sub(r'[\\/:*?"<>|\s]', '_', basename)
+    if not filename.strip():
+        filename = "uploaded_file"
+        
     upload_folder = 'data/temp'
     os.makedirs(upload_folder, exist_ok=True)
     file_path = os.path.join(upload_folder, filename)
