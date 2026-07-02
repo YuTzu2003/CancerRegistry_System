@@ -63,7 +63,7 @@
             // Re-render ECharts in the new visible pane to avoid sizing issues
             if (typeof echarts !== 'undefined') {
                 setTimeout(() => {
-                    const chartDoms = targetPane.querySelectorAll('div[_echarts_instance_], #main, #barChart');
+                    const chartDoms = targetPane.querySelectorAll('div[_echarts_instance_], #main');
                     chartDoms.forEach(c => {
                        const inst = echarts.getInstanceByDom(c);
                        if (inst) inst.resize();
@@ -151,12 +151,6 @@
               resultDiv.innerText = '分析失敗: ' + (data.error || '發生錯誤');
           }
       })
-      .catch(err => {
-          btn.disabled = false;
-          btn.innerHTML = '重新產生敘述';
-          console.error(err);
-          resultDiv.innerText = '系統錯誤，無法取得分析結果。';
-      });
   }
 
   document.addEventListener('DOMContentLoaded', function() {
@@ -165,14 +159,6 @@
           btnAiMain.addEventListener('click', function() {
               if (!window.lastChartData) return;
               fetchInsight('診斷年齡', window.lastChartData.genderAgeData, 'llmResponseMain', 'btnAiMain');
-          });
-      }
-
-      const btnAiBar = document.getElementById('btnAiBar');
-      if (btnAiBar) {
-          btnAiBar.addEventListener('click', function() {
-              if (!window.lastChartData) return;
-              fetchInsight('原發部位', window.lastChartData.topCancersData, 'llmResponseBar', 'btnAiBar');
           });
       }
 
