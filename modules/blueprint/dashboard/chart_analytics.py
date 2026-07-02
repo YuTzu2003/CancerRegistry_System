@@ -7,14 +7,23 @@ from modules.blueprint.dashboard.definition.cancer_group_rules import CANCER_GRO
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 DASHBOARD_DATA = f"{BASE_DIR}/tasks/data"
 
+def _find_column(df, candidates):
+    for col in df.columns:
+        col_text = str(col).lower()
+        if any(candidate.lower() in col_text for candidate in candidates):
+            return col
+    return None
+
+
 def get_column_names(df):
     return {
-        "gender_col": next((col for col in df.columns if '性別' in col), None),
-        "age_col": next((col for col in df.columns if '診斷年齡' in col), None),
-        "site_col": next((col for col in df.columns if '原發部位' in col), None),
-        "hist_col": next((col for col in df.columns if '組織型態' in col), None),
-        "year_col": next((col for col in df.columns if '最初診斷日' in col), None),
-        "behavior_col": next((col for col in df.columns if '性態碼' in col), None)
+        "gender_col": _find_column(df, ["sex", "性別"]),
+        "age_col": _find_column(df, ["age", "診斷年齡", "年齡"]),
+        "site_col": _find_column(df, ["site", "原發部位"]),
+        "hist_col": _find_column(df, ["hist", "組織型態"]),
+        "year_col": _find_column(df, ["didiag", "最初診斷日", "診斷日期"]),
+        "behavior_col": _find_column(df, ["behavior", "性態碼"]),
+        "ajcc_ed_col": _find_column(df, ["ajcc_ed", "ajcc edition", "ajcc版本"]),
     }
 
 def filter_dashboard_data(df, cols, cancers=[], year_start="", year_end="", behavior=""):
@@ -36,7 +45,17 @@ def filter_dashboard_data(df, cols, cancers=[], year_start="", year_end="", beha
     hist_col = cols["hist_col"]
     if cancers and "All_Cancers" not in cancers and site_col and hist_col:
         def is_selected_cancer(row):
-            res = classify_cancer_group(str(row[site_col]), str(row[hist_col]), CANCER_GROUP_RULES)
+            behavior_col = cols.get("behavior_col")
+            year_col = cols.get("year_col")
+            ajcc_ed_col = cols.get("ajcc_ed_col")
+            res = classify_cancer_group(
+                str(row[site_col]),
+                str(row[hist_col]),
+                CANCER_GROUP_RULES,
+                behavior=str(row[behavior_col]) if behavior_col else None,
+                didiag=str(row[year_col]) if year_col else None,
+                ajcc_ed=str(row[ajcc_ed_col]) if ajcc_ed_col else None,
+            )
             if not res:
                 return False
             return res["group_key"] in cancers or res["subgroup_key"] in cancers           
