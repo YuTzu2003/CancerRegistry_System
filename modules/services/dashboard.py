@@ -10,6 +10,22 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 DASHBOARD_DATA = os.path.join(BASE_DIR, 'tasks', 'data')
 os.makedirs(DASHBOARD_DATA, exist_ok=True)
 
+import datetime
+from flask import render_template
+
+@dashboard_bp.route("/dashboard")
+@login_required
+def dashboard():
+    uploaded_files = []
+    if os.path.isdir(DASHBOARD_DATA):
+        for fname in os.listdir(DASHBOARD_DATA):
+            if fname.lower().endswith((".xls", ".xlsx")):
+                fpath = os.path.join(DASHBOARD_DATA, fname)
+                mtime = os.path.getmtime(fpath)
+                uploaded_files.append({"name": fname,"time": datetime.datetime.fromtimestamp(mtime).strftime("%Y/%m/%d %H:%M")})
+        uploaded_files.sort(key=lambda x: x["time"],reverse=True)
+    return render_template("dashboard.html", active="dashboard",uploaded_files=uploaded_files)
+
 @dashboard_bp.route("/dashboard/upload", methods=["POST"])
 @login_required
 def dashboard_upload():

@@ -87,11 +87,9 @@
 
   let currentCategory = cancerData[0];
   
-  /* ── UI Rendering ── */
   function getBadgeHtml(cat) {
     const leafIds = getLeafIds(cat);
     const selectedCount = leafIds.filter(id => selectedCancers.has(id)).length;
-    
     if (selectedCount === 0) return '';
     if (selectedCount < leafIds.length) {
       return `<span class="badge bg-warning text-dark ms-2 rounded-pill">${selectedCount}</span>`;
@@ -273,6 +271,11 @@
         window.dashboardSelectedCancerTitle = getSelectedCancerTitle();
       }
     }
+    
+    // Call updateSummary if it exists to update the summary panel
+    if (typeof updateSummary === 'function') {
+      updateSummary();
+    }
   }
 
   /* ── Event Listeners (Delegation) ── */
@@ -404,8 +407,6 @@
       preset.cancers.forEach(id => selectedCancers.add(id));
     }
 
-    // 3. 套用分析主題與子項目
-    // 先清空所有已勾選的主題與子項目
     document.querySelectorAll('input[name="mainCategoryTab"]:checked').forEach(el => {
       el.checked = false;
       el.dispatchEvent(new Event('change'));
@@ -442,9 +443,6 @@
     updateStatus();
     togglePresetActionButtons(true);
     checkFiltersState();
-    
-    // 自動執行查詢以顯示對應圖表
-    document.getElementById('btnRunQuery')?.click();
   });
 
   // 新增範本
@@ -522,9 +520,6 @@
             Swal.fire({ icon: 'error', title: '儲存失敗', text: data.error || '未知錯誤', confirmButtonColor: '#2563eb' });
           }
         })
-        .catch(err => {
-          Swal.fire({ icon: 'error', title: '儲存失敗', text: '網路或伺服器出錯。', confirmButtonColor: '#2563eb' });
-        });
       }
     });
   });
@@ -573,7 +568,6 @@
                 if (data.ok) {
                   userPresets = data.favorites || [];
                   populatePresetSelect();
-                  // 重新選取該項目
                   const newSelect = document.getElementById('favPresetSelect');
                   if (newSelect) {
                     newSelect.value = presetId;
@@ -585,9 +579,6 @@
             Swal.fire({ icon: 'error', title: '修改失敗', text: data.error || '未知錯誤', confirmButtonColor: '#2563eb' });
           }
         })
-        .catch(err => {
-          Swal.fire({ icon: 'error', title: '修改失敗', text: '網路或伺服器出錯。', confirmButtonColor: '#2563eb' });
-        });
       }
     });
   });
@@ -624,22 +615,17 @@
             Swal.fire({ icon: 'error', title: '刪除失敗', text: data.error || '未知錯誤', confirmButtonColor: '#2563eb' });
           }
         })
-        .catch(err => {
-          Swal.fire({ icon: 'error', title: '刪除失敗', text: '網路或伺服器出錯。', confirmButtonColor: '#2563eb' });
-        });
       }
     });
   });
-
-  // 載入我的最愛列表
   loadPresets();
 
-  // 重置按鈕邏輯
+  // 重置按鈕
   document.getElementById('btnResetFilters')?.addEventListener('click', function() {
     window.location.reload();
   });
 
-  /* ── 篩選欄位依序解鎖邏輯 ── */
+  /* ── 篩選欄位 ── */
   const yearStartInput = document.getElementById('filterYearStart');
   const yearEndInput = document.getElementById('filterYearEnd');
   const behaviorSelect = document.getElementById('filterBehavior');
@@ -655,7 +641,7 @@
     if (behaviorSelect) {
       behaviorSelect.disabled = !isYearValid;
       if (!isYearValid) {
-        behaviorSelect.value = ''; // Reset behavior if year is invalid
+        behaviorSelect.value = '';
       }
     }
 
@@ -685,6 +671,51 @@
     itemRadios.forEach(radio => {
       radio.disabled = !isBehaviorValid;
     });
+    updateSummary();
+  }
+
+  function updateSummary() {
+    // 1. 年份
+    const ys = yearStartInput ? yearStartInput.value.trim() : '';
+    const ye = yearEndInput ? yearEndInput.value.trim() : '';
+    const summaryYear = document.getElementById('summaryYear');
+    if (summaryYear) {
+      if (ys && ye) summaryYear.textContent = ys === ye ? ys : `${ys} - ${ye}`;
+      else if (ys) summaryYear.textContent = `${ys} 起`;
+      else if (ye) summaryYear.textContent = `至 ${ye}`;
+      else summaryYear.innerHTML = '<span class="text-muted">尚未選擇</span>';
+    }
+
+    // 2. 性態碼
+    const summaryBehavior = document.getElementById('summaryBehavior');
+    if (summaryBehavior && behaviorSelect) {
+      const selectedOpt = behaviorSelect.options[behaviorSelect.selectedIndex];
+      if (behaviorSelect.value) summaryBehavior.textContent = selectedOpt.text;
+      else summaryBehavior.innerHTML = '<span class="text-muted">尚未選擇</span>';
+    }
+
+    // 3. 癌別
+    const summaryCancer = document.getElementById('summaryCancer');
+    if (summaryCancer) {
+      const btnText = document.getElementById('btnCancerPickerText')?.textContent.trim();
+      if (!btnText || btnText.includes('尚未選擇')) {
+        summaryCancer.innerHTML = '<span class="text-muted">尚未選擇</span>';
+      } else {
+        summaryCancer.textContent = window.dashboardSelectedCancerTitle || btnText.replace(/已選取 \d+ 項/g, '').trim();
+      }
+    }
+
+    // 4. 分析項目
+    const summaryAnalysis = document.getElementById('summaryAnalysis');
+    if (summaryAnalysis) {
+      const checkedItems = document.querySelectorAll('.item-checkbox:checked');
+      if (checkedItems.length > 0) {
+        const itemNames = Array.from(checkedItems).map(el => el.nextElementSibling.textContent.trim());
+        summaryAnalysis.textContent = itemNames.join('、');
+      } else {
+        summaryAnalysis.innerHTML = '<span class="text-muted">尚未選擇</span>';
+      }
+    }
   }
 
   // 綁定輸入與變更事件
@@ -698,6 +729,10 @@
   if (behaviorSelect) {
     behaviorSelect.addEventListener('change', checkFiltersState);
   }
+
+  document.querySelectorAll('.item-checkbox').forEach(cb => {
+    cb.addEventListener('change', updateSummary);
+  });
 
   // Initialize
   renderCategories();
