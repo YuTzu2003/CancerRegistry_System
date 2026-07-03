@@ -1,14 +1,8 @@
-/* ── Analysis Items Checkbox Logic ── */
 (function() {
-  // Use document instead of a specific table container so elements can be placed anywhere
   const table = document;
 
-  // Handle Group Checkbox (Check all items under it)
   table.querySelectorAll('.group-checkbox').forEach(groupChk => {
     groupChk.addEventListener('change', function() {
-      
-      // For radio buttons, the browser might not fire 'change' on the one that gets unchecked.
-      // So we loop through ALL group checkboxes and update their respective sub-items containers.
       table.querySelectorAll('.group-checkbox').forEach(chk => {
         const gName = chk.dataset.group;
         const subContainer = document.getElementById(`subItems-${gName}`);
@@ -16,42 +10,31 @@
           if (chk.checked) {
             subContainer.classList.remove('d-none');
             subContainer.style.display = 'flex';
-            // Ensure the charts switch to the active sub-items in this group
-            subContainer.querySelectorAll('.item-checkbox:checked').forEach(item => {
-               item.dispatchEvent(new Event('change'));
-            });
-          } else {
+            subContainer.querySelectorAll('.item-checkbox:checked').forEach(item => {item.dispatchEvent(new Event('change'));});
+          } 
+          else {
             subContainer.classList.add('d-none');
             subContainer.style.display = 'none';
           }
         }
       });
-
-      // (Removed auto-check logic so they can act as independent toolbar options)
     });
   });
 
-  // Handle Item Checkbox (Switching Chart Panes)
   table.querySelectorAll('.item-checkbox').forEach(itemChk => {
     itemChk.addEventListener('change', function() {
-      // Toggle selected class on chip (if any remains)
       const chip = this.closest('.field-chip') || this.closest('.naming-chip');
       if (chip) chip.classList.toggle('selected', this.checked);
       updateGroupCheckbox(this.dataset.parent);
     });
   });
 
-  // Apply chart visibility only when Run Query is clicked
   const btnRunQuery = document.getElementById('btnRunQuery');
   if (btnRunQuery) {
     btnRunQuery.addEventListener('click', function() {
-      // Hide all chart panes first
-      document.querySelectorAll('.chart-pane').forEach(pane => {
-        pane.classList.add('d-none');
-      });
+      document.querySelectorAll('.chart-pane').forEach(pane => {pane.classList.add('d-none');});
 
       let anyChecked = false;
-
       table.querySelectorAll('.item-checkbox').forEach(itemChk => {
         const targetSelector = itemChk.getAttribute('data-target');
         if (targetSelector && itemChk.checked) {
@@ -60,7 +43,6 @@
             anyChecked = true;
             targetPane.classList.remove('d-none');
 
-            // Re-render ECharts in the new visible pane to avoid sizing issues
             if (typeof echarts !== 'undefined') {
                 setTimeout(() => {
                     const chartDoms = targetPane.querySelectorAll('div[_echarts_instance_], #main');
@@ -68,8 +50,7 @@
                        const inst = echarts.getInstanceByDom(c);
                        if (inst) inst.resize();
                     });
-                    
-                    // Auto-generate AI narrative if data is loaded but narrative is empty
+
                     if (window.lastChartData) {
                         const aiBtn = targetPane.querySelector('button[id^="btnAi"]');
                         const llmDiv = targetPane.querySelector('div[id^="llmResponse"]');
@@ -125,7 +106,7 @@
 (function() {
   window.lastChartData = null;
 
-  function fetchInsight(fieldKey, dataObj, resultDivId, btnId) {
+  function fetchInsight(fieldKey, dataObj, resultDivId, btnId, fields = []) {
       const btn = document.getElementById(btnId);
       const resultDiv = document.getElementById(resultDivId);
       if (!btn || !resultDiv) return;
@@ -138,7 +119,8 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
               field_key: fieldKey,
-              data: dataObj
+              data: dataObj,
+              fields: fields
           })
       })
       .then(res => res.json())
@@ -158,7 +140,7 @@
       if (btnAiMain) {
           btnAiMain.addEventListener('click', function() {
               if (!window.lastChartData) return;
-              fetchInsight('診斷年齡', window.lastChartData.genderAgeData, 'llmResponseMain', 'btnAiMain');
+              fetchInsight('診斷年齡', window.lastChartData.genderAgeData, 'llmResponseMain', 'btnAiMain', ['性別', '診斷年齡']);
           });
       }
 
@@ -166,7 +148,7 @@
       if (btnAiMedian) {
           btnAiMedian.addEventListener('click', function() {
               if (!window.lastChartData) return;
-              fetchInsight('年齡中位數', window.lastChartData.ageMedianTable, 'llmResponseMedian', 'btnAiMedian');
+              fetchInsight('年齡中位數', window.lastChartData.ageMedianData, 'llmResponseMedian', 'btnAiMedian', ['性別', '診斷年齡']);
           });
       }
   });
