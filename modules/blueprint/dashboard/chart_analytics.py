@@ -14,6 +14,10 @@ def _find_column(df, candidates):
             return col
     return None
 
+def _column_by_index(df, index):
+    if len(df.columns) > index:
+        return df.columns[index]
+    return None
 
 def get_column_names(df):
     return {
@@ -24,8 +28,11 @@ def get_column_names(df):
         "year_col": _find_column(df, ["didiag", "最初診斷日", "診斷日期"]),
         "behavior_col": _find_column(df, ["behavior", "性態碼"]),
         "ajcc_ed_col": _find_column(df, ["ajcc_ed", "ajcc edition", "ajcc版本"]),
+        "class_col": _find_column(df, ["class", "診斷等級", "診斷方式"]) or _column_by_index(df, 9),
+        "confirm_col": _find_column(df, ["confirm", "確診方式", "確診"]) or _column_by_index(df, 20),
     }
 
+# 性別年齡分布圖
 def filter_dashboard_data(df, cols, cancers=[], year_start="", year_end="", behavior=""):
     # --- 年份篩選 ---
     year_col = cols["year_col"]
@@ -63,7 +70,7 @@ def filter_dashboard_data(df, cols, cancers=[], year_start="", year_end="", beha
         
     return df
 
-# 性別年齡分布
+# 性別年齡分布表
 def calculate_gender_age_distribution(df, cols):
     labels = ['<=19', '20-24', '25-29', '30-34', '35-39', '40-44', '45-49', '50-54', '55-59', '60-64', '65-69', '70-74', '75-79', '80-84', '>=85']
     gender_age_data = {
@@ -94,7 +101,7 @@ def calculate_gender_age_distribution(df, cols):
             
     return gender_age_data
 
-# 年齡中位數
+# 年齡中位數表
 def calculate_age_median(df, cols):
     age_median_data = {
         "male": 0, "female": 0, "total": 0,
@@ -135,6 +142,55 @@ def calculate_age_median(df, cols):
             
     return age_median_data
 
+# 可分析個案與確診個案表
+def normalize_case_code(value):
+    if pd.isna(value):
+        return ""
+
+    text = str(value).strip()
+    try:
+        return str(int(float(text)))
+    except (ValueError, TypeError):
+        return text
+
+
+def calculate_analyzable_confirmed_cases(df, cols):
+    analyzable_confirmed_data = {
+        "total_count": 0,
+        "analyzable_count": 0,
+        "analyzable_percent": "0.0%",
+        "confirmed_count": 0,
+        "confirmed_percent": "0.0%"
+    }
+
+    class_col = cols["class_col"]
+    confirm_col = cols["confirm_col"]
+
+    total_count = len(df)
+    analyzable_confirmed_data["total_count"] = total_count
+
+    if class_col in df.columns and confirm_col in df.columns:
+        df_case = df[[class_col, confirm_col]].copy()
+        df_case[class_col] = df_case[class_col].apply(normalize_case_code)
+        df_case[confirm_col] = df_case[confirm_col].apply(normalize_case_code)
+
+        analyzable_df = df_case[df_case[class_col].isin(["1", "2"])]
+        confirmed_df = analyzable_df[analyzable_df[confirm_col].isin(["1", "2", "3", "4"])]
+
+        analyzable_count = len(analyzable_df)
+        confirmed_count = len(confirmed_df)
+
+        analyzable_confirmed_data["analyzable_count"] = analyzable_count
+        analyzable_confirmed_data["confirmed_count"] = confirmed_count
+
+        if total_count > 0:
+            analyzable_confirmed_data["analyzable_percent"] = f"{round(analyzable_count / total_count * 100, 1):.1f}%"
+
+        if analyzable_count > 0:
+            analyzable_confirmed_data["confirmed_percent"] = f"{round(confirmed_count / analyzable_count * 100, 1):.1f}%"
+
+    return analyzable_confirmed_data
+
 def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", behavior=""):
     fpath = f"{DASHBOARD_DATA}/{filename}"
     try:
@@ -145,10 +201,12 @@ def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", beh
         
         gender_age_data = calculate_gender_age_distribution(df, cols)
         age_median_data = calculate_age_median(df, cols)
+        analyzable_confirmed_data = calculate_analyzable_confirmed_cases(df, cols)
   
         return {
             "genderAgeData": gender_age_data,
-            "ageMedianData": age_median_data
+            "ageMedianData": age_median_data,
+            "analyzableConfirmedData": analyzable_confirmed_data
         }
     except Exception as e:
         logging.error(f"error {filename}: {str(e)}")
