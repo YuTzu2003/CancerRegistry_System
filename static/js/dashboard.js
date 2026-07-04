@@ -32,43 +32,9 @@
   const btnRunQuery = document.getElementById('btnRunQuery');
   if (btnRunQuery) {
     btnRunQuery.addEventListener('click', function() {
+      // 這裡原本會將所有勾選的圖表顯示，現在移到 dashboard.html 中的 API 成功後處理
+      // 以支援獨立圖表分頁功能。這裡我們只做最初的隱藏。
       document.querySelectorAll('.chart-pane').forEach(pane => {pane.classList.add('d-none');});
-
-      let anyChecked = false;
-      table.querySelectorAll('.item-checkbox').forEach(itemChk => {
-        const targetSelector = itemChk.getAttribute('data-target');
-        if (targetSelector && itemChk.checked) {
-          const targetPane = document.querySelector(targetSelector);
-          if (targetPane) {
-            anyChecked = true;
-            targetPane.classList.remove('d-none');
-
-            if (typeof echarts !== 'undefined') {
-                setTimeout(() => {
-                    const chartDoms = targetPane.querySelectorAll('div[_echarts_instance_], #main');
-                    chartDoms.forEach(c => {
-                       const inst = echarts.getInstanceByDom(c);
-                       if (inst) inst.resize();
-                    });
-
-                    if (window.lastChartData) {
-                        const aiBtn = targetPane.querySelector('button[id^="btnAi"]');
-                        const llmDiv = targetPane.querySelector('div[id^="llmResponse"]');
-                        if (aiBtn && llmDiv && llmDiv.innerText.includes('自動產生')) {
-                            aiBtn.click();
-                        }
-                    }
-                }, 50);
-            }
-          }
-        }
-      });
-
-      // If no items are checked, show empty pane
-      if (!anyChecked) {
-          const emptyPane = document.getElementById('chartPane-Empty');
-          if (emptyPane) emptyPane.classList.remove('d-none');
-      }
     });
   }
 
