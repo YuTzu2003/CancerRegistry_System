@@ -71,6 +71,18 @@
       if (confirmed.isConfirmed) {
         form.submit();
       }
+    },
+    showLoading: (msg = '正在處理中，請稍候...') => {
+      const overlay = document.getElementById('globalLoadingOverlay');
+      const text = document.getElementById('globalLoadingText');
+      if (overlay) {
+        if (text) text.innerText = msg;
+        overlay.style.display = 'flex';
+      }
+    },
+    hideLoading: () => {
+      const overlay = document.getElementById('globalLoadingOverlay');
+      if (overlay) overlay.style.display = 'none';
     }
   };
 

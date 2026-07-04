@@ -1,0 +1,304 @@
+{% extends "base.html" %}
+{% block title %}圖表匯出設定｜癌症登記平台{% endblock %}
+{% block page_title %}圖表匯出設定{% endblock %}
+
+{% block extra_head %}
+<style>
+  .export-section.card-flat {
+    box-shadow: none;
+    border: 1px solid var(--border);
+  }
+  .export-section .section-head {
+    background: var(--white);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 20px;
+  }
+  .export-section .section-head h2 {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--gray-700);
+    margin: 0;
+  }
+  .export-item {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: grab;
+    transition: background-color .15s ease, border-color .15s ease;
+  }
+  .export-item:hover {
+    background: var(--gray-50);
+    border-color: var(--gray-400);
+  }
+  .export-item:active {
+    cursor: grabbing;
+  }
+  .export-item.sortable-ghost {
+    opacity: 0.5;
+    background: var(--gray-100);
+    border: 1px dashed var(--gray-400);
+  }
+  .export-item-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+  }
+  .export-actions .badge {
+    font-size: 12px;
+    font-weight: 400;
+    padding: 4px 9px;
+    background: var(--gray-50) !important;
+    color: var(--gray-500) !important;
+    border: 1px solid var(--border);
+  }
+  .export-section .section-body {
+    padding: 20px;
+  }
+  .export-section .format-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    padding-bottom: 16px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+  }
+  .export-section .format-row .form-check-label {
+    font-weight: 400;
+    color: var(--text);
+    cursor: pointer;
+  }
+  .export-section .action-row {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    text-align: right;
+  }
+  .export-section .btn-export {
+    background: var(--gray-800);
+    color: var(--white);
+    border: 1px solid var(--gray-800);
+  }
+  .export-section .btn-export:hover {
+    background: var(--gray-700);
+    border-color: var(--gray-700);
+  }
+  .export-section .btn-export-outline {
+    background: var(--white);
+    color: var(--gray-700);
+    border: 1px solid var(--gray-300);
+  }
+  .export-section .btn-export-outline:hover {
+    background: var(--gray-50);
+    border-color: var(--gray-400);
+  }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>圖表匯出設定</h1>
+    <p class="lead">選擇您要輸出的格式（PDF 或 Word），並拖曳調整匯出的先後順序。</p>
+  </div>
+  <div>
+    <button class="btn btn-secondary" onclick="history.back()"><i class="bi bi-arrow-left"></i> 回上一頁</button>
+  </div>
+</div>
+
+<!-- 使用說明與注意事項 (using native card-flat) -->
+<div class="card-flat" style="border-left: 4px solid var(--accent);">
+  <div class="section-body p-4">
+    <h5 class="fw-bold mb-3" style="color: var(--accent-strong); font-size: 16px;">
+      <i class="bi bi-info-circle me-2"></i>使用說明與注意事項
+    </h5>
+    <ul class="mb-0" style="color: var(--muted); line-height: 1.8; font-size: 14px;">
+      <li><strong>調整順序：</strong>您可以直接點選下方任一圖表區塊並上下拖曳，即可改變匯出報表的排列順序。</li>
+      <li><strong>自訂內容：</strong>每個分析項目右側的勾選框，可讓您自由決定是否要在報告中包含該項目的「圖表」、「表格」或「AI 描述」。</li>
+      <li><strong>預覽功能：</strong>建議在正式下載前，先點擊「預覽 PDF」以確認排版與圖表呈現是否符合您的需求。</li>
+      <li><strong>產生時間：</strong>若勾選的圖表數量較多，產生 PDF 或 Word 檔案可能需要數秒鐘，請耐心等候。</li>
+    </ul>
+  </div>
+</div>
+
+<section class="card-flat export-section">
+  <div class="section-head">
+    <h2>匯出選項與順序</h2>
+  </div>
+  <div class="section-body">
+
+    <!-- Format Selection -->
+    <div class="format-row">
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="exportPdf" checked style="cursor: pointer;">
+        <label class="form-check-label" for="exportPdf">輸出成 PDF 檔</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="exportWord" checked style="cursor: pointer;">
+        <label class="form-check-label" for="exportWord">輸出成 Word 檔</label>
+      </div>
+    </div>
+
+    <!-- Items List -->
+    <div id="exportItemList">
+      <!-- Items will be generated here by JS -->
+    </div>
+
+    <!-- Actions -->
+    <div class="action-row">
+      <button class="btn btn-export-outline px-4 me-2" id="btnPreviewPdf">預覽 PDF</button>
+      <button class="btn btn-export px-4" id="btnConfirmExport">確認匯出</button>
+    </div>
+  </div>
+</section>
+
+
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const rawData = localStorage.getItem('dashboard_export_data');
+    if (!rawData) {
+        alert('找不到可匯出的資料！將返回上一頁。');
+        history.back();
+        return;
+    }
+    
+    const exportData = JSON.parse(rawData);
+    const listContainer = document.getElementById('exportItemList');
+    
+    exportData.forEach((item, index) => {
+        const div = document.createElement('div');
+        div.className = 'export-item';
+        div.dataset.id = item.id;
+        
+        const hasTable = item.tableHtml && item.tableHtml.trim().length > 0;
+        const hasChart = item.chartImage && item.chartImage.trim().length > 0;
+        const hasAi = item.llmText && item.llmText.trim().length > 0 && !item.llmText.includes('自動產生');
+
+        div.innerHTML = `
+            <div class="d-flex align-items-center flex-grow-1">
+                <i class="bi bi-grip-vertical text-muted fs-4 drag-handle-icon"></i>
+                <div class="export-item-title ms-2"><i class="bi bi-graph-up-arrow text-primary me-2"></i> ${item.title}</div>
+                <div class="d-flex align-items-center gap-3 ms-4 flex-wrap" onmousedown="event.stopPropagation()">
+                    ${hasChart ? '<div class="form-check"><input class="form-check-input item-cb-chart" type="checkbox" checked id="cb_chart_'+item.id+'"><label class="form-check-label" for="cb_chart_'+item.id+'">圖表</label></div>' : ''}
+                    ${hasTable ? '<div class="form-check"><input class="form-check-input item-cb-table" type="checkbox" checked id="cb_table_'+item.id+'"><label class="form-check-label" for="cb_table_'+item.id+'">表格</label></div>' : ''}
+                    ${hasAi ? '<div class="form-check"><input class="form-check-input item-cb-ai" type="checkbox" checked id="cb_ai_'+item.id+'"><label class="form-check-label" for="cb_ai_'+item.id+'">AI敘述</label></div>' : ''}
+                </div>
+            </div>
+            <div class="export-actions ms-3">
+                <span class="badge bg-secondary">Item <span class="order-number">${index + 1}</span></span>
+            </div>
+        `;
+        listContainer.appendChild(div);
+    });
+
+    if (typeof Sortable !== 'undefined') {
+        new Sortable(listContainer, {
+            animation: 150,
+            ghostClass: 'sortable-ghost',
+            onEnd: function() {
+                // Update order numbers after drag
+                document.querySelectorAll('.order-number').forEach((el, idx) => {
+                    el.innerText = idx + 1;
+                });
+            }
+        });
+    }
+
+    function doExport(isPreview) {
+        let doPdf = document.getElementById('exportPdf').checked;
+        let doWord = document.getElementById('exportWord').checked;
+        
+        if (isPreview) {
+            doPdf = true;
+            doWord = false;
+        } else {
+            if (!doPdf && !doWord) {
+                alert('請至少選擇一種匯出格式 (PDF 或 Word)。');
+                return;
+            }
+        }
+
+        const sortedIds = Array.from(listContainer.children).map(el => el.dataset.id);
+        const sortedData = sortedIds.map(id => {
+            const baseData = exportData.find(d => d.id === id);
+            const itemEl = document.querySelector('.export-item[data-id="'+id+'"]');
+            const cbTable = itemEl.querySelector('.item-cb-table');
+            const cbChart = itemEl.querySelector('.item-cb-chart');
+            const cbAi = itemEl.querySelector('.item-cb-ai');
+            return {
+                ...baseData,
+                includeTable: cbTable ? cbTable.checked : false,
+                includeChart: cbChart ? cbChart.checked : false,
+                includeAi: cbAi ? cbAi.checked : false
+            };
+        });
+
+        const payload = {
+            format_pdf: doPdf,
+            format_word: doWord,
+            charts: sortedData
+        };
+
+        if (window.utils && window.utils.showLoading) {
+            window.utils.showLoading('匯出中，請稍候...');
+        }
+
+        fetch('/api/dashboard/export', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        })
+        .then(response => {
+            if (!response.ok) throw new Error('操作失敗');
+            return response.blob();
+        })
+        .then(blob => {
+            if (window.utils && window.utils.hideLoading) window.utils.hideLoading();
+            const url = window.URL.createObjectURL(blob);
+            
+            if (isPreview) {
+                window.open(url, '_blank');
+            } else {
+                let filename = 'export_report';
+                if (doPdf && doWord) filename += '.zip';
+                else if (doPdf) filename += '.pdf';
+                else filename += '.docx';
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                
+                setTimeout(() => {
+                    window.URL.revokeObjectURL(url);
+                    localStorage.removeItem('dashboard_export_data');
+                }, 1000);
+            }
+        })
+        .catch(err => {
+            if (window.utils && window.utils.hideLoading) window.utils.hideLoading();
+            alert('發生錯誤：' + err.message);
+        });
+    }
+
+    document.getElementById('btnConfirmExport').addEventListener('click', function() {
+        doExport(false);
+    });
+    
+    document.getElementById('btnPreviewPdf').addEventListener('click', function() {
+        doExport(true);
+    });
+});
+</script>
+{% endblock %}
