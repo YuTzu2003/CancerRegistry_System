@@ -54,7 +54,7 @@ def get_chart_insight_logic(data):
                 {"role": "user", "content": prompt}
             ],temperature=0.3
         )
-        insight = response.choices[0].message.content.strip()
+        insight = response.choices[0].message.content.strip("*-_#` \n\t")
         return {"success": True, "insight": insight}
     except Exception as e:
         logging.error(f"Error in AI analysis: {e}")

@@ -141,6 +141,31 @@
     .annual-data-content.d-none {
       display: none !important;
     }
+    
+    /* 現代化圖表分頁按鈕樣式 */
+    .chart-tab-btn {
+      border-radius: 50rem !important; /* Pill shape */
+      padding: 8px 26px !important;
+      font-weight: 600 !important;
+      font-size: 15px !important;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+      border: 1.5px solid #0d6efd !important;
+      color: #0d6efd !important;
+      background-color: transparent !important;
+      box-shadow: 0 2px 4px rgba(13, 110, 253, 0.05) !important;
+    }
+    .chart-tab-btn:hover {
+      background-color: #f0f7ff !important;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(13, 110, 253, 0.15) !important;
+    }
+    .chart-tab-btn.active {
+      background-color: #0d6efd !important;
+      color: #ffffff !important;
+      box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3) !important;
+      border-color: #0d6efd !important;
+      transform: translateY(0);
+    }
   </style>
 {% endblock %}
 
@@ -154,8 +179,15 @@
 
 {% include "control.html" %}
 
+<!-- 圖表分頁按鈕區 -->
+<div id="chartTabsArea" class="row mb-1 mt-0 d-none">
+  <div class="col-12">
+    <div class="d-flex flex-wrap justify-content-center gap-3" id="chartTabsContainer"></div>
+  </div>
+</div>
+
 <!-- 圖表區塊 -->
-<div id="chartsArea" class="row g-4 my-4">
+<div id="chartsArea" class="row g-4 my-0">
   <div class="col-12">
     <!-- 1. 性別年齡分佈 (Pie Chart) -->
     <div id="chartPane-IncidenceAge" class="chart-pane d-none">
@@ -224,7 +256,7 @@
   </div>
 </div>
 
-<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=4"></script>
 <script>
   document.addEventListener('DOMContentLoaded', function() {
       var chartDom = document.getElementById('main');
@@ -246,8 +278,6 @@
         toolbox: {
             feature: {
               dataView: { show: true, readOnly: false },
-              magicType: { show: true, type: ['line', 'bar'] },
-              restore: { show: true },
               saveAsImage: { show: true }
             }
         },
@@ -499,25 +529,84 @@
                       const chartData = data.data;
                       window.lastChartData = chartData;
 
+                      // 建立圖表分頁按鈕
+                      const chartTabsArea = document.getElementById('chartTabsArea');
+                      const chartTabsContainer = document.getElementById('chartTabsContainer');
+                      if (chartTabsContainer) chartTabsContainer.innerHTML = '';
+                      
+                      let anyChecked = false;
+                      let firstBtn = null;
+                      
+                      document.querySelectorAll('.item-checkbox').forEach(itemChk => {
+                          const targetSelector = itemChk.getAttribute('data-target');
+                          if (targetSelector && itemChk.checked) {
+                              anyChecked = true;
+                              if (chartTabsContainer) {
+                                  const btn = document.createElement('button');
+                                  btn.className = 'btn btn-outline-primary chart-tab-btn';
+                                  btn.type = 'button';
+                                  btn.innerText = itemChk.value;
+                                  btn.dataset.target = targetSelector;
+                                  
+                                  btn.addEventListener('click', function() {
+                                      // Deactivate all
+                                      chartTabsContainer.querySelectorAll('.chart-tab-btn').forEach(b => b.classList.remove('active'));
+                                      this.classList.add('active');
+                                      
+                                      // Hide all panes
+                                      document.querySelectorAll('.chart-pane').forEach(pane => pane.classList.add('d-none'));
+                                      
+                                      // Show target pane
+                                      const targetPane = document.querySelector(this.dataset.target);
+                                      if (targetPane) {
+                                          targetPane.classList.remove('d-none');
+                                          
+                                          if (typeof echarts !== 'undefined') {
+                                              setTimeout(() => {
+                                                  const chartDoms = targetPane.querySelectorAll('div[_echarts_instance_], #main');
+                                                  chartDoms.forEach(c => {
+                                                      const inst = echarts.getInstanceByDom(c);
+                                                      if (inst) inst.resize();
+                                                  });
+                                                  
+                                                  if (window.lastChartData) {
+                                                      const aiBtn = targetPane.querySelector('button[id^="btnAi"]');
+                                                      const llmDiv = targetPane.querySelector('div[id^="llmResponse"]');
+                                                      if (aiBtn && llmDiv && llmDiv.innerText.includes('自動產生')) {
+                                                          aiBtn.click();
+                                                      }
+                                                  }
+                                              }, 50);
+                                          }
+                                      }
+                                  });
+                                  
+                                  chartTabsContainer.appendChild(btn);
+                                  if (!firstBtn) firstBtn = btn;
+                              }
+                          }
+                      });
+                      
+                      if (chartTabsArea) {
+                          if (anyChecked) {
+                              chartTabsArea.classList.remove('d-none');
+                          } else {
+                              chartTabsArea.classList.add('d-none');
+                              const emptyPane = document.getElementById('chartPane-Empty');
+                              if (emptyPane) emptyPane.classList.remove('d-none');
+                          }
+                      }
+
                       // 顯示 AI 分析按鈕
                       const btnAiMain = document.getElementById('btnAiMain');
                       const btnAiMedian = document.getElementById('btnAiMedian');
-                      btnAiMain.style.display = 'block';
+                      if (btnAiMain) btnAiMain.style.display = 'block';
                       if (btnAiMedian) btnAiMedian.style.display = 'block';
                       document.getElementById('llmResponseMain').innerText = '（系統將自動產生分析敘述）';
                       const llmResponseMedian = document.getElementById('llmResponseMedian');
                       if (llmResponseMedian) llmResponseMedian.innerText = '（系統將自動產生分析敘述）';
-                      btnAiMain.innerHTML = '重新產生敘述';
+                      if (btnAiMain) btnAiMain.innerHTML = '重新產生敘述';
                       if (btnAiMedian) btnAiMedian.innerHTML = '重新產生敘述';
-
-                      // 自動觸發目前可見的圖表的 AI 產生
-                      setTimeout(() => {
-                         const activePane = document.querySelector('.chart-pane:not(.d-none)');
-                         if (activePane) {
-                             const activeAiBtn = activePane.querySelector('button[id^="btnAi"]');
-                             if (activeAiBtn) activeAiBtn.click();
-                         }
-                      }, 100);
 
                       // Update Sex/Age Table and Chart
                       const yearTitle = getSelectedYearTitle();
@@ -544,7 +633,11 @@
                       
                       // 強制重新計算大小，避免一開始隱藏導致的比例跑版問題
                       setTimeout(() => {
-                          myChart.resize();
+                          if (firstBtn) {
+                              firstBtn.click();
+                          } else {
+                              myChart.resize();
+                          }
                       }, 50);
                   } else {
                       alert('資料分析失敗: ' + data.error);
