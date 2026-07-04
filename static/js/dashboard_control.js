@@ -770,6 +770,23 @@ document.addEventListener('DOMContentLoaded', function() {
                   setTimeout(() => {
                       if (firstBtn) firstBtn.click();
                       else if (window.dashboardChartInstance) window.dashboardChartInstance.resize();
+
+                      // Auto-trigger AI generation for all selected charts so they are ready for export
+                      document.querySelectorAll('.item-checkbox').forEach(itemChk => {
+                          if (itemChk.checked) {
+                              const targetSelector = itemChk.getAttribute('data-target');
+                              if (targetSelector) {
+                                  const targetPane = document.querySelector(targetSelector);
+                                  if (targetPane) {
+                                      const aiBtn = targetPane.querySelector('button[id^="btnAi"]');
+                                      const llmDiv = targetPane.querySelector('div[id^="llmResponse"]');
+                                      if (aiBtn && llmDiv && llmDiv.innerText.includes('自動產生')) {
+                                          aiBtn.click();
+                                      }
+                                  }
+                              }
+                          }
+                      });
                   }, 50);
               } else {
                   alert('資料分析失敗: ' + data.error);

@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+{% block title %}圖表匯出設定｜癌症登記平台{% endblock %}
+{% block page_title %}圖表匯出設定{% endblock %}
+
+{% block extra_head %}
+<style>
+  .export-item {
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  }
+  .export-item-title {
+    font-size: 16px;
+    font-weight: bold;
+    color: #333;
+    width: 250px;
+  }
+  .drag-handle {
+    cursor: grab;
+    color: #888;
+    margin-right: 15px;
+  }
+  .export-actions button {
+    margin-left: 5px;
+  }
+</style>
+<!-- Include SortableJS for drag and drop reordering -->
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>圖表匯出設定</h1>
+    <p class="lead">選擇您要輸出的格式（PDF 或 Word），並拖曳調整匯出的先後順序。</p>
+  </div>
+  <div>
+    <button class="btn btn-secondary me-2" onclick="history.back()"><i class="bi bi-arrow-left"></i> 回上一頁</button>
+  </div>
+</div>
+
+<section class="card-flat" style="margin-bottom: 22px;">
+  <div class="section-head">
+    <h2><span class="dot" style="background:var(--warning)"></span> 匯出選項</h2>
+  </div>
+  <div class="section-body p-4">
+    <div class="d-flex flex-wrap gap-4 mb-4">
+      <div class="form-check form-switch fs-5">
+        <input class="form-check-input" type="checkbox" id="exportPdf" checked>
+        <label class="form-check-label fw-bold" for="exportPdf">輸出成 PDF 檔</label>
+      </div>
+      <div class="form-check form-switch fs-5">
+        <input class="form-check-input" type="checkbox" id="exportWord" checked>
+        <label class="form-check-label fw-bold" for="exportWord">輸出成 Word 檔</label>
+      </div>
+    </div>
+    
+    <h5 class="fw-bold mb-3 border-bottom pb-2">匯出順序與細項設定（可拖曳左側 <i class="bi bi-grip-vertical"></i> 排序）</h5>
+    <div id="exportItemList">
+      <!-- Items will be generated here by JS -->
+    </div>
+    
+    <div class="mt-4 text-end border-top pt-3">
+      <button class="btn btn-lg btn-outline-primary me-2" id="btnPreviewPdf">
+        <i class="bi bi-file-earmark-pdf"></i> 預覽 PDF
+      </button>
+      <button class="btn btn-lg btn-success" id="btnConfirmExport">
+        <i class="bi bi-cloud-download"></i> 確認匯出
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- Loading Overlay -->
+<div id="loadingOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; justify-content: center; align-items: center; flex-direction: column; color: white;">
+    <div class="spinner-border" role="status" style="width: 3rem; height: 3rem;">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+    <h4 class="mt-3">正在處理中，請稍候...</h4>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const rawData = localStorage.getItem('dashboard_export_data');
+    if (!rawData) {
+        alert('找不到可匯出的資料！將返回上一頁。');
+        history.back();
+        return;
+    }
+    
+    const exportData = JSON.parse(rawData);
+    const listContainer = document.getElementById('exportItemList');
+    
+    exportData.forEach((item, index) => {
+        const div = document.createElement('div');
+        div.className = 'export-item';
+        div.dataset.id = item.id;
+        
+        const hasTable = item.tableHtml && item.tableHtml.trim().length > 0;
+        const hasChart = item.chartImage && item.chartImage.trim().length > 0;
+        const hasAi = item.llmText && item.llmText.trim().length > 0 && !item.llmText.includes('自動產生');
+
+        div.innerHTML = `
+            <div class="d-flex align-items-center flex-grow-1">
+                <i class="bi bi-grip-vertical drag-handle fs-4"></i>
+                <div class="export-item-title"><i class="bi bi-graph-up-arrow text-primary me-2"></i> ${item.title}</div>
+                <div class="d-flex align-items-center gap-3 ms-4 flex-wrap">
+                    ${hasChart ? '<div class="form-check"><input class="form-check-input item-cb-chart" type="checkbox" checked id="cb_chart_'+item.id+'"><label class="form-check-label" for="cb_chart_'+item.id+'">圖表</label></div>' : ''}
+                    ${hasTable ? '<div class="form-check"><input class="form-check-input item-cb-table" type="checkbox" checked id="cb_table_'+item.id+'"><label class="form-check-label" for="cb_table_'+item.id+'">表格</label></div>' : ''}
+                    ${hasAi ? '<div class="form-check"><input class="form-check-input item-cb-ai" type="checkbox" checked id="cb_ai_'+item.id+'"><label class="form-check-label text-success" for="cb_ai_'+item.id+'"><i class="bi bi-robot"></i> AI 描述</label></div>' : ''}
+                </div>
+            </div>
+            <div class="export-actions">
+                <span class="badge bg-secondary">排序: <span class="order-number">${index + 1}</span></span>
+            </div>
+        `;
+        listContainer.appendChild(div);
+    });
+
+    // Initialize Sortable
+    if (typeof Sortable !== 'undefined') {
+        new Sortable(listContainer, {
+            handle: '.drag-handle',
+            animation: 150,
+            onEnd: function() {
+                // Update order numbers after drag
+                document.querySelectorAll('.order-number').forEach((el, idx) => {
+                    el.innerText = idx + 1;
+                });
+            }
+        });
+    }
+
+    function doExport(isPreview) {
+        let doPdf = document.getElementById('exportPdf').checked;
+        let doWord = document.getElementById('exportWord').checked;
+        
+        if (isPreview) {
+            doPdf = true;
+            doWord = false;
+        } else {
+            if (!doPdf && !doWord) {
+                alert('請至少選擇一種匯出格式 (PDF 或 Word)。');
+                return;
+            }
+        }
+
+        // Reconstruct sorted data and include checkboxes state
+        const sortedIds = Array.from(listContainer.children).map(el => el.dataset.id);
+        const sortedData = sortedIds.map(id => {
+            const baseData = exportData.find(d => d.id === id);
+            const itemEl = document.querySelector('.export-item[data-id="'+id+'"]');
+            const cbTable = itemEl.querySelector('.item-cb-table');
+            const cbChart = itemEl.querySelector('.item-cb-chart');
+            const cbAi = itemEl.querySelector('.item-cb-ai');
+            return {
+                ...baseData,
+                includeTable: cbTable ? cbTable.checked : false,
+                includeChart: cbChart ? cbChart.checked : false,
+                includeAi: cbAi ? cbAi.checked : false
+            };
+        });
+
+        const payload = {
+            format_pdf: doPdf,
+            format_word: doWord,
+            charts: sortedData
+        };
+
+        // Show loading
+        document.getElementById('loadingOverlay').style.display = 'flex';
+
+        fetch('/api/dashboard/export', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        })
+        .then(response => {
+            if (!response.ok) throw new Error('操作失敗');
+            return response.blob();
+        })
+        .then(blob => {
+            document.getElementById('loadingOverlay').style.display = 'none';
+            const url = window.URL.createObjectURL(blob);
+            
+            if (isPreview) {
+                window.open(url, '_blank');
+            } else {
+                let filename = 'export_report';
+                if (doPdf && doWord) filename += '.zip';
+                else if (doPdf) filename += '.pdf';
+                else filename += '.docx';
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                
+                // Cleanup object URL after a delay
+                setTimeout(() => window.URL.revokeObjectURL(url), 10000);
+            }
+        })
+        .catch(err => {
+            document.getElementById('loadingOverlay').style.display = 'none';
+            alert('發生錯誤：' + err.message);
+        });
+    }
+
+    document.getElementById('btnConfirmExport').addEventListener('click', function() {
+        doExport(false);
+    });
+    
+    document.getElementById('btnPreviewPdf').addEventListener('click', function() {
+        doExport(true);
+    });
+});
+</script>
+{% endblock %}

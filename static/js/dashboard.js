@@ -191,3 +191,74 @@ window.DashboardRenderer = {
         });
     }
 };
+
+document.addEventListener('DOMContentLoaded', function() {
+    const btnPrepareExport = document.getElementById('btnPrepareExport');
+    if (btnPrepareExport) {
+        btnPrepareExport.addEventListener('click', function() {
+            const exportData = [];
+            let orderIndex = 0;
+            
+            const activeTargets = Array.from(document.querySelectorAll('#chartTabsContainer .chart-tab-btn')).map(btn => btn.dataset.target);
+            
+            document.querySelectorAll('.chart-pane').forEach(pane => {
+                if (pane.id !== 'chartPane-Empty' && activeTargets.includes('#' + pane.id)) {
+                    const paneId = pane.id;
+                    
+                    const wasHidden = pane.classList.contains('d-none');
+                    if (wasHidden) {
+                        pane.classList.remove('d-none');
+                        pane.style.visibility = 'hidden';
+                        pane.style.display = 'block';
+                        if (paneId === 'chartPane-IncidenceAge' && typeof echarts !== 'undefined') {
+                            const inst = echarts.getInstanceByDom(pane.querySelector('#main'));
+                            if (inst) inst.resize();
+                        }
+                    }
+
+                    let chartImage = '';
+                    if (paneId === 'chartPane-IncidenceAge' && window.dashboardChartInstance) {
+                        chartImage = window.dashboardChartInstance.getDataURL({ type: 'png', backgroundColor: '#fff', pixelRatio: 2 });
+                    }
+                    
+                    const tableWrap = pane.querySelector('.annual-report-table-wrap');
+                    let tableHtml = tableWrap ? tableWrap.innerHTML : '';
+                    
+                    let llmText = '';
+                    const llmDiv = pane.querySelector('[id^="llmResponse"]');
+                    if (llmDiv) {
+                        llmText = llmDiv.innerText;
+                    }
+
+                    if (wasHidden) {
+                        pane.classList.add('d-none');
+                        pane.style.visibility = '';
+                        pane.style.display = '';
+                    }
+
+                    let title = '未命名圖表';
+                    if (paneId === 'chartPane-IncidenceAge') title = '性別年齡分佈';
+                    else if (paneId === 'chartPane-IncidenceMedian') title = '年齡中位數';
+                    else if (paneId === 'chartPane-DiagnosisAnalyzable') title = '可分析個案與確診個案';
+
+                    exportData.push({
+                        id: paneId,
+                        order: orderIndex++,
+                        title: title,
+                        tableHtml: tableHtml,
+                        chartImage: chartImage,
+                        llmText: llmText
+                    });
+                }
+            });
+
+            if (exportData.length === 0) {
+                alert('沒有可匯出的內容，請先查詢圖表！');
+                return;
+            }
+
+            localStorage.setItem('dashboard_export_data', JSON.stringify(exportData));
+            window.location.href = '/dashboard/export_report';
+        });
+    }
+});

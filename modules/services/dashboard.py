@@ -153,3 +153,35 @@ def analyze_dashboard_file_route():
         import logging
         logging.error(f"Error analyzing dashboard file: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
+
+from flask import send_file
+from modules.blueprint.dashboard.export_report import generate_export_files
+
+@dashboard_bp.route('/dashboard/export_report', methods=['GET'])
+@login_required
+def export_report_page():
+    return render_template('export_report.html', active='dashboard')
+
+@dashboard_bp.route('/api/dashboard/export', methods=['POST'])
+@login_required
+def export_report_api():
+    data = request.json or {}
+    format_pdf = data.get('format_pdf', True)
+    format_word = data.get('format_word', False)
+    charts = data.get('charts', [])
+    
+    if not charts:
+        return jsonify({'ok': False, 'error': '沒有圖表資料可匯出'}), 400
+        
+    output_dir = os.path.join(DASHBOARD_DATA, 'exports')
+    
+    try:
+        file_path, mimetype, dl_name = generate_export_files(format_pdf, format_word, charts, output_dir)
+        if file_path and os.path.exists(file_path):
+            return send_file(file_path, mimetype=mimetype, as_attachment=True, download_name=dl_name)
+        else:
+            return jsonify({'ok': False, 'error': '無法產生匯出檔案'}), 500
+    except Exception as e:
+        import logging
+        logging.error(f'Export error: {e}')
+        return jsonify({'ok': False, 'error': str(e)}), 500
