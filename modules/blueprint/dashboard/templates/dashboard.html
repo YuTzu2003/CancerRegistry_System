@@ -1,4 +1,4 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 {% block title %}年報分析｜癌症登記平台{% endblock %}
 {% block page_title %}年報分析{% endblock %}
 {% block extra_head %}
@@ -510,7 +510,37 @@
       
       myChart.setOption(option);
       
+      function fetchLlmInsight(fieldKey, chartData, fields, responseContainerId, buttonId) {
+          const container = document.getElementById(responseContainerId);
+          const button = document.getElementById(buttonId);
+          
+          if (container) container.innerText = '分析中，請稍候...';
+          if (button) button.disabled = true;
 
+          fetch('/api/chart_insight', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                  field_key: fieldKey,
+                  data: chartData,
+                  fields: fields
+              })
+          })
+          .then(res => res.json())
+          .then(data => {
+              if (button) button.disabled = false;
+              if (data.success) {
+                  if (container) container.innerText = data.insight;
+              } else {
+                  if (container) container.innerText = '產生敘述失敗：' + (data.error || '未知錯誤');
+              }
+          })
+          .catch(err => {
+              if (button) button.disabled = false;
+              console.error('API 錯誤:', err);
+              if (container) container.innerText = '發生系統錯誤，請稍後再試。';
+          });
+      }
 
       window.addEventListener('resize', function() {
           myChart.resize();
@@ -663,14 +693,30 @@
                       // 顯示 AI 分析按鈕
                       const btnAiMain = document.getElementById('btnAiMain');
                       const btnAiMedian = document.getElementById('btnAiMedian');
-                      if (btnAiMain) btnAiMain.style.display = 'block';
-                      if (btnAiMedian) btnAiMedian.style.display = 'block';
-                      if (btnAiAnalyzable) btnAiAnalyzable.style.display = 'block';
-                      document.getElementById('llmResponseMain').innerText = '定義還沒串接使用。';
+                      const btnAiAnalyzable = document.getElementById('btnAiAnalyzable');
+                      
+                      if (btnAiMain) {
+                          btnAiMain.style.display = 'block';
+                          btnAiMain.innerHTML = '重新產生敘述';
+                          btnAiMain.onclick = () => fetchLlmInsight('性別與年齡分佈', window.lastChartData.genderAgeData, ['性別', '年齡'], 'llmResponseMain', 'btnAiMain');
+                      }
+                      if (btnAiMedian) {
+                          btnAiMedian.style.display = 'block';
+                          btnAiMedian.innerHTML = '重新產生敘述';
+                          btnAiMedian.onclick = () => fetchLlmInsight('年齡中位數', window.lastChartData.ageMedianData, ['年齡', '性別'], 'llmResponseMedian', 'btnAiMedian');
+                      }
+                      if (btnAiAnalyzable) {
+                          btnAiAnalyzable.style.display = 'block';
+                          btnAiAnalyzable.innerHTML = '重新產生敘述';
+                          btnAiAnalyzable.onclick = () => fetchLlmInsight('癌症登記可分析個案與確診個案', window.lastChartData.analyzableConfirmedData, ['可分析個案', '確診個案'], 'llmResponseAnalyzable', 'btnAiAnalyzable');
+                      }
+
+                      const llmResponseMain = document.getElementById('llmResponseMain');
+                      if (llmResponseMain) llmResponseMain.innerText = '（系統將自動產生分析敘述）';
                       const llmResponseMedian = document.getElementById('llmResponseMedian');
                       if (llmResponseMedian) llmResponseMedian.innerText = '（系統將自動產生分析敘述）';
-                      if (btnAiMain) btnAiMain.innerHTML = '重新產生敘述';
-                      if (btnAiMedian) btnAiMedian.innerHTML = '重新產生敘述';
+                      const llmResponseAnalyzable = document.getElementById('llmResponseAnalyzable');
+                      if (llmResponseAnalyzable) llmResponseAnalyzable.innerText = '（系統將自動產生分析敘述）';
 
                       // Update Sex/Age Table and Chart
                       const yearTitle = getSelectedYearTitle();
