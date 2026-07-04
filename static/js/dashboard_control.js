@@ -1,3 +1,6 @@
+/* ==========================================
+   癌別選擇與篩選邏輯
+   ========================================== */
 (function() {
   const cancerData = [
     {id:'All_Cancers',name:'全癌別(C00-C80)'},
@@ -6,7 +9,6 @@
                   { id:'Oral_Cavity',name:'口腔 Oral Cavity'},
                   { id:'Oropharynx',name:'口咽 Oropharynx'},
                   { id:'Hypopharynx',name:'下咽 Hypopharynx'}]},
-
     {id:'Salivary_Glands',name:'主唾液腺 Salivary Glands'},
     {id:'Nasopharynx',name:'鼻咽 Nasopharynx'},
     {id:'Larynx',name:'喉部 Larynx'},
@@ -18,7 +20,6 @@
                   {id:'colon',name:'結腸癌 Colon'},
                   {id:'rectum',name:'直腸癌 Rectum'},
                   {id:'Anus',name:'肛門癌 Anus'}]},
-
     {id:'liver_group',name:'肝及肝內膽管', 
         children: [
                   {id:'Liver',name:'肝 Liver'},
@@ -27,12 +28,10 @@
         children: [
                   {id:'Breast(Female)',name:'女性乳房 Breast(Female)'},
                   {id:'Breast(Male)',name:'男性乳癌 Breast(Male)'}]},
-
     {id:'lung_group',name:'肺、支氣管、氣管', 
         children: [
                   {id:'Trachea',name:'氣管' },
                   {id:'Lung',name:'肺、支氣管'}]},
-
     {id:'Cervix_Uteri',name:'子宮頸 Cervix Uteri'},
     {id:'Corpus_Uteri',name:'子宮體 Corpus Uteri'},
     {id:'Ovary',name:'卵巢 Ovary'},
@@ -48,7 +47,6 @@
                                 {id:'Plasma_cell_neoplasms', name: '漿細胞腫瘤（Plasma cell neoplasms）'},
                                 {id:'Histiocytic_and_dendritic_cell_neoplasms', name: '組織球與樹突細胞腫瘤（Histiocytic and dendritic cell neoplasms）'},
                                 {id:'Malignant_lymphoma_NOS_and_others', name: '未分類及其他惡性淋巴瘤（Malignant lymphoma, NOS and others）'}]}]},
-
     {id:'Leukemia_and_myeloid_neoplasm',name:'白血病及骨髓瘤 (Leukemia and myeloid neoplasm)', 
         children: [
                   {id:'AML',name:'急性骨髓性白血病 (AML)' },
@@ -62,7 +60,7 @@
                   {id:'Other_Leukemia',name:'其他白血病 (Other Leukemia)'},
                   {id:'Leukemia',name:'未分類白血病 (Leukemia, NOS )'}]}];
 
-  /* ── State Management ── */
+  /* ── 狀態管理與介面更新邏輯 ── */
   const selectedCancers = new Set();
   window.selectedCancers = selectedCancers;
   const allLeafIds = [];
@@ -102,16 +100,8 @@
     if (!list) return;
     
     let html = '';
+    html += `<div class="list-group-item bg-light border-0 py-2 fw-bold text-secondary text-uppercase" style="font-size: 11px; letter-spacing: 0.5px; cursor: default; pointer-events: none; margin-bottom: 5px;">不分癌別</div>`;
     
-    // 1. Render "不分癌別" divider header
-    html += `
-      <div class="list-group-item bg-light border-0 py-2 fw-bold text-secondary text-uppercase" 選ㄗㄜ˙
-           style="font-size: 11px; letter-spacing: 0.5px; cursor: default; pointer-events: none; margin-bottom: 5px;">
-        不分癌別
-      </div>
-    `;
-    
-    // 2. Render "全癌別(C00-C80)" clickable item
     const allCancersCat = cancerData.find(c => c.id === 'All_Cancers');
     if (allCancersCat) {
       const isActive = currentCategory.id === allCancersCat.id;
@@ -128,15 +118,8 @@
       `;
     }
     
-    // 3. Render "常見癌別" divider header
-    html += `
-      <div class="list-group-item bg-light border-0 py-2 fw-bold text-secondary text-uppercase" 
-           style="font-size: 11px; letter-spacing: 0.5px; cursor: default; pointer-events: none; margin-top: 10px; margin-bottom: 5px;">
-        常見癌別
-      </div>
-    `;
+    html += `<div class="list-group-item bg-light border-0 py-2 fw-bold text-secondary text-uppercase" style="font-size: 11px; letter-spacing: 0.5px; cursor: default; pointer-events: none; margin-top: 10px; margin-bottom: 5px;">常見癌別</div>`;
     
-    // 3. Render all other specific cancers
     cancerData.forEach(cat => {
       if (cat.id === 'All_Cancers') return;
       const isActive = currentCategory.id === cat.id;
@@ -210,7 +193,6 @@
     
     container.innerHTML = html;
     
-    // Checkboxes natively don't support indeterminate attribute in HTML, must be set via JS
     container.querySelectorAll('input[data-indeterminate="true"]').forEach(el => {
       el.indeterminate = true;
     });
@@ -221,11 +203,9 @@
     const specificSelectedCount = Array.from(selectedCancers).filter(id => id !== 'All_Cancers').length;
     const totalSpecificCount = allLeafIds.filter(id => id !== 'All_Cancers').length;
     window.dashboardSelectedCancerIds = Array.from(selectedCancers);
+    
     const getChineseCancerName = (name) => {
-      return String(name || '')
-        .replace(/\s*\([^)]*\)/g, '')
-        .replace(/\s+[A-Za-z][A-Za-z0-9\s,./&+-]*$/g, '')
-        .trim();
+      return String(name || '').replace(/\s*\([^)]*\)/g, '').replace(/\s+[A-Za-z][A-Za-z0-9\s,./&+-]*$/g, '').trim();
     };
 
     const getSelectedCancerTitle = () => {
@@ -272,13 +252,12 @@
       }
     }
     
-    // Call updateSummary if it exists to update the summary panel
     if (typeof updateSummary === 'function') {
       updateSummary();
     }
   }
 
-  /* ── Event Listeners (Delegation) ── */
+  /* ── 癌別選擇事件綁定 ── */
   document.getElementById('cancerCategoryList')?.addEventListener('click', (e) => {
     const btn = e.target.closest('.cat-nav-btn');
     if (!btn) return;
@@ -296,20 +275,17 @@
     const isChecked = e.target.checked;
     
     if (node.id === 'All_Cancers') {
-      // Toggle all cancers
       if (isChecked) {
         allLeafIds.forEach(id => selectedCancers.add(id));
       } else {
         selectedCancers.clear();
       }
     } else {
-      // Toggle specific cancer
       getLeafIds(node).forEach(id => {
         if (isChecked) selectedCancers.add(id);
         else selectedCancers.delete(id);
       });
       
-      // Check if all other specific leaf IDs are selected
       const otherLeaves = allLeafIds.filter(id => id !== 'All_Cancers');
       const allOthersChecked = otherLeaves.every(id => selectedCancers.has(id));
       if (allOthersChecked) {
@@ -331,7 +307,7 @@
       modalInstance.hide();
     }
   });
-  
+
   /* ── 我的最愛預設範本邏輯 ── */
   let userPresets = [];
 
@@ -346,12 +322,10 @@
           userPresets = data.favorites || [];
           populatePresetSelect();
         } else {
-          console.error("無法載入最愛範本: " + data.error);
           select.innerHTML = '<option value="">— 載入失敗 —</option>';
         }
       })
       .catch(err => {
-        console.error("載入最愛範本出錯", err);
         select.innerHTML = '<option value="">— 載入失敗 —</option>';
       });
   }
@@ -384,7 +358,6 @@
     }
   }
 
-  // 套用範本
   document.getElementById('favPresetSelect')?.addEventListener('change', function(e) {
     const presetId = parseInt(e.target.value, 10);
     if (!presetId) {
@@ -395,13 +368,11 @@
     const preset = userPresets.find(p => p.id === presetId);
     if (!preset) return;
 
-    // 1. 設定性態碼
     const behaviorSelect = document.getElementById('filterBehavior');
     if (behaviorSelect) {
       behaviorSelect.value = preset.behavior;
     }
 
-    // 2. 套用癌別
     selectedCancers.clear();
     if (preset.cancers && preset.cancers.length > 0) {
       preset.cancers.forEach(id => selectedCancers.add(id));
@@ -437,7 +408,6 @@
       });
     }
 
-    // 4. 更新介面
     renderCategories();
     renderDetails();
     updateStatus();
@@ -445,7 +415,6 @@
     checkFiltersState();
   });
 
-  // 新增範本
   document.getElementById('btnSavePreset')?.addEventListener('click', function() {
     const behaviorSelect = document.getElementById('filterBehavior');
     const behavior = behaviorSelect ? behaviorSelect.value : 'all';
@@ -454,7 +423,6 @@
     let main_category = '';
     let sub_category = '';
     
-    // Determine which main categories have checked sub-items
     const activeMainCats = new Set();
     document.querySelectorAll('.item-checkbox:checked').forEach(el => {
       if (el.dataset.parent) {
@@ -468,7 +436,6 @@
       }
     });
     
-    // Also include the currently active tab
     const currentTab = document.querySelector('input[name="mainCategoryTab"]:checked');
     if (currentTab) activeMainCats.add(currentTab.id);
     
@@ -476,7 +443,6 @@
       main_category = Array.from(activeMainCats).join(',');
     }
     
-    // Save ALL checked sub-items across all tabs
     const subCatEls = document.querySelectorAll('.item-checkbox:checked');
     if (subCatEls.length > 0) {
       sub_category = Array.from(subCatEls).map(el => el.id).join(',');
@@ -524,7 +490,6 @@
     });
   });
 
-  // 重新命名範本
   document.getElementById('btnRenamePreset')?.addEventListener('click', function() {
     const select = document.getElementById('favPresetSelect');
     const presetId = parseInt(select ? select.value : '', 10);
@@ -583,7 +548,6 @@
     });
   });
 
-  // 刪除範本
   document.getElementById('btnDeletePreset')?.addEventListener('click', function() {
     const select = document.getElementById('favPresetSelect');
     const presetId = parseInt(select ? select.value : '', 10);
@@ -620,12 +584,11 @@
   });
   loadPresets();
 
-  // 重置按鈕
   document.getElementById('btnResetFilters')?.addEventListener('click', function() {
     window.location.reload();
   });
 
-  /* ── 篩選欄位 ── */
+  /* ── 篩選欄位邏輯 ── */
   const yearStartInput = document.getElementById('filterYearStart');
   const yearEndInput = document.getElementById('filterYearEnd');
   const behaviorSelect = document.getElementById('filterBehavior');
@@ -637,7 +600,6 @@
 
     const isBehaviorValid = isYearValid && behaviorSelect && behaviorSelect.value !== '';
 
-    // Step 1: Unlock behavior if year is valid
     if (behaviorSelect) {
       behaviorSelect.disabled = !isYearValid;
       if (!isYearValid) {
@@ -645,7 +607,6 @@
       }
     }
 
-    // Step 2: Unlock presets if year is valid
     const presetElements = [
       document.getElementById('favPresetSelect'),
       document.getElementById('btnSavePreset')
@@ -656,7 +617,6 @@
       }
     });
 
-    // Step 3: Unlock cancer picker if behavior is valid
     const cancerPickerEl = document.getElementById('btnCancerPicker');
     if (cancerPickerEl) {
       cancerPickerEl.disabled = !isBehaviorValid;
@@ -675,7 +635,6 @@
   }
 
   function updateSummary() {
-    // 1. 年份
     const ys = yearStartInput ? yearStartInput.value.trim() : '';
     const ye = yearEndInput ? yearEndInput.value.trim() : '';
     const summaryYear = document.getElementById('summaryYear');
@@ -686,7 +645,6 @@
       else summaryYear.innerHTML = '<span class="text-muted">尚未選擇</span>';
     }
 
-    // 2. 性態碼
     const summaryBehavior = document.getElementById('summaryBehavior');
     if (summaryBehavior && behaviorSelect) {
       const selectedOpt = behaviorSelect.options[behaviorSelect.selectedIndex];
@@ -694,7 +652,6 @@
       else summaryBehavior.innerHTML = '<span class="text-muted">尚未選擇</span>';
     }
 
-    // 3. 癌別
     const summaryCancer = document.getElementById('summaryCancer');
     if (summaryCancer) {
       const btnText = document.getElementById('btnCancerPickerText')?.textContent.trim();
@@ -705,7 +662,6 @@
       }
     }
 
-    // 4. 分析項目
     const summaryAnalysis = document.getElementById('summaryAnalysis');
     if (summaryAnalysis) {
       const checkedItems = document.querySelectorAll('.item-checkbox:checked');
@@ -718,7 +674,6 @@
     }
   }
 
-  // 綁定輸入與變更事件
   if (yearStartInput && yearEndInput) {
     ['input', 'change'].forEach(evtType => {
       yearStartInput.addEventListener(evtType, checkFiltersState);
@@ -734,88 +689,291 @@
     cb.addEventListener('change', updateSummary);
   });
 
-  // Initialize
   renderCategories();
   renderDetails();
   updateStatus();
   checkFiltersState();
 })();
 
-/* ── Dashboard Upload (Admin only) ─────────────────────── */
-(function() {
+/* ==========================================
+   檔案管理與查詢執行邏輯
+   ========================================== */
+document.addEventListener('DOMContentLoaded', function() {
+
+  /* ── 檔案列表選擇邏輯 ── */
+  const fileRows = document.querySelectorAll('#dashFileListBody tr');
+  fileRows.forEach(row => {
+      if (row.querySelector('a')) {
+          row.addEventListener('click', function(e) {
+              if (e.target.closest('.btn-del-file')) return;                 
+              e.preventDefault();
+              fileRows.forEach(r => {
+                  r.classList.remove('table-active');
+                  const link = r.querySelector('a');
+                  if(link) link.classList.replace('text-primary', 'text-dark');
+              });
+              this.classList.add('table-active');
+              const activeLink = this.querySelector('a');
+              if(activeLink) activeLink.classList.replace('text-dark', 'text-primary');
+          });
+      }
+  });
+
+  /* ── 查詢按鈕執行邏輯 ── */
+  const btnRunQuery = document.getElementById('btnRunQuery');
+  if (btnRunQuery) {
+      btnRunQuery.addEventListener('click', function() {
+          document.querySelectorAll('.chart-pane').forEach(pane => {pane.classList.add('d-none');});
+
+          let selectedFile = '';
+          const activeRow = document.querySelector('#dashFileListBody tr.table-active');
+          if (activeRow) {
+              const link = activeRow.querySelector('a');
+              if (link) selectedFile = link.innerText.trim();
+          }
+
+          const yearStartVal = document.getElementById('filterYearStart')?.value.trim();
+          const yearEndVal = document.getElementById('filterYearEnd')?.value.trim();
+          if (!yearStartVal || !yearEndVal || yearStartVal.length !== 4 || yearEndVal.length !== 4) {
+              alert('請先輸入四位數的年度！');
+              return;
+          }
+          
+          const behaviorVal = document.getElementById('filterBehavior')?.value;
+          if (!behaviorVal) {
+              alert('請先選擇性態碼！');
+              return;
+          }
+
+          if (!selectedFile) {
+              alert('請先從上方檔案列表點選要分析的檔案！');
+              return;
+          }
+
+          if (window.dashboardChartInstance) {
+              window.dashboardChartInstance.showLoading({ text: '資料載入中...', color: '#2563eb', textColor: '#212529', maskColor: 'rgba(255, 255, 255, 0.8)', zlevel: 0 });
+          }
+
+          fetch('/api/dashboard/analyze_file', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                  filename: selectedFile,
+                  cancers: Array.from(window.selectedCancers || []),
+                  year_start: yearStartVal,
+                  year_end: yearEndVal,
+                  behavior: behaviorVal
+              })
+          })
+          .then(res => res.json())
+          .then(data => {
+              if (window.dashboardChartInstance) window.dashboardChartInstance.hideLoading();
+              if (data.ok) {
+                  const chartData = data.data;
+                  window.lastChartData = chartData;
+
+                  const chartTabsArea = document.getElementById('chartTabsArea');
+                  const chartTabsContainer = document.getElementById('chartTabsContainer');
+                  if (chartTabsContainer) chartTabsContainer.innerHTML = '';
+                  
+                  let anyChecked = false;
+                  let firstBtn = null;
+                  
+                  document.querySelectorAll('.item-checkbox').forEach(itemChk => {
+                      const targetSelector = itemChk.getAttribute('data-target');
+                      if (targetSelector && itemChk.checked) {
+                          anyChecked = true;
+                          if (chartTabsContainer) {
+                              const btn = document.createElement('button');
+                              btn.className = 'btn btn-outline-primary chart-tab-btn';
+                              btn.type = 'button';
+                              btn.innerText = itemChk.value;
+                              btn.dataset.target = targetSelector;
+                              
+                              btn.addEventListener('click', function() {
+                                  chartTabsContainer.querySelectorAll('.chart-tab-btn').forEach(b => b.classList.remove('active'));
+                                  this.classList.add('active');
+                                  document.querySelectorAll('.chart-pane').forEach(pane => pane.classList.add('d-none'));
+                                  const targetPane = document.querySelector(this.dataset.target);
+                                  if (targetPane) {
+                                      targetPane.classList.remove('d-none');
+                                      if (typeof echarts !== 'undefined') {
+                                          setTimeout(() => {
+                                              const chartDoms = targetPane.querySelectorAll('div[_echarts_instance_], #main');
+                                              chartDoms.forEach(c => {
+                                                  const inst = echarts.getInstanceByDom(c);
+                                                  if (inst) inst.resize();
+                                              });
+                                              
+                                              if (window.lastChartData) {
+                                                  const aiBtn = targetPane.querySelector('button[id^="btnAi"]');
+                                                  const llmDiv = targetPane.querySelector('div[id^="llmResponse"]');
+                                                  if (aiBtn && llmDiv && llmDiv.innerText.includes('自動產生')) {
+                                                      aiBtn.click();
+                                                  }
+                                              }
+                                          }, 50);
+                                      }
+                                  }
+                              });
+                              
+                              chartTabsContainer.appendChild(btn);
+                              if (!firstBtn) firstBtn = btn;
+                          }
+                      }
+                  });
+                  
+                  if (chartTabsArea) {
+                      if (anyChecked) chartTabsArea.classList.remove('d-none');
+                      else {
+                          chartTabsArea.classList.add('d-none');
+                          const emptyPane = document.getElementById('chartPane-Empty');
+                          if (emptyPane) emptyPane.classList.remove('d-none');
+                      }
+                  }
+
+                  const btnAiMain = document.getElementById('btnAiMain');
+                  const btnAiMedian = document.getElementById('btnAiMedian');
+                  const btnAiAnalyzable = document.getElementById('btnAiAnalyzable');
+                  
+                  if (btnAiMain) {
+                      btnAiMain.style.display = 'block';
+                      btnAiMain.innerHTML = '重新產生敘述';
+                      btnAiMain.onclick = () => window.DashboardRenderer.fetchLlmInsight('性別與年齡分佈', window.lastChartData.genderAgeData, ['性別', '年齡'], 'llmResponseMain', 'btnAiMain');
+                  }
+                  if (btnAiMedian) {
+                      btnAiMedian.style.display = 'block';
+                      btnAiMedian.innerHTML = '重新產生敘述';
+                      btnAiMedian.onclick = () => window.DashboardRenderer.fetchLlmInsight('年齡中位數', window.lastChartData.ageMedianData, ['年齡', '性別'], 'llmResponseMedian', 'btnAiMedian');
+                  }
+                  if (btnAiAnalyzable) {
+                      btnAiAnalyzable.style.display = 'block';
+                      btnAiAnalyzable.innerHTML = '重新產生敘述';
+                      btnAiAnalyzable.onclick = () => window.DashboardRenderer.fetchLlmInsight('癌症登記可分析個案與確診個案', window.lastChartData.analyzableConfirmedData, ['可分析個案', '確診個案'], 'llmResponseAnalyzable', 'btnAiAnalyzable');
+                  }
+
+                  const llmResponseMain = document.getElementById('llmResponseMain');
+                  if (llmResponseMain) llmResponseMain.innerText = '（系統將自動產生分析敘述）';
+                  const llmResponseMedian = document.getElementById('llmResponseMedian');
+                  if (llmResponseMedian) llmResponseMedian.innerText = '（系統將自動產生分析敘述）';
+                  const llmResponseAnalyzable = document.getElementById('llmResponseAnalyzable');
+                  if (llmResponseAnalyzable) llmResponseAnalyzable.innerText = '（系統將自動產生分析敘述）';
+
+                  if (window.DashboardRenderer) {
+                      const yearTitle = window.DashboardRenderer.getSelectedYearTitle();
+                      const cancerTitle = window.DashboardRenderer.getSelectedCancerTitle();
+                      window.DashboardRenderer.renderSexAgeTable(chartData.genderAgeData, yearTitle, cancerTitle);
+                      window.DashboardRenderer.renderAgeMedianTable(chartData.ageMedianData, yearTitle, cancerTitle);
+                      window.DashboardRenderer.renderAnalyzableConfirmedTable(chartData.analyzableConfirmedData, yearTitle, cancerTitle);
+                      window.DashboardRenderer.showAnnualDataContent();
+                      const chartCaption = document.getElementById('annualSexAgeChartCaption');
+                      if (chartCaption) {
+                          chartCaption.innerText = `圖、${yearTitle}年新診斷${window.DashboardRenderer.getCancerTitleForSentence(cancerTitle)}病患性別及年齡分佈圖`;
+                      }
+                  }
+
+                  if (window.dashboardChartInstance) {
+                      window.dashboardChartInstance.setOption({
+                          title: { text: '性別與年齡分佈', subtext: selectedFile },
+                          xAxis: [{ data: chartData.genderAgeData.categories }],
+                          series: [
+                              { name: '男性', data: chartData.genderAgeData.male },
+                              { name: '女性', data: chartData.genderAgeData.female },
+                              { name: '總計', data: chartData.genderAgeData.total }
+                          ]
+                      });
+                  }
+                  
+                  setTimeout(() => {
+                      if (firstBtn) firstBtn.click();
+                      else if (window.dashboardChartInstance) window.dashboardChartInstance.resize();
+                  }, 50);
+              } else {
+                  alert('資料分析失敗: ' + data.error);
+              }
+          })
+          .catch(err => {
+              if (window.dashboardChartInstance) window.dashboardChartInstance.hideLoading();
+              alert('發生系統錯誤，請稍後再試。');
+          });
+      });
+  }
+
+  /* ── 檔案上傳邏輯 ── */
   const form = document.getElementById('dashUploadForm');
   const fileInput = document.getElementById('dashFileInput');
   
-  if (!form || !fileInput) return;
-
-  form.addEventListener('submit', function(e) {
-    e.preventDefault();
-    if (!fileInput.files.length) {
-      Swal.fire({ icon: 'warning', title: '請先選擇檔案', allowOutsideClick: false, confirmButtonColor: '#2563eb' });
-      return;
-    }
-    
-    const ext = fileInput.files[0].name.split('.').pop().toLowerCase();
-    if (ext !== 'xls' && ext !== 'xlsx') {
-      Swal.fire({ icon: 'error', title: '格式錯誤', text: '僅接受 .xls 或 .xlsx 檔案', allowOutsideClick: false, confirmButtonColor: '#2563eb' });
-      return;
-    }
-    
-    const btn = document.getElementById('btnDashUpload');
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> 上傳中…';
-    
-    fetch('/dashboard/upload', { method: 'POST', body: new FormData(form) })
-      .then(r => r.json())
-      .then(data => {
-        if (data.ok) {
-          Swal.fire({ icon: 'success', title: '上傳成功', text: `${data.filename} 已儲存`, allowOutsideClick: false, confirmButtonColor: '#2563eb' })
-            .then(() => location.reload());
-        } else {
-          Swal.fire({ icon: 'error', title: '上傳失敗', text: data.error || '未知錯誤', allowOutsideClick: false, confirmButtonColor: '#2563eb' });
-        }
-      })
-      .catch(() => {
-        Swal.fire({ icon: 'error', title: '上傳失敗', allowOutsideClick: false, confirmButtonColor: '#2563eb' });
-      })
-      .finally(() => {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-upload"></i> 上傳檔案';
+  if (form && fileInput) {
+      form.addEventListener('submit', function(e) {
+          e.preventDefault();
+          if (!fileInput.files.length) {
+            Swal.fire({ icon: 'warning', title: '請先選擇檔案', allowOutsideClick: false, confirmButtonColor: '#2563eb' });
+            return;
+          }
+          
+          const ext = fileInput.files[0].name.split('.').pop().toLowerCase();
+          if (ext !== 'xls' && ext !== 'xlsx') {
+            Swal.fire({ icon: 'error', title: '格式錯誤', text: '僅接受 .xls 或 .xlsx 檔案', allowOutsideClick: false, confirmButtonColor: '#2563eb' });
+            return;
+          }
+          
+          const btn = document.getElementById('btnDashUpload');
+          btn.disabled = true;
+          btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> 上傳中…';
+          
+          fetch('/dashboard/upload', { method: 'POST', body: new FormData(form) })
+            .then(r => r.json())
+            .then(data => {
+              if (data.ok) {
+                Swal.fire({ icon: 'success', title: '上傳成功', text: `${data.filename} 已儲存`, allowOutsideClick: false, confirmButtonColor: '#2563eb' })
+                  .then(() => location.reload());
+              } else {
+                Swal.fire({ icon: 'error', title: '上傳失敗', text: data.error || '未知錯誤', allowOutsideClick: false, confirmButtonColor: '#2563eb' });
+              }
+            })
+            .catch(() => {
+              Swal.fire({ icon: 'error', title: '上傳失敗', allowOutsideClick: false, confirmButtonColor: '#2563eb' });
+            })
+            .finally(() => {
+              btn.disabled = false;
+              btn.innerHTML = '<i class="bi bi-upload"></i> 上傳檔案';
+            });
       });
-  });
+  }
 
-  /* Delete file */
+  /* ── 檔案刪除邏輯 ── */
   document.addEventListener('click', function(e) {
-    const btn = e.target.closest('.btn-del-file');
-    if (!btn) return;
-    
-    const name = btn.dataset.name;
-    Swal.fire({
-      title: '確定刪除？',
-      text: `將刪除 ${name}`,
-      icon: 'warning',
-      showCancelButton: true,
-      allowOutsideClick: false,
-      confirmButtonColor: '#dc2626',
-      cancelButtonText: '取消',
-      confirmButtonText: '刪除'
-    }).then(result => {
-      if (!result.isConfirmed) return;
+      const btn = e.target.closest('.btn-del-file');
+      if (!btn) return;
       
-      fetch('/dashboard/delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: name })
-      })
-      .then(r => r.json())
-      .then(data => {
-        if (data.ok) {
-          Swal.fire({ icon: 'success', title: '已刪除', confirmButtonColor: '#2563eb' })
-            .then(() => location.reload());
-        } else {
-          Swal.fire({ icon: 'error', title: '刪除失敗', text: data.error, confirmButtonColor: '#2563eb' });
-        }
+      const name = btn.dataset.name;
+      Swal.fire({
+          title: '確定刪除？',
+          text: `將刪除 ${name}`,
+          icon: 'warning',
+          showCancelButton: true,
+          allowOutsideClick: false,
+          confirmButtonColor: '#dc2626',
+          cancelButtonText: '取消',
+          confirmButtonText: '刪除'
+      }).then(result => {
+          if (!result.isConfirmed) return;
+          
+          fetch('/dashboard/delete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ filename: name })
+          })
+          .then(r => r.json())
+          .then(data => {
+              if (data.ok) {
+                  Swal.fire({ icon: 'success', title: '已刪除', confirmButtonColor: '#2563eb' })
+                      .then(() => location.reload());
+              } else {
+                  Swal.fire({ icon: 'error', title: '刪除失敗', text: data.error, confirmButtonColor: '#2563eb' });
+              }
+          });
       });
-    });
   });
-})();
+
+});
