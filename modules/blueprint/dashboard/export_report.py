@@ -22,14 +22,14 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir):
             body { font-family: sans-serif; }
             .chart-section { margin-bottom: 40px; page-break-after: always; }
             .annual-report-table { 
-                border-collapse: collapse; width: 100%; font-size: 10px; table-layout: fixed; margin-bottom: 20px;
+                border-collapse: collapse; width: 100%; font-size: 10px; margin-bottom: 20px;
             }
             .annual-report-table th, .annual-report-table td { 
-                border: 1px solid #ccc; padding: 4px; white-space: normal; word-wrap: break-word; text-align: center;
+                border: 1px solid #ccc; padding: 4px; text-align: center;
             }
             .annual-report-table caption { font-weight: bold; font-size: 14px; margin-bottom: 10px; }
-            .chart-img { max-width: 100%; height: auto; margin-bottom: 10px; }
-            .llm-text { background: #f8f9fa; padding: 10px; border-radius: 5px; font-size: 12px; }
+            .chart-img { max-width: 100%; height: auto; margin-bottom: 15px; display: block; }
+            .llm-text { background: #f8f9fa; padding: 15px; border-radius: 5px; font-size: 12px; white-space: pre-wrap; margin-top: 15px; }
             @page { size: A4 landscape; margin: 1cm; }
         </style>
     </head>
@@ -122,32 +122,85 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir):
                         
                     rows = table_node.find_all('tr')
                     if rows:
-                        num_cols = max(len(row.find_all(['th', 'td'])) for row in rows)
-                        w_table = doc.add_table(rows=len(rows), cols=num_cols)
-                        w_table.style = 'Table Grid'
-                        
+                        # Determine exact grid dimensions
+                        grid = {}
+                        max_cols = 0
                         for r_idx, row in enumerate(rows):
                             cells = row.find_all(['th', 'td'])
-                            for c_idx, cell in enumerate(cells):
-                                if c_idx >= num_cols:
-                                    break
-                                w_cell = w_table.cell(r_idx, c_idx)
-                                w_cell.text = cell.text.strip()
-                                for paragraph in w_cell.paragraphs:
-                                    for run in paragraph.runs:
-                                        run.font.size = Pt(8)
-                                        if cell.name == 'th' or 'fw-bold' in cell.get('class', []):
-                                            run.font.bold = True
+                            c_idx = 0
+                            for cell in cells:
+                                # Find first empty spot in this row
+                                while (r_idx, c_idx) in grid:
+                                    c_idx += 1
+                                
+                                rowspan = int(cell.get('rowspan', 1))
+                                colspan = int(cell.get('colspan', 1))
+                                
+                                # Mark the grid
+                                for r in range(rowspan):
+                                    for c in range(colspan):
+                                        grid[(r_idx + r, c_idx + c)] = {
+                                            'text': cell.text.strip(),
+                                            'is_head': cell.name == 'th' or 'fw-bold' in cell.get('class', []),
+                                            'main_r': r_idx,
+                                            'main_c': c_idx,
+                                            'rowspan': rowspan,
+                                            'colspan': colspan
+                                        }
+                                
+                                c_idx += colspan
+                                max_cols = max(max_cols, c_idx)
+                                
+                        if max_cols > 0:
+                            w_table = doc.add_table(rows=len(rows), cols=max_cols)
+                            w_table.style = 'Table Grid'
+                            
+                            # Apply merges
+                            merged_cells = set()
+                            for (r, c), data in grid.items():
+                                if (r, c) in merged_cells:
+                                    continue
+                                if data['rowspan'] > 1 or data['colspan'] > 1:
+                                    main_cell = w_table.cell(data['main_r'], data['main_c'])
+                                    target_cell = w_table.cell(data['main_r'] + data['rowspan'] - 1, data['main_c'] + data['colspan'] - 1)
+                                    main_cell.merge(target_cell)
+                                    for mr in range(data['rowspan']):
+                                        for mc in range(data['colspan']):
+                                            merged_cells.add((data['main_r'] + mr, data['main_c'] + mc))
+                                    
+                            # Write text and apply styles to the main cells
+                            written = set()
+                            from docx.enum.text import WD_ALIGN_PARAGRAPH
+                            for (r, c), data in grid.items():
+                                mr, mc = data['main_r'], data['main_c']
+                                if (mr, mc) not in written:
+                                    w_cell = w_table.cell(mr, mc)
+                                    w_cell.text = data['text']
+                                    for paragraph in w_cell.paragraphs:
+                                        paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                                        for run in paragraph.runs:
+                                            run.font.size = Pt(8)
+                                            if data['is_head']:
+                                                run.font.bold = True
+                                    # Ensure minimal padding to prevent overlap
+                                    written.add((mr, mc))
                                             
                 img_node = sec.find('img', class_='chart-img')
                 if img_node and img_node.get('src'):
                     src = img_node.get('src').replace('file://', '')
                     if os.path.exists(src):
-                        doc.add_picture(src, width=Inches(9.5))
+                        # Add a small spacing paragraph
+                        doc.add_paragraph()
+                        doc.add_picture(src, width=Inches(9.0)) # slightly smaller to ensure it fits
                         
                 llm_node = sec.find('div', class_='llm-text')
                 if llm_node:
-                    doc.add_paragraph(llm_node.text.strip())
+                    doc.add_paragraph()
+                    # Split by newlines so Word formats paragraphs properly
+                    lines = llm_node.text.strip().split('\n')
+                    for line in lines:
+                        if line.strip():
+                            doc.add_paragraph(line.strip())
                     
             doc.save(docx_path)
         except Exception as e:
