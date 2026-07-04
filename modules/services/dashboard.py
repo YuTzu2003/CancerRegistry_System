@@ -1,6 +1,7 @@
 from flask import Blueprint, request, session, jsonify
 from modules.services.auth import login_required
 from modules.blueprint.dashboard import load_user_favorites, save_user_favorites
+from modules.blueprint.dashboard.reply import get_chart_insight_logic
 import os
 import re
 import logging
@@ -62,7 +63,13 @@ def dashboard_delete():
 @dashboard_bp.route("/api/chart_insight", methods=["POST"])
 @login_required
 def chart_insight_route():
-    return jsonify({"success": True, "insight": "定義還沒串接使用。"}), 200
+    try:
+        data = request.json or {}
+        result = get_chart_insight_logic(data)
+        return jsonify(result), 200
+    except Exception as e:
+        logging.error(f"Error in chart_insight_route: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
 
 @dashboard_bp.route('/api/favorites', methods=['GET'])
 @login_required
