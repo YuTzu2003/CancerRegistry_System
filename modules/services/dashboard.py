@@ -176,9 +176,9 @@ def export_report_api():
     output_dir = os.path.join(DASHBOARD_DATA, 'exports')
     
     try:
-        file_path, mimetype, dl_name = generate_export_files(format_pdf, format_word, charts, output_dir)
-        if file_path and os.path.exists(file_path):
-            return send_file(file_path, mimetype=mimetype, as_attachment=True, download_name=dl_name)
+        file_obj, mimetype, dl_name = generate_export_files(format_pdf, format_word, charts, output_dir)
+        if file_obj:
+            return send_file(file_obj, mimetype=mimetype, as_attachment=True, download_name=dl_name)
         else:
             return jsonify({'ok': False, 'error': '無法產生匯出檔案'}), 500
     except Exception as e:

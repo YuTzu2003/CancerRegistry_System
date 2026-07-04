@@ -633,7 +633,9 @@ document.addEventListener('DOMContentLoaded', function() {
               return;
           }
 
-          if (window.dashboardChartInstance) {
+          if (window.utils && window.utils.showLoading) {
+              window.utils.showLoading('分析中，請稍候...');
+          } else if (window.dashboardChartInstance) {
               window.dashboardChartInstance.showLoading({ text: '資料載入中...', color: '#2563eb', textColor: '#212529', maskColor: 'rgba(255, 255, 255, 0.8)', zlevel: 0 });
           }
 
@@ -650,7 +652,6 @@ document.addEventListener('DOMContentLoaded', function() {
           })
           .then(res => res.json())
           .then(data => {
-              if (window.dashboardChartInstance) window.dashboardChartInstance.hideLoading();
               if (data.ok) {
                   const chartData = data.data;
                   window.lastChartData = chartData;
@@ -706,14 +707,7 @@ document.addEventListener('DOMContentLoaded', function() {
                       }
                   });
                   
-                  if (chartTabsArea) {
-                      if (anyChecked) chartTabsArea.classList.remove('d-none');
-                      else {
-                          chartTabsArea.classList.add('d-none');
-                          const emptyPane = document.getElementById('chartPane-Empty');
-                          if (emptyPane) emptyPane.classList.remove('d-none');
-                      }
-                  }
+
 
                   const btnAiMain = document.getElementById('btnAiMain');
                   const btnAiMedian = document.getElementById('btnAiMedian');
@@ -767,33 +761,65 @@ document.addEventListener('DOMContentLoaded', function() {
                       });
                   }
                   
-                  setTimeout(() => {
-                      if (firstBtn) firstBtn.click();
-                      else if (window.dashboardChartInstance) window.dashboardChartInstance.resize();
-
-                      // Auto-trigger AI generation for all selected charts so they are ready for export
-                      document.querySelectorAll('.item-checkbox').forEach(itemChk => {
-                          if (itemChk.checked) {
-                              const targetSelector = itemChk.getAttribute('data-target');
-                              if (targetSelector) {
-                                  const targetPane = document.querySelector(targetSelector);
-                                  if (targetPane) {
-                                      const aiBtn = targetPane.querySelector('button[id^="btnAi"]');
-                                      const llmDiv = targetPane.querySelector('div[id^="llmResponse"]');
-                                      if (aiBtn && llmDiv && llmDiv.innerText.includes('自動產生')) {
-                                          aiBtn.click();
+                  // Collect all AI promises before showing the charts
+                  let aiPromises = [];
+                  document.querySelectorAll('.item-checkbox').forEach(itemChk => {
+                      if (itemChk.checked) {
+                          const targetSelector = itemChk.getAttribute('data-target');
+                          if (targetSelector) {
+                              const targetPane = document.querySelector(targetSelector);
+                              if (targetPane) {
+                                  const aiBtn = targetPane.querySelector('button[id^="btnAi"]');
+                                  const llmDiv = targetPane.querySelector('div[id^="llmResponse"]');
+                                  if (aiBtn && llmDiv && llmDiv.innerText.includes('自動產生')) {
+                                      if (typeof aiBtn.onclick === 'function') {
+                                          const prom = aiBtn.onclick();
+                                          if (prom instanceof Promise) aiPromises.push(prom);
                                       }
                                   }
                               }
                           }
-                      });
-                  }, 50);
+                      }
+                  });
+
+                  Promise.all(aiPromises).then(() => {
+                      if (window.utils && window.utils.hideLoading) {
+                          window.utils.hideLoading();
+                      } else if (window.dashboardChartInstance) {
+                          window.dashboardChartInstance.hideLoading();
+                      }
+                      
+                      if (chartTabsArea) {
+                          if (anyChecked) {
+                              chartTabsArea.classList.remove('d-none');
+                              setTimeout(() => {
+                                  if (firstBtn) firstBtn.click();
+                                  else if (window.dashboardChartInstance) window.dashboardChartInstance.resize();
+                              }, 50);
+                          } else {
+                              chartTabsArea.classList.add('d-none');
+                              const emptyPane = document.getElementById('chartPane-Empty');
+                              if (emptyPane) emptyPane.classList.remove('d-none');
+                          }
+                      }
+                  }).catch(() => {
+                      if (window.utils && window.utils.hideLoading) {
+                          window.utils.hideLoading();
+                      } else if (window.dashboardChartInstance) {
+                          window.dashboardChartInstance.hideLoading();
+                      }
+                  });
               } else {
+                  if (window.utils && window.utils.hideLoading) window.utils.hideLoading();
                   alert('資料分析失敗: ' + data.error);
               }
           })
           .catch(err => {
-              if (window.dashboardChartInstance) window.dashboardChartInstance.hideLoading();
+              if (window.utils && window.utils.hideLoading) {
+                  window.utils.hideLoading();
+              } else if (window.dashboardChartInstance) {
+                  window.dashboardChartInstance.hideLoading();
+              }
               alert('發生系統錯誤，請稍後再試。');
           });
       });

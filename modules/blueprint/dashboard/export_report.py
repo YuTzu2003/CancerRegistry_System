@@ -1,4 +1,5 @@
 import os
+import io
 import uuid
 import zipfile
 import base64
@@ -36,7 +37,7 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir):
     <body>
     """
     
-    image_paths = []
+    image_bytes_map = {}
     
     for idx, chart in enumerate(charts_data):
         html_content += f'<div class="chart-section" id="section-{idx}">'
@@ -51,16 +52,10 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir):
         # Image
         if chart.get('includeChart', True):
             b64_image = chart.get('chartImage', '')
-            img_path = ""
             if b64_image and b64_image.startswith('data:image'):
-                # Extract base64
+                html_content += f'<div class="chart-img-wrapper"><img src="{b64_image}" class="chart-img" data-idx="{idx}" /></div>'
                 header, encoded = b64_image.split(",", 1)
-                img_data = base64.b64decode(encoded)
-                img_path = os.path.join(output_dir, f"chart_{session_id}_{idx}.png")
-                with open(img_path, "wb") as f:
-                    f.write(img_data)
-                image_paths.append(img_path)
-                html_content += f'<div class="chart-img-wrapper"><img src="file://{img_path.replace(chr(92), "/")}" class="chart-img" /></div>'
+                image_bytes_map[str(idx)] = base64.b64decode(encoded)
                 
         # LLM text
         if chart.get('includeAi', True):
@@ -72,28 +67,23 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir):
         
     html_content += "</body></html>"
     
-    temp_html_path = os.path.join(output_dir, f"temp_{session_id}.html")
-    with open(temp_html_path, "w", encoding="utf-8") as f:
-        f.write(html_content)
-        
-    pdf_path = os.path.join(output_dir, f"export_{session_id}.pdf")
-    docx_path = os.path.join(output_dir, f"export_{session_id}.docx")
+    pdf_bytes = None
+    docx_bytes = None
     
     # 1. Generate PDF
     if format_pdf:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             page = browser.new_page()
-            page.goto("file://" + os.path.abspath(temp_html_path).replace("\\", "/"), wait_until="networkidle")
+            page.set_content(html_content, wait_until="networkidle")
             page.emulate_media(media="print")
-            page.pdf(path=pdf_path, format="A4", landscape=True, print_background=True)
+            pdf_bytes = page.pdf(format="A4", landscape=True, print_background=True)
             browser.close()
             
     # 2. Generate Word
     if format_word:
         try:
-            with open(temp_html_path, 'r', encoding='utf-8') as f:
-                soup = BeautifulSoup(f, 'html.parser')
+            soup = BeautifulSoup(html_content, 'html.parser')
                 
             doc = Document()
             section = doc.sections[0]
@@ -186,12 +176,12 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir):
                                     written.add((mr, mc))
                                             
                 img_node = sec.find('img', class_='chart-img')
-                if img_node and img_node.get('src'):
-                    src = img_node.get('src').replace('file://', '')
-                    if os.path.exists(src):
-                        # Add a small spacing paragraph
+                if img_node and img_node.get('data-idx'):
+                    idx_str = img_node.get('data-idx')
+                    if idx_str in image_bytes_map:
                         doc.add_paragraph()
-                        doc.add_picture(src, width=Inches(9.0)) # slightly smaller to ensure it fits
+                        img_stream = io.BytesIO(image_bytes_map[idx_str])
+                        doc.add_picture(img_stream, width=Inches(9.0))
                         
                 llm_node = sec.find('div', class_='llm-text')
                 if llm_node:
@@ -202,30 +192,24 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir):
                         if line.strip():
                             doc.add_paragraph(line.strip())
                     
-            doc.save(docx_path)
+            docx_buffer = io.BytesIO()
+            doc.save(docx_buffer)
+            docx_bytes = docx_buffer.getvalue()
         except Exception as e:
             print(f"Word export failed: {e}")
             
-    # Cleanup temps
-    try:
-        os.remove(temp_html_path)
-        for p in image_paths:
-            if os.path.exists(p):
-                os.remove(p)
-    except:
-        pass
-        
-    # Return paths
+    # Return bytes in io.BytesIO
     if format_pdf and format_word:
-        zip_path = os.path.join(output_dir, f"export_{session_id}.zip")
-        with zipfile.ZipFile(zip_path, 'w') as zf:
-            zf.write(pdf_path, "export_report.pdf")
-            zf.write(docx_path, "export_report.docx")
-        if os.path.exists(pdf_path): os.remove(pdf_path)
-        if os.path.exists(docx_path): os.remove(docx_path)
-        return zip_path, "application/zip", "export_report.zip"
-    elif format_pdf:
-        return pdf_path, "application/pdf", "export_report.pdf"
-    elif format_word:
-        return docx_path, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "export_report.docx"
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w') as zf:
+            if pdf_bytes:
+                zf.writestr("export_report.pdf", pdf_bytes)
+            if docx_bytes:
+                zf.writestr("export_report.docx", docx_bytes)
+        zip_buffer.seek(0)
+        return zip_buffer, "application/zip", "export_report.zip"
+    elif format_pdf and pdf_bytes:
+        return io.BytesIO(pdf_bytes), "application/pdf", "export_report.pdf"
+    elif format_word and docx_bytes:
+        return io.BytesIO(docx_bytes), "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "export_report.docx"
     return None, None, None
