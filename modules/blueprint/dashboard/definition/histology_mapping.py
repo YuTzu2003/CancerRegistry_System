@@ -1,4 +1,5 @@
 HISTOLOGY_RULES = {
+    #8000-8842
     "Neoplasm, malignant": {
         "raw_name": "Neoplasm, malignant",
         "report_name": "Neoplasm, malignant",
@@ -2372,8 +2373,7 @@ HISTOLOGY_RULES = {
         "behavior": 3,
         "site_include": ['C49']
     },
-# 8850-9993
-HISTOLOGY_RULES = {
+    # 8850-9993
     "Liposarcoma, NOS": {
         "raw_name": "Liposarcoma, NOS",
         "report_name": "Liposarcoma, NOS",
