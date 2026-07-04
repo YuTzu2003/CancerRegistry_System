@@ -117,5 +117,12 @@
               fetchInsight('年齡中位數', window.lastChartData.ageMedianData, 'llmResponseMedian', 'btnAiMedian', ['性別', '診斷年齡']);
           });
       }
+      const btnAiAnalyzable = document.getElementById('btnAiAnalyzable');
+      if (btnAiAnalyzable) {
+          btnAiAnalyzable.addEventListener('click', function() {
+              if (!window.lastChartData) return;
+              fetchInsight('可分析個案與確診個案', window.lastChartData.analyzableConfirmedData, 'llmResponseAnalyzable', 'btnAiAnalyzable');
+          });
+      }
   });
 })();
