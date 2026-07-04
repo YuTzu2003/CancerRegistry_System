@@ -353,7 +353,7 @@ HISTOLOGY_RULES = {
         "hist": 8085,
         "behavior": 3,
         "year_min": 2018,
-        "site_include": ["C019", "C099", "C102", "C103", "C108", "C109", "C310", "C311", "C312", "C313", "C319"]        
+        "site_include": ["C019", "C099", "C102", "C103", "C108", "C109", "C310", "C311", "C312", "C313", "C319"]
     },
     "Squamous cell carcinoma, HPV-negative (C01.9, C09.9, C10.2, C10.3, C10.8, C10.9, C31.0–C31.3, C31.9) [2018+]": {
         "raw_name": "Squamous cell carcinoma, HPV-negative (C01.9, C09.9, C10.2, C10.3, C10.8, C10.9, C31.0–C31.3, C31.9) [2018+]",
@@ -361,7 +361,7 @@ HISTOLOGY_RULES = {
         "hist": 8086,
         "behavior": 3,
         "year_min": 2018,
-        "site_include": ["C019", "C099", "C102", "C103", "C108", "C109", "C310", "C311", "C312", "C313", "C319"]        
+        "site_include": ["C019", "C099", "C102", "C103", "C108", "C109", "C310", "C311", "C312", "C313", "C319"]
     },
     "Basal cell carcinoma, NOS (C44._)": {
         "raw_name": "Basal cell carcinoma, NOS (C44._)",
@@ -579,7 +579,7 @@ HISTOLOGY_RULES = {
         "hist": 8150,
         "behavior": 3,
         "year_min": 2021,
-        "site_include": ["C25"]        
+        "site_include": ["C25"]
     },
     "Insulinoma, NOS (C25._) [REPORTABLE 2021+. FOR PRE-2021, USE CODE 8151/0]": {
         "raw_name": "Insulinoma, NOS (C25._) [REPORTABLE 2021+. FOR PRE-2021, USE CODE 8151/0]",
@@ -587,7 +587,7 @@ HISTOLOGY_RULES = {
         "hist": 8151,
         "behavior": 3,
         "year_min": 2021,
-        "site_include": ["C25"]        
+        "site_include": ["C25"]
     },
     "Glucagonoma, NOS (C25._) [REPORTABLE 2021+. FOR PRE-2021, USE CODE 8152/1]": {
         "raw_name": "Glucagonoma, NOS (C25._) [REPORTABLE 2021+. FOR PRE-2021, USE CODE 8152/1]",
@@ -595,7 +595,7 @@ HISTOLOGY_RULES = {
         "hist": 8152,
         "behavior": 3,
         "year_min": 2021,
-        "site_include": ["C25"]        
+        "site_include": ["C25"]
     },
     "Gastrinoma, NOS [REPORTABLE 2021+. FOR PRE-2021, USE CODE 8153/1]": {
         "raw_name": "Gastrinoma, NOS [REPORTABLE 2021+. FOR PRE-2021, USE CODE 8153/1]",
@@ -603,7 +603,7 @@ HISTOLOGY_RULES = {
         "hist": 8153,
         "behavior": 3,
         "year_min": 2021,
-        "site_include": ["C25"]        
+        "site_include": ["C25"]
     },
     "Mixed pancreatic endocrine and exocrine tumor, malignant (C25._)": {
         "raw_name": "Mixed pancreatic endocrine and exocrine tumor, malignant (C25._)",
@@ -617,28 +617,28 @@ HISTOLOGY_RULES = {
         "report_name": "Vipoma, NOS",
         "hist": 8155,
         "year_min": 2021,
-        "behavior": 3        
+        "behavior": 3
     },
     "Somatostatinoma, NOS [REPORTABLE 2021+. FOR PRE-2021, USE CODE 8156/1.]": {
         "raw_name": "Somatostatinoma, NOS [REPORTABLE 2021+. FOR PRE-2021, USE CODE 8156/1.]",
         "report_name": "Somatostatinoma, NOS",
         "hist": 8156,
         "year_min": 2021,
-        "behavior": 3        
+        "behavior": 3
     },
     "Enteroglucagonoma, malignant [obs] [FOR 2014+, USE CODE 8152/3.]": {
         "raw_name": "Enteroglucagonoma, malignant [obs] [FOR 2014+, USE CODE 8152/3.]",
         "report_name": "Enteroglucagonoma, malignant [obs]",
         "hist": 8157,
         "year_max": 2013,
-        "behavior": 3        
+        "behavior": 3
     },
     "ACTH-producing tumor [REPORTABLE 2021+. FOR PRE-2021, USE CODE 8158/1.]": {
         "raw_name": "ACTH-producing tumor [REPORTABLE 2021+. FOR PRE-2021, USE CODE 8158/1.]",
         "report_name": "ACTH-producing tumor",
         "hist": 8158,
         "year_min": 2021,
-        "behavior": 3        
+        "behavior": 3
     },
     "Cholangiocarcinoma (C22.1, C24.0)": {
         "raw_name": "Cholangiocarcinoma (C22.1, C24.0)",
@@ -667,7 +667,7 @@ HISTOLOGY_RULES = {
         "hist": 8163,
         "behavior": 2,
         "year_min": 2022,
-        "site_include": ["C241"]        
+        "site_include": ["C241"]
     },
     "Pancreatobiliary-type carcinoma (C24.1) [2018+. FOR 2015-2017, USE 8255/3]": {
         "raw_name": "Pancreatobiliary-type carcinoma (C24.1) [2018+. FOR 2015-2017, USE 8255/3]",
@@ -675,7 +675,7 @@ HISTOLOGY_RULES = {
         "hist": 8163,
         "behavior": 3,
         "year_min": 2018,
-        "site_include": ["C241"]        
+        "site_include": ["C241"]
     },
     "Hepatocellular carcinoma, NOS (C22.0)": {
         "raw_name": "Hepatocellular carcinoma, NOS (C22.0)",
@@ -861,7 +861,7 @@ HISTOLOGY_RULES = {
         "report_name": "Goblet cell adenocarcinoma",
         "hist": 8243,
         "year_min": 2022,
-        "behavior": 3        
+        "behavior": 3
     },
     "Mixed adenoneuroendocrine carcinoma": {
         "raw_name": "Mixed adenoneuroendocrine carcinoma",
@@ -928,7 +928,7 @@ HISTOLOGY_RULES = {
         "hist": 8253,
         "behavior": 2,
         "year_min": 2018,
-        "site_include": ["C34"]        
+        "site_include": ["C34"]
     },
     "Invasive mucinous adenocarcinoma (C34._) [LUNG ONLY, 2018+, DO NOT USE 8480]": {
         "raw_name": "Invasive mucinous adenocarcinoma (C34._) [LUNG ONLY, 2018+, DO NOT USE 8480]",
@@ -936,7 +936,7 @@ HISTOLOGY_RULES = {
         "hist": 8253,
         "behavior": 3,
         "year_min": 2018,
-        "site_include": ["C34"]        
+        "site_include": ["C34"]
     },
     "Mixed invasive mucinous and non-mucinous adenocarcinoma (C34._)": {
         "raw_name": "Mixed invasive mucinous and non-mucinous adenocarcinoma (C34._)",
@@ -965,7 +965,7 @@ HISTOLOGY_RULES = {
         "hist": 8257,
         "behavior": 3,
         "year_min": 2018,
-        "site_include": ["C34"]        
+        "site_include": ["C34"]
     },
     "Papillary adenocarcinoma, NOS": {
         "raw_name": "Papillary adenocarcinoma, NOS",
@@ -1009,7 +1009,7 @@ HISTOLOGY_RULES = {
         "hist": 8265,
         "behavior": 3,
         "year_min": 2018,
-        "site_include": ["C18", "C199", "C209", "C34"]        
+        "site_include": ["C18", "C199", "C209", "C34"]
     },
     "Chromophobe carcinoma (C75.1)": {
         "raw_name": "Chromophobe carcinoma (C75.1)",
@@ -1031,7 +1031,7 @@ HISTOLOGY_RULES = {
         "hist": 8273,
         "behavior": 3,
         "year_min": 2021,
-        "site_include": ["C751"]        
+        "site_include": ["C751"]
     },
     "Acidophil carcinoma (C75.1)": {
         "raw_name": "Acidophil carcinoma (C75.1)",
@@ -1072,7 +1072,7 @@ HISTOLOGY_RULES = {
         "hist": 8311,
         "behavior": 3,
         "year_min": 2018,
-        "site_include": ["C649"]        
+        "site_include": ["C649"]
     },
     "Renal cell carcinoma, NOS (C64.9)": {
         "raw_name": "Renal cell carcinoma, NOS (C64.9)",
@@ -1190,7 +1190,7 @@ HISTOLOGY_RULES = {
         "hist": 8337,
         "behavior": 3,
         "year_min": 2021,
-        "site_include": ["C739"]        
+        "site_include": ["C739"]
     },
     "Follicular thyroid carcinoma (FTC), encapsulated angioinvasive (C73.9) [2018+]": {
         "raw_name": "Follicular thyroid carcinoma (FTC), encapsulated angioinvasive (C73.9) [2018+]",
@@ -1198,7 +1198,7 @@ HISTOLOGY_RULES = {
         "hist": 8339,
         "behavior": 3,
         "year_min": 2018,
-        "site_include": ["C739"]        
+        "site_include": ["C739"]
     },
     "Papillary carcinoma, follicular variant (C73.9)": {
         "raw_name": "Papillary carcinoma, follicular variant (C73.9)",
@@ -1220,7 +1220,7 @@ HISTOLOGY_RULES = {
         "hist": 8342,
         "behavior": 3,
         "year_min": 2021,
-        "site_include": ["C739"]        
+        "site_include": ["C739"]
     },
     "Non-invasive follicular thyroid neoplasm with papillary-like nuclear features (NIFTP) (C73.9) [REPORTABLE 2017-2020 ONLY. FOR 2021+ USE CODE 8349/1.]": {
         "raw_name": "Non-invasive follicular thyroid neoplasm with papillary-like nuclear features (NIFTP) (C73.9) [REPORTABLE 2017-2020 ONLY. FOR 2021+ USE CODE 8349/1.]",
@@ -1229,7 +1229,7 @@ HISTOLOGY_RULES = {
         "behavior": 2,
         "year_min": 2017,
         "year_max": 2020,
-        "site_include": ["C739"]        
+        "site_include": ["C739"]
     },
     "Papillary carcinoma, encapsulated (C73.9)": {
         "raw_name": "Papillary carcinoma, encapsulated (C73.9)",
@@ -1251,7 +1251,7 @@ HISTOLOGY_RULES = {
         "hist": 8345,
         "behavior": 3,
         "year_min": 2018,
-        "site_include": ["C739"]        
+        "site_include": ["C739"]
     },
     "Mixed medullary-follicular carcinoma (C73.9)": {
         "raw_name": "Mixed medullary-follicular carcinoma (C73.9)",
@@ -1287,7 +1287,7 @@ HISTOLOGY_RULES = {
         "hist": 8380,
         "behavior": 2,
         "year_min": 2018,
-        "site_include": ["C54"]        
+        "site_include": ["C54"]
     },
     "Endometrioid adenocarcinoma, NOS": {
         "raw_name": "Endometrioid adenocarcinoma, NOS",
@@ -1447,7 +1447,7 @@ HISTOLOGY_RULES = {
         "hist": 8452,
         "behavior": 3,
         "year_min": 2021,
-        "site_include": ["C25"]        
+        "site_include": ["C25"]
     },
     "Intraductal papillary-mucinous carcinoma, non-invasive (C25._)": {
         "raw_name": "Intraductal papillary-mucinous carcinoma, non-invasive (C25._)",
@@ -1469,7 +1469,7 @@ HISTOLOGY_RULES = {
         "hist": 8455,
         "behavior": 2,
         "year_min": 2022,
-        "site_include": ["C25"]        
+        "site_include": ["C25"]
     },
     "Intraductal oncocytic papillary neoplasm with associated invasive carcinoma (C25._) [2022+]": {
         "raw_name": "Intraductal oncocytic papillary neoplasm with associated invasive carcinoma (C25._) [2022+]",
@@ -1477,7 +1477,7 @@ HISTOLOGY_RULES = {
         "hist": 8455,
         "behavior": 3,
         "year_min": 2022,
-        "site_include": ["C25"]        
+        "site_include": ["C25"]
     },
     "Non-invasive low grade serous carcinoma (C56.9)": {
         "raw_name": "Non-invasive low grade serous carcinoma (C56.9)",
@@ -1513,7 +1513,7 @@ HISTOLOGY_RULES = {
         "hist": 8470,
         "behavior": 3,
         "year_min": 2021,
-        "site_include": ["C569"]        
+        "site_include": ["C569"]
     },
     "Papillary mucinous cystadenocarcinoma (C56.9) [PRE-2021 ONLY. FOR 2021+ USE CODE 8470/3.]": {
         "raw_name": "Papillary mucinous cystadenocarcinoma (C56.9) [PRE-2021 ONLY. FOR 2021+ USE CODE 8470/3.]",
@@ -1521,7 +1521,7 @@ HISTOLOGY_RULES = {
         "hist": 8471,
         "behavior": 3,
         "year_max": 2020,
-        "site_include": ["C569"]        
+        "site_include": ["C569"]
     },
     "Seromucinous carcinoma (C56.9) [2018+]": {
         "raw_name": "Seromucinous carcinoma (C56.9) [2018+]",
@@ -1529,7 +1529,7 @@ HISTOLOGY_RULES = {
         "hist": 8474,
         "behavior": 3,
         "year_min": 2018,
-        "site_include": ["C569"]        
+        "site_include": ["C569"]
     },
     "High grade appendiceal mucinous neoplasm (HAMN) (C181) [2022+]": {
         "raw_name": "High grade appendiceal mucinous neoplasm (HAMN) (C181) [2022+]",
@@ -1537,7 +1537,7 @@ HISTOLOGY_RULES = {
         "hist": 8480,
         "behavior": 2,
         "year_min": 2022,
-        "site_include": ["C181"]        
+        "site_include": ["C181"]
     },
     "Mucinous adenocarcinoma [2018+: USE 8253 FOR LUNG ONLY]": {
         "raw_name": "Mucinous adenocarcinoma [2018+: USE 8253 FOR LUNG ONLY]",
@@ -1545,7 +1545,7 @@ HISTOLOGY_RULES = {
         "hist": 8480,
         "behavior": 3,
         "year_min": 2018,
-        "site_exclude": ["C34"]        
+        "site_exclude": ["C34"]
     },
     "Mucin-producing adenocarcinoma": {
         "raw_name": "Mucin-producing adenocarcinoma",
@@ -1565,7 +1565,7 @@ HISTOLOGY_RULES = {
         "hist": 8483,
         "behavior": 2,
         "year_min": 2022,
-        "site_include": ["C53"]        
+        "site_include": ["C53"]
     },
     "Adenocarcinoma, HPV-associated (C53._) [2021+]": {
         "raw_name": "Adenocarcinoma, HPV-associated (C53._) [2021+]",
@@ -1573,7 +1573,7 @@ HISTOLOGY_RULES = {
         "hist": 8483,
         "behavior": 3,
         "year_min": 2021,
-        "site_include": ["C53"]        
+        "site_include": ["C53"]
     },
     "Adenocarcinoma in situ, HPV-independent, NOS (C53._) [2022+; NOT REPORTABLE]": {
         "raw_name": "Adenocarcinoma in situ, HPV-independent, NOS (C53._) [2022+; NOT REPORTABLE]",
@@ -1581,7 +1581,7 @@ HISTOLOGY_RULES = {
         "hist": 8484,
         "behavior": 2,
         "year_min": 2022,
-        "site_include": ["C53"]        
+        "site_include": ["C53"]
     },
     "Adenocarcinoma, HPV-independent, NOS (C53._) [2021+]": {
         "raw_name": "Adenocarcinoma, HPV-independent, NOS (C53._) [2021+]",
@@ -1589,7 +1589,7 @@ HISTOLOGY_RULES = {
         "hist": 8484,
         "behavior": 3,
         "year_min": 2021,
-        "site_include": ["C53"]        
+        "site_include": ["C53"]
     },
     "Signet ring cell carcinoma": {
         "raw_name": "Signet ring cell carcinoma",
@@ -1689,7 +1689,7 @@ HISTOLOGY_RULES = {
         "hist": 8508,
         "behavior": 3,
         "year_max": 2020,
-        "site_include": ["C50"]        
+        "site_include": ["C50"]
     },
     "Solid papillary carcinoma in situ (C50._) [2018+]": {
         "raw_name": "Solid papillary carcinoma in situ (C50._) [2018+]",
@@ -1697,14 +1697,14 @@ HISTOLOGY_RULES = {
         "hist": 8509,
         "behavior": 2,
         "year_min": 2018,
-        "site_include": ["C50"]        
+        "site_include": ["C50"]
     },
     "Tall cell carcinoma with reversed polarity [2022+]": {
         "raw_name": "Tall cell carcinoma with reversed polarity [2022+]",
         "report_name": "Tall cell carcinoma with reversed polarity",
         "hist": 8509,
         "year_min": 2022,
-        "behavior": 3        
+        "behavior": 3
     },
     "Medullary carcinoma, NOS [DO NOT USE FOR THYROID 2018+, USE 8345/3.]": {
         "raw_name": "Medullary carcinoma, NOS [DO NOT USE FOR THYROID 2018+, USE 8345/3.]",
@@ -1748,7 +1748,7 @@ HISTOLOGY_RULES = {
         "hist": 8519,
         "behavior": 2,
         "year_min": 2018,
-        "site_include": ["C50"]        
+        "site_include": ["C50"]
     },
     "Lobular carcinoma in situ, NOS (C50._)": {
         "raw_name": "Lobular carcinoma in situ, NOS (C50._)",
@@ -1798,7 +1798,7 @@ HISTOLOGY_RULES = {
         "hist": 8523,
         "behavior": 3,
         "year_max": 2017,
-        "site_exclude": ["C50"]        
+        "site_exclude": ["C50"]
     },
     "Infiltrating lobular mixed with other types of carcinoma (C50._)": {
         "raw_name": "Infiltrating lobular mixed with other types of carcinoma (C50._)",
@@ -1865,7 +1865,7 @@ HISTOLOGY_RULES = {
         "report_name": "Mixed acinar ductal carcinoma",
         "hist": 8552,
         "year_min": 2018,
-        "behavior": 3        
+        "behavior": 3
     },
     "Adenosquamous carcinoma": {
         "raw_name": "Adenosquamous carcinoma",
@@ -1927,7 +1927,7 @@ HISTOLOGY_RULES = {
         "hist": 8580,
         "behavior": 3,
         "year_min": 2021,
-        "site_include": ["C379"]        
+        "site_include": ["C379"]
     },
     "Thymoma, type A, NOS (C37.9) [2021+]": {
         "raw_name": "Thymoma, type A, NOS (C37.9) [2021+]",
@@ -1935,7 +1935,7 @@ HISTOLOGY_RULES = {
         "hist": 8581,
         "behavior": 3,
         "year_min": 2021,
-        "site_include": ["C379"]        
+        "site_include": ["C379"]
     },
     "Thymoma, type AB, NOS (C37.9) [2021+]": {
         "raw_name": "Thymoma, type AB, NOS (C37.9) [2021+]",
@@ -1952,7 +1952,7 @@ HISTOLOGY_RULES = {
         "hist": 8583,
         "behavior": 3,
         "year_min": 2021,
-        "site_include": ["C379"]        
+        "site_include": ["C379"]
     },
     "Thymoma, type B2, NOS (C37.9) [2021+]": {
         "raw_name": "Thymoma, type B2, NOS (C37.9) [2021+]",
@@ -1960,7 +1960,7 @@ HISTOLOGY_RULES = {
         "hist": 8584,
         "behavior": 3,
         "year_min": 2021,
-        "site_include": ["C379"]        
+        "site_include": ["C379"]
     },
     "Thymoma, type B3, NOS (C37.9) [2021+]": {
         "raw_name": "Thymoma, type B3, NOS (C37.9) [2021+]",
@@ -1968,7 +1968,7 @@ HISTOLOGY_RULES = {
         "hist": 8585,
         "behavior": 3,
         "year_min": 2021,
-        "site_include": ["C379"]        
+        "site_include": ["C379"]
     },
     "Thymic carcinoma, NOS (C37.9)": {
         "raw_name": "Thymic carcinoma, NOS (C37.9)",
@@ -2242,7 +2242,7 @@ HISTOLOGY_RULES = {
         "hist": 8770,
         "behavior": 3,
         "year_min": 2021,
-        "site_include": ["C44"]        
+        "site_include": ["C44"]
     },
     "Epithelioid cell melanoma": {
         "raw_name": "Epithelioid cell melanoma",
@@ -2381,7 +2381,7 @@ HISTOLOGY_RULES = {
         "hist": 8833,
         "behavior": 3,
         "year_max": 2020,
-        "site_include": ["C44"]        
+        "site_include": ["C44"]
     },
     "Myxosarcoma": {
         "raw_name": "Myxosarcoma",
