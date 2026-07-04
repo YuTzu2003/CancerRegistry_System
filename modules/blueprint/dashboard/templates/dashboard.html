@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% block title %}年報分析｜癌症登記平台{% endblock %}
 {% block page_title %}年報分析{% endblock %}
 {% block extra_head %}
@@ -179,7 +179,7 @@
             </div>
             <button id="btnAiMain" class="btn btn-sm" style="display: none; background-color: transparent; border: 1px solid #495057; color: #212529; font-weight: 500;">重新產生敘述</button>
           </div>
-          <div id="llmResponseMain" class="text-dark" style="font-size: 14px; white-space: pre-wrap;">（請先載入圖表，系統將自動產生分析敘述）</div>
+          <div id="llmResponseMain" class="text-dark" style="font-size: 14px; white-space: pre-wrap;">定義還沒串接使用。</div>
         </div>
       </div>
     </div>
@@ -187,7 +187,6 @@
     <!-- 2. 年齡中位數 -->
     <div id="chartPane-IncidenceMedian" class="chart-pane d-none">
       <div class="bg-white border border-secondary-subtle rounded shadow-sm p-4 mt-2">
-        <div class="annual-report-title">年齡中位數</div>
         <div class="annual-data-content d-none">
           <div class="annual-report-table-wrap">
             <table class="annual-report-table annual-median-table">
@@ -205,14 +204,38 @@
             </div>
             <button id="btnAiMedian" class="btn btn-sm" style="display: none; background-color: transparent; border: 1px solid #495057; color: #212529; font-weight: 500;">重新產生敘述</button>
           </div>
-          <div id="llmResponseMedian" class="text-dark" style="font-size: 14px; white-space: pre-wrap;">（請先載入圖表，系統將自動產生分析敘述）</div>
+          <div id="llmResponseMedian" class="text-dark" style="font-size: 14px; white-space: pre-wrap;">定義還沒串接使用。</div>
         </div>
       </div>
     </div>
 
+    <!-- 3. 可分析個案與確診個案 -->
+    <div id="chartPane-DiagnosisAnalyzable" class="chart-pane d-none">
+      <div class="bg-white border border-secondary-subtle rounded shadow-sm p-4 mt-2">
+        <div class="annual-data-content d-none">
+          <div class="annual-report-table-wrap">
+            <table class="annual-report-table">
+              <caption id="annualAnalyzableConfirmedCaption">表、XXXX年XX－癌症登記可分析個案與確診個案</caption>
+              <thead id="annualAnalyzableConfirmedTableHead"></thead>
+              <tbody id="annualAnalyzableConfirmedTableBody"></tbody>
+            </table>
+            <div id="annualAnalyzableConfirmedNote" class="mt-2 text-start" style="font-size: 14px;"></div>
+          </div>
+          <!-- LLM 分析結果文字框 -->
+          <div class="mt-4 p-3 rounded" style="background-color: rgba(209, 231, 221, 0.5); border: 1px solid #a3cfbb;">
+            <div class="d-flex align-items-center mb-2 justify-content-between">
+              <div class="d-flex align-items-center">
+                <h6 class="mb-0 fw-bold text-dark">語言模型敘述</h6>
+              </div>
+              <button id="btnAiAnalyzable" class="btn btn-sm" style="display: none; background-color: transparent; border: 1px solid #495057; color: #212529; font-weight: 500;">重新產生敘述</button>
+            </div>
+            <div id="llmResponseAnalyzable" class="text-dark" style="font-size: 14px; white-space: pre-wrap;">定義還沒串接使用。</div>
+          </div>
+        </div>
+      </div>
+    </div>
 
-
-    <!-- 3. 空白佔位區 (尚未實作圖表) -->
+    <!-- 4. 空白佔位區 (尚未實作圖表) -->
     <div id="chartPane-Empty" class="chart-pane d-none">
       <div class="bg-white border border-secondary-subtle rounded shadow-sm p-5 mt-2 text-center text-muted">
         <i class="bi bi-bar-chart fs-1 opacity-50 mb-3 d-block"></i>
@@ -409,6 +432,46 @@
           `;
       }
 
+      function renderAnalyzableConfirmedTable(tableData, yearTitle, cancerTitle) {
+          const head = document.getElementById('annualAnalyzableConfirmedTableHead');
+          const body = document.getElementById('annualAnalyzableConfirmedTableBody');
+          const caption = document.getElementById('annualAnalyzableConfirmedCaption');
+          const note = document.getElementById('annualAnalyzableConfirmedNote');
+          if (!head || !body || !tableData) return;
+
+          if (caption) {
+              caption.innerText = `表、${yearTitle}年${getCancerTitleForSentence(cancerTitle)}－癌症登記可分析個案與確診個案`;
+          }
+
+          head.innerHTML = `
+              <tr>
+                <th>${yearTitle}年癌症總數<br>(A)</th>
+                <th>*可分析個案數<br>(B)</th>
+                <th>可分析個案百分比 %<br>(B/A)</th>
+                <th>顯微鏡檢確診個案數<br>(C)</th>
+                <th>確診個案百分比 %<br>(C/B)</th>
+              </tr>
+          `;
+
+          body.innerHTML = `
+              <tr>
+                <td>${tableData.total_count}</td>
+                <td>${tableData.analyzable_count}</td>
+                <td>${tableData.analyzable_percent}</td>
+                <td>${tableData.confirmed_count}</td>
+                <td>${tableData.confirmed_percent}</td>
+              </tr>
+          `;
+
+          if (note) {
+              note.innerHTML = `
+                  <div>* 可分析個案包含：</div>
+                  <div class="ms-3">Class1 本院診斷，並於本院接受全部或部分首次治療。</div>
+                  <div class="ms-3">Class2 他院診斷，於本院接受全部或部分首次治療。</div>
+              `;
+          }
+      }
+
       function showAnnualDataContent() {
           document.querySelectorAll('.annual-data-content').forEach(el => {
               el.classList.remove('d-none');
@@ -502,29 +565,26 @@
                       // 顯示 AI 分析按鈕
                       const btnAiMain = document.getElementById('btnAiMain');
                       const btnAiMedian = document.getElementById('btnAiMedian');
+                      const btnAiAnalyzable = document.getElementById('btnAiAnalyzable');
                       btnAiMain.style.display = 'block';
                       if (btnAiMedian) btnAiMedian.style.display = 'block';
-                      document.getElementById('llmResponseMain').innerText = '（系統將自動產生分析敘述）';
+                      if (btnAiAnalyzable) btnAiAnalyzable.style.display = 'block';
+                      document.getElementById('llmResponseMain').innerText = '定義還沒串接使用。';
                       const llmResponseMedian = document.getElementById('llmResponseMedian');
-                      if (llmResponseMedian) llmResponseMedian.innerText = '（系統將自動產生分析敘述）';
+                      if (llmResponseMedian) llmResponseMedian.innerText = '定義還沒串接使用。';
+                      const llmResponseAnalyzable = document.getElementById('llmResponseAnalyzable');
+                      if (llmResponseAnalyzable) llmResponseAnalyzable.innerText = '定義還沒串接使用。';
                       btnAiMain.innerHTML = '重新產生敘述';
                       if (btnAiMedian) btnAiMedian.innerHTML = '重新產生敘述';
-
-                      // 自動觸發目前可見的圖表的 AI 產生
-                      setTimeout(() => {
-                         const activePane = document.querySelector('.chart-pane:not(.d-none)');
-                         if (activePane) {
-                             const activeAiBtn = activePane.querySelector('button[id^="btnAi"]');
-                             if (activeAiBtn) activeAiBtn.click();
-                         }
-                      }, 100);
+                      if (btnAiAnalyzable) btnAiAnalyzable.innerHTML = '重新產生敘述';
 
                       // Update Sex/Age Table and Chart
                       const yearTitle = getSelectedYearTitle();
                       const cancerTitle = getSelectedCancerTitle();
-                      showAnnualDataContent();
                       renderSexAgeTable(chartData.genderAgeData, yearTitle, cancerTitle);
                       renderAgeMedianTable(chartData.ageMedianData, yearTitle, cancerTitle);
+                      renderAnalyzableConfirmedTable(chartData.analyzableConfirmedData, yearTitle, cancerTitle);
+                      showAnnualDataContent();
                       const chartCaption = document.getElementById('annualSexAgeChartCaption');
                       if (chartCaption) {
                           chartCaption.innerText = `圖、${yearTitle}年新診斷${getCancerTitleForSentence(cancerTitle)}病患性別及年齡分佈圖`;
