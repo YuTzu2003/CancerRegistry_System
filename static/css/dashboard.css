@@ -325,30 +325,50 @@
 }
 
 /* --- 現代化圖表分頁按鈕 --- */
-.chart-tab-btn {
-  border-radius: 50rem !important;
-  padding: 8px 26px !important;
-  font-weight: 600 !important;
-  font-size: 15px !important;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  border: 1.5px solid #0d6efd !important;
-  color: #0d6efd !important;
+#chartTabsArea {
+  text-align: left;
+  margin-bottom: -10px !important; /* 縮小與下方圖表的間距 */
+}
+
+#chartTabsContainer {
   background-color: transparent !important;
-  box-shadow: 0 2px 4px rgba(13, 110, 253, 0.05) !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 10px !important;
+  box-shadow: none !important;
+  border: none !important;
+  margin: 0;
+  justify-content: flex-start !important; /* 蓋掉 html 中的 justify-content-center */
+}
+
+.chart-tab-btn {
+  border-radius: 6px !important;
+  padding: 8px 24px !important;
+  font-weight: 500 !important;
+  font-size: 15px !important;
+  letter-spacing: 0.5px !important;
+  transition: all 0.2s ease-in-out !important;
+  border: 1px solid #ced4da !important;
+  color: #495057 !important;
+  background-color: #f8f9fa !important;
+  box-shadow: none !important;
+  position: relative;
 }
 
 .chart-tab-btn:hover {
-  background-color: #f0f7ff !important;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(13, 110, 253, 0.15) !important;
+  color: #212529 !important;
+  background-color: #e9ecef !important;
+  border-color: #adb5bd !important;
 }
 
 .chart-tab-btn.active {
-  background-color: #0d6efd !important;
+  background: #212529 !important; /* 深灰色，較為穩重，不使用漸層 */
   color: #ffffff !important;
-  box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3) !important;
-  border-color: #0d6efd !important;
-  transform: translateY(0);
+  border-color: #212529 !important;
+  box-shadow: none !important;
+  transform: none !important;
 }
 
 /* =========================================================================

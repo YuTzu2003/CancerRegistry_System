@@ -276,15 +276,352 @@
         <div class="row g-0 h-100" style="min-height: 450px;">
           <!-- Left Pane (Categories) -->
           <div class="col-md-4 border-end bg-light">
-            <div class="list-group list-group-flush" id="cancerCategoryList" style="max-height: 60vh; overflow-y: auto; font-size: 14px;">
-              <!-- Categories injected via JS -->
+            <div class="list-group list-group-flush" id="cancerCategoryList" role="tablist" style="max-height: 60vh; overflow-y: auto; font-size: 14px;">
+              <div class="list-group-item bg-light border-0 py-2 fw-bold text-secondary text-uppercase" style="font-size: 11px; letter-spacing: 0.5px; cursor: default; pointer-events: none; margin-bottom: 5px;">不分癌別</div>
+              <a class="list-group-item list-group-item-action active bg-transparent border-0 py-3 cat-nav-btn text-primary fw-bold" id="list-All_Cancers-list" data-bs-toggle="list" href="#list-All_Cancers" role="tab" style="border-left: 4px solid #0d6efd;">全癌別(C00-C80)
+                <span class="cat-badge float-end"></span>
+              </a>
+
+              <div class="list-group-item bg-light border-0 py-2 fw-bold text-secondary text-uppercase" style="font-size: 11px; letter-spacing: 0.5px; cursor: default; pointer-events: none; margin-top: 10px; margin-bottom: 5px;">常見癌別</div>
+              <a class="list-group-item list-group-item-action bg-transparent border-0 py-3 cat-nav-btn text-secondary" id="list-oral_group-list" data-bs-toggle="list" href="#list-oral_group" role="tab" style="border-left: 4px solid transparent;">口腔癌症(含口腔、口咽、下咽)
+                <span class="cat-badge float-end"></span>
+              </a>
+              <a class="list-group-item list-group-item-action bg-transparent border-0 py-3 cat-nav-btn text-secondary" id="list-Salivary_Glands-list" data-bs-toggle="list" href="#list-Salivary_Glands" role="tab" style="border-left: 4px solid transparent;">主唾液腺 Salivary Glands
+                <span class="cat-badge float-end"></span>
+              </a>
+              <a class="list-group-item list-group-item-action bg-transparent border-0 py-3 cat-nav-btn text-secondary" id="list-Nasopharynx-list" data-bs-toggle="list" href="#list-Nasopharynx" role="tab" style="border-left: 4px solid transparent;">鼻咽 Nasopharynx
+                <span class="cat-badge float-end"></span>
+              </a>
+              <a class="list-group-item list-group-item-action bg-transparent border-0 py-3 cat-nav-btn text-secondary" id="list-Larynx-list" data-bs-toggle="list" href="#list-Larynx" role="tab" style="border-left: 4px solid transparent;">喉部 Larynx
+                <span class="cat-badge float-end"></span>
+              </a>
+              <a class="list-group-item list-group-item-action bg-transparent border-0 py-3 cat-nav-btn text-secondary" id="list-Esophagus-list" data-bs-toggle="list" href="#list-Esophagus" role="tab" style="border-left: 4px solid transparent;">食道 Esophagus
+                <span class="cat-badge float-end"></span>
+              </a>
+              <a class="list-group-item list-group-item-action bg-transparent border-0 py-3 cat-nav-btn text-secondary" id="list-Stomach-list" data-bs-toggle="list" href="#list-Stomach" role="tab" style="border-left: 4px solid transparent;">胃 Stomach
+                <span class="cat-badge float-end"></span>
+              </a>
+              <a class="list-group-item list-group-item-action bg-transparent border-0 py-3 cat-nav-btn text-secondary" id="list-Pancreas-list" data-bs-toggle="list" href="#list-Pancreas" role="tab" style="border-left: 4px solid transparent;">胰臟 Pancreas
+                <span class="cat-badge float-end"></span>
+              </a>
+              <a class="list-group-item list-group-item-action bg-transparent border-0 py-3 cat-nav-btn text-secondary" id="list-Colorectal-list" data-bs-toggle="list" href="#list-Colorectal" role="tab" style="border-left: 4px solid transparent;">結腸、直腸及肛門
+                <span class="cat-badge float-end"></span>
+              </a>
+              <a class="list-group-item list-group-item-action bg-transparent border-0 py-3 cat-nav-btn text-secondary" id="list-liver_group-list" data-bs-toggle="list" href="#list-liver_group" role="tab" style="border-left: 4px solid transparent;">肝及肝內膽管
+                <span class="cat-badge float-end"></span>
+              </a>
+              <a class="list-group-item list-group-item-action bg-transparent border-0 py-3 cat-nav-btn text-secondary" id="list-breast-list" data-bs-toggle="list" href="#list-breast" role="tab" style="border-left: 4px solid transparent;">乳房
+                <span class="cat-badge float-end"></span>
+              </a>
+              <a class="list-group-item list-group-item-action bg-transparent border-0 py-3 cat-nav-btn text-secondary" id="list-lung_group-list" data-bs-toggle="list" href="#list-lung_group" role="tab" style="border-left: 4px solid transparent;">肺、支氣管、氣管
+                <span class="cat-badge float-end"></span>
+              </a>
+              <a class="list-group-item list-group-item-action bg-transparent border-0 py-3 cat-nav-btn text-secondary" id="list-Cervix_Uteri-list" data-bs-toggle="list" href="#list-Cervix_Uteri" role="tab" style="border-left: 4px solid transparent;">子宮頸 Cervix Uteri
+                <span class="cat-badge float-end"></span>
+              </a>
+              <a class="list-group-item list-group-item-action bg-transparent border-0 py-3 cat-nav-btn text-secondary" id="list-Corpus_Uteri-list" data-bs-toggle="list" href="#list-Corpus_Uteri" role="tab" style="border-left: 4px solid transparent;">子宮體 Corpus 
+                <span class="cat-badge float-end"></span>
+              </a>
+              <a class="list-group-item list-group-item-action bg-transparent border-0 py-3 cat-nav-btn text-secondary" id="list-Ovary-list" data-bs-toggle="list" href="#list-Ovary" role="tab" style="border-left: 4px solid transparent;">卵巢 Ovary
+                <span class="cat-badge float-end"></span>
+              </a>
+              <a class="list-group-item list-group-item-action bg-transparent border-0 py-3 cat-nav-btn text-secondary" id="list-Prostate-list" data-bs-toggle="list" href="#list-Prostate" role="tab" style="border-left: 4px solid transparent;">攝護腺 Prostate
+                <span class="cat-badge float-end"></span>
+              </a>
+              <a class="list-group-item list-group-item-action bg-transparent border-0 py-3 cat-nav-btn text-secondary" id="list-Bladder-list" data-bs-toggle="list" href="#list-Bladder" role="tab" style="border-left: 4px solid transparent;">膀胱 Bladder
+                <span class="cat-badge float-end"></span>
+              </a>
+              <a class="list-group-item list-group-item-action bg-transparent border-0 py-3 cat-nav-btn text-secondary" id="list-Lymphoma-list" data-bs-toggle="list" href="#list-Lymphoma" role="tab" style="border-left: 4px solid transparent;">惡性淋巴瘤 （Lymphoma）
+                <span class="cat-badge float-end"></span>
+              </a>
+              <a class="list-group-item list-group-item-action bg-transparent border-0 py-3 cat-nav-btn text-secondary" id="list-Leukemia_and_myeloid_neoplasm-list" data-bs-toggle="list" href="#list-Leukemia_and_myeloid_neoplasm" role="tab" style="border-left: 4px solid transparent;">白血病及骨髓瘤 (Leukemia and myeloid neoplasm)
+                <span class="cat-badge float-end"></span>
+              </a>
             </div>
           </div>
+
           <!-- Right Pane (Details) -->
           <div class="col-md-8 bg-white">
-            <div class="p-4" id="cancerDetailList" style="max-height: 60vh; overflow-y: auto; font-size: 14px;">
-              <!-- Checkboxes injected via JS -->
-            </div>
+            <div class="tab-content" id="cancerDetailList" style="max-height: 60vh; overflow-y: auto; font-size: 14px;">
+              <div class="tab-pane fade show active p-4" id="list-All_Cancers" role="tabpanel">
+                <div class="form-check mb-3 pb-2 border-bottom d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-group" id="chk_group_All_Cancers" data-group="All_Cancers" style="transform: scale(1.2);">
+                  <label class="form-check-label fw-bold text-dark fs-6" for="chk_group_All_Cancers">全癌別(C00-C80) (全選)</label>
+                </div>
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_All_Cancers" value="All_Cancers" data-parent="All_Cancers">
+                  <label class="form-check-label text-secondary" for="chk_All_Cancers">全癌別(C00-C80)</label>
+                </div>
+              </div>
+              <div class="tab-pane fade  p-4" id="list-oral_group" role="tabpanel">
+                <div class="form-check mb-3 pb-2 border-bottom d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-group" id="chk_group_oral_group" data-group="oral_group" style="transform: scale(1.2);">
+                  <label class="form-check-label fw-bold text-dark fs-6" for="chk_group_oral_group">口腔癌症(含口腔、口咽、下咽) (全選)</label>
+                </div>
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Oral_Cavity" value="Oral_Cavity" data-parent="oral_group">
+                  <label class="form-check-label text-secondary" for="chk_Oral_Cavity">口腔 Oral Cavity</label>
+                </div>
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Oropharynx" value="Oropharynx" data-parent="oral_group">
+                  <label class="form-check-label text-secondary" for="chk_Oropharynx">口咽 Oropharynx</label>
+                </div>
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Hypopharynx" value="Hypopharynx" data-parent="oral_group">
+                  <label class="form-check-label text-secondary" for="chk_Hypopharynx">下咽 Hypopharynx</label>
+                </div>
+              </div>
+              <div class="tab-pane fade  p-4" id="list-Salivary_Glands" role="tabpanel">
+                <div class="form-check mb-3 pb-2 border-bottom d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-group" id="chk_group_Salivary_Glands" data-group="Salivary_Glands" style="transform: scale(1.2);">
+                  <label class="form-check-label fw-bold text-dark fs-6" for="chk_group_Salivary_Glands">主唾液腺 Salivary Glands (全選)</label>
+                </div>
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Salivary_Glands" value="Salivary_Glands" data-parent="Salivary_Glands">
+                  <label class="form-check-label text-secondary" for="chk_Salivary_Glands">主唾液腺 Salivary Glands</label>
+                </div>
+              </div>
+              <div class="tab-pane fade  p-4" id="list-Nasopharynx" role="tabpanel">
+                <div class="form-check mb-3 pb-2 border-bottom d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-group" id="chk_group_Nasopharynx" data-group="Nasopharynx" style="transform: scale(1.2);">
+                  <label class="form-check-label fw-bold text-dark fs-6" for="chk_group_Nasopharynx">鼻咽 Nasopharynx (全選)</label>
+                </div>
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Nasopharynx" value="Nasopharynx" data-parent="Nasopharynx">
+                  <label class="form-check-label text-secondary" for="chk_Nasopharynx">鼻咽 Nasopharynx</label>
+                </div>
+              </div>
+              <div class="tab-pane fade  p-4" id="list-Larynx" role="tabpanel">
+                <div class="form-check mb-3 pb-2 border-bottom d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-group" id="chk_group_Larynx" data-group="Larynx" style="transform: scale(1.2);">
+                  <label class="form-check-label fw-bold text-dark fs-6" for="chk_group_Larynx">喉部 Larynx (全選)</label>
+                </div>
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Larynx" value="Larynx" data-parent="Larynx">
+                  <label class="form-check-label text-secondary" for="chk_Larynx">喉部 Larynx</label>
+                </div>
+              </div>
+              <div class="tab-pane fade  p-4" id="list-Esophagus" role="tabpanel">
+                <div class="form-check mb-3 pb-2 border-bottom d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-group" id="chk_group_Esophagus" data-group="Esophagus" style="transform: scale(1.2);">
+                  <label class="form-check-label fw-bold text-dark fs-6" for="chk_group_Esophagus">食道 Esophagus (全選)</label>
+                </div>
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Esophagus" value="Esophagus" data-parent="Esophagus">
+                  <label class="form-check-label text-secondary" for="chk_Esophagus">食道 Esophagus</label>
+                </div>
+              </div>
+              <div class="tab-pane fade  p-4" id="list-Stomach" role="tabpanel">
+                <div class="form-check mb-3 pb-2 border-bottom d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-group" id="chk_group_Stomach" data-group="Stomach" style="transform: scale(1.2);">
+                  <label class="form-check-label fw-bold text-dark fs-6" for="chk_group_Stomach">胃 Stomach (全選)</label>
+                </div>
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Stomach" value="Stomach" data-parent="Stomach">
+                  <label class="form-check-label text-secondary" for="chk_Stomach">胃 Stomach</label>
+                </div>
+              </div>
+              <div class="tab-pane fade  p-4" id="list-Pancreas" role="tabpanel">
+                <div class="form-check mb-3 pb-2 border-bottom d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-group" id="chk_group_Pancreas" data-group="Pancreas" style="transform: scale(1.2);">
+                  <label class="form-check-label fw-bold text-dark fs-6" for="chk_group_Pancreas">胰臟 Pancreas (全選)</label>
+                </div>
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Pancreas" value="Pancreas" data-parent="Pancreas">
+                  <label class="form-check-label text-secondary" for="chk_Pancreas">胰臟 Pancreas</label>
+                </div>
+              </div>
+              <div class="tab-pane fade  p-4" id="list-Colorectal" role="tabpanel">
+                <div class="form-check mb-3 pb-2 border-bottom d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-group" id="chk_group_Colorectal" data-group="Colorectal" style="transform: scale(1.2);">
+                  <label class="form-check-label fw-bold text-dark fs-6" for="chk_group_Colorectal">結腸、直腸及肛門 (全選)</label>
+                </div>
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_colon" value="colon" data-parent="Colorectal">
+                  <label class="form-check-label text-secondary" for="chk_colon">結腸癌 Colon</label>
+                </div>
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_rectum" value="rectum" data-parent="Colorectal">
+                  <label class="form-check-label text-secondary" for="chk_rectum">直腸癌 Rectum</label>
+                </div>
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Anus" value="Anus" data-parent="Colorectal">
+                  <label class="form-check-label text-secondary" for="chk_Anus">肛門癌 Anus</label>
+                </div>
+              </div>
+              <div class="tab-pane fade  p-4" id="list-liver_group" role="tabpanel">
+                <div class="form-check mb-3 pb-2 border-bottom d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-group" id="chk_group_liver_group" data-group="liver_group" style="transform: scale(1.2);">
+                  <label class="form-check-label fw-bold text-dark fs-6" for="chk_group_liver_group">肝及肝內膽管 (全選)</label>
+                </div>
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Liver" value="Liver" data-parent="liver_group">
+                  <label class="form-check-label text-secondary" for="chk_Liver">肝 Liver</label>
+                </div>
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Intrahepatic_bile_duct" value="Intrahepatic_bile_duct" data-parent="liver_group">
+                  <label class="form-check-label text-secondary" for="chk_Intrahepatic_bile_duct">肝內膽管Intrahepatic bile duct</label>
+                </div>
+              </div>
+              <div class="tab-pane fade  p-4" id="list-breast" role="tabpanel">
+                <div class="form-check mb-3 pb-2 border-bottom d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-group" id="chk_group_breast" data-group="breast" style="transform: scale(1.2);">
+                  <label class="form-check-label fw-bold text-dark fs-6" for="chk_group_breast">乳房 (全選)</label>
+                </div>
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Breast(Female)" value="Breast(Female)" data-parent="breast">
+                  <label class="form-check-label text-secondary" for="chk_Breast(Female)">女性乳房 Breast(Female)</label>
+                </div>
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Breast(Male)" value="Breast(Male)" data-parent="breast">
+                  <label class="form-check-label text-secondary" for="chk_Breast(Male)">男性乳癌 Breast(Male)</label>
+                </div>
+              </div>
+              <div class="tab-pane fade  p-4" id="list-lung_group" role="tabpanel">
+                <div class="form-check mb-3 pb-2 border-bottom d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-group" id="chk_group_lung_group" data-group="lung_group" style="transform: scale(1.2);">
+                  <label class="form-check-label fw-bold text-dark fs-6" for="chk_group_lung_group">肺、支氣管、氣管 (全選)</label>
+                </div>
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Trachea" value="Trachea" data-parent="lung_group">
+                  <label class="form-check-label text-secondary" for="chk_Trachea">氣管</label>
+                </div>
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Lung" value="Lung" data-parent="lung_group">
+                  <label class="form-check-label text-secondary" for="chk_Lung">肺、支氣管</label>
+                </div>
+              </div>
+              <div class="tab-pane fade  p-4" id="list-Cervix_Uteri" role="tabpanel">
+                <div class="form-check mb-3 pb-2 border-bottom d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-group" id="chk_group_Cervix_Uteri" data-group="Cervix_Uteri" style="transform: scale(1.2);">
+                  <label class="form-check-label fw-bold text-dark fs-6" for="chk_group_Cervix_Uteri">子宮頸 Cervix Uteri (全選)</label>
+                </div>
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Cervix_Uteri" value="Cervix_Uteri" data-parent="Cervix_Uteri">
+                  <label class="form-check-label text-secondary" for="chk_Cervix_Uteri">子宮頸 Cervix Uteri</label>
+                </div>
+              </div>
+              <div class="tab-pane fade  p-4" id="list-Corpus_Uteri" role="tabpanel">
+                <div class="form-check mb-3 pb-2 border-bottom d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-group" id="chk_group_Corpus_Uteri" data-group="Corpus_Uteri" style="transform: scale(1.2);">
+                  <label class="form-check-label fw-bold text-dark fs-6" for="chk_group_Corpus_Uteri">子宮體 Corpus Uteri (全選)</label>
+                </div>
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Corpus_Uteri" value="Corpus_Uteri" data-parent="Corpus_Uteri">
+                  <label class="form-check-label text-secondary" for="chk_Corpus_Uteri">子宮體 Corpus Uteri</label>
+                </div>
+              </div>
+              <div class="tab-pane fade  p-4" id="list-Ovary" role="tabpanel">
+                <div class="form-check mb-3 pb-2 border-bottom d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-group" id="chk_group_Ovary" data-group="Ovary" style="transform: scale(1.2);">
+                  <label class="form-check-label fw-bold text-dark fs-6" for="chk_group_Ovary">卵巢 Ovary (全選)</label>
+                </div>
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Ovary" value="Ovary" data-parent="Ovary">
+                  <label class="form-check-label text-secondary" for="chk_Ovary">卵巢 Ovary</label>
+                </div>
+              </div>
+              <div class="tab-pane fade  p-4" id="list-Prostate" role="tabpanel">
+                <div class="form-check mb-3 pb-2 border-bottom d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-group" id="chk_group_Prostate" data-group="Prostate" style="transform: scale(1.2);">
+                  <label class="form-check-label fw-bold text-dark fs-6" for="chk_group_Prostate">攝護腺 Prostate (全選)</label>
+                </div>
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Prostate" value="Prostate" data-parent="Prostate">
+                  <label class="form-check-label text-secondary" for="chk_Prostate">攝護腺 Prostate</label>
+                </div>
+              </div>
+              <div class="tab-pane fade  p-4" id="list-Bladder" role="tabpanel">
+                <div class="form-check mb-3 pb-2 border-bottom d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-group" id="chk_group_Bladder" data-group="Bladder" style="transform: scale(1.2);">
+                  <label class="form-check-label fw-bold text-dark fs-6" for="chk_group_Bladder">膀胱 Bladder (全選)</label>
+                </div>
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Bladder" value="Bladder" data-parent="Bladder">
+                  <label class="form-check-label text-secondary" for="chk_Bladder">膀胱 Bladder</label>
+                </div>
+              </div>
+              <div class="tab-pane fade  p-4" id="list-Lymphoma" role="tabpanel">
+                <div class="form-check mb-3 pb-2 border-bottom d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-group" id="chk_group_Lymphoma" data-group="Lymphoma" style="transform: scale(1.2);">
+                  <label class="form-check-label fw-bold text-dark fs-6" for="chk_group_Lymphoma">惡性淋巴瘤 （Lymphoma） (全選)</label>
+                </div>
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Hodgkin_lymphomahodgkin" value="Hodgkin_lymphomahodgkin" data-parent="Lymphoma">
+                  <label class="form-check-label text-secondary" for="chk_Hodgkin_lymphomahodgkin">何杰金氏淋巴瘤（Hodgkin lymphoma）</label>
+                </div>
+                <div class="form-check mb-2 ms-3 mt-3 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-subgroup" id="chk_group_Non-Hodgkin_lymphoma" data-group="Non-Hodgkin_lymphoma" data-parent="Lymphoma">
+                  <label class="form-check-label fw-semibold text-dark border-bottom pb-1 mb-1 w-100" for="chk_group_Non-Hodgkin_lymphoma">非何杰金氏淋巴瘤（Non-Hodgkin lymphoma）</label>
+                </div>
+                <div class="form-check mb-2 ms-5 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_B-cell_lymphoid_neoplasms" value="B-cell_lymphoid_neoplasms" data-parent="Non-Hodgkin_lymphoma" data-grandparent="Lymphoma">
+                  <label class="form-check-label text-secondary" for="chk_B-cell_lymphoid_neoplasms">B細胞淋巴系腫瘤（B-cell lymphoid neoplasms）</label>
+                </div>
+                <div class="form-check mb-2 ms-5 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_T/NK-cell_lymphoid_neoplasms" value="T/NK-cell_lymphoid_neoplasms" data-parent="Non-Hodgkin_lymphoma" data-grandparent="Lymphoma">
+                  <label class="form-check-label text-secondary" for="chk_T/NK-cell_lymphoid_neoplasms">T/NK細胞淋巴系腫瘤（T/NK-cell lymphoid neoplasms）</label>
+                </div>
+                <div class="form-check mb-2 ms-5 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Plasma_cell_neoplasms" value="Plasma_cell_neoplasms" data-parent="Non-Hodgkin_lymphoma" data-grandparent="Lymphoma">
+                  <label class="form-check-label text-secondary" for="chk_Plasma_cell_neoplasms">漿細胞腫瘤（Plasma cell neoplasms）</label>
+                </div>
+                <div class="form-check mb-2 ms-5 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Histiocytic_and_dendritic_cell_neoplasms" value="Histiocytic_and_dendritic_cell_neoplasms" data-parent="Non-Hodgkin_lymphoma" data-grandparent="Lymphoma">
+                  <label class="form-check-label text-secondary" for="chk_Histiocytic_and_dendritic_cell_neoplasms">組織球與樹突細胞腫瘤（Histiocytic and dendritic cell neoplasms）</label>
+                </div>
+                <div class="form-check mb-2 ms-5 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Malignant_lymphoma_NOS_and_others" value="Malignant_lymphoma_NOS_and_others" data-parent="Non-Hodgkin_lymphoma" data-grandparent="Lymphoma">
+                  <label class="form-check-label text-secondary" for="chk_Malignant_lymphoma_NOS_and_others">未分類及其他惡性淋巴瘤（Malignant lymphoma, NOS and others）</label>
+                </div>
+              </div>
+              <div class="tab-pane fade  p-4" id="list-Leukemia_and_myeloid_neoplasm" role="tabpanel">
+                <div class="form-check mb-3 pb-2 border-bottom d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-group" id="chk_group_Leukemia_and_myeloid_neoplasm" data-group="Leukemia_and_myeloid_neoplasm" style="transform: scale(1.2);">
+                  <label class="form-check-label fw-bold text-dark fs-6" for="chk_group_Leukemia_and_myeloid_neoplasm">白血病及骨髓瘤 (Leukemia and myeloid neoplasm) (全選)</label>
+                </div>
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_AML" value="AML" data-parent="Leukemia_and_myeloid_neoplasm">
+                  <label class="form-check-label text-secondary" for="chk_AML">急性骨髓性白血病 (AML)</label>
+                </div>
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_CML" value="CML" data-parent="Leukemia_and_myeloid_neoplasm">
+                  <label class="form-check-label text-secondary" for="chk_CML">慢性骨髓性白血病 (CML,Only BCR-ABL1-positive)</label>
+                </div>
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_ALL" value="ALL" data-parent="Leukemia_and_myeloid_neoplasm">
+                  <label class="form-check-label text-secondary" for="chk_ALL">急性淋巴性白血病 (ALL)</label>
+                </div>
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_CLL" value="CLL" data-parent="Leukemia_and_myeloid_neoplasm">
+                  <label class="form-check-label text-secondary" for="chk_CLL">慢性淋巴性白血病 (CLL)</label>
+                </div>
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Acute_leukemias_of_ambiguous_lineage" value="Acute_leukemias_of_ambiguous_lineage" data-parent="Leukemia_and_myeloid_neoplasm">
+                  <label class="form-check-label text-secondary" for="chk_Acute_leukemias_of_ambiguous_lineage">系統歧異不明之急性白血病 (Acute leukemias of ambiguous lineage)</label>
+                </div>
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Myeloproliferative_neoplasms" value="Myeloproliferative_neoplasms" data-parent="Leukemia_and_myeloid_neoplasm">
+                  <label class="form-check-label text-secondary" for="chk_Myeloproliferative_neoplasms">骨髓增生性腫瘤 (Myeloproliferative neoplasms)</label>
+                </div>
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Myelodysplastic_syndromes" value="Myelodysplastic_syndromes" data-parent="Leukemia_and_myeloid_neoplasm">
+                  <label class="form-check-label text-secondary" for="chk_Myelodysplastic_syndromes">骨髓發育不良症候群 (Myelodysplastic syndromes)</label>
+                </div>
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Acute_biphenotypic_leukemia" value="Acute_biphenotypic_leukemia" data-parent="Leukemia_and_myeloid_neoplasm">
+                  <label class="form-check-label text-secondary" for="chk_Acute_biphenotypic_leukemia">急性雙表型白血病 (Acute biphenotypic leukemia)</label>
+                </div>
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Other_Leukemia" value="Other_Leukemia" data-parent="Leukemia_and_myeloid_neoplasm">
+                  <label class="form-check-label text-secondary" for="chk_Other_Leukemia">其他白血病 (Other Leukemia)</label>
+                </div>
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Leukemia" value="Leukemia" data-parent="Leukemia_and_myeloid_neoplasm">
+                  <label class="form-check-label text-secondary" for="chk_Leukemia">未分類白血病 (Leukemia, NOS )</label>
+                </div>
+              </div>
+            </div>          
           </div>
         </div>
       </div>
