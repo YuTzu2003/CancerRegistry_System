@@ -4,33 +4,100 @@
 
 {% block extra_head %}
 <style>
+  .export-section.card-flat {
+    box-shadow: none;
+    border: 1px solid var(--border);
+  }
+  .export-section .section-head {
+    background: var(--white);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 20px;
+  }
+  .export-section .section-head h2 {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--gray-700);
+    margin: 0;
+  }
   .export-item {
-    background: #fff;
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
-    padding: 15px;
-    margin-bottom: 10px;
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    margin-bottom: 8px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    cursor: grab;
+    transition: background-color .15s ease, border-color .15s ease;
+  }
+  .export-item:hover {
+    background: var(--gray-50);
+    border-color: var(--gray-400);
+  }
+  .export-item:active {
+    cursor: grabbing;
+  }
+  .export-item.sortable-ghost {
+    opacity: 0.5;
+    background: var(--gray-100);
+    border: 1px dashed var(--gray-400);
   }
   .export-item-title {
-    font-size: 16px;
-    font-weight: bold;
-    color: #333;
-    width: 250px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
   }
-  .drag-handle {
-    cursor: grab;
-    color: #888;
-    margin-right: 15px;
+  .export-actions .badge {
+    font-size: 12px;
+    font-weight: 400;
+    padding: 4px 9px;
+    background: var(--gray-50) !important;
+    color: var(--gray-500) !important;
+    border: 1px solid var(--border);
   }
-  .export-actions button {
-    margin-left: 5px;
+  .export-section .section-body {
+    padding: 20px;
+  }
+  .export-section .format-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    padding-bottom: 16px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+  }
+  .export-section .format-row .form-check-label {
+    font-weight: 400;
+    color: var(--text);
+    cursor: pointer;
+  }
+  .export-section .action-row {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    text-align: right;
+  }
+  .export-section .btn-export {
+    background: var(--gray-800);
+    color: var(--white);
+    border: 1px solid var(--gray-800);
+  }
+  .export-section .btn-export:hover {
+    background: var(--gray-700);
+    border-color: var(--gray-700);
+  }
+  .export-section .btn-export-outline {
+    background: var(--white);
+    color: var(--gray-700);
+    border: 1px solid var(--gray-300);
+  }
+  .export-section .btn-export-outline:hover {
+    background: var(--gray-50);
+    border-color: var(--gray-400);
   }
 </style>
-<!-- Include SortableJS for drag and drop reordering -->
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 {% endblock %}
 
@@ -41,38 +108,52 @@
     <p class="lead">選擇您要輸出的格式（PDF 或 Word），並拖曳調整匯出的先後順序。</p>
   </div>
   <div>
-    <button class="btn btn-secondary me-2" onclick="history.back()"><i class="bi bi-arrow-left"></i> 回上一頁</button>
+    <button class="btn btn-secondary" onclick="history.back()"><i class="bi bi-arrow-left"></i> 回上一頁</button>
   </div>
 </div>
 
-<section class="card-flat" style="margin-bottom: 22px;">
-  <div class="section-head">
-    <h2><span class="dot" style="background:var(--warning)"></span> 匯出選項</h2>
-  </div>
+<!-- 使用說明與注意事項 (using native card-flat) -->
+<div class="card-flat" style="border-left: 4px solid var(--accent);">
   <div class="section-body p-4">
-    <div class="d-flex flex-wrap gap-4 mb-4">
-      <div class="form-check form-switch fs-5">
-        <input class="form-check-input" type="checkbox" id="exportPdf" checked>
-        <label class="form-check-label fw-bold" for="exportPdf">輸出成 PDF 檔</label>
+    <h5 class="fw-bold mb-3" style="color: var(--accent-strong); font-size: 16px;">
+      <i class="bi bi-info-circle me-2"></i>使用說明與注意事項
+    </h5>
+    <ul class="mb-0" style="color: var(--muted); line-height: 1.8; font-size: 14px;">
+      <li><strong>調整順序：</strong>您可以直接點選下方任一圖表區塊並上下拖曳，即可改變匯出報表的排列順序。</li>
+      <li><strong>自訂內容：</strong>每個分析項目右側的勾選框，可讓您自由決定是否要在報告中包含該項目的「圖表」、「表格」或「AI 描述」。</li>
+      <li><strong>預覽功能：</strong>建議在正式下載前，先點擊「預覽 PDF」以確認排版與圖表呈現是否符合您的需求。</li>
+      <li><strong>產生時間：</strong>若勾選的圖表數量較多，產生 PDF 或 Word 檔案可能需要數秒鐘，請耐心等候。</li>
+    </ul>
+  </div>
+</div>
+
+<section class="card-flat export-section">
+  <div class="section-head">
+    <h2>匯出選項與順序</h2>
+  </div>
+  <div class="section-body">
+
+    <!-- Format Selection -->
+    <div class="format-row">
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="exportPdf" checked style="cursor: pointer;">
+        <label class="form-check-label" for="exportPdf">輸出成 PDF 檔</label>
       </div>
-      <div class="form-check form-switch fs-5">
-        <input class="form-check-input" type="checkbox" id="exportWord" checked>
-        <label class="form-check-label fw-bold" for="exportWord">輸出成 Word 檔</label>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="exportWord" checked style="cursor: pointer;">
+        <label class="form-check-label" for="exportWord">輸出成 Word 檔</label>
       </div>
     </div>
-    
-    <h5 class="fw-bold mb-3 border-bottom pb-2">匯出順序與細項設定（可拖曳左側 <i class="bi bi-grip-vertical"></i> 排序）</h5>
+
+    <!-- Items List -->
     <div id="exportItemList">
       <!-- Items will be generated here by JS -->
     </div>
-    
-    <div class="mt-4 text-end border-top pt-3">
-      <button class="btn btn-lg btn-outline-primary me-2" id="btnPreviewPdf">
-        <i class="bi bi-file-earmark-pdf"></i> 預覽 PDF
-      </button>
-      <button class="btn btn-lg btn-success" id="btnConfirmExport">
-        <i class="bi bi-cloud-download"></i> 確認匯出
-      </button>
+
+    <!-- Actions -->
+    <div class="action-row">
+      <button class="btn btn-export-outline px-4 me-2" id="btnPreviewPdf">預覽 PDF</button>
+      <button class="btn btn-export px-4" id="btnConfirmExport">確認匯出</button>
     </div>
   </div>
 </section>
@@ -108,26 +189,25 @@ document.addEventListener('DOMContentLoaded', function() {
 
         div.innerHTML = `
             <div class="d-flex align-items-center flex-grow-1">
-                <i class="bi bi-grip-vertical drag-handle fs-4"></i>
-                <div class="export-item-title"><i class="bi bi-graph-up-arrow text-primary me-2"></i> ${item.title}</div>
-                <div class="d-flex align-items-center gap-3 ms-4 flex-wrap">
+                <i class="bi bi-grip-vertical text-muted fs-4 drag-handle-icon"></i>
+                <div class="export-item-title ms-2"><i class="bi bi-graph-up-arrow text-primary me-2"></i> ${item.title}</div>
+                <div class="d-flex align-items-center gap-3 ms-4 flex-wrap" onmousedown="event.stopPropagation()">
                     ${hasChart ? '<div class="form-check"><input class="form-check-input item-cb-chart" type="checkbox" checked id="cb_chart_'+item.id+'"><label class="form-check-label" for="cb_chart_'+item.id+'">圖表</label></div>' : ''}
                     ${hasTable ? '<div class="form-check"><input class="form-check-input item-cb-table" type="checkbox" checked id="cb_table_'+item.id+'"><label class="form-check-label" for="cb_table_'+item.id+'">表格</label></div>' : ''}
-                    ${hasAi ? '<div class="form-check"><input class="form-check-input item-cb-ai" type="checkbox" checked id="cb_ai_'+item.id+'"><label class="form-check-label text-success" for="cb_ai_'+item.id+'"><i class="bi bi-robot"></i> AI 描述</label></div>' : ''}
+                    ${hasAi ? '<div class="form-check"><input class="form-check-input item-cb-ai" type="checkbox" checked id="cb_ai_'+item.id+'"><label class="form-check-label" for="cb_ai_'+item.id+'">AI敘述</label></div>' : ''}
                 </div>
             </div>
-            <div class="export-actions">
-                <span class="badge bg-secondary">排序: <span class="order-number">${index + 1}</span></span>
+            <div class="export-actions ms-3">
+                <span class="badge bg-secondary">Item <span class="order-number">${index + 1}</span></span>
             </div>
         `;
         listContainer.appendChild(div);
     });
 
-    // Initialize Sortable
     if (typeof Sortable !== 'undefined') {
         new Sortable(listContainer, {
-            handle: '.drag-handle',
             animation: 150,
+            ghostClass: 'sortable-ghost',
             onEnd: function() {
                 // Update order numbers after drag
                 document.querySelectorAll('.order-number').forEach((el, idx) => {
@@ -151,7 +231,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
-        // Reconstruct sorted data and include checkboxes state
         const sortedIds = Array.from(listContainer.children).map(el => el.dataset.id);
         const sortedData = sortedIds.map(id => {
             const baseData = exportData.find(d => d.id === id);
@@ -173,7 +252,6 @@ document.addEventListener('DOMContentLoaded', function() {
             charts: sortedData
         };
 
-        // Show loading
         document.getElementById('loadingOverlay').style.display = 'flex';
 
         fetch('/api/dashboard/export', {
@@ -206,7 +284,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 a.click();
                 a.remove();
                 
-                // Cleanup object URL after a delay
                 setTimeout(() => window.URL.revokeObjectURL(url), 10000);
             }
         })

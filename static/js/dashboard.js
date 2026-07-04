@@ -227,7 +227,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     let llmText = '';
                     const llmDiv = pane.querySelector('[id^="llmResponse"]');
                     if (llmDiv) {
-                        llmText = llmDiv.innerText;
+                        llmText = llmDiv.textContent || llmDiv.innerText;
                     }
 
                     if (wasHidden) {
