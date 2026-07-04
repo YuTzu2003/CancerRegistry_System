@@ -1,4 +1,4 @@
-<section class="card-flat" style="margin-bottom: 22px;">
+﻿<section class="card-flat" style="margin-bottom: 22px;">
   <div class="section-head">
     <h2><span class="dot" style="background:var(--warning)"></span> 資料上傳</h2>
   </div>
@@ -25,7 +25,7 @@
             <h6 class="mb-0 fw-bold text-dark d-flex align-items-center gap-2">
               <i class="bi bi-folder2-open text-primary"></i>檔案清單
               {% if uploaded_files %}
-              <span class="badge bg-secondary rounded-pill font-monospace" style="font-size: 11px;">{{ uploaded_files|length }}</span>
+                <span class="badge bg-secondary rounded-pill font-monospace" style="font-size: 11px;">{{ uploaded_files|length }}</span>
               {% endif %}
             </h6>
             <span class="text-secondary" style="font-size: 12px;">點選檔案進行查詢</span>
@@ -76,7 +76,7 @@
   </div>
 </section>
 
-<!-- ── 分析條件設定卡片 ──────────────────────────── -->
+<!--分析條件設定卡片-->
 <section class="card-flat" style="margin-bottom: 22px;">
   <div class="section-head">
     <div class="d-flex align-items-center">
@@ -114,10 +114,9 @@
           </div>
         </div>
 
-        <!-- 主類別列 (標題按鈕) -->
         <div id="mainCategoryArea">
-          <hr class="my-4 border-secondary-subtle">
-          
+          <hr class="my-4 border-secondary-subtle"> 
+
           <!-- 分析主題列 -->
           <div class="d-flex align-items-center mb-1">
             <h6 class="mb-0 fw-bold text-dark me-3" style="flex-shrink: 0;">分析主題：</h6>
@@ -160,7 +159,7 @@
               <!-- 診斷 細項 -->
               <div id="subItems-diagnosis" class="d-none d-flex flex-wrap gap-3">
                 <div class="form-check">
-                  <input class="form-check-input item-checkbox" type="checkbox" name="subTab_diagnosis" id="chkDiagnosisAnalyzable" data-parent="diagnosis" value="可分析個案與確診個案" disabled>
+                  <input class="form-check-input item-checkbox" type="checkbox" name="subTab_diagnosis" id="chkDiagnosisAnalyzable" data-parent="diagnosis" value="可分析個案與確診個案" data-target="#chartPane-DiagnosisAnalyzable" disabled>
                   <label class="form-check-label text-dark" for="chkDiagnosisAnalyzable" style="cursor: pointer;">可分析個案與確診個案</label>
                 </div>
                 <div class="form-check">
@@ -300,5 +299,4 @@
   </div>
 </div>
 
-
-<script src="{{ url_for('static', filename='js/control.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard_control.js') }}"></script>
