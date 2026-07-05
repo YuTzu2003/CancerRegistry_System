@@ -28,8 +28,10 @@ def get_column_names(df):
         "year_col": _find_column(df, ["didiag", "最初診斷日", "診斷日期"]),
         "behavior_col": _find_column(df, ["behavior", "性態碼"]),
         "ajcc_ed_col": _find_column(df, ["ajcc_ed", "ajcc edition", "ajcc版本"]),
-        "class_col": _find_column(df, ["class", "診斷等級", "診斷方式"]) or _column_by_index(df, 9),
+        "class_col": _find_column(df, ["class", "診斷等級", "診斷方式", "個案分類"]) or _column_by_index(df, 9),
         "confirm_col": _find_column(df, ["confirm", "確診方式", "確診"]) or _column_by_index(df, 20),
+        "diag_status_col": _find_column(df, ["診斷狀態分類", "診斷狀態"]),
+        "treat_status_col": _find_column(df, ["治療狀態分類", "治療狀態"]),
     }
 
 # 性別年齡分布圖
@@ -191,6 +193,56 @@ def calculate_analyzable_confirmed_cases(df, cols):
 
     return analyzable_confirmed_data
 
+def calculate_diagnosis_classification(df, cols):
+    data = {
+        "class0_total": 0, "0_1_0": 0, "0_1_2": 0,
+        "class1_total": 0, "1_1_1": 0, "1_1_3": 0, "1_1_4": 0,
+        "class2_total": 0, "2_2_1": 0, "2_2_3": 0,
+        "class3_total": 0, "3_2_0": 0, "3_3_2": 0,
+        "total_count": 0
+    }
+    
+    class_col = cols.get("class_col")
+    diag_status_col = cols.get("diag_status_col")
+    treat_status_col = cols.get("treat_status_col")
+    
+    if class_col in df.columns:
+        df_class = df.copy()
+        df_class[class_col] = df_class[class_col].apply(normalize_case_code)
+        
+        has_diag = bool(diag_status_col and diag_status_col in df.columns)
+        has_treat = bool(treat_status_col and treat_status_col in df.columns)
+        
+        if has_diag: df_class[diag_status_col] = df_class[diag_status_col].apply(normalize_case_code)
+        if has_treat: df_class[treat_status_col] = df_class[treat_status_col].apply(normalize_case_code)
+        
+        data["total_count"] = len(df_class)
+        
+        for idx, row in df_class.iterrows():
+            c = str(row[class_col])
+            d = str(row[diag_status_col]) if has_diag else ""
+            t = str(row[treat_status_col]) if has_treat else ""
+            
+            if c == "0":
+                data["class0_total"] += 1
+                if d == "1" and t == "0": data["0_1_0"] += 1
+                if d == "1" and t == "2": data["0_1_2"] += 1
+            elif c == "1":
+                data["class1_total"] += 1
+                if d == "1" and t == "1": data["1_1_1"] += 1
+                if d == "1" and t == "3": data["1_1_3"] += 1
+                if d == "1" and t == "4": data["1_1_4"] += 1
+            elif c == "2":
+                data["class2_total"] += 1
+                if d == "2" and t == "1": data["2_2_1"] += 1
+                if d == "2" and t == "3": data["2_2_3"] += 1
+            elif c == "3":
+                data["class3_total"] += 1
+                if d == "2" and t == "0": data["3_2_0"] += 1
+                if d == "3" and t == "2": data["3_3_2"] += 1
+
+    return data
+
 def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", behavior=""):
     fpath = f"{DASHBOARD_DATA}/{filename}"
     try:
@@ -202,11 +254,13 @@ def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", beh
         gender_age_data = calculate_gender_age_distribution(df, cols)
         age_median_data = calculate_age_median(df, cols)
         analyzable_confirmed_data = calculate_analyzable_confirmed_cases(df, cols)
+        diagnosis_classification_data = calculate_diagnosis_classification(df, cols)
   
         return {
             "genderAgeData": gender_age_data,
             "ageMedianData": age_median_data,
-            "analyzableConfirmedData": analyzable_confirmed_data
+            "analyzableConfirmedData": analyzable_confirmed_data,
+            "diagnosisClassificationData": diagnosis_classification_data
         }
     except Exception as e:
         logging.error(f"error {filename}: {str(e)}")
