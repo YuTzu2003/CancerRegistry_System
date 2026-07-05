@@ -581,25 +581,29 @@
 /* ==========================================
    檔案管理與查詢執行邏輯
    ========================================== */
-document.addEventListener('DOMContentLoaded', function() {
-
+function initDashboardControl() {
   /* ── 檔案列表選擇邏輯 ── */
-  const fileRows = document.querySelectorAll('#dashFileListBody tr');
-  fileRows.forEach(row => {
-      if (row.querySelector('a')) {
-          row.addEventListener('click', function(e) {
-              if (e.target.closest('.btn-del-file')) return;                 
-              e.preventDefault();
-              fileRows.forEach(r => {
-                  r.classList.remove('table-active');
-                  const link = r.querySelector('a');
-                  if(link) link.classList.replace('text-primary', 'text-dark');
-              });
-              this.classList.add('table-active');
-              const activeLink = this.querySelector('a');
-              if(activeLink) activeLink.classList.replace('text-dark', 'text-primary');
-          });
-      }
+  document.addEventListener('click', function(e) {
+      const row = e.target.closest('#dashFileListBody tr');
+      if (!row) return;
+      if (!row.querySelector('a')) return;
+      if (e.target.closest('.btn-del-file')) return;                 
+      
+      e.preventDefault();
+      const fileRows = document.querySelectorAll('#dashFileListBody tr');
+      fileRows.forEach(r => {
+          r.classList.remove('table-active');
+          const link = r.querySelector('a');
+          if(link) link.classList.replace('text-primary', 'text-dark');
+          const badge = r.querySelector('.status-badge-selected');
+          if(badge) badge.style.display = 'none';
+      });
+      
+      row.classList.add('table-active');
+      const activeLink = row.querySelector('a');
+      if(activeLink) activeLink.classList.replace('text-dark', 'text-primary');
+      const activeBadge = row.querySelector('.status-badge-selected');
+      if(activeBadge) activeBadge.style.display = 'inline-block';
   });
 
   /* ── 查詢按鈕執行邏輯 ── */
@@ -734,6 +738,7 @@ document.addEventListener('DOMContentLoaded', function() {
                       btnAiHistology.style.display = 'block';
                       btnAiHistology.innerHTML = '重新產生敘述';
                       btnAiHistology.onclick = () => window.DashboardRenderer.fetchLlmInsight('組織型態分佈', window.lastChartData.histologyData, ['組織型態', '個案數'], 'llmResponseHistology', 'btnAiHistology');
+                  }
                   if (btnAiDiagnosisClassification) {
                       btnAiDiagnosisClassification.style.display = 'block';
                       btnAiDiagnosisClassification.innerHTML = '重新產生敘述';
@@ -768,6 +773,7 @@ document.addEventListener('DOMContentLoaded', function() {
                       const histologyChartCaption = document.getElementById('annualHistologyChartCaption');
                       if (histologyChartCaption) {
                           histologyChartCaption.innerText = `圖、${yearTitle}年${window.DashboardRenderer.getCancerTitleForSentence(cancerTitle)}組織型態分佈圖`;
+                      }
                       const classificationChartCaption = document.getElementById('annualDiagnosisClassificationChartCaption');
                       if (classificationChartCaption) {
                           classificationChartCaption.innerText = `圖、${yearTitle}年${window.DashboardRenderer.getCancerTitleForSentence(cancerTitle)}個案分類分佈圖`;
@@ -957,4 +963,10 @@ document.addEventListener('DOMContentLoaded', function() {
       });
   });
 
-});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initDashboardControl);
+} else {
+  initDashboardControl();
+}

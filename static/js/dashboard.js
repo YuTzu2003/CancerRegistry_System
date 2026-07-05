@@ -185,12 +185,10 @@ window.DashboardRenderer = {
 
         if (!histologyData || histologyData.length === 0) {
             body.innerHTML = `<tr><td colspan="4" class="text-center py-4">無資料</td></tr>`;
-            return;
-        }
+            return;}
 
         const validData = histologyData.filter(item => item.name !== 'Unknown / 未對應組織型態');
         const totalCount = validData.reduce((sum, item) => sum + item.count, 0);
-
         const rowsHtml = validData.map(item => {
             const pct = totalCount > 0 ? ((item.count / totalCount) * 100).toFixed(1) : '0.0';
             return `
@@ -209,9 +207,7 @@ window.DashboardRenderer = {
                 <td></td>
                 <td>${totalCount}</td>
                 <td>100.0%</td>
-            </tr>
-        `;
-
+            </tr>`;
         body.innerHTML = rowsHtml + totalRowHtml;
     },
 
