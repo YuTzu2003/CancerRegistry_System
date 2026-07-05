@@ -713,6 +713,7 @@ document.addEventListener('DOMContentLoaded', function() {
                   const btnAiMedian = document.getElementById('btnAiMedian');
                   const btnAiAnalyzable = document.getElementById('btnAiAnalyzable');
                   const btnAiHistology = document.getElementById('btnAiHistology');
+                  const btnAiDiagnosisClassification = document.getElementById('btnAiDiagnosisClassification');
                   
                   if (btnAiMain) {
                       btnAiMain.style.display = 'block';
@@ -733,6 +734,10 @@ document.addEventListener('DOMContentLoaded', function() {
                       btnAiHistology.style.display = 'block';
                       btnAiHistology.innerHTML = '重新產生敘述';
                       btnAiHistology.onclick = () => window.DashboardRenderer.fetchLlmInsight('組織型態分佈', window.lastChartData.histologyData, ['組織型態', '個案數'], 'llmResponseHistology', 'btnAiHistology');
+                  if (btnAiDiagnosisClassification) {
+                      btnAiDiagnosisClassification.style.display = 'block';
+                      btnAiDiagnosisClassification.innerHTML = '重新產生敘述';
+                      btnAiDiagnosisClassification.onclick = () => window.DashboardRenderer.fetchLlmInsight('個案分類', window.lastChartData.diagnosisClassificationData, ['個案分類'], 'llmResponseDiagnosisClassification', 'btnAiDiagnosisClassification');
                   }
 
                   const llmResponseMain = document.getElementById('llmResponseMain');
@@ -743,6 +748,8 @@ document.addEventListener('DOMContentLoaded', function() {
                   if (llmResponseAnalyzable) llmResponseAnalyzable.innerText = '（系統將自動產生分析敘述）';
                   const llmResponseHistology = document.getElementById('llmResponseHistology');
                   if (llmResponseHistology) llmResponseHistology.innerText = '（系統將自動產生分析敘述）';
+                  const llmResponseDiagnosisClassification = document.getElementById('llmResponseDiagnosisClassification');
+                  if (llmResponseDiagnosisClassification) llmResponseDiagnosisClassification.innerText = '（系統將自動產生分析敘述）';
 
                   if (window.DashboardRenderer) {
                       const yearTitle = window.DashboardRenderer.getSelectedYearTitle();
@@ -751,6 +758,8 @@ document.addEventListener('DOMContentLoaded', function() {
                       window.DashboardRenderer.renderAgeMedianTable(chartData.ageMedianData, yearTitle, cancerTitle);
                       window.DashboardRenderer.renderAnalyzableConfirmedTable(chartData.analyzableConfirmedData, yearTitle, cancerTitle);
                       window.DashboardRenderer.renderHistologyTable(chartData.histologyData, yearTitle, cancerTitle);
+                      window.DashboardRenderer.renderDiagnosisClassificationTable(chartData.diagnosisClassificationData, yearTitle, cancerTitle);
+                      window.DashboardRenderer.renderDiagnosisClassificationChart(chartData.diagnosisClassificationData, yearTitle, cancerTitle);
                       window.DashboardRenderer.showAnnualDataContent();
                       const chartCaption = document.getElementById('annualSexAgeChartCaption');
                       if (chartCaption) {
@@ -759,6 +768,9 @@ document.addEventListener('DOMContentLoaded', function() {
                       const histologyChartCaption = document.getElementById('annualHistologyChartCaption');
                       if (histologyChartCaption) {
                           histologyChartCaption.innerText = `圖、${yearTitle}年${window.DashboardRenderer.getCancerTitleForSentence(cancerTitle)}組織型態分佈圖`;
+                      const classificationChartCaption = document.getElementById('annualDiagnosisClassificationChartCaption');
+                      if (classificationChartCaption) {
+                          classificationChartCaption.innerText = `圖、${yearTitle}年${window.DashboardRenderer.getCancerTitleForSentence(cancerTitle)}個案分類分佈圖`;
                       }
                   }
 

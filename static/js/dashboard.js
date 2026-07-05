@@ -247,6 +247,207 @@ window.DashboardRenderer = {
         }
     },
 
+    /* ── 個案分類分佈圖 ── */
+    renderDiagnosisClassificationChart: function(chartData, yearTitle, cancerTitle) {
+        let chartDom = document.getElementById('annualDiagnosisClassificationChart');
+        if (!chartDom) return;
+        
+        if (!this.classificationChartInst) {
+            this.classificationChartInst = echarts.init(chartDom);
+        }
+
+        const total = chartData.total_count || 1;
+        const calcPctNum = (val) => Number((val / total * 100).toFixed(1));
+
+        const colors = [
+            '#5470C6',
+            '#91CC75',
+            '#FAC858',
+            '#EE6666',
+            '#73C0DE',
+            '#3BA272',
+            '#FC8452'
+        ];
+
+        const labels = [
+            'Class0 本院診斷，未於本院接受首次治療',
+            'Class1 本院診斷，並於本院接受全部或部分首次治療。',
+            'Class2 他院診斷，於本院接受全部或部分首次治療。',
+            'Class3 他院診斷，未於本院接受首次治療，或因復發／持續癌症問題至本院就診。'
+        ];
+
+        const option = {
+            title: {
+                text: '個案分類分佈圖',
+                subtext: '資料來源：癌症登記資料庫',
+                left: 'center',
+                textStyle: {
+                    fontSize: 20,
+                    fontWeight: 'bold',
+                    color: '#333'
+                }
+            },
+            toolbox: {
+                show: true,
+                feature: {
+                    dataView: { show: true, readOnly: false, title: '數據檢視', lang: ['數據檢視', '關閉', '更新'] },
+                    saveAsImage: { show: true, title: '下載圖片' }
+                }
+            },
+            legend: {
+                orient: 'vertical',
+                right: '2%',
+                top: 'middle',
+                itemWidth: 14,
+                itemHeight: 14,
+                data: labels,
+                textStyle: {
+                    fontSize: 14,
+                    lineHeight: 24,
+                    width: 450,
+                    overflow: 'break'
+                }
+            },
+            tooltip: {
+                trigger: 'axis',
+                axisPointer: {
+                    type: 'shadow'
+                }
+            },
+            grid: {
+                left: '3%',
+                right: '32%',
+                top: '15%',
+                bottom: '3%',
+                containLabel: true
+            },
+            xAxis: [
+                {
+                    type: 'category',
+                    data: ['Class0', 'Class1', 'Class2', 'Class3'],
+                    axisTick: {
+                        alignWithLabel: true
+                    }
+                }
+            ],
+            yAxis: [
+                {
+                    type: 'value',
+                    axisLabel: { formatter: '{value}%' }
+                }
+            ],
+            series: [
+                {
+                    name: labels[0],
+                    type: 'bar',
+                    stack: 'total',
+                    barWidth: '60%',
+                    data: [calcPctNum(chartData.class0_total), '-', '-', '-'],
+                    itemStyle: { borderRadius: [6, 6, 0, 0], color: colors[0] },
+                    label: { show: true, position: 'top', color: '#333', fontSize: 14, fontWeight: 'bold', formatter: '{c}%' }
+                },
+                {
+                    name: labels[1],
+                    type: 'bar',
+                    stack: 'total',
+                    barWidth: '60%',
+                    data: ['-', calcPctNum(chartData.class1_total), '-', '-'],
+                    itemStyle: { borderRadius: [6, 6, 0, 0], color: colors[1] },
+                    label: { show: true, position: 'top', color: '#333', fontSize: 14, fontWeight: 'bold', formatter: '{c}%' }
+                },
+                {
+                    name: labels[2],
+                    type: 'bar',
+                    stack: 'total',
+                    barWidth: '60%',
+                    data: ['-', '-', calcPctNum(chartData.class2_total), '-'],
+                    itemStyle: { borderRadius: [6, 6, 0, 0], color: colors[2] },
+                    label: { show: true, position: 'top', color: '#333', fontSize: 14, fontWeight: 'bold', formatter: '{c}%' }
+                },
+                {
+                    name: labels[3],
+                    type: 'bar',
+                    stack: 'total',
+                    barWidth: '60%',
+                    data: ['-', '-', '-', calcPctNum(chartData.class3_total)],
+                    itemStyle: { borderRadius: [6, 6, 0, 0], color: colors[3] },
+                    label: { show: true, position: 'top', color: '#333', fontSize: 14, fontWeight: 'bold', formatter: '{c}%' }
+                }
+            ]
+        };
+
+        this.classificationChartInst.setOption(option, true);
+    },
+
+    /* ── 個案分類分佈表 ── */
+    renderDiagnosisClassificationTable: function(tableData, yearTitle, cancerTitle) {
+        const head = document.getElementById('annualDiagnosisClassificationTableHead');
+        const body = document.getElementById('annualDiagnosisClassificationTableBody');
+        const caption = document.getElementById('annualDiagnosisClassificationCaption');
+        if (!head || !body || !tableData) return;
+
+        if (caption) caption.innerText = `表、${yearTitle}年${this.getCancerTitleForSentence(cancerTitle)}個案分類分佈表`;
+
+        head.innerHTML = `<tr><th class="text-center">個案分類</th><th class="text-center">人數</th><th class="text-center">百分比%</th></tr>`;
+        
+        const total = tableData.total_count || 1; // avoid div by 0
+        const calcPct = (val) => (val / total * 100).toFixed(1) + '%';
+        
+        const classMappings = [
+            {
+                title: 'Class0 本院診斷，未於本院接受首次治療',
+                totalKey: 'class0_total',
+                subClasses: [
+                    { key: '0_1_0', label: '未接受任何治療即死亡或病危(0.1.0)' },
+                    { key: '0_1_2', label: '首次療程未於本院進行，或本院僅提供支援／諮詢(0.1.2)' }
+                ]
+            },
+            {
+                title: 'Class1 本院診斷，並於本院接受全部或部分首次治療。',
+                totalKey: 'class1_total',
+                subClasses: [
+                    { key: '1_1_1', label: '首次療程僅於本院完成(1.1.1)' },
+                    { key: '1_1_3', label: '首次療程由本院與他院共同完成(1.1.3)' },
+                    { key: '1_1_4', label: '首次療程為觀察、支持性或緩和治療(1.1.4)' }
+                ]
+            },
+            {
+                title: 'Class2 他院診斷，於本院接受全部或部分首次治療。',
+                totalKey: 'class2_total',
+                subClasses: [
+                    { key: '2_2_1', label: '首次療程僅於本院完成(2.2.1)' },
+                    { key: '2_2_3', label: '首次療程由本院與他院共同完成(2.2.3)' }
+                ]
+            },
+            {
+                title: 'Class3 他院診斷，未於本院接受首次治療，或因復發／持續癌症問題至本院就診。',
+                totalKey: 'class3_total',
+                subClasses: [
+                    { key: '3_2_0', label: '未接受任何治療即死亡或病危(3.2.0)' },
+                    { key: '3_3_2', label: '首次療程未於本院進行，或本院僅提供支援／諮詢(3.3.2)' }
+                ]
+            }
+        ];
+        
+        let html = '';
+        classMappings.forEach(cls => {
+            const clsTotal = tableData[cls.totalKey] || 0;
+            if (clsTotal > 0) {
+                html += `<tr class="table-light fw-bold" style="font-weight: bold; border-top: 2px solid #6c757d;"><td>${cls.title}</td><td class="text-center">${clsTotal}</td><td class="text-center">${calcPct(clsTotal)}</td></tr>`;
+                cls.subClasses.forEach(sub => {
+                    const count = tableData[sub.key] || 0;
+                    if (count > 0) {
+                        html += `<tr><td class="ps-4">${sub.label}</td><td class="text-end">${count}</td><td class="text-end">${calcPct(count)}</td></tr>`;
+                    }
+                });
+            }
+        });
+        
+        html += `<tr class="table-secondary fw-bold" style="font-weight: bold; border-top: 2px solid #6c757d;"><td class="text-center">總計</td><td class="text-center">${tableData.total_count}</td><td class="text-center">100.0%</td></tr>`;
+        
+        body.innerHTML = html;
+    },
+
     /* ── 顯示年度資料區塊 ── */
     showAnnualDataContent: function() {
         document.querySelectorAll('.annual-data-content').forEach(el => {
@@ -303,6 +504,9 @@ document.addEventListener('DOMContentLoaded', function() {
                             const inst = echarts.getInstanceByDom(pane.querySelector('#histologyChart'));
                             if (inst) inst.resize();
                         }
+                        if (paneId === 'chartPane-DiagnosisClassification' && window.DashboardRenderer && window.DashboardRenderer.classificationChartInst) {
+                            window.DashboardRenderer.classificationChartInst.resize();
+                        }
                     }
 
                     let chartImage = '';
@@ -310,6 +514,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         chartImage = window.dashboardChartInstance.getDataURL({ type: 'png', backgroundColor: '#fff', pixelRatio: 2 });
                     } else if (paneId === 'chartPane-DiagnosisHistology' && window.dashboardHistologyChartInstance) {
                         chartImage = window.dashboardHistologyChartInstance.getDataURL({ type: 'png', backgroundColor: '#fff', pixelRatio: 2 });
+                    } else if (paneId === 'chartPane-DiagnosisClassification' && window.DashboardRenderer && window.DashboardRenderer.classificationChartInst) {
+                        chartImage = window.DashboardRenderer.classificationChartInst.getDataURL({ type: 'png', backgroundColor: '#fff', pixelRatio: 2 });
                     }
                     
                     const tableWrap = pane.querySelector('.annual-report-table-wrap');
@@ -332,6 +538,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     else if (paneId === 'chartPane-IncidenceMedian') title = '年齡中位數';
                     else if (paneId === 'chartPane-DiagnosisAnalyzable') title = '可分析個案與確診個案';
                     else if (paneId === 'chartPane-DiagnosisHistology') title = '組織型態分佈';
+                    else if (paneId === 'chartPane-DiagnosisClassification') title = '個案分類';
 
                     exportData.push({
                         id: paneId,

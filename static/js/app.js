@@ -90,4 +90,27 @@
   autoHideAlerts();
   window.autoHideAlerts = autoHideAlerts;
 
+  // 佈景主題切換 (Dark Mode Toggle)
+  const themeToggleBtn = document.getElementById('themeToggleBtn');
+  const themeIcon = document.getElementById('themeIcon');
+  
+  if (themeToggleBtn && themeIcon) {
+    if (document.documentElement.getAttribute('data-theme') === 'dark') {
+      themeIcon.classList.replace('bi-sun', 'bi-moon');
+    }
+    
+    themeToggleBtn.addEventListener('click', () => {
+      let theme = document.documentElement.getAttribute('data-theme');
+      if (theme === 'dark') {
+        document.documentElement.removeAttribute('data-theme');
+        localStorage.setItem('theme', 'light');
+        themeIcon.classList.replace('bi-moon', 'bi-sun');
+      } else {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        localStorage.setItem('theme', 'dark');
+        themeIcon.classList.replace('bi-sun', 'bi-moon');
+      }
+    });
+  }
+
 })();
