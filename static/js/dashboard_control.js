@@ -573,6 +573,41 @@
     cb.addEventListener('change', updateSummary);
   });
 
+  document.querySelectorAll('input[name="mainCategoryTab"]').forEach(radio => {
+    radio.addEventListener('change', function() {
+      // Hide all subItems
+      document.querySelectorAll('[id^="subItems-"]').forEach(div => {
+        div.classList.add('d-none');
+      });
+      // Show the selected subItems group
+      if (this.checked) {
+        const group = this.getAttribute('data-group');
+        const targetDiv = document.getElementById('subItems-' + group);
+        if (targetDiv) {
+          targetDiv.classList.remove('d-none');
+        }
+      }
+      updateSummary();
+    });
+  });
+
+  document.querySelectorAll('.cat-nav-btn').forEach(btn => {
+    btn.addEventListener('show.bs.tab', function(e) {
+      const oldTab = e.relatedTarget;
+      if (oldTab) {
+        oldTab.classList.remove('text-primary', 'fw-bold');
+        oldTab.classList.add('text-secondary');
+        oldTab.style.borderLeft = '4px solid transparent';
+      }
+      const newTab = e.target;
+      if (newTab) {
+        newTab.classList.remove('text-secondary');
+        newTab.classList.add('text-primary', 'fw-bold');
+        newTab.style.borderLeft = '4px solid #0d6efd';
+      }
+    });
+  });
+
   updateParentCheckboxes();
   updateStatus();
   checkFiltersState();
