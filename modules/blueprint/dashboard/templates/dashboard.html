@@ -136,6 +136,36 @@
         </div>
       </div>
     </div>
+    <!--個案分類-->
+    <div id="chartPane-DiagnosisClassification" class="chart-pane d-none">
+      <div class="bg-white border border-secondary-subtle rounded shadow-sm p-4 mt-2">
+        <div class="annual-data-content d-none">
+          <div class="annual-report-table-wrap mb-4">
+            <table class="annual-report-table text-start" style="width: 100%;">
+              <caption id="annualDiagnosisClassificationCaption">表、XXXX年XX癌個案分類分佈表</caption>
+              <thead id="annualDiagnosisClassificationTableHead"></thead>
+              <tbody id="annualDiagnosisClassificationTableBody"></tbody>
+            </table>
+          </div>
+          <div class="row align-items-center">
+            <div class="col-md-12">
+              <div id="annualDiagnosisClassificationChart" style="width: 100%; height: 450px;"></div>
+            </div>
+          </div>
+          <div id="annualDiagnosisClassificationChartCaption" class="annual-chart-caption mt-2">圖、XXXX年新診斷XX病患個案分類分佈圖</div>
+          <!--LLM分析結果-->
+          <div class="mt-4 p-3 rounded" style="background-color: rgba(209, 231, 221, 0.5); border: 1px solid #a3cfbb;">
+            <div class="d-flex align-items-center mb-2 justify-content-between">
+              <div class="d-flex align-items-center">
+                <h6 class="mb-0 fw-bold text-dark">語言模型敘述</h6>
+              </div>
+              <button id="btnAiDiagnosisClassification" class="btn btn-sm" style="display: none; background-color: transparent; border: 1px solid #495057; color: #212529; font-weight: 500;">重新產生敘述</button>
+            </div>
+            <div id="llmResponseDiagnosisClassification" class="text-dark" style="font-size: 14px; white-space: pre-wrap;">定義還沒串接使用。</div>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!--空白佔位區 (尚未實作圖表) -->
     <div id="chartPane-Empty" class="chart-pane d-none">
