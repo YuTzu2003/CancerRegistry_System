@@ -618,18 +618,18 @@ document.addEventListener('DOMContentLoaded', function() {
           const yearStartVal = document.getElementById('filterYearStart')?.value.trim();
           const yearEndVal = document.getElementById('filterYearEnd')?.value.trim();
           if (!yearStartVal || !yearEndVal || yearStartVal.length !== 4 || yearEndVal.length !== 4) {
-              alert('請先輸入四位數的年度！');
+              utils.alert('請先輸入四位數的年度！', 'warning');
               return;
           }
           
           const behaviorVal = document.getElementById('filterBehavior')?.value;
           if (!behaviorVal) {
-              alert('請先選擇性態碼！');
+              utils.alert('請先選擇性態碼！', 'warning');
               return;
           }
 
           if (!selectedFile) {
-              alert('請先從上方檔案列表點選要分析的檔案！');
+              utils.alert('請先從上方檔案列表點選要分析的檔案！', 'warning');
               return;
           }
 
@@ -712,6 +712,7 @@ document.addEventListener('DOMContentLoaded', function() {
                   const btnAiMain = document.getElementById('btnAiMain');
                   const btnAiMedian = document.getElementById('btnAiMedian');
                   const btnAiAnalyzable = document.getElementById('btnAiAnalyzable');
+                  const btnAiHistology = document.getElementById('btnAiHistology');
                   
                   if (btnAiMain) {
                       btnAiMain.style.display = 'block';
@@ -728,6 +729,11 @@ document.addEventListener('DOMContentLoaded', function() {
                       btnAiAnalyzable.innerHTML = '重新產生敘述';
                       btnAiAnalyzable.onclick = () => window.DashboardRenderer.fetchLlmInsight('癌症登記可分析個案與確診個案', window.lastChartData.analyzableConfirmedData, ['可分析個案', '確診個案'], 'llmResponseAnalyzable', 'btnAiAnalyzable');
                   }
+                  if (btnAiHistology) {
+                      btnAiHistology.style.display = 'block';
+                      btnAiHistology.innerHTML = '重新產生敘述';
+                      btnAiHistology.onclick = () => window.DashboardRenderer.fetchLlmInsight('組織型態分佈', window.lastChartData.histologyData, ['組織型態', '個案數'], 'llmResponseHistology', 'btnAiHistology');
+                  }
 
                   const llmResponseMain = document.getElementById('llmResponseMain');
                   if (llmResponseMain) llmResponseMain.innerText = '（系統將自動產生分析敘述）';
@@ -735,6 +741,8 @@ document.addEventListener('DOMContentLoaded', function() {
                   if (llmResponseMedian) llmResponseMedian.innerText = '（系統將自動產生分析敘述）';
                   const llmResponseAnalyzable = document.getElementById('llmResponseAnalyzable');
                   if (llmResponseAnalyzable) llmResponseAnalyzable.innerText = '（系統將自動產生分析敘述）';
+                  const llmResponseHistology = document.getElementById('llmResponseHistology');
+                  if (llmResponseHistology) llmResponseHistology.innerText = '（系統將自動產生分析敘述）';
 
                   if (window.DashboardRenderer) {
                       const yearTitle = window.DashboardRenderer.getSelectedYearTitle();
@@ -742,10 +750,15 @@ document.addEventListener('DOMContentLoaded', function() {
                       window.DashboardRenderer.renderSexAgeTable(chartData.genderAgeData, yearTitle, cancerTitle);
                       window.DashboardRenderer.renderAgeMedianTable(chartData.ageMedianData, yearTitle, cancerTitle);
                       window.DashboardRenderer.renderAnalyzableConfirmedTable(chartData.analyzableConfirmedData, yearTitle, cancerTitle);
+                      window.DashboardRenderer.renderHistologyTable(chartData.histologyData, yearTitle, cancerTitle);
                       window.DashboardRenderer.showAnnualDataContent();
                       const chartCaption = document.getElementById('annualSexAgeChartCaption');
                       if (chartCaption) {
                           chartCaption.innerText = `圖、${yearTitle}年新診斷${window.DashboardRenderer.getCancerTitleForSentence(cancerTitle)}病患性別及年齡分佈圖`;
+                      }
+                      const histologyChartCaption = document.getElementById('annualHistologyChartCaption');
+                      if (histologyChartCaption) {
+                          histologyChartCaption.innerText = `圖、${yearTitle}年${window.DashboardRenderer.getCancerTitleForSentence(cancerTitle)}組織型態分佈圖`;
                       }
                   }
 
@@ -757,6 +770,36 @@ document.addEventListener('DOMContentLoaded', function() {
                               { name: '男性', data: chartData.genderAgeData.male },
                               { name: '女性', data: chartData.genderAgeData.female },
                               { name: '總計', data: chartData.genderAgeData.total }
+                          ]
+                      });
+                  }
+
+                  if (window.dashboardHistologyChartInstance && chartData.histologyData) {
+                      const yearTitle = window.DashboardRenderer ? window.DashboardRenderer.getSelectedYearTitle() : '';
+                      const cancerTitle = window.DashboardRenderer ? window.DashboardRenderer.getSelectedCancerTitle() : '';
+                      const cancerTitleSent = window.DashboardRenderer ? window.DashboardRenderer.getCancerTitleForSentence(cancerTitle) : '';
+                      const validData = chartData.histologyData.filter(item => item.name !== 'Unknown / 未對應組織型態');
+                      const topData = validData.reverse();
+                      const categories = topData.map(item => item.name);
+                      const counts = topData.map(item => item.count);
+
+                      // 動態調整圖表高度，防止柱狀圖項目過多時擠壓重疊
+                      const chartDom = document.getElementById('histologyChart');
+                      if (chartDom) {
+                          const computedHeight = Math.max(450, categories.length * 30); // 每筆資料給予 30px 的垂直空間，最低 450px
+                          chartDom.style.height = computedHeight + 'px';
+                          window.dashboardHistologyChartInstance.resize();
+                      }
+
+                      window.dashboardHistologyChartInstance.setOption({
+                          title: { 
+                              text: `${yearTitle}年${cancerTitleSent}組織型態分佈圖`, 
+                              subtext: selectedFile,
+                              left: 'center'
+                          },
+                          yAxis: { data: categories },
+                          series: [
+                              { data: counts }
                           ]
                       });
                   }
@@ -811,7 +854,7 @@ document.addEventListener('DOMContentLoaded', function() {
                   });
               } else {
                   if (window.utils && window.utils.hideLoading) window.utils.hideLoading();
-                  alert('資料分析失敗: ' + data.error);
+                  utils.alert('資料分析失敗: ' + data.error, 'error');
               }
           })
           .catch(err => {
@@ -820,7 +863,7 @@ document.addEventListener('DOMContentLoaded', function() {
               } else if (window.dashboardChartInstance) {
                   window.dashboardChartInstance.hideLoading();
               }
-              alert('發生系統錯誤，請稍後再試。');
+              utils.alert('發生系統錯誤，請稍後再試。', 'error');
           });
       });
   }

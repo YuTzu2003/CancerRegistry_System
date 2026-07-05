@@ -191,6 +191,56 @@ def calculate_analyzable_confirmed_cases(df, cols):
 
     return analyzable_confirmed_data
 
+def calculate_histology_distribution(df, cols):
+    hist_dist_data = []
+
+    class_col = cols["class_col"]
+    hist_col = cols["hist_col"]
+    behavior_col = cols["behavior_col"]
+    site_col = cols["site_col"]
+    year_col = cols["year_col"]
+
+    if class_col in df.columns and hist_col in df.columns and behavior_col in df.columns:
+        df_filtered = df.dropna(subset=[class_col])
+        df_filtered = df_filtered[df_filtered[class_col].apply(normalize_case_code).isin(["1", "2"])]
+
+        total_valid_cases = len(df_filtered)
+        if total_valid_cases > 0:
+            from modules.blueprint.dashboard.definition.histology_mapping import get_histology_rules
+            from modules.blueprint.dashboard.definition.histology_validate import match_histology
+
+            rules = get_histology_rules()
+            hist_counts = {}
+            for _, row in df_filtered.iterrows():
+                case_row = {
+                    "hist": row[hist_col] if hist_col in df.columns else "",
+                    "behavior": row[behavior_col] if behavior_col in df.columns else "",
+                    "site": row[site_col] if site_col in df.columns else "",
+                    "didiag": row[year_col] if year_col in df.columns else "",
+                }
+                res = match_histology(case_row, rules)
+                icdo_code = res.get("icdo_code", "")
+                report_name = res.get("report_name", "Unknown / 未對應組織型態")
+                key = (icdo_code, report_name)
+                hist_counts[key] = hist_counts.get(key, 0) + 1
+
+            for (icdo_code, report_name), count in hist_counts.items():
+                pct = (count / total_valid_cases) * 100
+                hist_dist_data.append({
+                    "code": icdo_code,
+                    "name": report_name,
+                    "count": count,
+                    "percentage": f"{pct:.1f}%",
+                    "pct_val": pct
+                })
+
+            hist_dist_data.sort(key=lambda x: x["pct_val"], reverse=True)
+
+            for item in hist_dist_data:
+                item.pop("pct_val", None)
+
+    return hist_dist_data
+
 def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", behavior=""):
     fpath = f"{DASHBOARD_DATA}/{filename}"
     try:
@@ -202,11 +252,13 @@ def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", beh
         gender_age_data = calculate_gender_age_distribution(df, cols)
         age_median_data = calculate_age_median(df, cols)
         analyzable_confirmed_data = calculate_analyzable_confirmed_cases(df, cols)
+        histology_data = calculate_histology_distribution(df, cols)
   
         return {
             "genderAgeData": gender_age_data,
             "ageMedianData": age_median_data,
-            "analyzableConfirmedData": analyzable_confirmed_data
+            "analyzableConfirmedData": analyzable_confirmed_data,
+            "histologyData": histology_data
         }
     except Exception as e:
         logging.error(f"error {filename}: {str(e)}")
