@@ -3,6 +3,8 @@ import pandas as pd
 import logging
 from modules.blueprint.dashboard.definition.cancer_grouping import classify_cancer_group
 from modules.blueprint.dashboard.definition.cancer_group_rules import CANCER_GROUP_RULES
+from modules.blueprint.dashboard.definition.histology_mapping import get_histology_rules
+from modules.blueprint.dashboard.definition.histology_validate import match_histology
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 DASHBOARD_DATA = f"{BASE_DIR}/tasks/data"
@@ -72,7 +74,7 @@ def filter_dashboard_data(df, cols, cancers=[], year_start="", year_end="", beha
         
     return df
 
-# 性別年齡分布表
+# 性別年齡分布(表,圖)
 def calculate_gender_age_distribution(df, cols):
     labels = ['<=19', '20-24', '25-29', '30-34', '35-39', '40-44', '45-49', '50-54', '55-59', '60-64', '65-69', '70-74', '75-79', '80-84', '>=85']
     gender_age_data = {
@@ -103,7 +105,7 @@ def calculate_gender_age_distribution(df, cols):
             
     return gender_age_data
 
-# 年齡中位數表
+# 年齡中位數(表)
 def calculate_age_median(df, cols):
     age_median_data = {
         "male": 0, "female": 0, "total": 0,
@@ -155,7 +157,7 @@ def normalize_case_code(value):
     except (ValueError, TypeError):
         return text
 
-
+# 可分析個案與確診個案(表)
 def calculate_analyzable_confirmed_cases(df, cols):
     analyzable_confirmed_data = {
         "total_count": 0,
@@ -193,6 +195,7 @@ def calculate_analyzable_confirmed_cases(df, cols):
 
     return analyzable_confirmed_data
 
+# 組織型態(表,圖)
 def calculate_histology_distribution(df, cols):
     hist_dist_data = []
 
@@ -208,9 +211,6 @@ def calculate_histology_distribution(df, cols):
 
         total_valid_cases = len(df_filtered)
         if total_valid_cases > 0:
-            from modules.blueprint.dashboard.definition.histology_mapping import get_histology_rules
-            from modules.blueprint.dashboard.definition.histology_validate import match_histology
-
             rules = get_histology_rules()
             hist_counts = {}
             for _, row in df_filtered.iterrows():
@@ -233,24 +233,20 @@ def calculate_histology_distribution(df, cols):
                     "name": report_name,
                     "count": count,
                     "percentage": f"{pct:.1f}%",
-                    "pct_val": pct
-                })
+                    "pct_val": pct})
 
             hist_dist_data.sort(key=lambda x: x["pct_val"], reverse=True)
-
             for item in hist_dist_data:
                 item.pop("pct_val", None)
-
     return hist_dist_data
+
 def calculate_diagnosis_classification(df, cols):
     data = {
         "class0_total": 0, "0_1_0": 0, "0_1_2": 0,
         "class1_total": 0, "1_1_1": 0, "1_1_3": 0, "1_1_4": 0,
         "class2_total": 0, "2_2_1": 0, "2_2_3": 0,
         "class3_total": 0, "3_2_0": 0, "3_3_2": 0,
-        "total_count": 0
-    }
-    
+        "total_count": 0}
     class_col = cols.get("class_col")
     diag_status_col = cols.get("diag_status_col")
     treat_status_col = cols.get("treat_status_col")
@@ -289,15 +285,15 @@ def calculate_diagnosis_classification(df, cols):
                 data["class3_total"] += 1
                 if d == "2" and t == "0": data["3_2_0"] += 1
                 if d == "3" and t == "2": data["3_3_2"] += 1
-
     return data
 
+# 個案分類(表,圖)
 def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", behavior=""):
     fpath = f"{DASHBOARD_DATA}/{filename}"
     try:
         df = pd.read_excel(fpath)
         cols = get_column_names(df)
-        
+
         df = filter_dashboard_data(df, cols, cancers, year_start, year_end, behavior)
         
         gender_age_data = calculate_gender_age_distribution(df, cols)
@@ -310,7 +306,7 @@ def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", beh
             "genderAgeData": gender_age_data,
             "ageMedianData": age_median_data,
             "analyzableConfirmedData": analyzable_confirmed_data,
-            "histologyData": histology_data
+            "histologyData": histology_data,
             "diagnosisClassificationData": diagnosis_classification_data
         }
     except Exception as e:
