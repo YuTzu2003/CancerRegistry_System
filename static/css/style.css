@@ -818,3 +818,190 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   .page-head h1 { font-size: 20px; }
   .naming-grid { grid-template-columns: 1fr; }
 }
+
+/* ==========================================================
+   深色模式 (Dark Mode)
+   ========================================================== */
+[data-theme="dark"] {
+  /* Base Colors: Google Material dark theme — neutral grey, never pure black */
+  --bg: #202124;
+  --surface: #292a2d;
+  --text: #e8eaed;
+  --muted: #9aa0a6;
+  --border: #5f6368;
+
+  --white: #292a2d; /* Card backgrounds */
+  --gray-50: #292a2d;
+  --gray-100: #35363a;
+  --gray-200: #3c4043;
+  --gray-300: #5f6368;
+  --gray-400: #80868b;
+  --gray-500: #9aa0a6;
+  --gray-600: #bdc1c6;
+  --gray-700: #dadce0;
+  --gray-800: #e8eaed;
+  --gray-900: #ffffff;
+
+  /* Accent Color: Google Blue (dark-theme variant, as used in Search/Gmail/YouTube) */
+  --blue-100: #253242;
+  --blue-500: #8ab4f8;
+  --blue-600: #669df6;
+  --blue-700: #4285f4;
+
+  --warning-soft: #332b1a;
+  --success-soft: #1e3327;
+  --danger-soft: #3c2422;
+  --accent-soft: #253242;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.6);
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] body {
+  color: var(--text);
+}
+
+/* Improve text contrast */
+[data-theme="dark"] .text-dark,
+[data-theme="dark"] .brand-title,
+[data-theme="dark"] .page-head h1,
+[data-theme="dark"] .section-head h2,
+[data-theme="dark"] .user-name {
+  color: #e8eaed !important;
+}
+[data-theme="dark"] .text-muted,
+[data-theme="dark"] .brand-subtitle,
+[data-theme="dark"] .page-head .lead,
+[data-theme="dark"] .user-role {
+  color: #9aa0a6 !important;
+}
+
+/* Obvious borders for buttons and inputs */
+[data-theme="dark"] .btn,
+[data-theme="dark"] .btn-toggle,
+[data-theme="dark"] .top-btn,
+[data-theme="dark"] .form-control,
+[data-theme="dark"] .form-select,
+[data-theme="dark"] .user-chip,
+[data-theme="dark"] .field-chip,
+[data-theme="dark"] .naming-chip,
+[data-theme="dark"] .kpi {
+  border: 1px solid #5f6368 !important;
+}
+
+/* Google-style hover: soft tinted blue background, blue text (not solid fill) */
+[data-theme="dark"] .top-btn:hover,
+[data-theme="dark"] .btn-toggle:hover,
+[data-theme="dark"] .sidebar .btn-toggle:hover,
+[data-theme="dark"] .nav-link:hover,
+[data-theme="dark"] .btn-light:hover,
+[data-theme="dark"] .logout-action:hover,
+[data-theme="dark"] .field-chip:hover,
+[data-theme="dark"] .naming-chip:hover,
+[data-theme="dark"] .btn:hover {
+  background-color: rgba(138, 180, 248, 0.16) !important;
+  color: #8ab4f8 !important;
+  border-color: #8ab4f8 !important;
+}
+
+[data-theme="dark"] .nav-link:hover .nav-icon,
+[data-theme="dark"] .logout-action:hover .user-name,
+[data-theme="dark"] .logout-action:hover .user-role,
+[data-theme="dark"] .logout-action:hover .logout-icon,
+[data-theme="dark"] .top-btn:hover i,
+[data-theme="dark"] .btn-toggle:hover i {
+  color: #8ab4f8 !important;
+}
+
+[data-theme="dark"] .nav-link.active {
+  background-color: rgba(138, 180, 248, 0.24) !important;
+  color: #8ab4f8 !important;
+  border-color: #8ab4f8 !important;
+  box-shadow: none;
+}
+
+[data-theme="dark"] .nav-link.active .nav-icon {
+  color: #8ab4f8 !important;
+}
+
+/* Core component fixes */
+[data-theme="dark"] .bg-light { background-color: var(--gray-100) !important; }
+[data-theme="dark"] .border { border-color: var(--border) !important; }
+[data-theme="dark"] .table-excel thead th {
+  background: var(--gray-100); color: var(--text); border-bottom: 2px solid var(--border);
+}
+[data-theme="dark"] .table-excel tbody tr:nth-child(even) { background: #292a2d; }
+[data-theme="dark"] .table-excel tbody tr:hover { background: #35363a; }
+[data-theme="dark"] .section-head { background: linear-gradient(180deg, #292a2d 0%, var(--surface) 100%); }
+[data-theme="dark"] .stepper-sticky { background: linear-gradient(180deg, var(--bg) 0%, var(--bg) 70%, rgba(32, 33, 36, 0) 100%); }
+
+[data-theme="dark"] .form-control, [data-theme="dark"] .form-select {
+  background-color: #202124; color: #e8eaed;
+}
+[data-theme="dark"] .form-control:focus, [data-theme="dark"] .form-select:focus {
+  background-color: #202124; color: #e8eaed; border-color: #8ab4f8 !important; box-shadow: 0 0 0 3px rgba(138, 180, 248, 0.25);
+}
+[data-theme="dark"] .btn-close { filter: invert(1) grayscale(100%) brightness(200%); }
+[data-theme="dark"] .brand-logo {
+  background-color: rgba(255, 255, 255, 0.9);
+  border-radius: 8px;
+  padding: 4px;
+}
+
+/* 修正未帶有特殊色彩的 .btn (如快速操作) 在深色模式下的文字與 Icon 顏色 */
+[data-theme="dark"] .btn:not([class*="btn-"]) {
+  color: var(--text) !important;
+}
+
+/* 修正 Bootstrap 的 .text-bg-light 在深色模式下變成白底白字的問題 (如 IP 紀錄) */
+[data-theme="dark"] .text-bg-light {
+  background-color: var(--gray-100) !important;
+  color: var(--text) !important;
+}
+
+/* 修正 Bootstrap 的 dark 與 outline-dark 按鈕在深色模式不明顯的問題 */
+[data-theme="dark"] .btn-dark {
+  background-color: #5f6368 !important;
+  color: #e8eaed !important;
+  border-color: #80868b !important;
+}
+[data-theme="dark"] .btn-dark:hover {
+  background-color: #80868b !important;
+  color: #ffffff !important;
+}
+
+[data-theme="dark"] .btn-outline-dark {
+  color: #e8eaed !important;
+  border-color: #9aa0a6 !important;
+}
+[data-theme="dark"] .btn-outline-dark:hover {
+  background-color: #e8eaed !important;
+  color: #202124 !important;
+}
+[data-theme="dark"] .btn-outline-dark:hover * {
+  color: #202124 !important;
+}
+
+/* 確保如果元素背景被選到變成白色/亮色時，內部的灰色文字會自動變黑，避免反白看不到 */
+[data-theme="dark"] *:hover > .text-muted,
+[data-theme="dark"] *:hover > .text-secondary,
+[data-theme="dark"] .active > .text-muted,
+[data-theme="dark"] .active > .text-secondary,
+[data-theme="dark"] .selected > .text-muted,
+[data-theme="dark"] .selected > .text-secondary {
+  color: inherit !important;
+}
+
+/* 針對所有按鈕或選取的標籤，如果觸發滯留(hover)或選中(active)，強制內部次要文字跟隨主色 */
+[data-theme="dark"] .btn:hover .text-muted,
+[data-theme="dark"] .btn:hover .text-secondary,
+[data-theme="dark"] .nav-link:hover .text-muted,
+[data-theme="dark"] .nav-link:hover .text-secondary,
+[data-theme="dark"] .nav-link.active .text-muted,
+[data-theme="dark"] .nav-link.active .text-secondary,
+[data-theme="dark"] .field-chip.selected .text-muted,
+[data-theme="dark"] .field-chip.selected .text-secondary,
+[data-theme="dark"] .naming-chip.selected .text-muted,
+[data-theme="dark"] .naming-chip.selected .text-secondary {
+  color: inherit !important;
+}
