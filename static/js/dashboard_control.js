@@ -712,6 +712,7 @@ document.addEventListener('DOMContentLoaded', function() {
                   const btnAiMain = document.getElementById('btnAiMain');
                   const btnAiMedian = document.getElementById('btnAiMedian');
                   const btnAiAnalyzable = document.getElementById('btnAiAnalyzable');
+                  const btnAiDiagnosisClassification = document.getElementById('btnAiDiagnosisClassification');
                   
                   if (btnAiMain) {
                       btnAiMain.style.display = 'block';
@@ -728,6 +729,11 @@ document.addEventListener('DOMContentLoaded', function() {
                       btnAiAnalyzable.innerHTML = '重新產生敘述';
                       btnAiAnalyzable.onclick = () => window.DashboardRenderer.fetchLlmInsight('癌症登記可分析個案與確診個案', window.lastChartData.analyzableConfirmedData, ['可分析個案', '確診個案'], 'llmResponseAnalyzable', 'btnAiAnalyzable');
                   }
+                  if (btnAiDiagnosisClassification) {
+                      btnAiDiagnosisClassification.style.display = 'block';
+                      btnAiDiagnosisClassification.innerHTML = '重新產生敘述';
+                      btnAiDiagnosisClassification.onclick = () => window.DashboardRenderer.fetchLlmInsight('個案分類', window.lastChartData.diagnosisClassificationData, ['個案分類'], 'llmResponseDiagnosisClassification', 'btnAiDiagnosisClassification');
+                  }
 
                   const llmResponseMain = document.getElementById('llmResponseMain');
                   if (llmResponseMain) llmResponseMain.innerText = '（系統將自動產生分析敘述）';
@@ -735,6 +741,8 @@ document.addEventListener('DOMContentLoaded', function() {
                   if (llmResponseMedian) llmResponseMedian.innerText = '（系統將自動產生分析敘述）';
                   const llmResponseAnalyzable = document.getElementById('llmResponseAnalyzable');
                   if (llmResponseAnalyzable) llmResponseAnalyzable.innerText = '（系統將自動產生分析敘述）';
+                  const llmResponseDiagnosisClassification = document.getElementById('llmResponseDiagnosisClassification');
+                  if (llmResponseDiagnosisClassification) llmResponseDiagnosisClassification.innerText = '（系統將自動產生分析敘述）';
 
                   if (window.DashboardRenderer) {
                       const yearTitle = window.DashboardRenderer.getSelectedYearTitle();
@@ -742,10 +750,16 @@ document.addEventListener('DOMContentLoaded', function() {
                       window.DashboardRenderer.renderSexAgeTable(chartData.genderAgeData, yearTitle, cancerTitle);
                       window.DashboardRenderer.renderAgeMedianTable(chartData.ageMedianData, yearTitle, cancerTitle);
                       window.DashboardRenderer.renderAnalyzableConfirmedTable(chartData.analyzableConfirmedData, yearTitle, cancerTitle);
+                      window.DashboardRenderer.renderDiagnosisClassificationTable(chartData.diagnosisClassificationData, yearTitle, cancerTitle);
+                      window.DashboardRenderer.renderDiagnosisClassificationChart(chartData.diagnosisClassificationData, yearTitle, cancerTitle);
                       window.DashboardRenderer.showAnnualDataContent();
                       const chartCaption = document.getElementById('annualSexAgeChartCaption');
                       if (chartCaption) {
                           chartCaption.innerText = `圖、${yearTitle}年新診斷${window.DashboardRenderer.getCancerTitleForSentence(cancerTitle)}病患性別及年齡分佈圖`;
+                      }
+                      const classificationChartCaption = document.getElementById('annualDiagnosisClassificationChartCaption');
+                      if (classificationChartCaption) {
+                          classificationChartCaption.innerText = `圖、${yearTitle}年${window.DashboardRenderer.getCancerTitleForSentence(cancerTitle)}個案分類分佈圖`;
                       }
                   }
 
