@@ -103,6 +103,40 @@
       </div>
     </div>
 
+    <!--組織型態分佈-->
+    <div id="chartPane-DiagnosisHistology" class="chart-pane d-none">
+      <div class="bg-white border border-secondary-subtle rounded shadow-sm p-4 mt-2">
+        <div class="annual-data-content d-none">
+          <div class="annual-report-table-wrap">
+            <table class="annual-report-table">
+              <caption id="annualHistologyCaption">表、XXXX年XX癌組織型態分佈表</caption>
+              <thead>
+                <tr>
+                  <th>ICD-O編碼</th>
+                  <th>組織型態</th>
+                  <th>人數</th>
+                  <th>百分比%</th>
+                </tr>
+              </thead>
+              <tbody id="annualHistologyTableBody"></tbody>
+            </table>
+          </div>
+          <div id="histologyChart" style="width: 100%; height: 450px; margin-top: 20px;"></div>
+          <div id="annualHistologyChartCaption" class="annual-chart-caption">圖、XXXX年新診斷XX病患組織型態分佈圖</div>
+        </div>
+        <!--LLM 分析結果-->
+        <div class="mt-4 p-3 rounded" style="background-color: rgba(209, 231, 221, 0.5); border: 1px solid #a3cfbb;">
+          <div class="d-flex align-items-center mb-2 justify-content-between">
+            <div class="d-flex align-items-center">
+              <h6 class="mb-0 fw-bold text-dark">語言模型敘述</h6>
+            </div>
+            <button id="btnAiHistology" class="btn btn-sm" style="display: none; background-color: transparent; border: 1px solid #495057; color: #212529; font-weight: 500;">重新產生敘述</button>
+          </div>
+          <div id="llmResponseHistology" class="text-dark" style="font-size: 14px; white-space: pre-wrap;">定義還沒串接使用。</div>
+        </div>
+      </div>
+    </div>
+
     <!--空白佔位區 (尚未實作圖表) -->
     <div id="chartPane-Empty" class="chart-pane d-none">
       <div class="bg-white border border-secondary-subtle rounded shadow-sm p-5 mt-2 text-center text-muted">

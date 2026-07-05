@@ -164,8 +164,9 @@
 document.addEventListener('DOMContentLoaded', function() {
     const rawData = localStorage.getItem('dashboard_export_data');
     if (!rawData) {
-        alert('找不到可匯出的資料！將返回上一頁。');
-        history.back();
+        utils.alert('找不到可匯出的資料！將返回上一頁。', 'error').then(() => {
+            history.back();
+        });
         return;
     }
     
@@ -220,7 +221,7 @@ document.addEventListener('DOMContentLoaded', function() {
             doWord = false;
         } else {
             if (!doPdf && !doWord) {
-                alert('請至少選擇一種匯出格式 (PDF 或 Word)。');
+                utils.alert('請至少選擇一種匯出格式 (PDF 或 Word)。', 'warning');
                 return;
             }
         }
@@ -288,7 +289,7 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .catch(err => {
             if (window.utils && window.utils.hideLoading) window.utils.hideLoading();
-            alert('發生錯誤：' + err.message);
+            utils.alert('發生錯誤：' + err.message, 'error');
         });
     }
 

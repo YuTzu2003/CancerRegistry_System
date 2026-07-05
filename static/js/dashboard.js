@@ -81,6 +81,52 @@ document.addEventListener('DOMContentLoaded', function() {
             myChart.resize();
         });
     }
+
+    /* ── 組織型態分佈圖表 ── */
+    var histChartDom = document.getElementById('histologyChart');
+    if (histChartDom) {
+        var myHistChart = echarts.init(histChartDom);
+        window.dashboardHistologyChartInstance = myHistChart;
+        var histOption = {
+          title: { text: '組織型態分佈圖', subtext: '請點擊查詢載入資料', left: 'center' },
+          tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+          grid: {
+            left: '3%',
+            right: '8%',
+            bottom: '3%',
+            containLabel: true
+          },
+          legend: { show: false },
+          toolbox: { feature: { dataView: { show: true, readOnly: false }, saveAsImage: { show: true } } },
+          xAxis: { type: 'value', name: '個案數' },
+          yAxis: { 
+            type: 'category', 
+            data: [], 
+            inverse: true,
+            axisLabel: {
+              formatter: function (value) {
+                if (value && value.length > 25) {
+                  return value.substring(0, 22) + '...';
+                }
+                return value;
+              }
+            }
+          },
+          series: [
+            {
+              name: '個案數',
+              type: 'bar',
+              data: [],
+              itemStyle: { color: '#73c0de' },
+              label: { show: true, position: 'right' }
+            }
+          ]
+        };
+        myHistChart.setOption(histOption);
+        window.addEventListener('resize', function() {
+            myHistChart.resize();
+        });
+    }
 });
 
 // 表格與輔助功能
@@ -127,6 +173,46 @@ window.DashboardRenderer = {
         const sumTotal = genderAgeData.total.reduce((a, b) => a + b, 0);
 
         body.innerHTML = `<tr><td>男</td>${genderAgeData.male.map(value => `<td>${value}</td>`).join('')}<td>${sumMale}</td></tr><tr><td>女</td>${genderAgeData.female.map(value => `<td>${value}</td>`).join('')}<td>${sumFemale}</td></tr><tr><td>總計</td>${genderAgeData.total.map(value => `<td>${value}</td>`).join('')}<td>${sumTotal}</td></tr>`;
+    },
+
+    /* ── 組織型態分佈表 ── */
+    renderHistologyTable: function(histologyData, yearTitle, cancerTitle) {
+        const body = document.getElementById('annualHistologyTableBody');
+        const caption = document.getElementById('annualHistologyCaption');
+        if (!body) return;
+
+        if (caption) caption.innerText = `表、${yearTitle}年${this.getCancerTitleForSentence(cancerTitle)}組織型態分佈表`;
+
+        if (!histologyData || histologyData.length === 0) {
+            body.innerHTML = `<tr><td colspan="4" class="text-center py-4">無資料</td></tr>`;
+            return;
+        }
+
+        const validData = histologyData.filter(item => item.name !== 'Unknown / 未對應組織型態');
+        const totalCount = validData.reduce((sum, item) => sum + item.count, 0);
+
+        const rowsHtml = validData.map(item => {
+            const pct = totalCount > 0 ? ((item.count / totalCount) * 100).toFixed(1) : '0.0';
+            return `
+                <tr>
+                    <td>${item.code}</td>
+                    <td class="text-start">${item.name}</td>
+                    <td>${item.count}</td>
+                    <td>${pct}%</td>
+                </tr>
+            `;
+        }).join('');
+
+        const totalRowHtml = `
+            <tr class="fw-bold" style="background-color: var(--gray-50);">
+                <td>合計</td>
+                <td></td>
+                <td>${totalCount}</td>
+                <td>100.0%</td>
+            </tr>
+        `;
+
+        body.innerHTML = rowsHtml + totalRowHtml;
     },
 
     /* ── 年齡中位數表 ── */
@@ -213,12 +299,17 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (paneId === 'chartPane-IncidenceAge' && typeof echarts !== 'undefined') {
                             const inst = echarts.getInstanceByDom(pane.querySelector('#main'));
                             if (inst) inst.resize();
+                        } else if (paneId === 'chartPane-DiagnosisHistology' && typeof echarts !== 'undefined') {
+                            const inst = echarts.getInstanceByDom(pane.querySelector('#histologyChart'));
+                            if (inst) inst.resize();
                         }
                     }
 
                     let chartImage = '';
                     if (paneId === 'chartPane-IncidenceAge' && window.dashboardChartInstance) {
                         chartImage = window.dashboardChartInstance.getDataURL({ type: 'png', backgroundColor: '#fff', pixelRatio: 2 });
+                    } else if (paneId === 'chartPane-DiagnosisHistology' && window.dashboardHistologyChartInstance) {
+                        chartImage = window.dashboardHistologyChartInstance.getDataURL({ type: 'png', backgroundColor: '#fff', pixelRatio: 2 });
                     }
                     
                     const tableWrap = pane.querySelector('.annual-report-table-wrap');
@@ -240,6 +331,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (paneId === 'chartPane-IncidenceAge') title = '性別年齡分佈';
                     else if (paneId === 'chartPane-IncidenceMedian') title = '年齡中位數';
                     else if (paneId === 'chartPane-DiagnosisAnalyzable') title = '可分析個案與確診個案';
+                    else if (paneId === 'chartPane-DiagnosisHistology') title = '組織型態分佈';
 
                     exportData.push({
                         id: paneId,
@@ -253,7 +345,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
 
             if (exportData.length === 0) {
-                alert('沒有可匯出的內容，請先查詢圖表！');
+                utils.alert('沒有可匯出的內容，請先查詢圖表！', 'warning');
                 return;
             }
 

@@ -120,7 +120,7 @@ def match_histology(case_row, rules):
 
     matched_rules = []
 
-    for raw_name, rule in rules.items():
+    for rule in rules:
         rule_hist = normalize_code(rule.get("hist", ""))
         rule_behavior = normalize_code(rule.get("behavior", ""))
 
@@ -131,7 +131,7 @@ def match_histology(case_row, rules):
             continue
 
         matched_rule = dict(rule)
-        matched_rule["raw_name"] = rule.get("raw_name", raw_name)
+        matched_rule["raw_name"] = rule.get("raw_name", "")
         matched_rules.append(matched_rule)
 
     if not matched_rules:
