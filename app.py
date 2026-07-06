@@ -3,7 +3,6 @@ import os
 import logging
 import sys
 from dotenv import load_dotenv
-import datetime
 from modules.services import auth_bp, login_required, member_bp, history_bp, clean_bp, data_gen_bp, dashboard_bp
 from modules.services.db import get_conn
 import jinja2
@@ -46,11 +45,11 @@ def inject_nav():
         # NAV_ITEMS.append({"endpoint":"rag_config", "title": "RAG知識庫", "icon": "bi-robot"})
         NAV_ITEMS.append({"endpoint":"member.member", "title": "使用者管理", "icon": "bi-people"})
         
-    provider = os.environ.get("LLM_PROVIDER", "ollama")
+    provider = os.environ.get("LLM_PROVIDER")
     if provider and provider.lower() == "openai":
-        model = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+        model = os.environ.get("OPENAI_MODEL")
     else:
-        model = os.environ.get("LLM_MODEL", "gemma4:26b")
+        model = os.environ.get("LLM_MODEL")
         
     return {
         "nav_items": NAV_ITEMS,
@@ -86,5 +85,5 @@ def index():
 # def rag_config(): return render_template("rag_config.html", active="rag_config")
 
 if __name__ == "__main__":
-    flask_port = int(os.environ.get("FLASK_PORT", 5000))
+    flask_port = int(os.environ.get("FLASK_PORT"))
     app.run(host="0.0.0.0", port=flask_port, debug=True)

@@ -555,6 +555,19 @@
       } else {
         summaryAnalysis.innerHTML = '<span class="text-muted">尚未選擇</span>';
       }
+      
+      document.querySelectorAll('.cat-count-badge').forEach(badge => {
+        const group = badge.getAttribute('data-parent-group');
+        if (group) {
+          const count = document.querySelectorAll(`.item-checkbox:checked[data-parent="${group}"]`).length;
+          if (count > 0) {
+            badge.textContent = count;
+            badge.classList.remove('d-none');
+          } else {
+            badge.classList.add('d-none');
+          }
+        }
+      });
     }
   }
 
