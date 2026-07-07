@@ -37,10 +37,11 @@ document.addEventListener('DOMContentLoaded', function() {
           title: { text: '組織型態分佈圖', subtext: '請點擊查詢載入資料', left: 'center' },
           tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
           grid: {
-            left: '3%',
-            right: '8%',
-            bottom: '3%',
-            containLabel: true
+            left: 300,
+            right: 40,
+            bottom: 50,
+            top: 60,
+            containLabel: false
           },
           legend: { show: false },
           toolbox: { feature: { dataView: { show: true, readOnly: false }, saveAsImage: { show: true } } },
@@ -50,12 +51,8 @@ document.addEventListener('DOMContentLoaded', function() {
             data: [], 
             inverse: true,
             axisLabel: {
-              formatter: function (value) {
-                if (value && value.length > 25) {
-                  return value.substring(0, 22) + '...';
-                }
-                return value;
-              }
+              width: 280,
+              overflow: 'truncate'
             }
           },
           series: [

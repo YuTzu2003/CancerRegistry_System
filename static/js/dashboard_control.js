@@ -761,7 +761,24 @@ function initDashboardControl() {
                       if (btn) {
                           btn.style.display = 'block';
                           btn.innerHTML = '重新產生敘述';
-                          btn.onclick = () => window.DashboardRenderer.fetchLlmInsight(cfg.title, window.lastChartData[cfg.dataKey], cfg.fields, cfg.respId, cfg.btnId);
+                          btn.onclick = () => {
+                              let dataToSend = window.lastChartData[cfg.dataKey];
+                              if (cfg.btnId === 'btnAiHistology' && dataToSend) {
+                                  // 過濾掉 Unknown / 未對應組織型態，並重新計算百分比以與表格配平
+                                  const validHist = dataToSend.filter(item => item.name !== 'Unknown / 未對應組織型態');
+                                  const totalValid = validHist.reduce((sum, item) => sum + item.count, 0);
+                                  dataToSend = validHist.map(item => {
+                                      const pct = totalValid > 0 ? ((item.count / totalValid) * 100).toFixed(1) + '%' : '0.0%';
+                                      return {
+                                          code: item.code,
+                                          name: item.name,
+                                          count: item.count,
+                                          percentage: pct
+                                      };
+                                  });
+                              }
+                              return window.DashboardRenderer.fetchLlmInsight(cfg.title, dataToSend, cfg.fields, cfg.respId, cfg.btnId);
+                          };
                       }
                   });
 
