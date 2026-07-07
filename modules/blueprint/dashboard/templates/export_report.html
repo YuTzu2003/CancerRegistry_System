@@ -239,7 +239,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 includeChart: cbChart ? cbChart.checked : false,
                 includeAi: cbAi ? cbAi.checked : false
             };
-        });
+        }).filter(item => item.includeTable || item.includeChart || item.includeAi);
 
         const payload = {
             format_pdf: doPdf,

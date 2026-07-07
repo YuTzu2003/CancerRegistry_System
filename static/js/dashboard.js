@@ -1,61 +1,7 @@
-// 畫面切換與多選框邏輯
-(function() {
-  const table = document;
-  table.querySelectorAll('.group-checkbox').forEach(groupChk => {
-    groupChk.addEventListener('change', function() {
-      table.querySelectorAll('.group-checkbox').forEach(chk => {
-        const gName = chk.dataset.group;
-        const subContainer = document.getElementById(`subItems-${gName}`);
-        if (subContainer) {
-          if (chk.checked) {
-            subContainer.classList.remove('d-none');
-            subContainer.style.display = 'flex';
-            subContainer.querySelectorAll('.item-checkbox:checked').forEach(item => {item.dispatchEvent(new Event('change'));});
-          } else {
-            subContainer.classList.add('d-none');
-            subContainer.style.display = 'none';
-          }
-        }
-      });
-    });
-  });
-
-  table.querySelectorAll('.item-checkbox').forEach(itemChk => {
-    itemChk.addEventListener('change', function() {
-      const chip = this.closest('.field-chip') || this.closest('.naming-chip');
-      if (chip) chip.classList.toggle('selected', this.checked);
-      updateGroupCheckbox(this.dataset.parent);
-    });
-  });
-
-  function updateGroupCheckbox(groupName) {
-    if (!groupName) return;
-    let chkId = '';
-    if (groupName === 'incidence') chkId = 'chkGroupIncidence';
-    else if (groupName === 'diagnosis') chkId = 'chkGroupDiagnosis';
-    else if (groupName === 'stage') chkId = 'chkGroupStage';
-    else if (groupName === 'treatment') chkId = 'chkGroupTreatment';
-    else if (groupName === 'cross_year') chkId = 'chkGroupCrossYear';
-    
-    if (!chkId) return;
-    const container = document.getElementById(`subItems-${groupName}`);
-    if (!container) return;
-    const label = document.querySelector(`label[for="${chkId}"]`);
-    if (label) {
-      const checkedCount = container.querySelectorAll('.item-checkbox:checked').length;
-      let text = label.innerHTML;
-      text = text.replace(/\s*<span class="badge.*<\/span>$/, '');
-      if (checkedCount > 0) {
-        text += ` <span class="badge bg-primary rounded-pill ms-1" style="font-size:0.75rem;">${checkedCount}</span>`;
-      }
-      label.innerHTML = text;
-    }
-  }
-})();
-
-
-// 圖表
 window.dashboardChartInstance = null;
+window.dashboardHistologyChartInstance = null;
+window.DashboardRenderer = {};
+
 document.addEventListener('DOMContentLoaded', function() {
     /* ── 性別與年齡分佈圖表 ── */
     var chartDom = document.getElementById('main');
@@ -91,10 +37,11 @@ document.addEventListener('DOMContentLoaded', function() {
           title: { text: '組織型態分佈圖', subtext: '請點擊查詢載入資料', left: 'center' },
           tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
           grid: {
-            left: '3%',
-            right: '8%',
-            bottom: '3%',
-            containLabel: true
+            left: 300,
+            right: 40,
+            bottom: 50,
+            top: 60,
+            containLabel: false
           },
           legend: { show: false },
           toolbox: { feature: { dataView: { show: true, readOnly: false }, saveAsImage: { show: true } } },
@@ -104,12 +51,8 @@ document.addEventListener('DOMContentLoaded', function() {
             data: [], 
             inverse: true,
             axisLabel: {
-              formatter: function (value) {
-                if (value && value.length > 25) {
-                  return value.substring(0, 22) + '...';
-                }
-                return value;
-              }
+              width: 280,
+              overflow: 'truncate'
             }
           },
           series: [
@@ -129,126 +72,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// 表格與輔助功能
-window.DashboardRenderer = {
-    // 取得年度字串
-    getSelectedYearTitle: function() {
-        const startYear = document.getElementById('filterYearStart')?.value.trim();
-        const endYear = document.getElementById('filterYearEnd')?.value.trim();
-        if (startYear && endYear && startYear !== endYear) return `${startYear}-${endYear}`;
-        return startYear || endYear || 'XXXX';
-    },
 
-    // 取得癌症標題
-    getSelectedCancerTitle: function() {
-        const cancerTitle = window.dashboardSelectedCancerTitle;
-        if (cancerTitle && cancerTitle !== 'XX') return cancerTitle;
-        const btnText = document.getElementById('btnCancerPickerText')?.innerText.trim();
-        if (!btnText || btnText.includes('尚未選擇')) return 'XX';
-        if (btnText.includes('全部癌症')) return '全部癌症';
-        return btnText;
-    },
-
-    // 組成癌症字串
-    getCancerTitleForSentence: function(cancerTitle) {
-        if (!cancerTitle || cancerTitle === 'XX') return 'XX癌';
-        if (cancerTitle.includes('癌') || cancerTitle.includes('全部癌症')) return cancerTitle;
-        return `${cancerTitle}癌`;
-    },
-
-    /* ── 性別與年齡分佈表 ── */
-    renderSexAgeTable: function(genderAgeData, yearTitle, cancerTitle) {
-        const head = document.getElementById('annualSexAgeTableHead');
-        const body = document.getElementById('annualSexAgeTableBody');
-        const caption = document.getElementById('annualSexAgeCaption');
-        if (!head || !body) return;
-
-        const ageLabels = genderAgeData.categories || [];
-        if (caption) caption.innerText = `表、${yearTitle}年新診斷${this.getCancerTitleForSentence(cancerTitle)}病患性別及年齡分佈表`;
-
-        head.innerHTML = `<tr><th rowspan="2">性別</th><th colspan="${ageLabels.length}">年齡層次</th><th rowspan="2">總計</th></tr><tr>${ageLabels.map(label => `<th>${label}</th>`).join('')}</tr>`;
-
-        const sumMale = genderAgeData.male.reduce((a, b) => a + b, 0);
-        const sumFemale = genderAgeData.female.reduce((a, b) => a + b, 0);
-        const sumTotal = genderAgeData.total.reduce((a, b) => a + b, 0);
-
-        body.innerHTML = `<tr><td>男</td>${genderAgeData.male.map(value => `<td>${value}</td>`).join('')}<td>${sumMale}</td></tr><tr><td>女</td>${genderAgeData.female.map(value => `<td>${value}</td>`).join('')}<td>${sumFemale}</td></tr><tr><td>總計</td>${genderAgeData.total.map(value => `<td>${value}</td>`).join('')}<td>${sumTotal}</td></tr>`;
-    },
-
-    /* ── 組織型態分佈表 ── */
-    renderHistologyTable: function(histologyData, yearTitle, cancerTitle) {
-        const body = document.getElementById('annualHistologyTableBody');
-        const caption = document.getElementById('annualHistologyCaption');
-        if (!body) return;
-
-        if (caption) caption.innerText = `表、${yearTitle}年${this.getCancerTitleForSentence(cancerTitle)}組織型態分佈表`;
-
-        if (!histologyData || histologyData.length === 0) {
-            body.innerHTML = `<tr><td colspan="4" class="text-center py-4">無資料</td></tr>`;
-            return;
-        }
-
-        const validData = histologyData.filter(item => item.name !== 'Unknown / 未對應組織型態');
-        const totalCount = validData.reduce((sum, item) => sum + item.count, 0);
-
-        const rowsHtml = validData.map(item => {
-            const pct = totalCount > 0 ? ((item.count / totalCount) * 100).toFixed(1) : '0.0';
-            return `
-                <tr>
-                    <td>${item.code}</td>
-                    <td class="text-start">${item.name}</td>
-                    <td>${item.count}</td>
-                    <td>${pct}%</td>
-                </tr>
-            `;
-        }).join('');
-
-        const totalRowHtml = `
-            <tr class="fw-bold" style="background-color: var(--gray-50);">
-                <td>合計</td>
-                <td></td>
-                <td>${totalCount}</td>
-                <td>100.0%</td>
-            </tr>
-        `;
-
-        body.innerHTML = rowsHtml + totalRowHtml;
-    },
-
-    /* ── 年齡中位數表 ── */
-    renderAgeMedianTable: function(medianData, yearTitle, cancerTitle) {
-        const head = document.getElementById('annualAgeMedianTableHead');
-        const body = document.getElementById('annualAgeMedianTableBody');
-        const caption = document.getElementById('annualAgeMedianCaption');
-        if (!head || !body || !medianData) return;
-
-        const columns = ['男性', '女性'];
-        if (caption) caption.innerText = `表、${yearTitle}年新診斷${this.getCancerTitleForSentence(cancerTitle)}病患年齡中位數表`;
-
-        head.innerHTML = `<tr><th rowspan="2" style="vertical-align: middle;">項目</th><th colspan="${columns.length}">發生個案</th></tr><tr>${columns.map(label => `<th>${label}</th>`).join('')}</tr>`;
-        body.innerHTML = `<tr><td>個案數(人)</td><td>${medianData.male_count}</td><td>${medianData.female_count}</td></tr><tr><td>年齡中位數</td><td>${medianData.male}</td><td>${medianData.female}</td></tr><tr><td>性別比</td><td>${medianData.male_ratio}</td><td>${medianData.female_ratio}</td></tr>`;
-    },
-
-    /* ── 癌症登記可分析個案與確診個案表 ── */
-    renderAnalyzableConfirmedTable: function(tableData, yearTitle, cancerTitle) {
-        const head = document.getElementById('annualAnalyzableConfirmedTableHead');
-        const body = document.getElementById('annualAnalyzableConfirmedTableBody');
-        const caption = document.getElementById('annualAnalyzableConfirmedCaption');
-        const note = document.getElementById('annualAnalyzableConfirmedNote');
-        if (!head || !body || !tableData) return;
-
-        if (caption) caption.innerText = `表、${yearTitle}年${this.getCancerTitleForSentence(cancerTitle)}－癌症登記可分析個案與確診個案`;
-
-        head.innerHTML = `<tr><th>${yearTitle}年癌症總數<br>(A)</th><th>*可分析個案數<br>(B)</th><th>可分析個案百分比 %<br>(B/A)</th><th>顯微鏡檢確診個案數<br>(C)</th><th>確診個案百分比 %<br>(C/B)</th></tr>`;
-        body.innerHTML = `<tr><td>${tableData.total_count}</td><td>${tableData.analyzable_count}</td><td>${tableData.analyzable_percent}</td><td>${tableData.confirmed_count}</td><td>${tableData.confirmed_percent}</td></tr>`;
-
-        if (note) {
-            note.innerHTML = `<div>* 可分析個案包含：</div><div class="ms-3">Class1 本院診斷，並於本院接受全部或部分首次治療。</div><div class="ms-3">Class2 他院診斷，於本院接受全部或部分首次治療。</div>`;
-        }
-    },
-
-    /* ── 個案分類分佈圖 ── */
-    renderDiagnosisClassificationChart: function(chartData, yearTitle, cancerTitle) {
+/* ── 個案分類分佈圖 ── */
+window.DashboardRenderer.renderDiagnosisClassificationChart = function(chartData, yearTitle, cancerTitle) {
         let chartDom = document.getElementById('annualDiagnosisClassificationChart');
         if (!chartDom) return;
         
@@ -258,17 +84,7 @@ window.DashboardRenderer = {
 
         const total = chartData.total_count || 1;
         const calcPctNum = (val) => Number((val / total * 100).toFixed(1));
-
-        const colors = [
-            '#5470C6',
-            '#91CC75',
-            '#FAC858',
-            '#EE6666',
-            '#73C0DE',
-            '#3BA272',
-            '#FC8452'
-        ];
-
+        const colors = ['#5470C6','#91CC75','#FAC858','#EE6666','#73C0DE','#3BA272','#FC8452'];
         const labels = [
             'Class0 本院診斷，未於本院接受首次治療',
             'Class1 本院診斷，並於本院接受全部或部分首次治療。',
@@ -281,11 +97,7 @@ window.DashboardRenderer = {
                 text: '個案分類分佈圖',
                 subtext: '資料來源：癌症登記資料庫',
                 left: 'center',
-                textStyle: {
-                    fontSize: 20,
-                    fontWeight: 'bold',
-                    color: '#333'
-                }
+                textStyle: {fontSize: 20,fontWeight: 'bold',color: '#333'}
             },
             toolbox: {
                 show: true,
@@ -301,18 +113,11 @@ window.DashboardRenderer = {
                 itemWidth: 14,
                 itemHeight: 14,
                 data: labels,
-                textStyle: {
-                    fontSize: 14,
-                    lineHeight: 24,
-                    width: 450,
-                    overflow: 'break'
-                }
+                textStyle: {fontSize: 14,lineHeight: 24,width: 450,overflow: 'break'}
             },
             tooltip: {
                 trigger: 'axis',
-                axisPointer: {
-                    type: 'shadow'
-                }
+                axisPointer: {type: 'shadow'}
             },
             grid: {
                 left: '3%',
@@ -325,9 +130,7 @@ window.DashboardRenderer = {
                 {
                     type: 'category',
                     data: ['Class0', 'Class1', 'Class2', 'Class3'],
-                    axisTick: {
-                        alignWithLabel: true
-                    }
+                    axisTick: {alignWithLabel: true}
                 }
             ],
             yAxis: [
@@ -375,12 +178,94 @@ window.DashboardRenderer = {
                 }
             ]
         };
-
         this.classificationChartInst.setOption(option, true);
-    },
+    };
 
-    /* ── 個案分類分佈表 ── */
-    renderDiagnosisClassificationTable: function(tableData, yearTitle, cancerTitle) {
+/* ── 性別與年齡分佈表 ── */
+window.DashboardRenderer.renderSexAgeTable = function(genderAgeData, yearTitle, cancerTitle) {
+        const head = document.getElementById('annualSexAgeTableHead');
+        const body = document.getElementById('annualSexAgeTableBody');
+        const caption = document.getElementById('annualSexAgeCaption');
+        if (!head || !body) return;
+
+        const ageLabels = genderAgeData.categories || [];
+        if (caption) caption.innerText = `表、${yearTitle}年新診斷${this.getCancerTitleForSentence(cancerTitle)}病患性別及年齡分佈表`;
+
+        head.innerHTML = `<tr><th rowspan="2">性別</th><th colspan="${ageLabels.length}">年齡層次</th><th rowspan="2">總計</th></tr><tr>${ageLabels.map(label => `<th>${label}</th>`).join('')}</tr>`;
+        const sumMale = genderAgeData.male.reduce((a, b) => a + b, 0);
+        const sumFemale = genderAgeData.female.reduce((a, b) => a + b, 0);
+        const sumTotal = genderAgeData.total.reduce((a, b) => a + b, 0);
+        body.innerHTML = `<tr><td>男</td>${genderAgeData.male.map(value => `<td>${value}</td>`).join('')}<td>${sumMale}</td></tr><tr><td>女</td>${genderAgeData.female.map(value => `<td>${value}</td>`).join('')}<td>${sumFemale}</td></tr><tr><td>總計</td>${genderAgeData.total.map(value => `<td>${value}</td>`).join('')}<td>${sumTotal}</td></tr>`;
+    };
+
+/* ── 組織型態分佈表 ── */
+window.DashboardRenderer.renderHistologyTable = function(histologyData, yearTitle, cancerTitle) {
+        const body = document.getElementById('annualHistologyTableBody');
+        const caption = document.getElementById('annualHistologyCaption');
+        if (!body) return;
+        if (caption) caption.innerText = `表、${yearTitle}年${this.getCancerTitleForSentence(cancerTitle)}組織型態分佈表`;
+        if (!histologyData || histologyData.length === 0) {
+            body.innerHTML = `<tr><td colspan="4" class="text-center py-4">無資料</td></tr>`;
+            return;}
+
+        const validData = histologyData.filter(item => item.name !== 'Unknown / 未對應組織型態');
+        const totalCount = validData.reduce((sum, item) => sum + item.count, 0);
+        const rowsHtml = validData.map(item => {
+            const pct = totalCount > 0 ? ((item.count / totalCount) * 100).toFixed(1) : '0.0';
+            return `
+                <tr>
+                    <td>${item.code}</td>
+                    <td class="text-start">${item.name}</td>
+                    <td>${item.count}</td>
+                    <td>${pct}%</td>
+                </tr>
+            `;
+        }).join('');
+
+        const totalRowHtml = `
+            <tr class="fw-bold" style="background-color: var(--gray-50);">
+                <td>合計</td>
+                <td></td>
+                <td>${totalCount}</td>
+                <td>100.0%</td>
+            </tr>`;
+        body.innerHTML = rowsHtml + totalRowHtml;
+    };
+
+/* ── 年齡中位數表 ── */
+window.DashboardRenderer.renderAgeMedianTable = function(medianData, yearTitle, cancerTitle) {
+        const head = document.getElementById('annualAgeMedianTableHead');
+        const body = document.getElementById('annualAgeMedianTableBody');
+        const caption = document.getElementById('annualAgeMedianCaption');
+        if (!head || !body || !medianData) return;
+
+        const columns = ['男性', '女性'];
+        if (caption) caption.innerText = `表、${yearTitle}年新診斷${this.getCancerTitleForSentence(cancerTitle)}病患年齡中位數表`;
+
+        head.innerHTML = `<tr><th rowspan="2" style="vertical-align: middle;">項目</th><th colspan="${columns.length}">發生個案</th></tr><tr>${columns.map(label => `<th>${label}</th>`).join('')}</tr>`;
+        body.innerHTML = `<tr><td>個案數(人)</td><td>${medianData.male_count}</td><td>${medianData.female_count}</td></tr><tr><td>年齡中位數</td><td>${medianData.male}</td><td>${medianData.female}</td></tr><tr><td>性別比</td><td>${medianData.male_ratio}</td><td>${medianData.female_ratio}</td></tr>`;
+    };
+
+/* ── 癌症登記可分析個案與確診個案表 ── */
+window.DashboardRenderer.renderAnalyzableConfirmedTable = function(tableData, yearTitle, cancerTitle) {
+        const head = document.getElementById('annualAnalyzableConfirmedTableHead');
+        const body = document.getElementById('annualAnalyzableConfirmedTableBody');
+        const caption = document.getElementById('annualAnalyzableConfirmedCaption');
+        const note = document.getElementById('annualAnalyzableConfirmedNote');
+        if (!head || !body || !tableData) return;
+
+        if (caption) caption.innerText = `表、${yearTitle}年${this.getCancerTitleForSentence(cancerTitle)}－癌症登記可分析個案與確診個案`;
+
+        head.innerHTML = `<tr><th>${yearTitle}年癌症總數<br>(A)</th><th>*可分析個案數<br>(B)</th><th>可分析個案百分比 %<br>(B/A)</th><th>顯微鏡檢確診個案數<br>(C)</th><th>確診個案百分比 %<br>(C/B)</th></tr>`;
+        body.innerHTML = `<tr><td>${tableData.total_count}</td><td>${tableData.analyzable_count}</td><td>${tableData.analyzable_percent}</td><td>${tableData.confirmed_count}</td><td>${tableData.confirmed_percent}</td></tr>`;
+
+        if (note) {
+            note.innerHTML = `<div>* 可分析個案包含：</div><div class="ms-3">Class1 本院診斷，並於本院接受全部或部分首次治療。</div><div class="ms-3">Class2 他院診斷，於本院接受全部或部分首次治療。</div>`;
+        }
+    };
+
+/* ── 個案分類分佈表 ── */
+window.DashboardRenderer.renderDiagnosisClassificationTable = function(tableData, yearTitle, cancerTitle) {
         const head = document.getElementById('annualDiagnosisClassificationTableHead');
         const body = document.getElementById('annualDiagnosisClassificationTableBody');
         const caption = document.getElementById('annualDiagnosisClassificationCaption');
@@ -390,7 +275,7 @@ window.DashboardRenderer = {
 
         head.innerHTML = `<tr><th class="text-center">個案分類</th><th class="text-center">人數</th><th class="text-center">百分比%</th></tr>`;
         
-        const total = tableData.total_count || 1; // avoid div by 0
+        const total = tableData.total_count || 1;
         const calcPct = (val) => (val / total * 100).toFixed(1) + '%';
         
         const classMappings = [
@@ -441,22 +326,13 @@ window.DashboardRenderer = {
                     }
                 });
             }
-        });
-        
+        });    
         html += `<tr class="table-secondary fw-bold" style="font-weight: bold; border-top: 2px solid #6c757d;"><td class="text-center">總計</td><td class="text-center">${tableData.total_count}</td><td class="text-center">100.0%</td></tr>`;
-        
         body.innerHTML = html;
-    },
+    };
 
-    /* ── 顯示年度資料區塊 ── */
-    showAnnualDataContent: function() {
-        document.querySelectorAll('.annual-data-content').forEach(el => {
-            el.classList.remove('d-none');
-        });
-    },
-    
-    /* ── LLM敘述分析 ── */
-    fetchLlmInsight: function(fieldKey, chartData, fields, responseContainerId, buttonId) {
+/* ── LLM敘述分析 ── */
+window.DashboardRenderer.fetchLlmInsight = function(fieldKey, chartData, fields, responseContainerId, buttonId) {
         const container = document.getElementById(responseContainerId);
         const button = document.getElementById(buttonId);
         if (container) container.innerText = '分析中，請稍候...';
@@ -476,8 +352,39 @@ window.DashboardRenderer = {
             if (button) button.disabled = false;
             if (container) container.innerText = 'error';
         });
-    }
-};
+    };
+
+// 取得年度字串
+window.DashboardRenderer.getSelectedYearTitle = function() {
+        const startYear = document.getElementById('filterYearStart')?.value.trim();
+        const endYear = document.getElementById('filterYearEnd')?.value.trim();
+        if (startYear && endYear && startYear !== endYear) return `${startYear}-${endYear}`;
+        return startYear || endYear || 'XXXX';
+    };
+
+// 取得癌症標題
+window.DashboardRenderer.getSelectedCancerTitle = function() {
+        const cancerTitle = window.dashboardSelectedCancerTitle;
+        if (cancerTitle && cancerTitle !== 'XX') return cancerTitle;
+        const btnText = document.getElementById('btnCancerPickerText')?.innerText.trim();
+        if (!btnText || btnText.includes('尚未選擇')) return 'XX';
+        if (btnText.includes('全部癌症')) return '全部癌症';
+        return btnText;
+    };
+
+// 組成癌症字串
+window.DashboardRenderer.getCancerTitleForSentence = function(cancerTitle) {
+        if (!cancerTitle || cancerTitle === 'XX') return 'XX癌';
+        if (cancerTitle.includes('癌') || cancerTitle.includes('全部癌症')) return cancerTitle;
+        return `${cancerTitle}癌`;
+    };
+
+/* ── 顯示年度資料區塊 ── */
+window.DashboardRenderer.showAnnualDataContent = function() {
+        document.querySelectorAll('.annual-data-content').forEach(el => {
+            el.classList.remove('d-none');
+        });
+    };
 
 document.addEventListener('DOMContentLoaded', function() {
     const btnPrepareExport = document.getElementById('btnPrepareExport');
