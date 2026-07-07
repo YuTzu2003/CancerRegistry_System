@@ -111,7 +111,7 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir):
                 if table_node:
                     caption = table_node.find('caption')
                     if caption:
-                        doc.add_paragraph(caption.text.strip())
+                        doc.add_paragraph(caption.get_text(separator='\n').strip())
                         
                     rows = table_node.find_all('tr')
                     if rows:
