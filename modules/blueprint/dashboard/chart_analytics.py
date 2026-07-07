@@ -59,6 +59,7 @@ def filter_dashboard_data(df, cols, cancers=[], year_start="", year_end="", beha
             behavior_col = cols.get("behavior_col")
             year_col = cols.get("year_col")
             ajcc_ed_col = cols.get("ajcc_ed_col")
+            gender_col = cols.get("gender_col")
             res = classify_cancer_group(
                 str(row[site_col]),
                 str(row[hist_col]),
@@ -66,10 +67,12 @@ def filter_dashboard_data(df, cols, cancers=[], year_start="", year_end="", beha
                 behavior=str(row[behavior_col]) if behavior_col else None,
                 didiag=str(row[year_col]) if year_col else None,
                 ajcc_ed=str(row[ajcc_ed_col]) if ajcc_ed_col else None,
+                sex=str(row[gender_col]) if gender_col else None,
             )
             if not res:
                 return False
-            return res["group_key"] in cancers or res["subgroup_key"] in cancers           
+            matched_keys = {res["group_key"], res["subgroup_key"], *res.get("ancestor_subgroup_keys", [])}
+            return bool(matched_keys.intersection(cancers))
         df = df[df.apply(is_selected_cancer, axis=1)]
         
     return df
