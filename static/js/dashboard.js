@@ -9,16 +9,16 @@ document.addEventListener('DOMContentLoaded', function() {
         var myChart = echarts.init(chartDom);
         window.dashboardChartInstance = myChart;
         var option = {
-          title: { text: '性別與年齡分佈', subtext: '請點擊查詢載入資料', left: 'center' },
+          title: { text: '性別與年齡分佈', left: 'center' },
           tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
           legend: { data: ['男性', '女性', '總計'], bottom: 10 },
           toolbox: { feature: { dataView: { show: true, readOnly: false }, saveAsImage: { show: true } } },
           xAxis: [{ type: 'category', data: ['<=19', '20-24', '25-29', '30-34', '35-39', '40-44', '45-49', '50-54', '55-59', '60-64', '65-69', '70-74', '75-79', '80-84', '>=85'], axisPointer: { type: 'shadow' } }],
-          yAxis: [{ type: 'value', name: '各別數', axisLabel: { formatter: '{value}' } }, { type: 'value', name: '總計', axisLabel: { formatter: '{value}' } }],
+          yAxis: [{ type: 'value', name: '個案數', axisLabel: { formatter: '{value}' } }],
           series: [
             { name: '男性', type: 'bar', data: [], itemStyle: { color: '#5470C6' } },
             { name: '女性', type: 'bar', data: [], itemStyle: { color: '#EE6666' } },
-            { name: '總計', type: 'line', yAxisIndex: 1, data: [], itemStyle: { color: '#91CC75' }, smooth: false }
+            { name: '總計', type: 'line', data: [], itemStyle: { color: '#91CC75' }, smooth: false }
           ]
         };
         myChart.setOption(option);
@@ -34,7 +34,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var myHistChart = echarts.init(histChartDom);
         window.dashboardHistologyChartInstance = myHistChart;
         var histOption = {
-          title: { text: '組織型態分佈圖', subtext: '請點擊查詢載入資料', left: 'center' },
+          title: { text: '組織型態分佈圖', left: 'center' },
           tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
           grid: {
             left: 300,
@@ -45,14 +45,20 @@ document.addEventListener('DOMContentLoaded', function() {
           },
           legend: { show: false },
           toolbox: { feature: { dataView: { show: true, readOnly: false }, saveAsImage: { show: true } } },
-          xAxis: { type: 'value', name: '個案數' },
+          xAxis: { 
+            type: 'value', 
+            name: '個案數', 
+            nameLocation: 'middle', 
+            nameGap: 30 
+          },
           yAxis: { 
             type: 'category', 
             data: [], 
             inverse: true,
             axisLabel: {
               width: 280,
-              overflow: 'truncate'
+              overflow: 'break',
+              lineHeight: 16
             }
           },
           series: [
@@ -95,7 +101,6 @@ window.DashboardRenderer.renderDiagnosisClassificationChart = function(chartData
         const option = {
             title: {
                 text: '個案分類分佈圖',
-                subtext: '資料來源：癌症登記資料庫',
                 left: 'center',
                 textStyle: {fontSize: 20,fontWeight: 'bold',color: '#333'}
             },
@@ -318,7 +323,7 @@ window.DashboardRenderer.renderDiagnosisClassificationTable = function(tableData
         classMappings.forEach(cls => {
             const clsTotal = tableData[cls.totalKey] || 0;
             if (clsTotal > 0) {
-                html += `<tr class="table-light fw-bold" style="font-weight: bold; border-top: 2px solid #6c757d;"><td>${cls.title}</td><td class="text-center">${clsTotal}</td><td class="text-center">${calcPct(clsTotal)}</td></tr>`;
+                html += `<tr class="table-light" style="border-top: 2px solid #6c757d;"><td style="font-size: 1.1em; font-weight: 900;">${cls.title}</td><td class="text-center fw-bold" style="font-weight: bold;">${clsTotal}</td><td class="text-center fw-bold" style="font-weight: bold;">${calcPct(clsTotal)}</td></tr>`;
                 cls.subClasses.forEach(sub => {
                     const count = tableData[sub.key] || 0;
                     if (count > 0) {
