@@ -555,6 +555,19 @@
       } else {
         summaryAnalysis.innerHTML = '<span class="text-muted">尚未選擇</span>';
       }
+      
+      document.querySelectorAll('.cat-count-badge').forEach(badge => {
+        const group = badge.getAttribute('data-parent-group');
+        if (group) {
+          const count = document.querySelectorAll(`.item-checkbox:checked[data-parent="${group}"]`).length;
+          if (count > 0) {
+            badge.textContent = count;
+            badge.classList.remove('d-none');
+          } else {
+            badge.classList.add('d-none');
+          }
+        }
+      });
     }
   }
 
@@ -573,6 +586,41 @@
     cb.addEventListener('change', updateSummary);
   });
 
+  document.querySelectorAll('input[name="mainCategoryTab"]').forEach(radio => {
+    radio.addEventListener('change', function() {
+      // Hide all subItems
+      document.querySelectorAll('[id^="subItems-"]').forEach(div => {
+        div.classList.add('d-none');
+      });
+      // Show the selected subItems group
+      if (this.checked) {
+        const group = this.getAttribute('data-group');
+        const targetDiv = document.getElementById('subItems-' + group);
+        if (targetDiv) {
+          targetDiv.classList.remove('d-none');
+        }
+      }
+      updateSummary();
+    });
+  });
+
+  document.querySelectorAll('.cat-nav-btn').forEach(btn => {
+    btn.addEventListener('show.bs.tab', function(e) {
+      const oldTab = e.relatedTarget;
+      if (oldTab) {
+        oldTab.classList.remove('text-primary', 'fw-bold');
+        oldTab.classList.add('text-secondary');
+        oldTab.style.borderLeft = '4px solid transparent';
+      }
+      const newTab = e.target;
+      if (newTab) {
+        newTab.classList.remove('text-secondary');
+        newTab.classList.add('text-primary', 'fw-bold');
+        newTab.style.borderLeft = '4px solid #0d6efd';
+      }
+    });
+  });
+
   updateParentCheckboxes();
   updateStatus();
   checkFiltersState();
@@ -581,25 +629,29 @@
 /* ==========================================
    檔案管理與查詢執行邏輯
    ========================================== */
-document.addEventListener('DOMContentLoaded', function() {
-
+function initDashboardControl() {
   /* ── 檔案列表選擇邏輯 ── */
-  const fileRows = document.querySelectorAll('#dashFileListBody tr');
-  fileRows.forEach(row => {
-      if (row.querySelector('a')) {
-          row.addEventListener('click', function(e) {
-              if (e.target.closest('.btn-del-file')) return;                 
-              e.preventDefault();
-              fileRows.forEach(r => {
-                  r.classList.remove('table-active');
-                  const link = r.querySelector('a');
-                  if(link) link.classList.replace('text-primary', 'text-dark');
-              });
-              this.classList.add('table-active');
-              const activeLink = this.querySelector('a');
-              if(activeLink) activeLink.classList.replace('text-dark', 'text-primary');
-          });
-      }
+  document.addEventListener('click', function(e) {
+      const row = e.target.closest('#dashFileListBody tr');
+      if (!row) return;
+      if (!row.querySelector('a')) return;
+      if (e.target.closest('.btn-del-file')) return;                 
+      
+      e.preventDefault();
+      const fileRows = document.querySelectorAll('#dashFileListBody tr');
+      fileRows.forEach(r => {
+          r.classList.remove('table-active');
+          const link = r.querySelector('a');
+          if(link) link.classList.replace('text-primary', 'text-dark');
+          const badge = r.querySelector('.status-badge-selected');
+          if(badge) badge.style.display = 'none';
+      });
+      
+      row.classList.add('table-active');
+      const activeLink = row.querySelector('a');
+      if(activeLink) activeLink.classList.replace('text-dark', 'text-primary');
+      const activeBadge = row.querySelector('.status-badge-selected');
+      if(activeBadge) activeBadge.style.display = 'inline-block';
   });
 
   /* ── 查詢按鈕執行邏輯 ── */
@@ -709,47 +761,43 @@ document.addEventListener('DOMContentLoaded', function() {
                   
 
 
-                  const btnAiMain = document.getElementById('btnAiMain');
-                  const btnAiMedian = document.getElementById('btnAiMedian');
-                  const btnAiAnalyzable = document.getElementById('btnAiAnalyzable');
-                  const btnAiHistology = document.getElementById('btnAiHistology');
-                  const btnAiDiagnosisClassification = document.getElementById('btnAiDiagnosisClassification');
-                  
-                  if (btnAiMain) {
-                      btnAiMain.style.display = 'block';
-                      btnAiMain.innerHTML = '重新產生敘述';
-                      btnAiMain.onclick = () => window.DashboardRenderer.fetchLlmInsight('性別與年齡分佈', window.lastChartData.genderAgeData, ['性別', '年齡'], 'llmResponseMain', 'btnAiMain');
-                  }
-                  if (btnAiMedian) {
-                      btnAiMedian.style.display = 'block';
-                      btnAiMedian.innerHTML = '重新產生敘述';
-                      btnAiMedian.onclick = () => window.DashboardRenderer.fetchLlmInsight('年齡中位數', window.lastChartData.ageMedianData, ['年齡', '性別'], 'llmResponseMedian', 'btnAiMedian');
-                  }
-                  if (btnAiAnalyzable) {
-                      btnAiAnalyzable.style.display = 'block';
-                      btnAiAnalyzable.innerHTML = '重新產生敘述';
-                      btnAiAnalyzable.onclick = () => window.DashboardRenderer.fetchLlmInsight('癌症登記可分析個案與確診個案', window.lastChartData.analyzableConfirmedData, ['可分析個案', '確診個案'], 'llmResponseAnalyzable', 'btnAiAnalyzable');
-                  }
-                  if (btnAiHistology) {
-                      btnAiHistology.style.display = 'block';
-                      btnAiHistology.innerHTML = '重新產生敘述';
-                      btnAiHistology.onclick = () => window.DashboardRenderer.fetchLlmInsight('組織型態分佈', window.lastChartData.histologyData, ['組織型態', '個案數'], 'llmResponseHistology', 'btnAiHistology');
-                  if (btnAiDiagnosisClassification) {
-                      btnAiDiagnosisClassification.style.display = 'block';
-                      btnAiDiagnosisClassification.innerHTML = '重新產生敘述';
-                      btnAiDiagnosisClassification.onclick = () => window.DashboardRenderer.fetchLlmInsight('個案分類', window.lastChartData.diagnosisClassificationData, ['個案分類'], 'llmResponseDiagnosisClassification', 'btnAiDiagnosisClassification');
-                  }
+                  const llmConfigs = [
+                      { btnId: 'btnAiMain', title: '性別與年齡分佈', dataKey: 'genderAgeData', fields: ['性別', '年齡'], respId: 'llmResponseMain' },
+                      { btnId: 'btnAiMedian', title: '年齡中位數', dataKey: 'ageMedianData', fields: ['年齡', '性別'], respId: 'llmResponseMedian' },
+                      { btnId: 'btnAiAnalyzable', title: '癌症登記可分析個案與確診個案', dataKey: 'analyzableConfirmedData', fields: ['可分析個案', '確診個案'], respId: 'llmResponseAnalyzable' },
+                      { btnId: 'btnAiHistology', title: '組織型態分佈', dataKey: 'histologyData', fields: ['組織型態', '個案數'], respId: 'llmResponseHistology' },
+                      { btnId: 'btnAiDiagnosisClassification', title: '個案分類', dataKey: 'diagnosisClassificationData', fields: ['個案分類'], respId: 'llmResponseDiagnosisClassification' }
+                  ];
 
-                  const llmResponseMain = document.getElementById('llmResponseMain');
-                  if (llmResponseMain) llmResponseMain.innerText = '（系統將自動產生分析敘述）';
-                  const llmResponseMedian = document.getElementById('llmResponseMedian');
-                  if (llmResponseMedian) llmResponseMedian.innerText = '（系統將自動產生分析敘述）';
-                  const llmResponseAnalyzable = document.getElementById('llmResponseAnalyzable');
-                  if (llmResponseAnalyzable) llmResponseAnalyzable.innerText = '（系統將自動產生分析敘述）';
-                  const llmResponseHistology = document.getElementById('llmResponseHistology');
-                  if (llmResponseHistology) llmResponseHistology.innerText = '（系統將自動產生分析敘述）';
-                  const llmResponseDiagnosisClassification = document.getElementById('llmResponseDiagnosisClassification');
-                  if (llmResponseDiagnosisClassification) llmResponseDiagnosisClassification.innerText = '（系統將自動產生分析敘述）';
+                  llmConfigs.forEach(cfg => {
+                      const btn = document.getElementById(cfg.btnId);
+                      if (btn) {
+                          btn.style.display = 'block';
+                          btn.innerHTML = '重新產生敘述';
+                          btn.onclick = () => {
+                              let dataToSend = window.lastChartData[cfg.dataKey];
+                              if (cfg.btnId === 'btnAiHistology' && dataToSend) {
+                                  // 過濾掉 Unknown / 未對應組織型態，並重新計算百分比以與表格配平
+                                  const validHist = dataToSend.filter(item => item.name !== 'Unknown / 未對應組織型態');
+                                  const totalValid = validHist.reduce((sum, item) => sum + item.count, 0);
+                                  dataToSend = validHist.map(item => {
+                                      const pct = totalValid > 0 ? ((item.count / totalValid) * 100).toFixed(1) + '%' : '0.0%';
+                                      return {
+                                          code: item.code,
+                                          name: item.name,
+                                          count: item.count,
+                                          percentage: pct
+                                      };
+                                  });
+                              }
+                              return window.DashboardRenderer.fetchLlmInsight(cfg.title, dataToSend, cfg.fields, cfg.respId, cfg.btnId);
+                          };
+                      }
+                  });
+
+                  document.querySelectorAll('[id^="llmResponse"]').forEach(el => {
+                      el.innerText = '（系統將自動產生分析敘述）';
+                  });
 
                   if (window.DashboardRenderer) {
                       const yearTitle = window.DashboardRenderer.getSelectedYearTitle();
@@ -768,6 +816,7 @@ document.addEventListener('DOMContentLoaded', function() {
                       const histologyChartCaption = document.getElementById('annualHistologyChartCaption');
                       if (histologyChartCaption) {
                           histologyChartCaption.innerText = `圖、${yearTitle}年${window.DashboardRenderer.getCancerTitleForSentence(cancerTitle)}組織型態分佈圖`;
+                      }
                       const classificationChartCaption = document.getElementById('annualDiagnosisClassificationChartCaption');
                       if (classificationChartCaption) {
                           classificationChartCaption.innerText = `圖、${yearTitle}年${window.DashboardRenderer.getCancerTitleForSentence(cancerTitle)}個案分類分佈圖`;
@@ -957,4 +1006,10 @@ document.addEventListener('DOMContentLoaded', function() {
       });
   });
 
-});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initDashboardControl);
+} else {
+  initDashboardControl();
+}

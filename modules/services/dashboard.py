@@ -2,17 +2,18 @@ from flask import Blueprint, request, session, jsonify
 from modules.services.auth import login_required
 from modules.blueprint.dashboard import load_user_favorites, save_user_favorites
 from modules.blueprint.dashboard.reply import get_chart_insight_logic
+from flask import send_file
+from modules.blueprint.dashboard.export_report import generate_export_files
 import os
 import re
 import logging
+import datetime
+from flask import render_template
 
 dashboard_bp = Blueprint('dashboard', __name__, template_folder='../blueprint/dashboard/templates')
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DASHBOARD_DATA = os.path.join(BASE_DIR, 'tasks', 'data')
 os.makedirs(DASHBOARD_DATA, exist_ok=True)
-
-import datetime
-from flask import render_template
 
 @dashboard_bp.route("/dashboard")
 @login_required
@@ -154,8 +155,7 @@ def analyze_dashboard_file_route():
         logging.error(f"Error analyzing dashboard file: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
 
-from flask import send_file
-from modules.blueprint.dashboard.export_report import generate_export_files
+
 
 @dashboard_bp.route('/dashboard/export_report', methods=['GET'])
 @login_required
