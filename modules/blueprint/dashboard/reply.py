@@ -43,7 +43,7 @@ def get_chart_insight_logic(data):
             2. The tone must be professional and objective, suitable for inclusion in a formal cancer registry annual report or medical report.
             3. Do not include extraneous or irrelevant information. Keep it concise.
             4. Keep the explanation within 100 words."""
-    # print(prompt)
+    #print(prompt)
 
     try:
         client, model_name = get_llm_client()
