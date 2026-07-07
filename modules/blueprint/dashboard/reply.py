@@ -1,3 +1,4 @@
+import re
 import json
 import logging
 from modules.services.api import get_llm_client
@@ -54,8 +55,11 @@ def get_chart_insight_logic(data):
                 {"role": "user", "content": prompt}
             ],temperature=0.3
         )
-        insight = response.choices[0].message.content.strip("*-_#` \n\t")
+        content = response.choices[0].message.content
+        insight = re.sub(r'[*#`\n\t]+', '', content).strip()
+        insight = (insight.replace(r'\ge', '>=').replace(r'\le', '<=').replace(r'\neq', '!=').replace('$', ''))
         return {"success": True, "insight": insight}
+    
     except Exception as e:
         logging.error(f"Error in AI analysis: {e}")
         return {"success": False, "error": str(e)}
