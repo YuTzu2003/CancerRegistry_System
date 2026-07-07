@@ -5,15 +5,13 @@ import zipfile
 import base64
 from bs4 import BeautifulSoup
 from docx import Document
-from docx.shared import Pt, Inches
+from docx.shared import Pt, Inches, RGBColor
 from docx.enum.section import WD_ORIENT
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from playwright.sync_api import sync_playwright
 
 def generate_export_files(format_pdf, format_word, charts_data, output_dir):
     os.makedirs(output_dir, exist_ok=True)
-    session_id = str(uuid.uuid4())
-    
-    # Generate temporary HTML structure for Playwright and BeautifulSoup to parse
     html_content = """
     <!DOCTYPE html>
     <html>
@@ -26,11 +24,18 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir):
                 border-collapse: collapse; width: 100%; font-size: 10px; margin-bottom: 20px;
             }
             .annual-report-table th, .annual-report-table td { 
-                border: 1px solid #ccc; padding: 4px; text-align: center;
+                border: 1px solid #ccc; padding: 4px;
             }
             .annual-report-table caption { font-weight: bold; font-size: 14px; margin-bottom: 10px; }
             .chart-img { max-width: 100%; height: auto; margin-bottom: 15px; display: block; }
             .llm-text { background: #f8f9fa; padding: 15px; border-radius: 5px; font-size: 12px; white-space: pre-wrap; margin-top: 15px; }
+            .text-center { text-align: center !important; }
+            .text-start { text-align: left !important; }
+            .text-end { text-align: right !important; }
+            .fw-bold { font-weight: bold !important; }
+            .ps-4 { padding-left: 1.5rem !important; }
+            .table-light { background-color: #f8f9fa !important; }
+            .table-secondary { background-color: #e2e3e5 !important; }
             @page { size: A4 landscape; margin: 1cm; }
         </style>
     </head>
@@ -62,9 +67,7 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir):
             llm_text = chart.get('llmText', '')
             if llm_text:
                 html_content += f'<div class="llm-text"><strong>AI 分析敘述:</strong><br/>{llm_text}</div>'
-            
-        html_content += '</div>'
-        
+        html_content += '</div>'    
     html_content += "</body></html>"
     
     pdf_bytes = None
@@ -108,7 +111,7 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir):
                 if table_node:
                     caption = table_node.find('caption')
                     if caption:
-                        doc.add_paragraph(caption.text.strip())
+                        doc.add_paragraph(caption.get_text(separator='\n').strip())
                         
                     rows = table_node.find_all('tr')
                     if rows:
@@ -126,12 +129,38 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir):
                                 rowspan = int(cell.get('rowspan', 1))
                                 colspan = int(cell.get('colspan', 1))
                                 
+                                # parse classes and styles
+                                cell_classes = cell.get('class', [])
+                                if isinstance(cell_classes, str): cell_classes = cell_classes.split()
+                                row_classes = row.get('class', [])
+                                if isinstance(row_classes, str): row_classes = row_classes.split()
+                                table_classes = table_node.get('class', [])
+                                if isinstance(table_classes, str): table_classes = table_classes.split()
+                                
+                                all_classes = table_classes + row_classes + cell_classes
+                                
+                                style_str = (cell.get('style', '') or '') + ';' + (row.get('style', '') or '')
+                                is_bold = cell.name == 'th' or 'fw-bold' in all_classes or 'bold' in style_str or '900' in style_str
+                                
+                                alignment = WD_ALIGN_PARAGRAPH.CENTER
+                                if 'text-start' in all_classes or 'ps-4' in cell_classes: alignment = WD_ALIGN_PARAGRAPH.LEFT
+                                if 'text-center' in cell_classes: alignment = WD_ALIGN_PARAGRAPH.CENTER
+                                elif 'text-end' in cell_classes: alignment = WD_ALIGN_PARAGRAPH.RIGHT
+                                
+                                font_color = None
+                                import re
+                                color_match = re.search(r'color:\s*([^;]+)', style_str)
+                                if color_match:
+                                    font_color = color_match.group(1).strip()
+                                
                                 # Mark the grid
                                 for r in range(rowspan):
                                     for c in range(colspan):
                                         grid[(r_idx + r, c_idx + c)] = {
                                             'text': cell.text.strip(),
-                                            'is_head': cell.name == 'th' or 'fw-bold' in cell.get('class', []),
+                                            'is_head': is_bold,
+                                            'alignment': alignment,
+                                            'font_color': font_color,
                                             'main_r': r_idx,
                                             'main_c': c_idx,
                                             'rowspan': rowspan,
@@ -160,18 +189,20 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir):
                                     
                             # Write text and apply styles to the main cells
                             written = set()
-                            from docx.enum.text import WD_ALIGN_PARAGRAPH
                             for (r, c), data in grid.items():
                                 mr, mc = data['main_r'], data['main_c']
                                 if (mr, mc) not in written:
                                     w_cell = w_table.cell(mr, mc)
                                     w_cell.text = data['text']
                                     for paragraph in w_cell.paragraphs:
-                                        paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                                        paragraph.alignment = data['alignment']
                                         for run in paragraph.runs:
                                             run.font.size = Pt(8)
                                             if data['is_head']:
                                                 run.font.bold = True
+                                            if data['font_color']:
+                                                if 'darkred' in data['font_color']: run.font.color.rgb = RGBColor(139, 0, 0)
+                                                elif 'red' in data['font_color']: run.font.color.rgb = RGBColor(255, 0, 0)
                                     # Ensure minimal padding to prevent overlap
                                     written.add((mr, mc))
                                             
