@@ -811,21 +811,21 @@ function initDashboardControl() {
                       window.DashboardRenderer.showAnnualDataContent();
                       const chartCaption = document.getElementById('annualSexAgeChartCaption');
                       if (chartCaption) {
-                          chartCaption.innerText = `圖、${yearTitle}年新診斷${window.DashboardRenderer.getCancerTitleForSentence(cancerTitle)}病患性別及年齡分佈圖`;
+                          chartCaption.innerHTML = `圖、${yearTitle}年新診斷${window.DashboardRenderer.getCancerTitleForSentence(cancerTitle)}病患性別及年齡分佈圖<br><span class="text-muted fw-normal" style="font-size: 0.85em;">癌症登記資料庫</span>`;
                       }
                       const histologyChartCaption = document.getElementById('annualHistologyChartCaption');
                       if (histologyChartCaption) {
-                          histologyChartCaption.innerText = `圖、${yearTitle}年${window.DashboardRenderer.getCancerTitleForSentence(cancerTitle)}組織型態分佈圖`;
+                          histologyChartCaption.innerHTML = `圖、${yearTitle}年${window.DashboardRenderer.getCancerTitleForSentence(cancerTitle)}組織型態分佈圖<br><span class="text-muted fw-normal" style="font-size: 0.85em;">癌症登記資料庫</span>`;
                       }
                       const classificationChartCaption = document.getElementById('annualDiagnosisClassificationChartCaption');
                       if (classificationChartCaption) {
-                          classificationChartCaption.innerText = `圖、${yearTitle}年${window.DashboardRenderer.getCancerTitleForSentence(cancerTitle)}個案分類分佈圖`;
+                          classificationChartCaption.innerHTML = `圖、${yearTitle}年${window.DashboardRenderer.getCancerTitleForSentence(cancerTitle)}個案分類分佈圖<br><span class="text-muted fw-normal" style="font-size: 0.85em;">癌症登記資料庫</span>`;
                       }
                   }
 
                   if (window.dashboardChartInstance) {
                       window.dashboardChartInstance.setOption({
-                          title: { text: '性別與年齡分佈', subtext: selectedFile },
+                          title: { text: '性別與年齡分佈', subtext: '癌症登記資料庫' },
                           xAxis: [{ data: chartData.genderAgeData.categories }],
                           series: [
                               { name: '男性', data: chartData.genderAgeData.male },
@@ -847,7 +847,7 @@ function initDashboardControl() {
                       // 動態調整圖表高度，防止柱狀圖項目過多時擠壓重疊
                       const chartDom = document.getElementById('histologyChart');
                       if (chartDom) {
-                          const computedHeight = Math.max(450, categories.length * 30); // 每筆資料給予 30px 的垂直空間，最低 450px
+                          const computedHeight = Math.max(450, categories.length * 40); // 每筆資料給予 40px 的垂直空間，最低 450px
                           chartDom.style.height = computedHeight + 'px';
                           window.dashboardHistologyChartInstance.resize();
                       }
@@ -855,7 +855,7 @@ function initDashboardControl() {
                       window.dashboardHistologyChartInstance.setOption({
                           title: { 
                               text: `${yearTitle}年${cancerTitleSent}組織型態分佈圖`, 
-                              subtext: selectedFile,
+                              subtext: '癌症登記資料庫',
                               left: 'center'
                           },
                           yAxis: { data: categories },

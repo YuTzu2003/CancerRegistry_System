@@ -9,16 +9,16 @@ document.addEventListener('DOMContentLoaded', function() {
         var myChart = echarts.init(chartDom);
         window.dashboardChartInstance = myChart;
         var option = {
-          title: { text: '性別與年齡分佈', subtext: '請點擊查詢載入資料', left: 'center' },
+          title: { text: '性別與年齡分佈', subtext: '癌症登記資料庫', left: 'center' },
           tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
           legend: { data: ['男性', '女性', '總計'], bottom: 10 },
           toolbox: { feature: { dataView: { show: true, readOnly: false }, saveAsImage: { show: true } } },
           xAxis: [{ type: 'category', data: ['<=19', '20-24', '25-29', '30-34', '35-39', '40-44', '45-49', '50-54', '55-59', '60-64', '65-69', '70-74', '75-79', '80-84', '>=85'], axisPointer: { type: 'shadow' } }],
-          yAxis: [{ type: 'value', name: '各別數', axisLabel: { formatter: '{value}' } }, { type: 'value', name: '總計', axisLabel: { formatter: '{value}' } }],
+          yAxis: [{ type: 'value', name: '個案數', axisLabel: { formatter: '{value}' } }],
           series: [
             { name: '男性', type: 'bar', data: [], itemStyle: { color: '#5470C6' } },
             { name: '女性', type: 'bar', data: [], itemStyle: { color: '#EE6666' } },
-            { name: '總計', type: 'line', yAxisIndex: 1, data: [], itemStyle: { color: '#91CC75' }, smooth: false }
+            { name: '總計', type: 'line', data: [], itemStyle: { color: '#91CC75' }, smooth: false }
           ]
         };
         myChart.setOption(option);
@@ -34,7 +34,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var myHistChart = echarts.init(histChartDom);
         window.dashboardHistologyChartInstance = myHistChart;
         var histOption = {
-          title: { text: '組織型態分佈圖', subtext: '請點擊查詢載入資料', left: 'center' },
+          title: { text: '組織型態分佈圖', subtext: '癌症登記資料庫', left: 'center' },
           tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
           grid: {
             left: 300,
@@ -45,14 +45,22 @@ document.addEventListener('DOMContentLoaded', function() {
           },
           legend: { show: false },
           toolbox: { feature: { dataView: { show: true, readOnly: false }, saveAsImage: { show: true } } },
-          xAxis: { type: 'value', name: '個案數' },
+          xAxis: { 
+            type: 'value', 
+            name: '個案數', 
+            nameLocation: 'middle', 
+            nameGap: 30 
+          },
           yAxis: { 
             type: 'category', 
             data: [], 
             inverse: true,
             axisLabel: {
               width: 280,
-              overflow: 'truncate'
+              overflow: 'break',
+              lineHeight: 16,
+              align: 'center',
+              margin: 148
             }
           },
           series: [
@@ -95,7 +103,7 @@ window.DashboardRenderer.renderDiagnosisClassificationChart = function(chartData
         const option = {
             title: {
                 text: '個案分類分佈圖',
-                subtext: '資料來源：癌症登記資料庫',
+                subtext: '癌症登記資料庫',
                 left: 'center',
                 textStyle: {fontSize: 20,fontWeight: 'bold',color: '#333'}
             },
@@ -189,7 +197,7 @@ window.DashboardRenderer.renderSexAgeTable = function(genderAgeData, yearTitle, 
         if (!head || !body) return;
 
         const ageLabels = genderAgeData.categories || [];
-        if (caption) caption.innerText = `表、${yearTitle}年新診斷${this.getCancerTitleForSentence(cancerTitle)}病患性別及年齡分佈表`;
+        if (caption) caption.innerHTML = `表、${yearTitle}年新診斷${this.getCancerTitleForSentence(cancerTitle)}病患性別及年齡分佈表<br><span class="text-muted fw-normal" style="font-size: 0.85em;">癌症登記資料庫</span>`;
 
         head.innerHTML = `<tr><th rowspan="2">性別</th><th colspan="${ageLabels.length}">年齡層次</th><th rowspan="2">總計</th></tr><tr>${ageLabels.map(label => `<th>${label}</th>`).join('')}</tr>`;
         const sumMale = genderAgeData.male.reduce((a, b) => a + b, 0);
@@ -203,7 +211,7 @@ window.DashboardRenderer.renderHistologyTable = function(histologyData, yearTitl
         const body = document.getElementById('annualHistologyTableBody');
         const caption = document.getElementById('annualHistologyCaption');
         if (!body) return;
-        if (caption) caption.innerText = `表、${yearTitle}年${this.getCancerTitleForSentence(cancerTitle)}組織型態分佈表`;
+        if (caption) caption.innerHTML = `表、${yearTitle}年${this.getCancerTitleForSentence(cancerTitle)}組織型態分佈表<br><span class="text-muted fw-normal" style="font-size: 0.85em;">癌症登記資料庫</span>`;
         if (!histologyData || histologyData.length === 0) {
             body.innerHTML = `<tr><td colspan="4" class="text-center py-4">無資料</td></tr>`;
             return;}
@@ -240,7 +248,7 @@ window.DashboardRenderer.renderAgeMedianTable = function(medianData, yearTitle, 
         if (!head || !body || !medianData) return;
 
         const columns = ['男性', '女性'];
-        if (caption) caption.innerText = `表、${yearTitle}年新診斷${this.getCancerTitleForSentence(cancerTitle)}病患年齡中位數表`;
+        if (caption) caption.innerHTML = `表、${yearTitle}年新診斷${this.getCancerTitleForSentence(cancerTitle)}病患年齡中位數表<br><span class="text-muted fw-normal" style="font-size: 0.85em;">癌症登記資料庫</span>`;
 
         head.innerHTML = `<tr><th rowspan="2" style="vertical-align: middle;">項目</th><th colspan="${columns.length}">發生個案</th></tr><tr>${columns.map(label => `<th>${label}</th>`).join('')}</tr>`;
         body.innerHTML = `<tr><td>個案數(人)</td><td>${medianData.male_count}</td><td>${medianData.female_count}</td></tr><tr><td>年齡中位數</td><td>${medianData.male}</td><td>${medianData.female}</td></tr><tr><td>性別比</td><td>${medianData.male_ratio}</td><td>${medianData.female_ratio}</td></tr>`;
@@ -254,7 +262,7 @@ window.DashboardRenderer.renderAnalyzableConfirmedTable = function(tableData, ye
         const note = document.getElementById('annualAnalyzableConfirmedNote');
         if (!head || !body || !tableData) return;
 
-        if (caption) caption.innerText = `表、${yearTitle}年${this.getCancerTitleForSentence(cancerTitle)}－癌症登記可分析個案與確診個案`;
+        if (caption) caption.innerHTML = `表、${yearTitle}年${this.getCancerTitleForSentence(cancerTitle)}－癌症登記可分析個案與確診個案<br><span class="text-muted fw-normal" style="font-size: 0.85em;">癌症登記資料庫</span>`;
 
         head.innerHTML = `<tr><th>${yearTitle}年癌症總數<br>(A)</th><th>*可分析個案數<br>(B)</th><th>可分析個案百分比 %<br>(B/A)</th><th>顯微鏡檢確診個案數<br>(C)</th><th>確診個案百分比 %<br>(C/B)</th></tr>`;
         body.innerHTML = `<tr><td>${tableData.total_count}</td><td>${tableData.analyzable_count}</td><td>${tableData.analyzable_percent}</td><td>${tableData.confirmed_count}</td><td>${tableData.confirmed_percent}</td></tr>`;
@@ -271,7 +279,7 @@ window.DashboardRenderer.renderDiagnosisClassificationTable = function(tableData
         const caption = document.getElementById('annualDiagnosisClassificationCaption');
         if (!head || !body || !tableData) return;
 
-        if (caption) caption.innerText = `表、${yearTitle}年${this.getCancerTitleForSentence(cancerTitle)}個案分類分佈表`;
+        if (caption) caption.innerHTML = `表、${yearTitle}年${this.getCancerTitleForSentence(cancerTitle)}個案分類分佈表<br><span class="text-muted fw-normal" style="font-size: 0.85em;">癌症登記資料庫</span>`;
 
         head.innerHTML = `<tr><th class="text-center">個案分類</th><th class="text-center">人數</th><th class="text-center">百分比%</th></tr>`;
         
@@ -318,7 +326,7 @@ window.DashboardRenderer.renderDiagnosisClassificationTable = function(tableData
         classMappings.forEach(cls => {
             const clsTotal = tableData[cls.totalKey] || 0;
             if (clsTotal > 0) {
-                html += `<tr class="table-light fw-bold" style="font-weight: bold; border-top: 2px solid #6c757d;"><td>${cls.title}</td><td class="text-center">${clsTotal}</td><td class="text-center">${calcPct(clsTotal)}</td></tr>`;
+                html += `<tr class="table-light" style="border-top: 2px solid #6c757d;"><td style="font-size: 1.1em; font-weight: 900;">${cls.title}</td><td class="text-center fw-bold" style="font-weight: bold;">${clsTotal}</td><td class="text-center fw-bold" style="font-weight: bold;">${calcPct(clsTotal)}</td></tr>`;
                 cls.subClasses.forEach(sub => {
                     const count = tableData[sub.key] || 0;
                     if (count > 0) {

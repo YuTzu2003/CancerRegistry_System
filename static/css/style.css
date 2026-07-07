@@ -823,14 +823,12 @@ textarea.form-control { resize: vertical; min-height: 80px; }
    深色模式 (Dark Mode)
    ========================================================== */
 [data-theme="dark"] {
-  /* Base Colors: Google Material dark theme — neutral grey, never pure black */
   --bg: #202124;
   --surface: #292a2d;
   --text: #e8eaed;
   --muted: #9aa0a6;
   --border: #5f6368;
-
-  --white: #292a2d; /* Card backgrounds */
+  --white: #292a2d; 
   --gray-50: #292a2d;
   --gray-100: #35363a;
   --gray-200: #3c4043;
@@ -841,18 +839,14 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   --gray-700: #dadce0;
   --gray-800: #e8eaed;
   --gray-900: #ffffff;
-
-  /* Accent Color: Google Blue (dark-theme variant, as used in Search/Gmail/YouTube) */
   --blue-100: #253242;
   --blue-500: #8ab4f8;
   --blue-600: #669df6;
   --blue-700: #4285f4;
-
   --warning-soft: #332b1a;
   --success-soft: #1e3327;
   --danger-soft: #3c2422;
   --accent-soft: #253242;
-
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.6);
   --shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
 }
@@ -925,7 +919,18 @@ textarea.form-control { resize: vertical; min-height: 80px; }
 }
 
 /* Core component fixes */
-[data-theme="dark"] .bg-light { background-color: var(--gray-100) !important; }
+[data-theme="dark"] .bg-white { background-color: var(--surface) !important; color: var(--text) !important; }
+[data-theme="dark"] .bg-light { background-color: var(--gray-100) !important; color: var(--text) !important; }
+[data-theme="dark"] .table-light { --bs-table-bg: var(--gray-100); --bs-table-color: var(--text); }
+[data-theme="dark"] .table-secondary { --bs-table-bg: var(--gray-200); --bs-table-color: var(--text); }
+[data-theme="dark"] .table { color: var(--text); border-color: var(--border); }
+[data-theme="dark"] .table td, [data-theme="dark"] .table th { border-color: var(--border) !important; }
+[data-theme="dark"] .annual-report-table td, [data-theme="dark"] .annual-report-table th { border-color: var(--border) !important; }
+[data-theme="dark"] .modal-content, [data-theme="dark"] .dropdown-menu, [data-theme="dark"] .card, [data-theme="dark"] .offcanvas, [data-theme="dark"] .swal2-popup, [data-theme="dark"] .list-group-item {
+  background-color: var(--surface) !important;
+  color: var(--text) !important;
+  border-color: var(--border) !important;
+}
 [data-theme="dark"] .border { border-color: var(--border) !important; }
 [data-theme="dark"] .table-excel thead th {
   background: var(--gray-100); color: var(--text); border-bottom: 2px solid var(--border);
@@ -948,18 +953,15 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   padding: 4px;
 }
 
-/* 修正未帶有特殊色彩的 .btn (如快速操作) 在深色模式下的文字與 Icon 顏色 */
 [data-theme="dark"] .btn:not([class*="btn-"]) {
   color: var(--text) !important;
 }
 
-/* 修正 Bootstrap 的 .text-bg-light 在深色模式下變成白底白字的問題 (如 IP 紀錄) */
 [data-theme="dark"] .text-bg-light {
   background-color: var(--gray-100) !important;
   color: var(--text) !important;
 }
 
-/* 修正 Bootstrap 的 dark 與 outline-dark 按鈕在深色模式不明顯的問題 */
 [data-theme="dark"] .btn-dark {
   background-color: #5f6368 !important;
   color: #e8eaed !important;
@@ -981,8 +983,6 @@ textarea.form-control { resize: vertical; min-height: 80px; }
 [data-theme="dark"] .btn-outline-dark:hover * {
   color: #202124 !important;
 }
-
-/* 確保如果元素背景被選到變成白色/亮色時，內部的灰色文字會自動變黑，避免反白看不到 */
 [data-theme="dark"] *:hover > .text-muted,
 [data-theme="dark"] *:hover > .text-secondary,
 [data-theme="dark"] .active > .text-muted,
@@ -992,7 +992,6 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   color: inherit !important;
 }
 
-/* 針對所有按鈕或選取的標籤，如果觸發滯留(hover)或選中(active)，強制內部次要文字跟隨主色 */
 [data-theme="dark"] .btn:hover .text-muted,
 [data-theme="dark"] .btn:hover .text-secondary,
 [data-theme="dark"] .nav-link:hover .text-muted,
