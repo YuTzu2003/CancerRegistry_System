@@ -108,7 +108,7 @@
     <p class="lead">選擇您要輸出的格式（PDF 或 Word），並拖曳調整匯出的先後順序。</p>
   </div>
   <div>
-    <button class="btn btn-secondary" onclick="history.back()"><i class="bi bi-arrow-left"></i> 回上一頁</button>
+    <button class="btn btn-secondary" id="btnBackToDashboard"><i class="bi bi-arrow-left"></i> 回上一頁</button>
   </div>
 </div>
 
@@ -162,9 +162,15 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('btnBackToDashboard')?.addEventListener('click', function() {
+        sessionStorage.setItem('dashboard_reset_filters_on_return', '1');
+        history.back();
+    });
+
     const rawData = localStorage.getItem('dashboard_export_data');
     if (!rawData) {
         utils.alert('找不到可匯出的資料！將返回上一頁。', 'error').then(() => {
+            sessionStorage.setItem('dashboard_reset_filters_on_return', '1');
             history.back();
         });
         return;

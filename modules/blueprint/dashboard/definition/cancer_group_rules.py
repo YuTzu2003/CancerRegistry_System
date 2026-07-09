@@ -194,12 +194,6 @@ LUNG_AND_BRONCHUS = solid_rule(
             site_prefixes=["C33"]
         ),
         subgroup(
-            "Lung_and_Bronchus",
-            "肺、支氣管",
-            "Lung and Bronchus",
-            site_prefixes=["C34"]
-        ),
-        subgroup(
             "Small_cell_carcinoma",
             "肺小細胞癌",
             "Small Cell Carcinoma",
@@ -219,6 +213,17 @@ LUNG_AND_BRONCHUS = solid_rule(
             "Squamous Cell Carcinoma",
             site_prefixes=["C34"],
             hist_include=["8051-8052", "8070-8076", "8083-8084"]
+        ),
+        subgroup(
+            "Lung_and_Bronchus",
+            "肺、支氣管",
+            "Lung and Bronchus",
+            site_prefixes=["C34"],
+            child_keys=[
+                "Small_cell_carcinoma",
+                "Adenocarcinoma",
+                "Squamous_cell_carcinoma",
+            ]
         )
     ]
 )
@@ -244,7 +249,7 @@ CERVIX_UTERI = solid_rule(
 )
 
 # 子宮體癌 Corpus Uteri
-CORPUS_UTERI = solid_rule("Corpus_Uteri", "子宮體癌", "Corpus Uteri", ["C54", "C55"])
+CORPUS_UTERI = solid_rule("Corpus_Uteri", "子宮體癌", "Corpus Uteri", ["C54"])
 
 # 卵巢癌 Ovary
 OVARY = solid_rule("Ovary", "卵巢癌", "Ovary", ["C56"])
@@ -257,7 +262,7 @@ BLADDER = solid_rule(
     "Bladder",
     "膀胱癌",
     "Bladder",
-    ["C67"],
+    ["C679"],
     subgroups=[
         subgroup(
             "Bladder_in_situ",

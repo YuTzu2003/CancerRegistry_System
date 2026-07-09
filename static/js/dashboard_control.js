@@ -6,6 +6,15 @@
     const status = document.getElementById('cancerPickerStatus');
     const leafNodes = document.querySelectorAll('.cancer-cb-leaf:not([value="All_Cancers"])');
     const allCancersNode = document.querySelector('.cancer-cb-leaf[value="All_Cancers"]');
+    const lungHistologyChildChecks = document.querySelectorAll('.lung-histology-child input[type="checkbox"]');
+    const hasCheckedLungHistologyChild = Array.from(lungHistologyChildChecks).some(cb => cb.checked);
+    const lungTopGroup = document.getElementById('chk_group_Lung_and_Bronchus_Trachea');
+    const isDisplayOnlyLungParent = (node) => (
+        node &&
+        node.value === 'Lung_and_Bronchus' &&
+        hasCheckedLungHistologyChild &&
+        !(lungTopGroup && lungTopGroup.checked)
+    );
     
     let specificSelectedCount = 0;
     const selectedValues = [];
@@ -22,7 +31,7 @@
         window.dashboardSelectedCancerTitle = '全癌別';
     } else {
         leafNodes.forEach(node => {
-            if (node.checked) {
+            if (node.checked && !isDisplayOnlyLungParent(node)) {
                 selectedValues.push(node.value);
                 specificSelectedCount++;
             }
@@ -43,7 +52,7 @@
             
             const independentLeaves = [];
             leafNodes.forEach(node => {
-               if(node.checked) {
+               if(node.checked && !isDisplayOnlyLungParent(node)) {
                    const parentGrp = document.getElementById('chk_group_' + node.getAttribute('data-parent')) || 
                                      document.getElementById('chk_group_' + node.getAttribute('data-grandparent'));
                    if(!parentGrp || !parentGrp.checked) {
@@ -83,6 +92,25 @@
     }
   }
 
+  function updateLungHistologyChildrenVisibility() {
+      const lungParent = document.getElementById('chk_Lung_and_Bronchus');
+      const childRows = document.querySelectorAll('.lung-histology-child');
+      const childChecks = document.querySelectorAll('.lung-histology-child input[type="checkbox"]');
+      if (!lungParent || childRows.length === 0) return;
+
+      const hasCheckedChild = Array.from(childChecks).some(cb => cb.checked);
+      const shouldShow = lungParent.checked || hasCheckedChild;
+
+      childRows.forEach(row => {
+          row.classList.toggle('d-none', !shouldShow);
+          row.classList.toggle('d-flex', shouldShow);
+      });
+
+      if (!shouldShow) {
+          childChecks.forEach(cb => { cb.checked = false; });
+      }
+  }
+
   /* ── 癌別選擇事件綁定 ── */
   function updateParentCheckboxes() {
       document.querySelectorAll('.cancer-cb-subgroup').forEach(subgroup => {
@@ -119,6 +147,8 @@
               allCancersGroup.indeterminate = allCheckedLeaves.length > 0;
           }
       }
+
+      updateLungHistologyChildrenVisibility();
 
       document.querySelectorAll('.cat-nav-btn').forEach(navBtn => {
           const targetHref = navBtn.getAttribute('href');
@@ -166,6 +196,10 @@
                 cb.indeterminate = false;
             });
         }
+    } else if (target.id === 'chk_Lung_and_Bronchus' && !target.checked) {
+        document.querySelectorAll('.lung-histology-child input[type="checkbox"]').forEach(cb => {
+            cb.checked = false;
+        });
     } else if (target.classList.contains('cancer-cb-subgroup')) {
         const groupId = target.getAttribute('data-group');
         const isChecked = target.checked;
@@ -468,19 +502,116 @@
   });
   loadPresets();
 
-  document.getElementById('btnResetFilters')?.addEventListener('click', function() {
-    window.location.reload();
-  });
-
   /* ── 篩選欄位邏輯 ── */
   const yearStartInput = document.getElementById('filterYearStart');
   const yearEndInput = document.getElementById('filterYearEnd');
   const behaviorSelect = document.getElementById('filterBehavior');
 
+  window.dashboardFileYearRange = null;
+  window.dashboardYearRangeAlertKey = '';
+
+  window.validateDashboardYearRange = function(showAlert = false) {
+    const ys = yearStartInput ? yearStartInput.value.trim() : '';
+    const ye = yearEndInput ? yearEndInput.value.trim() : '';
+    const range = window.dashboardFileYearRange;
+    if (!range || ys.length !== 4 || ye.length !== 4) return true;
+
+    const start = Number(ys);
+    const end = Number(ye);
+    if (!Number.isFinite(start) || !Number.isFinite(end)) return false;
+
+    const isInvalidOrder = start > end;
+    const isOutside = start < Number(range.year_start) || end > Number(range.year_end);
+    if (isInvalidOrder || isOutside) {
+      const key = `${ys}-${ye}-${range.year_start}-${range.year_end}`;
+      if (showAlert && window.dashboardYearRangeAlertKey !== key) {
+        window.dashboardYearRangeAlertKey = key;
+        utils.alert('查無符合條件資料！', 'warning');
+      }
+      return false;
+    }
+
+    window.dashboardYearRangeAlertKey = '';
+    return true;
+  };
+
+  window.loadDashboardFileYearRange = function(filename) {
+    window.dashboardFileYearRange = null;
+    window.dashboardYearRangeAlertKey = '';
+    if (!filename) return Promise.resolve(null);
+
+    return fetch('/api/dashboard/year_range', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.ok) {
+          window.dashboardFileYearRange = {
+            year_start: Number(data.year_start),
+            year_end: Number(data.year_end)
+          };
+          window.validateDashboardYearRange(true);
+        }
+        checkFiltersState();
+        return window.dashboardFileYearRange;
+      })
+      .catch(() => {
+        window.dashboardFileYearRange = null;
+        checkFiltersState();
+        return null;
+      });
+  };
+
+  function resetDashboardFilters() {
+    if (yearStartInput) yearStartInput.value = '';
+    if (yearEndInput) yearEndInput.value = '';
+    if (behaviorSelect) behaviorSelect.value = '';
+
+    document.querySelectorAll('.cancer-cb-leaf, .cancer-cb-subgroup, .cancer-cb-group').forEach(cb => {
+      cb.checked = false;
+      cb.indeterminate = false;
+    });
+    document.querySelectorAll('.item-checkbox, input[name="mainCategoryTab"]').forEach(cb => {
+      cb.checked = false;
+    });
+    document.querySelectorAll('[id^="subItems-"]').forEach(div => {
+      div.classList.add('d-none');
+    });
+
+    const favPresetSelect = document.getElementById('favPresetSelect');
+    if (favPresetSelect) favPresetSelect.value = '';
+    togglePresetActionButtons(false);
+
+    window.selectedCancers = new Set();
+    window.dashboardSelectedCancerIds = [];
+    window.dashboardSelectedCancerTitle = 'XX';
+
+    document.querySelectorAll('.chart-pane').forEach(pane => {
+      pane.classList.add('d-none');
+    });
+    document.getElementById('chartTabsArea')?.classList.add('d-none');
+    document.getElementById('chartTabsContainer')?.replaceChildren();
+
+    updateParentCheckboxes();
+    updateStatus();
+    checkFiltersState();
+  }
+
+  document.getElementById('btnResetFilters')?.addEventListener('click', resetDashboardFilters);
+
+  window.addEventListener('pageshow', function() {
+    if (sessionStorage.getItem('dashboard_reset_filters_on_return') === '1') {
+      sessionStorage.removeItem('dashboard_reset_filters_on_return');
+      resetDashboardFilters();
+    }
+  });
+
   function checkFiltersState() {
     const ys = yearStartInput ? yearStartInput.value.trim() : '';
     const ye = yearEndInput ? yearEndInput.value.trim() : '';
-    const isYearValid = ys.length === 4 && ye.length === 4;
+    const isYearValid = ys.length === 4 && ye.length === 4 && window.validateDashboardYearRange(false);
 
     const isBehaviorValid = isYearValid && behaviorSelect && behaviorSelect.value !== '';
 
@@ -572,9 +703,20 @@
   }
 
   if (yearStartInput && yearEndInput) {
+    const handleYearInputChange = function() {
+      checkFiltersState();
+      window.validateDashboardYearRange(true);
+    };
     ['input', 'change'].forEach(evtType => {
-      yearStartInput.addEventListener(evtType, checkFiltersState);
-      yearEndInput.addEventListener(evtType, checkFiltersState);
+      yearStartInput.addEventListener(evtType, handleYearInputChange);
+      yearEndInput.addEventListener(evtType, handleYearInputChange);
+    });
+    yearStartInput.addEventListener('keydown', function(e) {
+      if (e.key === 'ArrowRight' && yearStartInput.value.trim().length === 4) {
+        e.preventDefault();
+        yearEndInput.focus();
+        yearEndInput.select();
+      }
     });
   }
   
@@ -652,6 +794,10 @@ function initDashboardControl() {
       if(activeLink) activeLink.classList.replace('text-dark', 'text-primary');
       const activeBadge = row.querySelector('.status-badge-selected');
       if(activeBadge) activeBadge.style.display = 'inline-block';
+      const selectedFilename = activeLink ? activeLink.innerText.trim() : '';
+      if (window.loadDashboardFileYearRange) {
+          window.loadDashboardFileYearRange(selectedFilename);
+      }
   });
 
   /* ── 查詢按鈕執行邏輯 ── */
@@ -673,6 +819,13 @@ function initDashboardControl() {
               utils.alert('請先輸入四位數的年度！', 'warning');
               return;
           }
+
+          const yearStartNum = Number(yearStartVal);
+          const yearEndNum = Number(yearEndVal);
+          if (yearStartNum > yearEndNum) {
+              utils.alert('查無符合條件資料！', 'warning');
+              return;
+          }
           
           const behaviorVal = document.getElementById('filterBehavior')?.value;
           if (!behaviorVal) {
@@ -691,22 +844,35 @@ function initDashboardControl() {
               window.dashboardChartInstance.showLoading({ text: '資料載入中...', color: '#2563eb', textColor: '#212529', maskColor: 'rgba(255, 255, 255, 0.8)', zlevel: 0 });
           }
 
+          const dashboardAnalyzePayload = {
+              filename: selectedFile,
+              cancers: Array.from(window.selectedCancers || []),
+              year_start: yearStartVal,
+              year_end: yearEndVal,
+              behavior: behaviorVal
+          };
           fetch('/api/dashboard/analyze_file', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ 
-                  filename: selectedFile,
-                  cancers: Array.from(window.selectedCancers || []),
-                  year_start: yearStartVal,
-                  year_end: yearEndVal,
-                  behavior: behaviorVal
-              })
+              body: JSON.stringify(dashboardAnalyzePayload)
           })
           .then(res => res.json())
           .then(data => {
               if (data.ok) {
                   const chartData = data.data;
+                  if (chartData && chartData.noDataWarning) {
+                      if (window.utils && window.utils.hideLoading) {
+                          window.utils.hideLoading();
+                      } else if (window.dashboardChartInstance) {
+                          window.dashboardChartInstance.hideLoading();
+                      }
+                      utils.alert(chartData.noDataWarning, 'warning');
+                      return;
+                  }
                   window.lastChartData = chartData;
+
+                  const histologyWarnings = Array.isArray(chartData.histologyWarnings) ? chartData.histologyWarnings : [];
+                  const histologyChecked = Boolean(document.getElementById('chkDiagnosisHistology')?.checked);
 
                   const chartTabsArea = document.getElementById('chartTabsArea');
                   const chartTabsContainer = document.getElementById('chartTabsContainer');
@@ -806,33 +972,37 @@ function initDashboardControl() {
                       window.DashboardRenderer.renderAgeMedianTable(chartData.ageMedianData, yearTitle, cancerTitle);
                       window.DashboardRenderer.renderAnalyzableConfirmedTable(chartData.analyzableConfirmedData, yearTitle, cancerTitle);
                       window.DashboardRenderer.renderHistologyTable(chartData.histologyData, yearTitle, cancerTitle);
+                      window.DashboardRenderer.renderColonHistologyTableNote(chartData.histologyWarnings);
+                      window.DashboardRenderer.renderHistologyWarningButton(histologyChecked ? histologyWarnings : []);
                       window.DashboardRenderer.renderDiagnosisClassificationTable(chartData.diagnosisClassificationData, yearTitle, cancerTitle);
                       window.DashboardRenderer.renderDiagnosisClassificationChart(chartData.diagnosisClassificationData, yearTitle, cancerTitle);
                       window.DashboardRenderer.showAnnualDataContent();
                       const chartCaption = document.getElementById('annualSexAgeChartCaption');
                       if (chartCaption) {
-                          chartCaption.innerHTML = `圖、${yearTitle}年新診斷${window.DashboardRenderer.getCancerTitleForSentence(cancerTitle)}病患性別及年齡分佈圖<br><span class="text-muted fw-normal" style="font-size: 0.85em;">癌症登記資料庫</span>`;
+                          chartCaption.innerHTML = `圖、${yearTitle}年新診斷${window.DashboardRenderer.getCancerTitleForSentence(cancerTitle)}病患性別及年齡分佈圖<br><span class="text-muted fw-normal" style="font-size: 0.85em;">資料來源：癌症登記資料庫</span>`;
                       }
                       const histologyChartCaption = document.getElementById('annualHistologyChartCaption');
                       if (histologyChartCaption) {
-                          histologyChartCaption.innerHTML = `圖、${yearTitle}年${window.DashboardRenderer.getCancerTitleForSentence(cancerTitle)}組織型態分佈圖<br><span class="text-muted fw-normal" style="font-size: 0.85em;">癌症登記資料庫</span>`;
+                          histologyChartCaption.innerHTML = `圖、${yearTitle}年${window.DashboardRenderer.getCancerTitleForSentence(cancerTitle)}組織型態分佈圖<br><span class="text-muted fw-normal" style="font-size: 0.85em;">資料來源：癌症登記資料庫</span>`;
                       }
                       const classificationChartCaption = document.getElementById('annualDiagnosisClassificationChartCaption');
                       if (classificationChartCaption) {
-                          classificationChartCaption.innerHTML = `圖、${yearTitle}年${window.DashboardRenderer.getCancerTitleForSentence(cancerTitle)}個案分類分佈圖<br><span class="text-muted fw-normal" style="font-size: 0.85em;">癌症登記資料庫</span>`;
+                          classificationChartCaption.innerHTML = `圖、${yearTitle}年${window.DashboardRenderer.getCancerTitleForSentence(cancerTitle)}個案分類分佈圖<br><span class="text-muted fw-normal" style="font-size: 0.85em;">資料來源：癌症登記資料庫</span>`;
                       }
                   }
 
                   if (window.dashboardChartInstance) {
-                      window.dashboardChartInstance.setOption({
-                          title: { text: '性別與年齡分佈', subtext: '癌症登記資料庫' },
-                          xAxis: [{ data: chartData.genderAgeData.categories }],
-                          series: [
-                              { name: '男性', data: chartData.genderAgeData.male },
-                              { name: '女性', data: chartData.genderAgeData.female },
-                              { name: '總計', data: chartData.genderAgeData.total }
-                          ]
-                      });
+                      const genderAgeOption = window.DashboardRenderer && window.DashboardRenderer.getGenderAgeChartOption
+                          ? window.DashboardRenderer.getGenderAgeChartOption(chartData.genderAgeData)
+                          : {
+                              xAxis: [{ data: chartData.genderAgeData.categories }],
+                              series: [
+                                  { name: '男性', data: chartData.genderAgeData.male },
+                                  { name: '女性', data: chartData.genderAgeData.female },
+                                  { name: '總計', data: chartData.genderAgeData.total }
+                              ]
+                          };
+                      window.dashboardChartInstance.setOption(genderAgeOption, true);
                   }
 
                   if (window.dashboardHistologyChartInstance && chartData.histologyData) {
@@ -855,7 +1025,7 @@ function initDashboardControl() {
                       window.dashboardHistologyChartInstance.setOption({
                           title: { 
                               text: `${yearTitle}年${cancerTitleSent}組織型態分佈圖`, 
-                              subtext: '癌症登記資料庫',
+                              subtext: '資料來源：癌症登記資料庫',
                               left: 'center'
                           },
                           yAxis: { data: categories },
