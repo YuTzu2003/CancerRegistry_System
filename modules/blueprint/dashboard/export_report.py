@@ -24,14 +24,19 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir):
                 border-collapse: collapse; width: 100%; font-size: 10px; margin-bottom: 20px;
             }
             .annual-report-table th, .annual-report-table td { 
-                border: 1px solid #ccc; padding: 4px;
+                border: 1px solid #ccc; padding: 4px; text-align: center; vertical-align: middle;
             }
             .annual-report-table caption { font-weight: bold; font-size: 14px; margin-bottom: 10px; }
+            #annualHistologyTableNote { color: #dc3545 !important; font-size: 10px !important; margin-top: -14px !important; margin-bottom: 8px !important; }
+            #annualAnalyzableConfirmedNote { margin-top: 6px !important; font-size: 10px !important; line-height: 1.45 !important; text-align: left !important; }
+            #annualAnalyzableConfirmedNote .annual-analyzable-note-item { margin-left: 12px !important; }
             .chart-img { max-width: 100%; height: auto; margin-bottom: 15px; display: block; }
             .llm-text { background: #f8f9fa; padding: 15px; border-radius: 5px; font-size: 12px; white-space: pre-wrap; margin-top: 15px; }
             .text-center { text-align: center !important; }
             .text-start { text-align: left !important; }
             .text-end { text-align: right !important; }
+            .annual-report-table.text-start tbody td:first-child { text-align: left !important; }
+            .annual-report-table.text-start tbody tr.table-secondary td:first-child { text-align: center !important; }
             .fw-bold { font-weight: bold !important; }
             .ps-4 { padding-left: 1.5rem !important; }
             .table-light { background-color: #f8f9fa !important; }
@@ -143,9 +148,12 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir):
                                 is_bold = cell.name == 'th' or 'fw-bold' in all_classes or 'bold' in style_str or '900' in style_str
                                 
                                 alignment = WD_ALIGN_PARAGRAPH.CENTER
-                                if 'text-start' in all_classes or 'ps-4' in cell_classes: alignment = WD_ALIGN_PARAGRAPH.LEFT
-                                if 'text-center' in cell_classes: alignment = WD_ALIGN_PARAGRAPH.CENTER
-                                elif 'text-end' in cell_classes: alignment = WD_ALIGN_PARAGRAPH.RIGHT
+                                if 'text-start' in all_classes or 'ps-4' in cell_classes:
+                                    alignment = WD_ALIGN_PARAGRAPH.LEFT
+                                if 'text-center' in cell_classes:
+                                    alignment = WD_ALIGN_PARAGRAPH.CENTER
+                                elif 'text-end' in cell_classes:
+                                    alignment = WD_ALIGN_PARAGRAPH.RIGHT
                                 
                                 font_color = None
                                 import re
@@ -205,6 +213,31 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir):
                                                 elif 'red' in data['font_color']: run.font.color.rgb = RGBColor(255, 0, 0)
                                     # Ensure minimal padding to prevent overlap
                                     written.add((mr, mc))
+
+                    analyzable_note = table_node.find_next_sibling(id='annualAnalyzableConfirmedNote')
+                    if analyzable_note:
+                        note_lines = [line.strip() for line in analyzable_note.get_text(separator='\n').split('\n') if line.strip()]
+                        for idx, note_line in enumerate(note_lines):
+                            note_paragraph = doc.add_paragraph(note_line)
+                            note_paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                            note_paragraph.paragraph_format.space_before = Pt(0)
+                            note_paragraph.paragraph_format.space_after = Pt(0)
+                            if idx > 0:
+                                note_paragraph.paragraph_format.left_indent = Inches(0.12)
+                            for run in note_paragraph.runs:
+                                run.font.size = Pt(8)
+
+                    histology_note = table_node.find_next_sibling(id='annualHistologyTableNote')
+                    if histology_note:
+                        note_text = histology_note.get_text(separator='\n').strip()
+                        if note_text:
+                            note_paragraph = doc.add_paragraph(note_text)
+                            note_paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                            note_paragraph.paragraph_format.space_before = Pt(0)
+                            note_paragraph.paragraph_format.space_after = Pt(0)
+                            for run in note_paragraph.runs:
+                                run.font.size = Pt(8)
+                                run.font.color.rgb = RGBColor(220, 53, 69)
                                             
                 img_node = sec.find('img', class_='chart-img')
                 if img_node and img_node.get('data-idx'):

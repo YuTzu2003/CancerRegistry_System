@@ -499,6 +499,18 @@
                   <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Lung_and_Bronchus" value="Lung_and_Bronchus" data-parent="Lung_and_Bronchus_Trachea">
                   <label class="form-check-label text-secondary" for="chk_Lung_and_Bronchus">肺、支氣管</label>
                 </div>
+                <div class="form-check mb-2 ms-5 d-none align-items-center gap-2 lung-histology-child">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Small_cell_carcinoma" value="Small_cell_carcinoma" data-parent="Lung_and_Bronchus" data-grandparent="Lung_and_Bronchus_Trachea">
+                  <label class="form-check-label text-secondary" for="chk_Small_cell_carcinoma">肺小細胞癌 Small Cell Carcinoma</label>
+                </div>
+                <div class="form-check mb-2 ms-5 d-none align-items-center gap-2 lung-histology-child">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Adenocarcinoma" value="Adenocarcinoma" data-parent="Lung_and_Bronchus" data-grandparent="Lung_and_Bronchus_Trachea">
+                  <label class="form-check-label text-secondary" for="chk_Adenocarcinoma">肺腺癌 Adenocarcinoma</label>
+                </div>
+                <div class="form-check mb-2 ms-5 d-none align-items-center gap-2 lung-histology-child">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Squamous_cell_carcinoma" value="Squamous_cell_carcinoma" data-parent="Lung_and_Bronchus" data-grandparent="Lung_and_Bronchus_Trachea">
+                  <label class="form-check-label text-secondary" for="chk_Squamous_cell_carcinoma">肺鱗狀細胞癌 Squamous Cell Carcinoma</label>
+                </div>
               </div>
               <div class="tab-pane fade  p-4" id="list-Cervix_Uteri" role="tabpanel">
                 <div class="form-check mb-3 pb-2 border-bottom d-flex align-items-center gap-2">
@@ -645,4 +657,4 @@
   </div>
 </div>
 
-<script src="{{ url_for('static', filename='js/dashboard_control.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard_control.js') }}?v=20260709-year-arrow"></script>

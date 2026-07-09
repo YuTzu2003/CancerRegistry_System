@@ -1004,3 +1004,19 @@ textarea.form-control { resize: vertical; min-height: 80px; }
 [data-theme="dark"] .naming-chip.selected .text-secondary {
   color: inherit !important;
 }
+
+
+.histology-warning-popup {
+  width: max-content !important;
+  max-width: calc(100vw - 48px) !important;
+}
+
+.histology-warning-popup .swal2-html-container {
+  overflow-x: auto !important;
+  overflow-y: visible !important;
+  max-width: none !important;
+}
+
+.histology-warning-popup .histology-warning-dialog {
+  white-space: nowrap;
+}
