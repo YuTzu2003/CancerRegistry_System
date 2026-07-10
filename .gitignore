@@ -20,3 +20,5 @@ Jobs/
 .env
 *.json
 AGENTS.md
+CLAUDE.md
+GEMINI.md
