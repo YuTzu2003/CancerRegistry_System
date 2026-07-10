@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}癌症登記資料清洗模組｜癌症登記平台{% endblock %}
+{% block title %}資料清洗模組｜癌症資料登記{% endblock %}
 {% block page_title %}癌症登記資料清洗模組{% endblock %}
 
 {% block content %}
@@ -21,7 +21,7 @@
 <!-- ===================== 參考資料格式 ===================== -->
 <section class="card-flat">
   <div class="section-head">
-    <h2><span class="dot"></span> 登記申報格式</h2>
+    <h2><span class="dot" style="background: var(--bs-primary);"></span> 登記申報格式</h2>
     <div class="d-flex align-items-center gap-2">
       <span class="hint">可新增、修改、刪除作為本次清洗依據的格式</span>
       {% if session.position == 'Admin' %}
@@ -108,7 +108,7 @@
 <!-- ===================== 上傳 ===================== -->
 <section class="card-flat" id="uploadPanel">
   <div class="section-head">
-    <h2><span class="dot"></span> 資料上傳與檢核</h2>
+    <h2><span class="dot" style="background: var(--bs-primary);"></span> 資料上傳與檢核</h2>
     <span class="hint">支援 Txt / Csv / Xls / Xlsx</span>
   </div>
   <div class="section-body">
@@ -179,7 +179,7 @@
   <div class="d-flex flex-column gap-3">
     <section class="card-flat" id="fieldAnalysisSection">
       <div class="section-head">
-        <h2><span class="dot"></span>清洗個案清單明細</h2>
+        <h2><span class="dot" style="background: var(--bs-primary);"></span>清洗個案清單明細</h2>
         <div class="d-flex align-items-center gap-2">
         <button class="btn btn-outline-dark btn-sm" type="button" id="btnDownloadCleaned">
           <i class="bi bi-file-earmark-excel"></i> 下載清洗結果 XLSX
@@ -213,7 +213,7 @@
   <!-- 右側：清洗結果分析 -->
   <section class="card-flat">
     <div class="section-head">
-      <h2><span class="dot"></span>清洗結果分析</h2>
+      <h2><span class="dot" style="background: var(--bs-primary);"></span>清洗結果分析</h2>
       <div class="d-flex align-items-center gap-2">
         <span id="detectedSystemBadge" class="badge bg-secondary" style="display: none;">偵測體系：<span id="detectedSystemName"></span></span>
         <button class="btn btn-outline-dark btn-sm" type="button" id="btnDownloadReport">
@@ -277,7 +277,7 @@
 <!-- ===================== 輸出欄位命名 ===================== -->
 <section class="card-flat">
   <div class="section-head">
-    <h2><span class="dot"></span> 模組欄位輸出設定</h2>
+    <h2><span class="dot" style="background: var(--bs-primary);"></span> 模組欄位輸出設定</h2>
     <span class="hint">勾選要輸出的欄位，並可設定輸出檔名及命名規則</span>
   </div>
   <div class="section-body">

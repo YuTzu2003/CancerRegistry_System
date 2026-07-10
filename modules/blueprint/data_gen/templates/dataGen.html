@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}虛擬資料生成 - 癌症登記資料平台{% endblock %}
+{% block title %}虛擬資料生成｜癌症資料登記{% endblock %}
 {% block page_title %}虛擬資料生成{% endblock %}
 {% block extra_head %}
 
@@ -82,10 +82,10 @@
 </div>
 
 <div class="card-flat mb-4">
-  <div class="section-head">
-    <div class="d-flex align-items-center flex-grow-1">
-      <h2><span class="dot"></span>資料上傳與格式設定</h2>
-      <span class="hint ms-3">支援 CSV, Excel 格式</span>
+  <div class="section-head d-flex justify-content-between align-items-center">
+    <div class="d-flex align-items-center gap-2">
+      <h2 class="mb-0"><span class="dot" style="background: var(--bs-success);"></span> 資料上傳與格式設定</h2>
+      <span class="hint mb-0">支援 CSV, Excel 格式</span>
     </div>
     <div class="header-actions" id="actionGroup" style="display: none;">
       <button class="btn btn-outline-secondary" onclick="resetUpload()">
@@ -124,9 +124,11 @@
 
 <!-- ===================== 輸出欄位命名 ===================== -->
 <section class="card-flat mb-4" id="namingSection" style="display: none;">
-  <div class="section-head">
-    <h2><span class="dot"></span> 模組欄位輸出設定</h2>
-    <span class="hint">選擇輸出 XLSX 欄位標頭採用的命名來源</span>
+  <div class="section-head d-flex justify-content-between align-items-center">
+    <div class="d-flex align-items-center gap-2">
+      <h2 class="mb-0"><span class="dot" style="background: var(--bs-success);"></span> 模組欄位輸出設定</h2>
+      <span class="hint mb-0">選擇輸出 XLSX 欄位標頭採用的命名來源</span>
+    </div>
   </div>
   <div class="section-body">
     <div class="naming-grid" id="namingScheme">
@@ -247,14 +249,12 @@
 
 <div class="result-section" id="resultSection">
   <div class="card-flat">
-    <div class="section-head">
-      <h2><i class="bi bi-check-circle-fill me-2 text-success"></i>結果預覽 (前20筆)</h2>
+    <div class="section-head d-flex justify-content-between align-items-center">
+      <h2 class="mb-0"><i class="bi bi-check-circle-fill me-2 text-success"></i>結果預覽 (前20筆)</h2>
+      <button class="btn btn-success text-white" onclick="downloadResult()">下載 XLSX</button>
     </div>
     <div class="section-body">
-      <div class="download-actions">
-        <div class="d-flex gap-2">
-          <button class="btn btn-success text-white" onclick="downloadResult()">下載 XLSX</button>
-        </div>
+      <div class="download-actions justify-content-end">
         <span class="text-muted small">滑動表格查看完整欄位</span>
       </div>
       
