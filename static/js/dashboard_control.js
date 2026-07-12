@@ -1010,9 +1010,16 @@ function initDashboardControl() {
                       const cancerTitle = window.DashboardRenderer ? window.DashboardRenderer.getSelectedCancerTitle() : '';
                       const cancerTitleSent = window.DashboardRenderer ? window.DashboardRenderer.getCancerTitleForSentence(cancerTitle) : '';
                       const validData = chartData.histologyData.filter(item => item.name !== 'Unknown / 未對應組織型態');
+                      const totalValid = validData.reduce((sum, item) => sum + item.count, 0);
                       const topData = validData.reverse();
                       const categories = topData.map(item => item.name);
-                      const counts = topData.map(item => item.count);
+                      const chartSeriesData = topData.map(item => {
+                          const pct = totalValid > 0 ? parseFloat(((item.count / totalValid) * 100).toFixed(1)) : 0;
+                          return {
+                              value: pct,
+                              count: item.count
+                          };
+                      });
 
                       // 動態調整圖表高度，防止柱狀圖項目過多時擠壓重疊
                       const chartDom = document.getElementById('histologyChart');
@@ -1030,7 +1037,7 @@ function initDashboardControl() {
                           },
                           yAxis: { data: categories },
                           series: [
-                              { data: counts }
+                              { data: chartSeriesData }
                           ]
                       });
                   }
