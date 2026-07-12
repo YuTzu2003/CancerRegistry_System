@@ -97,7 +97,17 @@ document.addEventListener('DOMContentLoaded', function() {
         window.dashboardHistologyChartInstance = myHistChart;
         var histOption = {
           title: { text: '組織型態分佈圖', subtext: '資料來源：癌症登記資料庫', left: 'center' },
-          tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+          tooltip: { 
+            trigger: 'axis', 
+            axisPointer: { type: 'shadow' },
+            formatter: function(params) {
+              const p = params[0];
+              if (!p || p.value === undefined || p.value === '-') return '';
+              const count = p.data && p.data.count !== undefined ? p.data.count : '-';
+              const val = typeof p.value === 'number' ? p.value.toFixed(1) : p.value;
+              return `${p.name}<br/>${p.marker}個案比例: ${val}% (${count}人)`;
+            }
+          },
           grid: {
             left: 300,
             right: 40,
@@ -109,9 +119,16 @@ document.addEventListener('DOMContentLoaded', function() {
           toolbox: { feature: { dataView: { show: true, readOnly: false }, saveAsImage: { show: true } } },
           xAxis: { 
             type: 'value', 
-            name: '個案數', 
+            name: '百分比 (%)', 
             nameLocation: 'middle', 
-            nameGap: 30 
+            nameGap: 30,
+            min: 0,
+            interval: 10,
+            axisLabel: {
+              formatter: function(value) {
+                return value.toFixed(1) + '%';
+              }
+            }
           },
           yAxis: { 
             type: 'category', 
@@ -127,11 +144,17 @@ document.addEventListener('DOMContentLoaded', function() {
           },
           series: [
             {
-              name: '個案數',
+              name: '個案比例',
               type: 'bar',
               data: [],
               itemStyle: { color: '#73c0de' },
-              label: { show: true, position: 'right' }
+              label: { 
+                show: false, 
+                position: 'right',
+                formatter: function(params) {
+                  return typeof params.value === 'number' ? params.value.toFixed(1) + '%' : params.value;
+                }
+              }
             }
           ]
         };
