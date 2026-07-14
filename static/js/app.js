@@ -90,26 +90,27 @@
   autoHideAlerts();
   window.autoHideAlerts = autoHideAlerts;
 
-  // 佈景主題切換 (Dark Mode Toggle)
-  const themeToggleBtn = document.getElementById('themeToggleBtn');
-  const themeIcon = document.getElementById('themeIcon');
-  
-  if (themeToggleBtn && themeIcon) {
-    if (document.documentElement.getAttribute('data-theme') === 'dark') {
-      themeIcon.classList.replace('bi-sun', 'bi-moon');
-    }
-    
-    themeToggleBtn.addEventListener('click', () => {
-      let theme = document.documentElement.getAttribute('data-theme');
-      if (theme === 'dark') {
-        document.documentElement.removeAttribute('data-theme');
-        localStorage.setItem('theme', 'light');
-        themeIcon.classList.replace('bi-moon', 'bi-sun');
-      } else {
-        document.documentElement.setAttribute('data-theme', 'dark');
-        localStorage.setItem('theme', 'dark');
-        themeIcon.classList.replace('bi-sun', 'bi-moon');
-      }
+
+
+  // 語言切換 (Language Toggle)
+  const langToggleBtn = document.getElementById('langToggleBtn');
+  const langText = document.getElementById('langText');
+
+  if (langToggleBtn && langText) {
+    const currentLang = localStorage.getItem('language') || 'zh-TW';
+    document.documentElement.lang = currentLang;
+    langText.textContent = currentLang === 'zh-TW' ? 'EN' : '中';
+
+    langToggleBtn.addEventListener('click', () => {
+      let lang = localStorage.getItem('language') || 'zh-TW';
+      let newLang = lang === 'zh-TW' ? 'en-US' : 'zh-TW';
+      
+      localStorage.setItem('language', newLang);
+      document.documentElement.lang = newLang;
+      langText.textContent = newLang === 'zh-TW' ? 'EN' : '中';
+      
+      // 若有結合多國語系 (i18n) 套件或需重載頁面，可在此加上：
+      // window.location.reload();
     });
   }
 

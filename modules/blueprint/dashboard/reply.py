@@ -4,11 +4,34 @@ import logging
 from modules.services.api import get_llm_client
 from modules.services.db import get_conn
 
+STYLE_PROMPTS = {
+    "balanced": """
+            Use a calm, neutral, and objective analytical style.
+            Clearly describe the main statistical trends and population distribution.
+            Avoid overly strong conclusions or speculative statements.
+            Use language suitable for general medical data interpretation.
+            """,
+
+    "formal": """
+            Use a rigorous, formal, and professional oncology reporting style.
+            The content must be suitable for inclusion in a cancer registry annual report
+            or formal medical report. Use precise medical, epidemiological, and statistical
+            terminology. Avoid conversational expressions and subjective judgments.
+            """,
+
+    "concise": """
+            Use a concise medical summary style.
+            Focus only on the most important statistical trend, population characteristic,
+            and clinical or public health significance.
+            Avoid repeating values or providing unnecessary background information.
+            """
+}
+
 def get_chart_insight_logic(data):
     field_key = data.get("field_key", "")
     chart_data = data.get("data", {})
     fields = data.get("fields", [])
-    
+    mode_ai = data.get("mode_ai", "balanced")
     definitions = []
     
     if fields:
@@ -27,24 +50,32 @@ def get_chart_insight_logic(data):
 
     if definitions:
         def_section = f"[Related Field Definitions]:\n" + "\n".join(definitions)
-        analysis_instruction = "Please provide a formal data insight and analytical narrative based on the definitions and information provided above."
     else:
         def_section = ""
-        analysis_instruction = "(No related field definitions are available; please interpret directly based on the data content.)\nPlease provide a formal data insight and analytical narrative based on the chart data above."
+    style_instruction = STYLE_PROMPTS.get(mode_ai, STYLE_PROMPTS["balanced"])
 
-    prompt = f"""You are a professional medical and oncology data analysis expert. Please provide a rigorous and formal analysis based on the cancer registry statistical chart data provided below.
-            [Chart Topic]: {field_key}
-            {def_section}
-            [Data Content]: {json.dumps(chart_data, ensure_ascii=False)}
-            
-            {analysis_instruction}
-            The content should include trends shown by the data, population distribution characteristics, and their clinical or public health significance.
-            Notes:
-            1. Please provide the analysis content directly without any opening remarks or greetings.
-            2. The tone must be professional and objective, suitable for inclusion in a formal cancer registry annual report or medical report.
-            3. Do not include extraneous or irrelevant information. Keep it concise.
-            4. Keep the explanation within 100 words."""
-    #print(prompt)
+    prompt = f"""
+                You are a professional medical and oncology data analysis expert.
+                Please provide a rigorous analysis based strictly on the cancer registry
+                statistical chart data provided below.
+                [Chart Topic]{field_key}
+                [Definition]{def_section}
+                [Data Content]{json.dumps(chart_data, ensure_ascii=False)}
+                [Writing Style]{style_instruction}
+
+                [Analysis Requirements]
+                The content should include:
+                1. The principal trends shown by the data.
+                2. Important population distribution characteristics.
+                3. Relevant clinical, epidemiological, or public health significance.
+
+                Notes:
+                1. Provide the analysis directly without opening remarks or greetings.
+                2. Base all conclusions strictly on the supplied data.
+                3. Do not infer causes that cannot be supported by the data.
+                4. Do not include irrelevant background information.
+                5. Keep the response within 100 words.
+            """
 
     try:
         client, model_name = get_llm_client()

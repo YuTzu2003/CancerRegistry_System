@@ -118,6 +118,14 @@
               <span id="btnCancerPickerText">所有癌別</span>
             </button>
           </div>
+          <div class="filter-group">
+            <label>敘述風格</label>
+            <select id="mode_ai" style="min-width: 130px;">
+                <option value="balanced" selected>平穩客觀</option>
+                <option value="formal">正式報告</option>
+                <option value="concise">精簡摘要</option>
+            </select>
+          </div>
         </div>
 
         <div id="mainCategoryArea">
@@ -255,6 +263,10 @@
           <div class="d-flex mb-2">
             <span class="text-secondary" style="width: 70px; flex-shrink: 0;">性態碼：</span>
             <span id="summaryBehavior" class="text-dark fw-medium">尚未選擇</span>
+          </div>
+          <div class="d-flex mb-2">
+            <span class="text-secondary" style="width: 70px; flex-shrink: 0;">敘述風格：</span>
+            <span id="summaryAiStyle" class="text-dark fw-medium">平穩客觀</span>
           </div>
           <div class="d-flex mb-2">
             <span class="text-secondary" style="width: 70px; flex-shrink: 0;">癌別：</span>

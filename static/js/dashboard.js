@@ -539,7 +539,8 @@ window.DashboardRenderer.fetchLlmInsight = function(fieldKey, chartData, fields,
         if (container) container.innerText = '分析中，請稍候...';
         if (button) button.disabled = true;
 
-        return fetch('/api/chart_insight', {method: 'POST',headers: { 'Content-Type': 'application/json' },body: JSON.stringify({ field_key: fieldKey, data: chartData, fields: fields })})
+        const modeAi = document.getElementById('mode_ai') ? document.getElementById('mode_ai').value : 'balanced';
+        return fetch('/api/chart_insight', {method: 'POST',headers: { 'Content-Type': 'application/json' },body: JSON.stringify({ field_key: fieldKey, data: chartData, fields: fields, mode_ai: modeAi })})
         .then(res => res.json())
         .then(data => {
             if (button) button.disabled = false;
