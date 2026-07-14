@@ -510,6 +510,73 @@
   window.dashboardFileYearRange = null;
   window.dashboardYearRangeAlertKey = '';
 
+  function setYearSelectPlaceholder(selectEl, text) {
+    if (!selectEl) return;
+    selectEl.replaceChildren();
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = text;
+    option.disabled = true;
+    option.selected = true;
+    selectEl.appendChild(option);
+    selectEl.disabled = true;
+  }
+
+  function fillYearOptions(selectEl, start, end) {
+    if (!selectEl) return;
+    for (let year = start; year <= end; year += 1) {
+      const option = document.createElement('option');
+      option.value = String(year);
+      option.textContent = String(year);
+      selectEl.appendChild(option);
+    }
+  }
+
+  function refreshYearEndOptions() {
+    const range = window.dashboardFileYearRange;
+    if (!yearEndInput || !range) return;
+
+    const rangeStart = Number(range.year_start);
+    const rangeEnd = Number(range.year_end);
+    if (!Number.isInteger(rangeStart) || !Number.isInteger(rangeEnd) || rangeStart > rangeEnd) return;
+
+    const selectedEnd = yearEndInput.value;
+    const selectedStartValue = yearStartInput?.value || '';
+    const selectedStart = Number(selectedStartValue);
+    const endStart = selectedStartValue.length === 4 && Number.isInteger(selectedStart) ? selectedStart : rangeStart;
+
+    setYearSelectPlaceholder(yearEndInput, '結束');
+    fillYearOptions(yearEndInput, endStart, rangeEnd);
+    yearEndInput.disabled = false;
+
+    if (selectedEnd && Number(selectedEnd) >= endStart && Number(selectedEnd) <= rangeEnd) {
+      yearEndInput.value = selectedEnd;
+    } else {
+      yearEndInput.value = '';
+    }
+  }
+
+  function populateYearSelects(range) {
+    if (!yearStartInput || !yearEndInput) return;
+    setYearSelectPlaceholder(yearStartInput, '起始');
+    setYearSelectPlaceholder(yearEndInput, '結束');
+
+    const start = Number(range?.year_start);
+    const end = Number(range?.year_end);
+    if (!Number.isInteger(start) || !Number.isInteger(end) || start > end) return;
+
+    fillYearOptions(yearStartInput, start, end);
+    fillYearOptions(yearEndInput, start, end);
+
+    yearStartInput.disabled = false;
+    yearEndInput.disabled = false;
+    yearStartInput.value = '';
+    yearEndInput.value = '';
+  }
+
+  setYearSelectPlaceholder(yearStartInput, '起始');
+  setYearSelectPlaceholder(yearEndInput, '結束');
+
   window.validateDashboardYearRange = function(showAlert = false) {
     const ys = yearStartInput ? yearStartInput.value.trim() : '';
     const ye = yearEndInput ? yearEndInput.value.trim() : '';
@@ -523,11 +590,6 @@
     const isInvalidOrder = start > end;
     const isOutside = start < Number(range.year_start) || end > Number(range.year_end);
     if (isInvalidOrder || isOutside) {
-      const key = `${ys}-${ye}-${range.year_start}-${range.year_end}`;
-      if (showAlert && window.dashboardYearRangeAlertKey !== key) {
-        window.dashboardYearRangeAlertKey = key;
-        utils.alert('查無符合條件資料！', 'warning');
-      }
       return false;
     }
 
@@ -538,6 +600,8 @@
   window.loadDashboardFileYearRange = function(filename) {
     window.dashboardFileYearRange = null;
     window.dashboardYearRangeAlertKey = '';
+    setYearSelectPlaceholder(yearStartInput, '起始');
+    setYearSelectPlaceholder(yearEndInput, '結束');
     if (!filename) return Promise.resolve(null);
 
     return fetch('/api/dashboard/year_range', {
@@ -552,7 +616,8 @@
             year_start: Number(data.year_start),
             year_end: Number(data.year_end)
           };
-          window.validateDashboardYearRange(true);
+          populateYearSelects(window.dashboardFileYearRange);
+          window.validateDashboardYearRange(false);
         }
         checkFiltersState();
         return window.dashboardFileYearRange;
@@ -565,8 +630,12 @@
   };
 
   function resetDashboardFilters() {
-    if (yearStartInput) yearStartInput.value = '';
-    if (yearEndInput) yearEndInput.value = '';
+    if (window.dashboardFileYearRange) {
+      populateYearSelects(window.dashboardFileYearRange);
+    } else {
+      setYearSelectPlaceholder(yearStartInput, '起始');
+      setYearSelectPlaceholder(yearEndInput, '結束');
+    }
     if (behaviorSelect) behaviorSelect.value = '';
 
     document.querySelectorAll('.cancer-cb-leaf, .cancer-cb-subgroup, .cancer-cb-group').forEach(cb => {
@@ -703,20 +772,14 @@
   }
 
   if (yearStartInput && yearEndInput) {
-    const handleYearInputChange = function() {
+    yearStartInput.addEventListener('change', function() {
+      refreshYearEndOptions();
       checkFiltersState();
-      window.validateDashboardYearRange(true);
-    };
-    ['input', 'change'].forEach(evtType => {
-      yearStartInput.addEventListener(evtType, handleYearInputChange);
-      yearEndInput.addEventListener(evtType, handleYearInputChange);
+      window.validateDashboardYearRange(false);
     });
-    yearStartInput.addEventListener('keydown', function(e) {
-      if (e.key === 'ArrowRight' && yearStartInput.value.trim().length === 4) {
-        e.preventDefault();
-        yearEndInput.focus();
-        yearEndInput.select();
-      }
+    yearEndInput.addEventListener('change', function() {
+      checkFiltersState();
+      window.validateDashboardYearRange(false);
     });
   }
   
@@ -822,8 +885,8 @@ function initDashboardControl() {
 
           const yearStartNum = Number(yearStartVal);
           const yearEndNum = Number(yearEndVal);
-          if (yearStartNum > yearEndNum) {
-              utils.alert('查無符合條件資料！', 'warning');
+          window.dashboardYearRangeAlertKey = '';
+          if (yearStartNum > yearEndNum || !window.validateDashboardYearRange(true)) {
               return;
           }
           
