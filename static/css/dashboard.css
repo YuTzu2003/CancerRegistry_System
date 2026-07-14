@@ -132,6 +132,19 @@
   background-position: right 10px center;
 }
 
+.filter-group select.year-select {
+  width: 80px;
+  min-width: 0;
+  padding: 8px 22px 8px 8px;
+  text-align: center;
+  text-align-last: center;
+  background-position: right 7px center;
+}
+
+.filter-group select.year-select option {
+  text-align: center;
+}
+
 .filter-group select:focus {
   outline: none;
   border-color: var(--blue-500);

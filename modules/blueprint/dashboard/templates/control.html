@@ -94,9 +94,13 @@
           <div class="filter-group">
             <label>年度</label>
             <div class="d-flex align-items-center gap-2">
-              <input type="number" id="filterYearStart" class="form-control px-2" placeholder="起始" style="width: 80px; text-align: center; min-width: 0;" oninput="if(this.value.length>4) this.value=this.value.slice(0,4);">
+              <select id="filterYearStart" class="form-select year-select" disabled>
+                <option value="" disabled selected>起始</option>
+              </select>
               <span class="text-secondary" style="font-size: 14px;">-</span>
-              <input type="number" id="filterYearEnd" class="form-control px-2" placeholder="結束" style="width: 80px; text-align: center; min-width: 0;" oninput="if(this.value.length>4) this.value=this.value.slice(0,4);">
+              <select id="filterYearEnd" class="form-select year-select" disabled>
+                <option value="" disabled selected>結束</option>
+              </select>
             </div>
           </div>
           <div class="filter-group">
@@ -659,4 +663,4 @@
   </div>
 </div>
 
-<script src="{{ url_for('static', filename='js/dashboard_control.js') }}?v=20260709-year-arrow"></script>
+<script src="{{ url_for('static', filename='js/dashboard_control.js') }}?v=20260714-year-select"></script>
