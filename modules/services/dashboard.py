@@ -8,6 +8,7 @@ import os
 import re
 import logging
 import datetime
+import pandas as pd
 from flask import render_template
 
 dashboard_bp = Blueprint('dashboard', __name__, template_folder='../blueprint/dashboard/templates')
@@ -46,6 +47,40 @@ def dashboard_upload():
     f.save(save_path)
     logging.info(f"Dashboard upload: {filename} saved to {save_path}")
     return jsonify({"ok": True, "filename": filename})
+
+
+@dashboard_bp.route('/api/dashboard/year_range', methods=['POST'])
+@login_required
+def dashboard_year_range():
+    data = request.json or {}
+    filename = os.path.basename(data.get("filename", ""))
+    if not filename:
+        return jsonify({"ok": False, "error": "未選擇檔案"}), 400
+
+    fpath = os.path.join(DASHBOARD_DATA, filename)
+    if not os.path.isfile(fpath):
+        return jsonify({"ok": False, "error": "檔案不存在"}), 404
+
+    try:
+        from modules.blueprint.dashboard.chart_analytics import get_column_names
+        df = pd.read_excel(fpath)
+        cols = get_column_names(df)
+        year_col = cols.get("year_col")
+        if not year_col or year_col not in df.columns:
+            return jsonify({"ok": False, "error": "找不到診斷年度欄位"}), 400
+
+        years = pd.to_numeric(df[year_col].astype(str).str[:4], errors="coerce").dropna()
+        if years.empty:
+            return jsonify({"ok": False, "error": "查無符合條件資料！"}), 400
+
+        return jsonify({
+            "ok": True,
+            "year_start": int(years.min()),
+            "year_end": int(years.max())
+        }), 200
+    except Exception as e:
+        logging.error(f"Error reading dashboard year range: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 @dashboard_bp.route("/dashboard/delete", methods=["POST"])
 @login_required

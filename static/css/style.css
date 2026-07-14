@@ -362,6 +362,7 @@ a {
   display: flex; align-items: center; justify-content: space-between;
   gap: 12px;
   padding: 14px 18px;
+  min-height: 60px;
   border-bottom: 1px solid var(--border);
   background: linear-gradient(180deg, #fbfcfd 0%, var(--white) 100%);
 }
@@ -1003,4 +1004,20 @@ textarea.form-control { resize: vertical; min-height: 80px; }
 [data-theme="dark"] .naming-chip.selected .text-muted,
 [data-theme="dark"] .naming-chip.selected .text-secondary {
   color: inherit !important;
+}
+
+
+.histology-warning-popup {
+  width: max-content !important;
+  max-width: calc(100vw - 48px) !important;
+}
+
+.histology-warning-popup .swal2-html-container {
+  overflow-x: auto !important;
+  overflow-y: visible !important;
+  max-width: none !important;
+}
+
+.histology-warning-popup .histology-warning-dialog {
+  white-space: nowrap;
 }

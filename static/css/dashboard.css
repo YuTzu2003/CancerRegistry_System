@@ -132,6 +132,19 @@
   background-position: right 10px center;
 }
 
+.filter-group select.year-select {
+  width: 80px;
+  min-width: 0;
+  padding: 8px 22px 8px 8px;
+  text-align: center;
+  text-align-last: center;
+  background-position: right 7px center;
+}
+
+.filter-group select.year-select option {
+  text-align: center;
+}
+
 .filter-group select:focus {
   outline: none;
   border-color: var(--blue-500);
@@ -305,6 +318,18 @@
   padding-bottom: 4px;
   text-align: center;
   white-space: nowrap;
+}
+
+
+.annual-analyzable-note {
+  margin-top: 6px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #111827;
+}
+
+.annual-analyzable-note-item {
+  margin-left: 12px;
 }
 
 .annual-median-table {

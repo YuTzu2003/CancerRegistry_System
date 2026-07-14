@@ -2,26 +2,88 @@ window.dashboardChartInstance = null;
 window.dashboardHistologyChartInstance = null;
 window.DashboardRenderer = {};
 
+window.DashboardRenderer.getGenderAgeChartOption = function(genderAgeData) {
+        const categories = genderAgeData?.categories || ['<=19', '20-24', '25-29', '30-34', '35-39', '40-44', '45-49', '50-54', '55-59', '60-64', '65-69', '70-74', '75-79', '80-84', '>=85'];
+        const male = genderAgeData?.male || [];
+        const female = genderAgeData?.female || [];
+        const total = genderAgeData?.total || [];
+        const maxValue = Math.max(0, ...male, ...female, ...total);
+        const yMax = Math.max(10, Math.ceil((maxValue * 1.15) / 5) * 5);
+
+        return {
+          title: {
+            text: '性別與年齡分佈',
+            subtext: '資料來源：癌症登記資料庫',
+            left: 'center',
+            top: 0,
+            textStyle: { fontSize: 16, fontWeight: 'bold' },
+            subtextStyle: { fontSize: 12 }
+          },
+          tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+          grid: { left: 72, right: 72, top: 70, bottom: 78, containLabel: false },
+          legend: { data: ['男性', '女性', '總計'], bottom: 28, itemGap: 12 },
+          toolbox: { right: 16, top: 0, feature: { dataView: { show: true, readOnly: false }, saveAsImage: { show: true } } },
+          xAxis: [{
+            type: 'category',
+            data: categories,
+            axisPointer: { type: 'shadow' },
+            axisTick: { alignWithLabel: true },
+            axisLabel: { interval: 0 }
+          }],
+          yAxis: [{
+            type: 'value',
+            name: '個案數',
+            min: 0,
+            max: yMax,
+            minInterval: 1,
+            splitNumber: 5,
+            axisLabel: { formatter: '{value}' },
+            splitLine: { lineStyle: { color: '#e5eaf3' } }
+          }],
+          series: [
+            {
+              name: '男性',
+              type: 'bar',
+              data: male,
+              barWidth: 20,
+              barGap: '20%',
+              barCategoryGap: '42%',
+              itemStyle: { color: '#5470C6' }
+            },
+            {
+              name: '女性',
+              type: 'bar',
+              data: female,
+              barWidth: 20,
+              itemStyle: { color: '#EE6666' }
+            },
+            {
+              name: '總計',
+              type: 'line',
+              data: total,
+              symbol: 'circle',
+              symbolSize: 5,
+              smooth: false,
+              z: 5,
+              itemStyle: { color: '#91CC75' },
+              lineStyle: { color: '#91CC75', width: 2 }
+            }
+          ]
+        };
+    };
+
 document.addEventListener('DOMContentLoaded', function() {
     /* ── 性別與年齡分佈圖表 ── */
     var chartDom = document.getElementById('main');
     if (chartDom) {
         var myChart = echarts.init(chartDom);
         window.dashboardChartInstance = myChart;
-        var option = {
-          title: { text: '性別與年齡分佈', subtext: '癌症登記資料庫', left: 'center' },
-          tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
-          legend: { data: ['男性', '女性', '總計'], bottom: 10 },
-          toolbox: { feature: { dataView: { show: true, readOnly: false }, saveAsImage: { show: true } } },
-          xAxis: [{ type: 'category', data: ['<=19', '20-24', '25-29', '30-34', '35-39', '40-44', '45-49', '50-54', '55-59', '60-64', '65-69', '70-74', '75-79', '80-84', '>=85'], axisPointer: { type: 'shadow' } }],
-          yAxis: [{ type: 'value', name: '個案數', axisLabel: { formatter: '{value}' } }],
-          series: [
-            { name: '男性', type: 'bar', data: [], itemStyle: { color: '#5470C6' } },
-            { name: '女性', type: 'bar', data: [], itemStyle: { color: '#EE6666' } },
-            { name: '總計', type: 'line', data: [], itemStyle: { color: '#91CC75' }, smooth: false }
-          ]
-        };
-        myChart.setOption(option);
+        myChart.setOption(window.DashboardRenderer.getGenderAgeChartOption({
+          categories: ['<=19', '20-24', '25-29', '30-34', '35-39', '40-44', '45-49', '50-54', '55-59', '60-64', '65-69', '70-74', '75-79', '80-84', '>=85'],
+          male: [],
+          female: [],
+          total: []
+        }));
         
         window.addEventListener('resize', function() {
             myChart.resize();
@@ -34,8 +96,18 @@ document.addEventListener('DOMContentLoaded', function() {
         var myHistChart = echarts.init(histChartDom);
         window.dashboardHistologyChartInstance = myHistChart;
         var histOption = {
-          title: { text: '組織型態分佈圖', subtext: '癌症登記資料庫', left: 'center' },
-          tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+          title: { text: '組織型態分佈圖', subtext: '資料來源：癌症登記資料庫', left: 'center' },
+          tooltip: { 
+            trigger: 'axis', 
+            axisPointer: { type: 'shadow' },
+            formatter: function(params) {
+              const p = params[0];
+              if (!p || p.value === undefined || p.value === '-') return '';
+              const count = p.data && p.data.count !== undefined ? p.data.count : '-';
+              const val = typeof p.value === 'number' ? p.value.toFixed(1) : p.value;
+              return `${p.name}<br/>${p.marker}個案比例: ${val}% (${count}人)`;
+            }
+          },
           grid: {
             left: 300,
             right: 40,
@@ -47,9 +119,16 @@ document.addEventListener('DOMContentLoaded', function() {
           toolbox: { feature: { dataView: { show: true, readOnly: false }, saveAsImage: { show: true } } },
           xAxis: { 
             type: 'value', 
-            name: '個案數', 
+            name: '百分比 (%)', 
             nameLocation: 'middle', 
-            nameGap: 30 
+            nameGap: 30,
+            min: 0,
+            interval: 10,
+            axisLabel: {
+              formatter: function(value) {
+                return value.toFixed(1) + '%';
+              }
+            }
           },
           yAxis: { 
             type: 'category', 
@@ -65,11 +144,17 @@ document.addEventListener('DOMContentLoaded', function() {
           },
           series: [
             {
-              name: '個案數',
+              name: '個案比例',
               type: 'bar',
               data: [],
               itemStyle: { color: '#73c0de' },
-              label: { show: true, position: 'right' }
+              label: { 
+                show: false, 
+                position: 'right',
+                formatter: function(params) {
+                  return typeof params.value === 'number' ? params.value.toFixed(1) + '%' : params.value;
+                }
+              }
             }
           ]
         };
@@ -103,7 +188,7 @@ window.DashboardRenderer.renderDiagnosisClassificationChart = function(chartData
         const option = {
             title: {
                 text: '個案分類分佈圖',
-                subtext: '癌症登記資料庫',
+                subtext: '資料來源：癌症登記資料庫',
                 left: 'center',
                 textStyle: {fontSize: 20,fontWeight: 'bold',color: '#333'}
             },
@@ -197,7 +282,7 @@ window.DashboardRenderer.renderSexAgeTable = function(genderAgeData, yearTitle, 
         if (!head || !body) return;
 
         const ageLabels = genderAgeData.categories || [];
-        if (caption) caption.innerHTML = `表、${yearTitle}年新診斷${this.getCancerTitleForSentence(cancerTitle)}病患性別及年齡分佈表<br><span class="text-muted fw-normal" style="font-size: 0.85em;">癌症登記資料庫</span>`;
+        if (caption) caption.innerHTML = `表、${yearTitle}年新診斷${this.getCancerTitleForSentence(cancerTitle)}病患性別及年齡分佈表<br><span class="text-muted fw-normal" style="font-size: 0.85em;">資料來源：癌症登記資料庫</span>`;
 
         head.innerHTML = `<tr><th rowspan="2">性別</th><th colspan="${ageLabels.length}">年齡層次</th><th rowspan="2">總計</th></tr><tr>${ageLabels.map(label => `<th>${label}</th>`).join('')}</tr>`;
         const sumMale = genderAgeData.male.reduce((a, b) => a + b, 0);
@@ -206,14 +291,122 @@ window.DashboardRenderer.renderSexAgeTable = function(genderAgeData, yearTitle, 
         body.innerHTML = `<tr><td>男</td>${genderAgeData.male.map(value => `<td>${value}</td>`).join('')}<td>${sumMale}</td></tr><tr><td>女</td>${genderAgeData.female.map(value => `<td>${value}</td>`).join('')}<td>${sumFemale}</td></tr><tr><td>總計</td>${genderAgeData.total.map(value => `<td>${value}</td>`).join('')}<td>${sumTotal}</td></tr>`;
     };
 
+/* ── 組織型態不適用個案說明按鈕 ── */
+window.DashboardRenderer.currentHistologyWarnings = [];
+
+window.DashboardRenderer.escapeHtml = function(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    };
+
+window.DashboardRenderer.showHistologyWarningDetails = function(histologyWarnings) {
+        const warnings = Array.isArray(histologyWarnings) ? histologyWarnings : [];
+        if (warnings.length === 0) return;
+
+        const warningLines = warnings.map(item => {
+            const user = this.escapeHtml(item.user || '未知個案');
+            const message = this.escapeHtml(item.message || `${item.icdo_code || ''} 未納入 1.3 組織型態規則`);
+            const rawDataMessage = item.raw_data_message
+                ? `<span class="fw-bold text-danger ms-1">${this.escapeHtml(item.raw_data_message)}</span>`
+                : '';
+            const detail = this.escapeHtml(item.detail_message || '若此組織型態無特殊適用條件，則此組織代碼組合不屬於目前統計規則範圍');
+            return `
+                <div class="mb-3 text-start histology-warning-item">
+                    <div class="text-nowrap">${user}：${message}${rawDataMessage}</div>
+                    <div class="text-nowrap">說明：${detail}</div>
+                </div>
+            `;
+        }).join('');
+        const warningHtml = `
+            <div class="text-center histology-warning-dialog">
+                <div class="mb-3 text-nowrap">以下個案未納入組織型態統計：</div>
+                <div class="mx-auto text-start" style="display: inline-block; min-width: max-content; max-width: none; overflow-x: visible; padding: 0 4px;">${warningLines}</div>
+            </div>
+        `;
+
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                icon: 'warning',
+                html: warningHtml,
+                confirmButtonText: '確定',
+                confirmButtonColor: '#dc3545',
+                width: 'auto',
+                allowOutsideClick: false,
+                customClass: { popup: 'histology-warning-popup' }
+            });
+        } else {
+            const alertLines = warnings.map(item => {
+                const user = item.user || '未知個案';
+                const message = item.message || `${item.icdo_code || ''} 未納入 1.3 組織型態規則`;
+                const rawDataMessage = item.raw_data_message ? ` ${item.raw_data_message}` : '';
+                const detail = item.detail_message || '若此組織型態無特殊適用條件，則此組織代碼組合不屬於目前統計規則範圍';
+                return `${user}：${message}${rawDataMessage}\n說明：${detail}`;
+            }).join('\n\n');
+            alert(`以下個案未納入組織型態統計：\n\n${alertLines}`);
+        }
+    };
+
+window.DashboardRenderer.renderHistologyWarningButton = function(histologyWarnings) {
+        const button = document.getElementById('histologyWarningButton');
+        if (!button) return;
+
+        const warnings = Array.isArray(histologyWarnings) ? histologyWarnings : [];
+        this.currentHistologyWarnings = warnings;
+
+        if (warnings.length === 0) {
+            button.classList.add('d-none');
+            button.textContent = '不適用個案說明';
+            return;
+        }
+
+        button.classList.remove('d-none');
+        button.textContent = `不適用個案說明 (${warnings.length})`;
+        if (button.dataset.boundHistologyWarning !== '1') {
+            button.addEventListener('click', () => {
+                this.showHistologyWarningDetails(this.currentHistologyWarnings);
+            });
+            button.dataset.boundHistologyWarning = '1';
+        }
+    };
+
+/* ── 結腸癌組織型態表格註記 ── */
+window.DashboardRenderer.renderColonHistologyTableNote = function(histologyWarnings) {
+        const tableNote = document.getElementById('annualHistologyTableNote');
+        if (!tableNote) return;
+
+        const warnings = Array.isArray(histologyWarnings) ? histologyWarnings : [];
+        const colonNotes = warnings.filter(item => {
+            const code = String(item.icdo_code || '');
+            const site = String(item.site || '').toUpperCase();
+            return code === '8211/2' && site.startsWith('C18');
+        });
+
+        if (colonNotes.length === 0) {
+            tableNote.classList.add('d-none');
+            tableNote.innerHTML = '';
+            return;
+        }
+
+        tableNote.classList.remove('d-none');
+        tableNote.innerHTML = colonNotes.map(item => {
+            const user = item.user || '未知個案';
+            return `註：有一筆組織型態不適用，已排除統計（${user} 不符合 M8211 診斷年度規範）`;
+        }).join('<br>');
+    };
+
 /* ── 組織型態分佈表 ── */
 window.DashboardRenderer.renderHistologyTable = function(histologyData, yearTitle, cancerTitle) {
         const body = document.getElementById('annualHistologyTableBody');
         const caption = document.getElementById('annualHistologyCaption');
         if (!body) return;
-        if (caption) caption.innerHTML = `表、${yearTitle}年${this.getCancerTitleForSentence(cancerTitle)}組織型態分佈表<br><span class="text-muted fw-normal" style="font-size: 0.85em;">癌症登記資料庫</span>`;
+        if (caption) caption.innerHTML = `表、${yearTitle}年${this.getCancerTitleForSentence(cancerTitle)}組織型態分佈表<br><span class="text-muted fw-normal" style="font-size: 0.85em;">資料來源：癌症登記資料庫</span>`;
         if (!histologyData || histologyData.length === 0) {
             body.innerHTML = `<tr><td colspan="4" class="text-center py-4">無資料</td></tr>`;
+            this.renderColonHistologyTableNote([]);
             return;}
 
         const validData = histologyData.filter(item => item.name !== 'Unknown / 未對應組織型態');
@@ -248,7 +441,7 @@ window.DashboardRenderer.renderAgeMedianTable = function(medianData, yearTitle, 
         if (!head || !body || !medianData) return;
 
         const columns = ['男性', '女性'];
-        if (caption) caption.innerHTML = `表、${yearTitle}年新診斷${this.getCancerTitleForSentence(cancerTitle)}病患年齡中位數表<br><span class="text-muted fw-normal" style="font-size: 0.85em;">癌症登記資料庫</span>`;
+        if (caption) caption.innerHTML = `表、${yearTitle}年新診斷${this.getCancerTitleForSentence(cancerTitle)}病患年齡中位數表<br><span class="text-muted fw-normal" style="font-size: 0.85em;">資料來源：癌症登記資料庫</span>`;
 
         head.innerHTML = `<tr><th rowspan="2" style="vertical-align: middle;">項目</th><th colspan="${columns.length}">發生個案</th></tr><tr>${columns.map(label => `<th>${label}</th>`).join('')}</tr>`;
         body.innerHTML = `<tr><td>個案數(人)</td><td>${medianData.male_count}</td><td>${medianData.female_count}</td></tr><tr><td>年齡中位數</td><td>${medianData.male}</td><td>${medianData.female}</td></tr><tr><td>性別比</td><td>${medianData.male_ratio}</td><td>${medianData.female_ratio}</td></tr>`;
@@ -262,13 +455,13 @@ window.DashboardRenderer.renderAnalyzableConfirmedTable = function(tableData, ye
         const note = document.getElementById('annualAnalyzableConfirmedNote');
         if (!head || !body || !tableData) return;
 
-        if (caption) caption.innerHTML = `表、${yearTitle}年${this.getCancerTitleForSentence(cancerTitle)}－癌症登記可分析個案與確診個案<br><span class="text-muted fw-normal" style="font-size: 0.85em;">癌症登記資料庫</span>`;
+        if (caption) caption.innerHTML = `表、${yearTitle}年${this.getCancerTitleForSentence(cancerTitle)}－癌症登記可分析個案與確診個案<br><span class="text-muted fw-normal" style="font-size: 0.85em;">資料來源：癌症登記資料庫</span>`;
 
         head.innerHTML = `<tr><th>${yearTitle}年癌症總數<br>(A)</th><th>*可分析個案數<br>(B)</th><th>可分析個案百分比 %<br>(B/A)</th><th>顯微鏡檢確診個案數<br>(C)</th><th>確診個案百分比 %<br>(C/B)</th></tr>`;
         body.innerHTML = `<tr><td>${tableData.total_count}</td><td>${tableData.analyzable_count}</td><td>${tableData.analyzable_percent}</td><td>${tableData.confirmed_count}</td><td>${tableData.confirmed_percent}</td></tr>`;
 
         if (note) {
-            note.innerHTML = `<div>* 可分析個案包含：</div><div class="ms-3">Class1 本院診斷，並於本院接受全部或部分首次治療。</div><div class="ms-3">Class2 他院診斷，於本院接受全部或部分首次治療。</div>`;
+            note.innerHTML = `<div>* 可分析個案包含：</div><div class="annual-analyzable-note-item">Class1 本院診斷，並於本院接受全部或部分首次治療。</div><div class="annual-analyzable-note-item">Class2 他院診斷，於本院接受全部或部分首次治療。</div>`;
         }
     };
 
@@ -279,7 +472,7 @@ window.DashboardRenderer.renderDiagnosisClassificationTable = function(tableData
         const caption = document.getElementById('annualDiagnosisClassificationCaption');
         if (!head || !body || !tableData) return;
 
-        if (caption) caption.innerHTML = `表、${yearTitle}年${this.getCancerTitleForSentence(cancerTitle)}個案分類分佈表<br><span class="text-muted fw-normal" style="font-size: 0.85em;">癌症登記資料庫</span>`;
+        if (caption) caption.innerHTML = `表、${yearTitle}年${this.getCancerTitleForSentence(cancerTitle)}個案分類分佈表<br><span class="text-muted fw-normal" style="font-size: 0.85em;">資料來源：癌症登記資料庫</span>`;
 
         head.innerHTML = `<tr><th class="text-center">個案分類</th><th class="text-center">人數</th><th class="text-center">百分比%</th></tr>`;
         

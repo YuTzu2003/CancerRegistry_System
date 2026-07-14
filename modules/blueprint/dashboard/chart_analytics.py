@@ -34,9 +34,48 @@ def get_column_names(df):
         "confirm_col": _find_column(df, ["confirm", "確診方式", "確診"]) or _column_by_index(df, 20),
         "diag_status_col": _find_column(df, ["診斷狀態分類", "診斷狀態"]),
         "treat_status_col": _find_column(df, ["治療狀態分類", "治療狀態"]),
+        "patient_id_col": _find_column(df, ["病歷號碼", "user", "id"]),
     }
 
 # 性別年齡分布圖
+
+def _empty_dashboard_response(message="查無符合條件資料！"):
+    return {
+        "noDataWarning": message,
+        "genderAgeData": {"male": [], "female": [], "total": []},
+        "ageMedianData": [],
+        "analyzableConfirmedData": [],
+        "histologyData": [],
+        "histologyWarnings": [],
+        "diagnosisClassificationData": []
+    }
+
+
+def _diagnosis_years(df, year_col):
+    if not year_col or year_col not in df.columns:
+        return pd.Series(dtype="float64")
+    return pd.to_numeric(df[year_col].astype(str).str[:4], errors="coerce").dropna()
+
+
+def _query_year_range_outside_data(df, cols, year_start, year_end):
+    if not (year_start and year_end):
+        return False
+
+    year_col = cols.get("year_col")
+    years = _diagnosis_years(df, year_col)
+    if years.empty:
+        return True
+
+    try:
+        query_start = int(year_start)
+        query_end = int(year_end)
+    except (TypeError, ValueError):
+        return True
+
+    data_start = int(years.min())
+    data_end = int(years.max())
+    return query_start < data_start or query_end > data_end
+
 def filter_dashboard_data(df, cols, cancers=[], year_start="", year_end="", behavior=""):
     # --- 年份篩選 ---
     year_col = cols["year_col"]
@@ -59,6 +98,7 @@ def filter_dashboard_data(df, cols, cancers=[], year_start="", year_end="", beha
             behavior_col = cols.get("behavior_col")
             year_col = cols.get("year_col")
             ajcc_ed_col = cols.get("ajcc_ed_col")
+            gender_col = cols.get("gender_col")
             res = classify_cancer_group(
                 str(row[site_col]),
                 str(row[hist_col]),
@@ -66,10 +106,12 @@ def filter_dashboard_data(df, cols, cancers=[], year_start="", year_end="", beha
                 behavior=str(row[behavior_col]) if behavior_col else None,
                 didiag=str(row[year_col]) if year_col else None,
                 ajcc_ed=str(row[ajcc_ed_col]) if ajcc_ed_col else None,
+                sex=str(row[gender_col]) if gender_col else None,
             )
             if not res:
                 return False
-            return res["group_key"] in cancers or res["subgroup_key"] in cancers           
+            matched_keys = {res["group_key"], res["subgroup_key"], *res.get("ancestor_subgroup_keys", [])}
+            return bool(matched_keys.intersection(cancers))
         df = df[df.apply(is_selected_cancer, axis=1)]
         
     return df
@@ -138,13 +180,39 @@ def calculate_age_median(df, cols):
             age_median_data["male_ratio"] = f"{round(m_count / f_count, 2):.2f}"
             age_median_data["female_ratio"] = "1.00"
         elif m_count > 0:
-            age_median_data["male_ratio"] = "無限大"
+            age_median_data["male_ratio"] = "女性為 0，無法計算"
             age_median_data["female_ratio"] = "0.00"
         else:
             age_median_data["male_ratio"] = "0.00"
             age_median_data["female_ratio"] = "0.00"
             
     return age_median_data
+
+
+def extract_year_display(value):
+    text = display_value(value)
+    return text[:4] if len(text) >= 4 and text[:4].isdigit() else text
+
+
+def clean_warning_sentence(text):
+    return str(text or "").replace("。", "").strip()
+
+
+def build_histology_raw_data_message(warning_type, mismatch_fields, didiag_value, site_value):
+    if warning_type != "condition_mismatch":
+        return ""
+
+    fields = mismatch_fields or []
+    details = []
+    year = extract_year_display(didiag_value)
+    if "year" in fields and year:
+        details.append(f"診斷年度 {year}")
+    if "site" in fields and site_value:
+        details.append(f"原發部位 {site_value}")
+
+    if not details:
+        return ""
+    return f"（原始資料：{'、'.join(details)}）"
 
 # 可分析個案與確診個案表
 def normalize_case_code(value):
@@ -156,6 +224,20 @@ def normalize_case_code(value):
         return str(int(float(text)))
     except (ValueError, TypeError):
         return text
+
+def display_value(value):
+    if pd.isna(value):
+        return ""
+
+    text = str(value).strip()
+    try:
+        numeric = float(text)
+        if numeric.is_integer():
+            return str(int(numeric))
+    except (ValueError, TypeError):
+        pass
+
+    return text
 
 # 可分析個案與確診個案(表)
 def calculate_analyzable_confirmed_cases(df, cols):
@@ -196,14 +278,17 @@ def calculate_analyzable_confirmed_cases(df, cols):
     return analyzable_confirmed_data
 
 # 組織型態(表,圖)
-def calculate_histology_distribution(df, cols):
+def calculate_histology_distribution(df, cols, return_warnings=False):
     hist_dist_data = []
+    histology_warnings = []
+    unknown_name = "Unknown / 未對應組織型態"
 
     class_col = cols["class_col"]
     hist_col = cols["hist_col"]
     behavior_col = cols["behavior_col"]
     site_col = cols["site_col"]
     year_col = cols["year_col"]
+    patient_id_col = cols.get("patient_id_col")
 
     if class_col in df.columns and hist_col in df.columns and behavior_col in df.columns:
         df_filtered = df.dropna(subset=[class_col])
@@ -222,9 +307,40 @@ def calculate_histology_distribution(df, cols):
                 }
                 res = match_histology(case_row, rules)
                 icdo_code = res.get("icdo_code", "")
-                report_name = res.get("report_name", "Unknown / 未對應組織型態")
+                report_name = res.get("report_name", unknown_name)
                 key = (icdo_code, report_name)
                 hist_counts[key] = hist_counts.get(key, 0) + 1
+
+                if report_name == unknown_name:
+                    user_id = display_value(row[patient_id_col]) if patient_id_col in df.columns else ""
+                    site_value = display_value(row[site_col]) if site_col in df.columns else ""
+                    hist_value = display_value(row[hist_col]) if hist_col in df.columns else ""
+                    behavior_value = display_value(row[behavior_col]) if behavior_col in df.columns else ""
+                    didiag_value = display_value(row[year_col]) if year_col in df.columns else ""
+                    warning_type = res.get("warning_type", "not_in_mapping")
+                    mismatch_fields = res.get("mismatch_fields", [])
+                    default_message = f"{icdo_code} 未納入 1.3 組織型態規則。"
+                    message = clean_warning_sentence(res.get("message", default_message))
+                    detail_message = clean_warning_sentence(res.get("detail_message", "若此組織型態無特殊適用條件，則此組織代碼組合不屬於目前統計規則範圍。"))
+                    raw_data_message = build_histology_raw_data_message(
+                        warning_type,
+                        mismatch_fields,
+                        didiag_value,
+                        site_value,
+                    )
+                    histology_warnings.append({
+                        "user": user_id or "未知個案",
+                        "site": site_value,
+                        "hist": hist_value,
+                        "behavior": behavior_value,
+                        "didiag": didiag_value,
+                        "icdo_code": icdo_code,
+                        "warning_type": warning_type,
+                        "mismatch_fields": mismatch_fields,
+                        "raw_data_message": raw_data_message,
+                        "message": message,
+                        "detail_message": detail_message
+                    })
 
             for (icdo_code, report_name), count in hist_counts.items():
                 pct = (count / total_valid_cases) * 100
@@ -238,6 +354,10 @@ def calculate_histology_distribution(df, cols):
             hist_dist_data.sort(key=lambda x: x["pct_val"], reverse=True)
             for item in hist_dist_data:
                 item.pop("pct_val", None)
+
+    if return_warnings:
+        return hist_dist_data, histology_warnings
+
     return hist_dist_data
 
 def calculate_diagnosis_classification(df, cols):
@@ -294,12 +414,17 @@ def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", beh
         df = pd.read_excel(fpath)
         cols = get_column_names(df)
 
+        if _query_year_range_outside_data(df, cols, year_start, year_end):
+            return _empty_dashboard_response()
+
         df = filter_dashboard_data(df, cols, cancers, year_start, year_end, behavior)
+        if df.empty:
+            return _empty_dashboard_response()
         
         gender_age_data = calculate_gender_age_distribution(df, cols)
         age_median_data = calculate_age_median(df, cols)
         analyzable_confirmed_data = calculate_analyzable_confirmed_cases(df, cols)
-        histology_data = calculate_histology_distribution(df, cols)
+        histology_data, histology_warnings = calculate_histology_distribution(df, cols, return_warnings=True)
         diagnosis_classification_data = calculate_diagnosis_classification(df, cols)
   
         return {
@@ -307,6 +432,7 @@ def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", beh
             "ageMedianData": age_median_data,
             "analyzableConfirmedData": analyzable_confirmed_data,
             "histologyData": histology_data,
+            "histologyWarnings": histology_warnings,
             "diagnosisClassificationData": diagnosis_classification_data
         }
     except Exception as e:

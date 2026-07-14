@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}年報分析｜癌症登記平台{% endblock %}
+{% block title %}年報分析｜癌症資料登記{% endblock %}
 {% block page_title %}年報分析{% endblock %}
 {% block extra_head %}
   <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
@@ -87,7 +87,7 @@
               <thead id="annualAnalyzableConfirmedTableHead"></thead>
               <tbody id="annualAnalyzableConfirmedTableBody"></tbody>
             </table>
-            <div id="annualAnalyzableConfirmedNote" class="mt-2 text-start" style="font-size: 14px;"></div>
+            <div id="annualAnalyzableConfirmedNote" class="annual-analyzable-note text-start"></div>
           </div>
           <!--LLM分析結果-->
           <div class="mt-4 p-3 rounded" style="background-color: rgba(209, 231, 221, 0.5); border: 1px solid #a3cfbb;">
@@ -107,6 +107,9 @@
     <div id="chartPane-DiagnosisHistology" class="chart-pane d-none">
       <div class="bg-white border border-secondary-subtle rounded shadow-sm p-4 mt-2">
         <div class="annual-data-content d-none">
+          <div class="d-flex justify-content-end mb-2">
+            <button type="button" id="histologyWarningButton" class="btn btn-outline-danger btn-sm d-none">不適用個案說明</button>
+          </div>
           <div class="annual-report-table-wrap">
             <table class="annual-report-table">
               <caption id="annualHistologyCaption">表、XXXX年XX癌組織型態分佈表</caption>
@@ -120,6 +123,7 @@
               </thead>
               <tbody id="annualHistologyTableBody"></tbody>
             </table>
+            <div id="annualHistologyTableNote" class="text-danger small mt-0 d-none"></div>
           </div>
           <div id="histologyChart" style="width: 100%; height: 450px; margin-top: 20px;"></div>
           <div id="annualHistologyChartCaption" class="annual-chart-caption">圖、XXXX年新診斷XX病患組織型態分佈圖</div>
@@ -179,5 +183,5 @@
   </div>
 </div>
 
-<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=4"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=20260709-histology-raw"></script>
 {% endblock %}
