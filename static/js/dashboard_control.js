@@ -510,6 +510,93 @@
   window.dashboardFileYearRange = null;
   window.dashboardYearRangeAlertKey = '';
 
+  const yearSelectUis = new Map();
+
+  function closeYearSelectMenus(exceptUi = null) {
+    yearSelectUis.forEach((ui) => {
+      if (ui !== exceptUi) {
+        ui.classList.remove('is-open');
+        ui.querySelector('.year-select-trigger')?.setAttribute('aria-expanded', 'false');
+      }
+    });
+  }
+
+  function syncYearSelectUi(selectEl) {
+    if (!selectEl) return;
+
+    let ui = yearSelectUis.get(selectEl);
+    if (!ui) {
+      selectEl.classList.add('year-select-native');
+
+      ui = document.createElement('div');
+      ui.className = 'year-select-ui';
+      ui.innerHTML = `
+        <button type="button" class="year-select-trigger" aria-haspopup="listbox" aria-expanded="false">
+          <span class="year-select-label"></span>
+        </button>
+        <div class="year-select-menu" role="listbox"></div>
+      `;
+      selectEl.insertAdjacentElement('afterend', ui);
+      yearSelectUis.set(selectEl, ui);
+
+      const trigger = ui.querySelector('.year-select-trigger');
+      trigger.addEventListener('click', () => {
+        if (selectEl.disabled) return;
+        const shouldOpen = !ui.classList.contains('is-open');
+        closeYearSelectMenus(ui);
+        ui.classList.toggle('is-open', shouldOpen);
+        trigger.setAttribute('aria-expanded', String(shouldOpen));
+      });
+    }
+
+    const trigger = ui.querySelector('.year-select-trigger');
+    const label = ui.querySelector('.year-select-label');
+    const menu = ui.querySelector('.year-select-menu');
+    const selectedOption = selectEl.options[selectEl.selectedIndex] || selectEl.options[0];
+
+    label.textContent = selectedOption ? selectedOption.textContent : '';
+    trigger.disabled = selectEl.disabled;
+    ui.classList.toggle('is-start', selectEl.id === 'filterYearStart');
+    ui.classList.toggle('is-end', selectEl.id === 'filterYearEnd');
+    ui.classList.toggle('is-placeholder', !selectedOption || !selectedOption.value);
+    ui.classList.toggle('is-disabled', selectEl.disabled);
+    if (selectEl.disabled) {
+      ui.classList.remove('is-open');
+      trigger.setAttribute('aria-expanded', 'false');
+    }
+
+    menu.replaceChildren();
+    Array.from(selectEl.options).forEach((option) => {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'year-select-option';
+      item.innerHTML = '<span class="year-select-option-label"></span>';
+      item.querySelector('.year-select-option-label').textContent = option.textContent;
+      item.setAttribute('role', 'option');
+      item.setAttribute('aria-selected', String(option.selected));
+
+      if (!option.value) item.classList.add('is-placeholder');
+      if (option.selected) item.classList.add('is-selected');
+
+      item.addEventListener('click', () => {
+        if (!option.value) return;
+        selectEl.value = option.value;
+        ui.classList.remove('is-open');
+        trigger.setAttribute('aria-expanded', 'false');
+        selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+        syncYearSelectUi(selectEl);
+      });
+
+      menu.appendChild(item);
+    });
+  }
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.year-select-ui')) {
+      closeYearSelectMenus();
+    }
+  });
+
   function setYearSelectPlaceholder(selectEl, text) {
     if (!selectEl) return;
     selectEl.replaceChildren();
@@ -520,6 +607,7 @@
     option.selected = true;
     selectEl.appendChild(option);
     selectEl.disabled = true;
+    syncYearSelectUi(selectEl);
   }
 
   function fillYearOptions(selectEl, start, end) {
@@ -530,6 +618,7 @@
       option.textContent = String(year);
       selectEl.appendChild(option);
     }
+    syncYearSelectUi(selectEl);
   }
 
   function refreshYearEndOptions() {
@@ -554,6 +643,7 @@
     } else {
       yearEndInput.value = '';
     }
+    syncYearSelectUi(yearEndInput);
   }
 
   function populateYearSelects(range) {
@@ -572,6 +662,8 @@
     yearEndInput.disabled = false;
     yearStartInput.value = '';
     yearEndInput.value = '';
+    syncYearSelectUi(yearStartInput);
+    syncYearSelectUi(yearEndInput);
   }
 
   setYearSelectPlaceholder(yearStartInput, '起始');
