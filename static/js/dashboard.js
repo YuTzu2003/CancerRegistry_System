@@ -540,7 +540,9 @@ window.DashboardRenderer.fetchLlmInsight = function(fieldKey, chartData, fields,
         if (button) button.disabled = true;
 
         const modeAi = document.getElementById('mode_ai') ? document.getElementById('mode_ai').value : 'balanced';
-        return fetch('/api/chart_insight', {method: 'POST',headers: { 'Content-Type': 'application/json' },body: JSON.stringify({ field_key: fieldKey, data: chartData, fields: fields, mode_ai: modeAi })})
+        const yearStart = document.getElementById('filterYearStart')?.value.trim() || '';
+        const yearEnd = document.getElementById('filterYearEnd')?.value.trim() || '';
+        return fetch('/api/chart_insight', {method: 'POST',headers: { 'Content-Type': 'application/json' },body: JSON.stringify({ field_key: fieldKey, data: chartData, fields: fields, mode_ai: modeAi, year_start: yearStart, year_end: yearEnd })})
         .then(res => res.json())
         .then(data => {
             if (button) button.disabled = false;
