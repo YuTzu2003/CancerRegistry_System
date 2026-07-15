@@ -110,7 +110,7 @@ document.addEventListener('DOMContentLoaded', function() {
           },
           grid: {
             left: 300,
-            right: 40,
+            right: 110,
             bottom: 50,
             top: 60,
             containLabel: false
@@ -138,8 +138,8 @@ document.addEventListener('DOMContentLoaded', function() {
               width: 280,
               overflow: 'break',
               lineHeight: 16,
-              align: 'center',
-              margin: 148
+              align: 'right',
+              margin: 20
             }
           },
           series: [
@@ -149,10 +149,15 @@ document.addEventListener('DOMContentLoaded', function() {
               data: [],
               itemStyle: { color: '#73c0de' },
               label: { 
-                show: false, 
+                show: true,
                 position: 'right',
+                distance: 8,
+                color: '#333',
+                fontSize: 13,
                 formatter: function(params) {
-                  return typeof params.value === 'number' ? params.value.toFixed(1) + '%' : params.value;
+                  if (typeof params.value !== 'number') return params.value;
+                  const count = params.data && params.data.count !== undefined ? params.data.count : '-';
+                  return `${params.value.toFixed(1)}% (${count}人)`;
                 }
               }
             }
