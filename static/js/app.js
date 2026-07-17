@@ -1,6 +1,5 @@
 (function () {
   "use strict";
-
   const sidebar = document.getElementById("sidebar");
   const toggle = document.getElementById("sidebarToggle");
 
@@ -85,20 +84,18 @@
       if (overlay) overlay.style.display = 'none';
     }
   };
-
-  // Run on initial load
   autoHideAlerts();
   window.autoHideAlerts = autoHideAlerts;
 
-  // 佈景主題切換 (Dark Mode Toggle)
+  // 主題切換
   const themeToggleBtn = document.getElementById('themeToggleBtn');
   const themeIcon = document.getElementById('themeIcon');
-  
+
   if (themeToggleBtn && themeIcon) {
     if (document.documentElement.getAttribute('data-theme') === 'dark') {
       themeIcon.classList.replace('bi-sun', 'bi-moon');
     }
-    
+
     themeToggleBtn.addEventListener('click', () => {
       let theme = document.documentElement.getAttribute('data-theme');
       if (theme === 'dark') {

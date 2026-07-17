@@ -292,7 +292,10 @@
     
     if (preset.cancers && preset.cancers.length > 0) {
       preset.cancers.forEach(id => {
-        const cb = document.querySelector(`.cancer-cb-leaf[value="${id}"]`);
+        let cb = document.querySelector(`.cancer-cb-leaf[value="${id}"]`);
+        if (!cb) {
+          cb = Array.from(document.querySelectorAll('.cancer-cb-leaf')).find(el => el.value.toLowerCase() === id.toLowerCase());
+        }
         if (cb) cb.checked = true;
       });
     }
@@ -778,9 +781,6 @@
 
     if (behaviorSelect) {
       behaviorSelect.disabled = !isYearValid;
-      if (!isYearValid) {
-        behaviorSelect.value = '';
-      }
     }
 
     const presetElements = [
@@ -860,6 +860,14 @@
           }
         }
       });
+
+      const summaryAiStyle = document.getElementById('summaryAiStyle');
+      const modeAiSelect = document.getElementById('mode_ai');
+      if (summaryAiStyle && modeAiSelect) {
+        const selectedOpt = modeAiSelect.options[modeAiSelect.selectedIndex];
+        if (modeAiSelect.value) summaryAiStyle.textContent = selectedOpt.text;
+        else summaryAiStyle.innerHTML = '<span class="text-muted">尚未選擇</span>';
+      }
     }
   }
 
@@ -877,6 +885,11 @@
   
   if (behaviorSelect) {
     behaviorSelect.addEventListener('change', checkFiltersState);
+  }
+
+  const modeAiSelect = document.getElementById('mode_ai');
+  if (modeAiSelect) {
+    modeAiSelect.addEventListener('change', updateSummary);
   }
 
   document.querySelectorAll('.item-checkbox').forEach(cb => {

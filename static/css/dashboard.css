@@ -93,6 +93,65 @@
   display: inline-block !important;
 }
 
+[data-theme="dark"] .file-list-card {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+[data-theme="dark"] .file-list-header {
+  background: var(--gray-50);
+  border-color: var(--border);
+}
+
+[data-theme="dark"] .file-list-header .text-dark,
+[data-theme="dark"] #dashFileList .text-dark {
+  color: var(--text) !important;
+}
+
+[data-theme="dark"] #dashFileList {
+  --bs-table-bg: var(--surface);
+  --bs-table-color: var(--text);
+  --bs-table-border-color: var(--border);
+  --bs-table-hover-bg: #1f1f23;
+  --bs-table-hover-color: var(--text);
+  --bs-table-active-bg: rgba(59, 130, 246, 0.18);
+  --bs-table-active-color: #dbeafe;
+}
+
+[data-theme="dark"] #dashFileList thead,
+[data-theme="dark"] #dashFileList thead th {
+  background: #18181b !important;
+  color: var(--muted) !important;
+  border-color: var(--border) !important;
+}
+
+[data-theme="dark"] #dashFileListBody tr {
+  background: var(--surface);
+  color: var(--text);
+}
+
+[data-theme="dark"] #dashFileListBody tr:hover {
+  background-color: #1f1f23 !important;
+}
+
+[data-theme="dark"] #dashFileListBody tr.table-active {
+  background-color: rgba(59, 130, 246, 0.18) !important;
+}
+
+[data-theme="dark"] #dashFileListBody tr.table-active .file-display-name {
+  color: #bfdbfe !important;
+}
+
+[data-theme="dark"] #dashFileListBody .text-secondary {
+  color: var(--muted) !important;
+}
+
+[data-theme="dark"] #dashFileListBody .status-badge-selected {
+  background: rgba(59, 130, 246, 0.22) !important;
+  color: #bfdbfe !important;
+  border: 1px solid rgba(96, 165, 250, 0.35);
+}
+
 /* --- 篩選條件設定 --- */
 .filter-bar {
   display: flex;
@@ -539,6 +598,124 @@
   border-color: #212529 !important;
   box-shadow: none !important;
   transform: none !important;
+}
+
+[data-theme="dark"] .upload-container-box,
+[data-theme="dark"] .upload-input-zone,
+[data-theme="dark"] .chart-pane > .bg-white,
+[data-theme="dark"] #chartPane-Empty > .bg-white {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+[data-theme="dark"] .upload-input-zone:hover {
+  background: #1f1f23 !important;
+  border-color: var(--blue-500) !important;
+}
+
+[data-theme="dark"] .filter-group label,
+[data-theme="dark"] .text-dark,
+[data-theme="dark"] .form-check-label.text-dark {
+  color: var(--text) !important;
+}
+
+[data-theme="dark"] .text-secondary,
+[data-theme="dark"] .form-check-label.text-secondary {
+  color: var(--muted) !important;
+}
+
+[data-theme="dark"] .cat-btn-label {
+  background-color: var(--gray-50);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+[data-theme="dark"] .cat-btn-label:hover {
+  background-color: #1f1f23;
+  color: #bfdbfe;
+  border-color: var(--blue-600);
+}
+
+[data-theme="dark"] .btn-check.group-checkbox:checked + .cat-btn-label {
+  background-color: rgba(59, 130, 246, 0.18);
+  color: #bfdbfe;
+  border-color: var(--blue-600);
+  box-shadow: none;
+}
+
+[data-theme="dark"] .btn-black,
+[data-theme="dark"] #btnDashUpload,
+[data-theme="dark"] .chart-tab-btn.active {
+  background-color: var(--blue-600) !important;
+  border-color: var(--blue-600) !important;
+  color: #ffffff !important;
+}
+
+[data-theme="dark"] .btn-black:hover,
+[data-theme="dark"] #btnDashUpload:hover {
+  background-color: #2563eb !important;
+  border-color: #2563eb !important;
+}
+
+[data-theme="dark"] .btn-black-outline,
+[data-theme="dark"] .chart-tab-btn {
+  background-color: var(--gray-50) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+[data-theme="dark"] .btn-black-outline:hover,
+[data-theme="dark"] .chart-tab-btn:hover {
+  background-color: #1f1f23 !important;
+  border-color: var(--blue-600) !important;
+  color: #bfdbfe !important;
+}
+
+[data-theme="dark"] #cancerPickerModal .modal-header,
+[data-theme="dark"] #cancerPickerModal .modal-footer,
+[data-theme="dark"] #cancerPickerModal .bg-light,
+[data-theme="dark"] #cancerPickerModal .bg-white {
+  background-color: var(--surface) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+[data-theme="dark"] #cancerPickerModal .list-group-item.bg-light {
+  background-color: var(--gray-50) !important;
+  color: var(--muted) !important;
+}
+
+[data-theme="dark"] #cancerPickerModal .cat-nav-btn.active {
+  background-color: rgba(59, 130, 246, 0.14) !important;
+  color: #bfdbfe !important;
+}
+
+[data-theme="dark"] .annual-report-table {
+  background: #0b0b0c;
+  color: var(--text);
+}
+
+[data-theme="dark"] .annual-report-table th,
+[data-theme="dark"] .annual-report-table td {
+  border-color: var(--gray-300);
+}
+
+[data-theme="dark"] .annual-report-table caption,
+[data-theme="dark"] .annual-analyzable-note,
+[data-theme="dark"] .annual-chart-caption {
+  color: var(--text);
+}
+
+[data-theme="dark"] .chart-pane .mt-4.p-3.rounded {
+  background-color: #18181b !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+[data-theme="dark"] .chart-pane .mt-4.p-3.rounded .btn-sm {
+  color: #bfdbfe !important;
+  border-color: var(--blue-500) !important;
 }
 
 /* =========================================================================
