@@ -40,6 +40,7 @@ def inject_nav():
         {"endpoint":"history.history","title":"資料審核紀錄","icon":"bi-file-earmark-text"},
         {"endpoint":"data_gen.dataGen","title":"虛擬資料生成","icon":"bi-database-add"},
         {"endpoint":"dashboard.dashboard","title":"年報分析","icon":"bi-bar-chart"},
+        {"endpoint":"dashboard.compare","title":"年報比較分析","icon":"bi-columns-gap"},
     ]
     if session.get("position") == "Admin":
         # NAV_ITEMS.append({"endpoint":"rag_config", "title": "RAG知識庫", "icon": "bi-robot"})
