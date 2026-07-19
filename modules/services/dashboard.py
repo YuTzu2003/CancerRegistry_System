@@ -1,7 +1,7 @@
 from flask import Blueprint, request, session, jsonify
 from modules.services.auth import login_required
 from modules.blueprint.dashboard import load_user_favorites, save_user_favorites
-from modules.blueprint.dashboard.reply import get_chart_insight_logic
+from modules.blueprint.dashboard.reply import get_chart_insight_logic, get_compare_insight_logic
 from flask import send_file
 from modules.blueprint.dashboard.export_report import generate_export_files
 import os
@@ -118,6 +118,19 @@ def chart_insight_route():
         return jsonify(result), 200
     except Exception as e:
         logging.error(f"Error in chart_insight_route: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@dashboard_bp.route("/api/dashboard/compare_insight", methods=["POST"])
+@login_required
+def compare_insight_route():
+    try:
+        data = request.json or {}
+        result = get_compare_insight_logic(data)
+        status_code = 200 if result.get("success") else 400
+        return jsonify(result), status_code
+    except Exception as e:
+        logging.error(f"Error in compare_insight_route: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 @dashboard_bp.route('/api/favorites', methods=['GET'])

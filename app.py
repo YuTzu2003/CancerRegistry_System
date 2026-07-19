@@ -39,8 +39,10 @@ def inject_nav():
         {"endpoint":"clean.clean","title":"資料清洗模組","icon":"bi-funnel"},
         {"endpoint":"history.history","title":"資料審核紀錄","icon":"bi-file-earmark-text"},
         {"endpoint":"data_gen.dataGen","title":"虛擬資料生成","icon":"bi-database-add"},
-        {"endpoint":"dashboard.dashboard","title":"年報分析","icon":"bi-bar-chart"},
-        {"endpoint":"dashboard.compare","title":"年報比較分析","icon":"bi-columns-gap"},
+        {"title":"報表分析","icon":"bi-bar-chart", "subitems": [
+            {"endpoint":"dashboard.dashboard","title":"年報分析","icon":"bi-bar-chart"},
+            {"endpoint":"dashboard.compare","title":"年度比較","icon":"bi-columns-gap"}
+        ]},
     ]
     if session.get("position") == "Admin":
         # NAV_ITEMS.append({"endpoint":"rag_config", "title": "RAG知識庫", "icon": "bi-robot"})

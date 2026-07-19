@@ -108,3 +108,60 @@ def get_chart_insight_logic(data):
     except Exception as e:
         logging.error(f"Error in AI analysis: {e}")
         return {"success": False, "error": str(e)}
+
+
+def get_compare_insight_logic(data):
+    analysis_item = str(data.get("analysis_item", "")).strip()
+    comparison_direction = str(data.get("comparison_direction", "")).strip()
+    selected_conditions = data.get("selected_conditions", {})
+    baseline_data = data.get("baseline", {})
+    comparison_data = data.get("comparison", {})
+    total_difference = data.get("total_difference", {})
+    mode_ai = data.get("mode_ai", "balanced")
+
+    if not analysis_item or not isinstance(baseline_data, dict) or not isinstance(comparison_data, dict):
+        return {"success": False, "error": "比較分析資料不完整"}
+
+    style_instruction = STYLE_PROMPTS.get(mode_ai, STYLE_PROMPTS["balanced"])
+    prompt = f"""
+                You are a professional medical and oncology data comparison expert.
+                Compare the baseline and comparison cancer registry datasets below.
+                [Analysis Item]{analysis_item}
+                [Comparison Direction]{comparison_direction}
+                [Selected Conditions]{json.dumps(selected_conditions, ensure_ascii=False)}
+                [Baseline Data]{json.dumps(baseline_data, ensure_ascii=False)}
+                [Comparison Data]{json.dumps(comparison_data, ensure_ascii=False)}
+                [Calculated Differences]{json.dumps(total_difference, ensure_ascii=False)}
+                [Writing Style]{style_instruction}
+
+                [Comparison Requirements]
+                1. State the principal difference between the comparison and baseline data.
+                2. Describe the most important distribution or trend differences supported by both datasets.
+                3. Use the baseline as the reference and keep the comparison direction consistent.
+                4. Mention zero counts or missing values when they materially limit comparison.
+
+                Notes:
+                1. Reply without an opening remark or greeting.
+                2. Base every conclusion strictly on the two supplied datasets.
+                3. Do not infer unsupported causes or clinical outcomes.
+                4. Do not confuse absolute differences with percentage differences.
+                5. Keep the response within 160 words.
+            """
+
+    try:
+        client, model_name = get_llm_client()
+        response = client.chat.completions.create(
+            model=model_name,
+            messages=[
+                {"role": "system", "content": "You are a professional cancer registry data comparison expert. Reply in Traditional Chinese."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.3
+        )
+        content = response.choices[0].message.content
+        insight = re.sub(r'[*#`\n\t]+', '', content).strip()
+        insight = insight.replace(r'\ge', '>=').replace(r'\le', '<=').replace(r'\neq', '!=').replace('$', '')
+        return {"success": True, "insight": insight}
+    except Exception as e:
+        logging.error(f"Error in AI comparison analysis: {e}")
+        return {"success": False, "error": str(e)}

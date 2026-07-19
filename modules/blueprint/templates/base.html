@@ -14,6 +14,26 @@
     }
   </script>
 
+<style>
+  .nav-link.submenu-active {
+    background: var(--gray-200) !important;
+    color: var(--gray-900) !important;
+    font-weight: 600;
+  }
+  .nav-link.submenu-active .nav-icon {
+    color: var(--gray-800) !important;
+  }
+  [data-theme="dark"] .nav-link.submenu-active {
+    background: rgba(255, 255, 255, 0.2) !important;
+    color: #ffffff !important;
+  }
+  [data-theme="dark"] .nav-link.submenu-active .nav-icon {
+    color: #e2e8f0 !important;
+  }
+  .nav-link[aria-expanded="true"] .submenu-icon {
+    transform: rotate(180deg);
+  }
+</style>
 {% block extra_head %}{% endblock %}
 </head>
 <body>
@@ -37,12 +57,38 @@
       <nav class="sidebar-nav">
         <ul>
           {% for item in nav_items %}
+          {% if item.subitems %}
+          {% set ns = namespace(is_active=false) %}
+          {% for sub in item.subitems %}
+            {% if active == sub.endpoint or active == sub.endpoint.split('.')[-1] %}
+              {% set ns.is_active = true %}
+            {% endif %}
+          {% endfor %}
+          <li>
+            <a href="#submenu-{{ loop.index }}" data-bs-toggle="collapse" class="nav-link {% if ns.is_active %}active{% endif %}" aria-expanded="{% if ns.is_active %}true{% else %}false{% endif %}">
+              <span class="nav-icon"><i class="bi {{ item.icon }}"></i></span>
+              <span class="nav-text">{{ item.title }}</span>
+              <i class="bi bi-chevron-down ms-auto submenu-icon" style="transition: transform 0.3s; font-size: 0.8rem;"></i>
+            </a>
+            <ul class="collapse {% if ns.is_active %}show{% endif %} list-unstyled m-0 p-0" id="submenu-{{ loop.index }}">
+              {% for subitem in item.subitems %}
+              <li>
+                <a href="{{ url_for(subitem.endpoint) }}" class="nav-link {% if active == subitem.endpoint or active == subitem.endpoint.split('.')[-1] %}submenu-active{% endif %}" style="padding-left: 48px; height: 38px; margin-top: 4px;">
+                  <span class="nav-icon" style="width: 16px; font-size: 14px;"><i class="bi {{ subitem.icon }}"></i></span>
+                  <span class="nav-text" style="font-size: 13px;">{{ subitem.title }}</span>
+                </a>
+              </li>
+              {% endfor %}
+            </ul>
+          </li>
+          {% else %}
           <li>
             <a href="{{ url_for(item.endpoint) }}" class="nav-link {% if active == item.endpoint or active == item.endpoint.split('.')[-1] %}active{% endif %}">
               <span class="nav-icon"><i class="bi {{ item.icon }}"></i></span>
               <span class="nav-text">{{ item.title }}</span>
             </a>
           </li>
+          {% endif %}
           {% endfor %}
         </ul>
       </nav>
