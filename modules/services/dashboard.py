@@ -16,18 +16,31 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 DASHBOARD_DATA = os.path.join(BASE_DIR, 'tasks', 'data')
 os.makedirs(DASHBOARD_DATA, exist_ok=True)
 
-@dashboard_bp.route("/dashboard")
-@login_required
-def dashboard():
+def _get_uploaded_dashboard_files():
     uploaded_files = []
     if os.path.isdir(DASHBOARD_DATA):
         for fname in os.listdir(DASHBOARD_DATA):
             if fname.lower().endswith((".xls", ".xlsx")):
                 fpath = os.path.join(DASHBOARD_DATA, fname)
                 mtime = os.path.getmtime(fpath)
-                uploaded_files.append({"name": fname,"time": datetime.datetime.fromtimestamp(mtime).strftime("%Y/%m/%d %H:%M")})
-        uploaded_files.sort(key=lambda x: x["time"],reverse=True)
-    return render_template("dashboard.html", active="dashboard",uploaded_files=uploaded_files)
+                uploaded_files.append({
+                    "name": fname,
+                    "time": datetime.datetime.fromtimestamp(mtime).strftime("%Y/%m/%d %H:%M")
+                })
+        uploaded_files.sort(key=lambda x: x["time"], reverse=True)
+    return uploaded_files
+
+@dashboard_bp.route("/dashboard")
+@login_required
+def dashboard():
+    uploaded_files = _get_uploaded_dashboard_files()
+    return render_template("dashboard.html", active="dashboard", uploaded_files=uploaded_files)
+
+@dashboard_bp.route("/dashboard/compare")
+@login_required
+def compare():
+    uploaded_files = _get_uploaded_dashboard_files()
+    return render_template("compare.html", active="compare", uploaded_files=uploaded_files)
 
 @dashboard_bp.route("/dashboard/upload", methods=["POST"])
 @login_required
@@ -188,6 +201,77 @@ def analyze_dashboard_file_route():
     except Exception as e:
         import logging
         logging.error(f"Error analyzing dashboard file: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+@dashboard_bp.route('/api/dashboard/file_years', methods=['POST'])
+@login_required
+def dashboard_file_years_route():
+    data = request.json or {}
+    filename = data.get("filename", "")
+    if not filename:
+        return jsonify({"ok": False, "error": "未提供檔案名稱"}), 400
+
+    try:
+        from modules.blueprint.dashboard.chart_analytics import get_dashboard_file_preview, get_dashboard_file_years
+        years = get_dashboard_file_years(filename)
+        preview = get_dashboard_file_preview(filename, 10)
+        return jsonify({"ok": True, "years": years, "preview": preview}), 200
+    except Exception as e:
+        logging.error(f"Error detecting dashboard file years: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+@dashboard_bp.route('/api/dashboard/compare', methods=['POST'])
+@login_required
+def compare_dashboard_files_route():
+    data = request.json or {}
+    main_filename = data.get("main_filename", "")
+    target_filename = data.get("target_filename", "")
+    main_year = str(data.get("main_year", "")).strip()
+    target_year = str(data.get("target_year", "")).strip()
+    main_year_end = str(data.get("main_year_end", "")).strip()
+    target_year_end = str(data.get("target_year_end", "")).strip()
+    compare_mode = str(data.get("compare_mode", "single")).strip()
+    behavior = data.get("behavior", "")
+    cancers = data.get("cancers", [])
+    compare_items = data.get("compare_items", [])
+
+    if not main_filename or not target_filename:
+        return jsonify({"ok": False, "error": "請選擇基準資料與對照資料"}), 400
+    if compare_mode not in {"single", "range"}:
+        return jsonify({"ok": False, "error": "比較模式不正確"}), 400
+    if compare_mode == "single":
+        main_year_end = main_year
+        target_year_end = target_year
+    if not main_year or not target_year or not main_year_end or not target_year_end:
+        return jsonify({"ok": False, "error": "請選擇基準資料與對照資料的年度"}), 400
+    if not all(year.isdigit() for year in (main_year, target_year, main_year_end, target_year_end)):
+        return jsonify({"ok": False, "error": "年度格式不正確"}), 400
+    if int(main_year) > int(main_year_end) or int(target_year) > int(target_year_end):
+        return jsonify({"ok": False, "error": "起始年度不可晚於結束年度"}), 400
+    if main_filename == target_filename and main_year == target_year and main_year_end == target_year_end:
+        return jsonify({"ok": False, "error": "同一份 Excel 比較時，基準期間與對照期間不可相同"}), 400
+    if not behavior:
+        return jsonify({"ok": False, "error": "請選擇性態碼"}), 400
+    if not cancers:
+        return jsonify({"ok": False, "error": "請選擇癌別"}), 400
+    if not compare_items:
+        return jsonify({"ok": False, "error": "請選擇分析項目"}), 400
+
+    try:
+        from modules.blueprint.dashboard.chart_analytics import compare_dashboard_files, get_dashboard_file_years
+        main_years = get_dashboard_file_years(main_filename)
+        target_years = get_dashboard_file_years(target_filename)
+        if (int(main_year) not in main_years or int(main_year_end) not in main_years
+                or int(target_year) not in target_years or int(target_year_end) not in target_years):
+            return jsonify({"ok": False, "error": "選擇的年度不在 Excel 資料範圍內"}), 400
+
+        result = compare_dashboard_files(
+            main_filename, target_filename, behavior, cancers, compare_items,
+            main_year, target_year, main_year_end, target_year_end, compare_mode
+        )
+        return jsonify({"ok": True, "data": result}), 200
+    except Exception as e:
+        logging.error(f"Error comparing dashboard files: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
 
 

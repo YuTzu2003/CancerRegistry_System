@@ -9,6 +9,14 @@ from modules.blueprint.dashboard.definition.histology_validate import match_hist
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 DASHBOARD_DATA = f"{BASE_DIR}/tasks/data"
 
+def _safe_dashboard_path(filename):
+    safe_name = os.path.basename(filename or "")
+    fpath = os.path.abspath(os.path.join(DASHBOARD_DATA, safe_name))
+    data_dir = os.path.abspath(DASHBOARD_DATA)
+    if not safe_name or not fpath.startswith(data_dir) or not os.path.isfile(fpath):
+        raise FileNotFoundError("找不到指定的 Excel 檔案")
+    return fpath
+
 def _find_column(df, candidates):
     for col in df.columns:
         col_text = str(col).lower()
@@ -40,9 +48,15 @@ def get_column_names(df):
 # 性別年齡分布圖
 
 def _empty_dashboard_response(message="查無符合條件資料！"):
+    labels = ['<=19', '20-24', '25-29', '30-34', '35-39', '40-44', '45-49', '50-54', '55-59', '60-64', '65-69', '70-74', '75-79', '80-84', '>=85']
     return {
         "noDataWarning": message,
-        "genderAgeData": {"male": [], "female": [], "total": []},
+        "genderAgeData": {
+            "categories": labels,
+            "male": [0] * len(labels),
+            "female": [0] * len(labels),
+            "total": [0] * len(labels)
+        },
         "ageMedianData": [],
         "analyzableConfirmedData": [],
         "histologyData": [],
@@ -77,6 +91,8 @@ def _query_year_range_outside_data(df, cols, year_start, year_end):
     return query_start < data_start or query_end > data_end
 
 def filter_dashboard_data(df, cols, cancers=[], year_start="", year_end="", behavior=""):
+    df = df.copy()
+
     # --- 年份篩選 ---
     year_col = cols["year_col"]
     if year_start and year_end and year_col:
@@ -409,7 +425,7 @@ def calculate_diagnosis_classification(df, cols):
 
 # 個案分類(表,圖)
 def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", behavior=""):
-    fpath = f"{DASHBOARD_DATA}/{filename}"
+    fpath = _safe_dashboard_path(filename)
     try:
         df = pd.read_excel(fpath)
         cols = get_column_names(df)
@@ -438,3 +454,84 @@ def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", beh
     except Exception as e:
         logging.error(f"error {filename}: {str(e)}")
         raise e
+
+def get_dashboard_file_years(filename):
+    df = pd.read_excel(_safe_dashboard_path(filename))
+    cols = get_column_names(df)
+    years = _diagnosis_years(df, cols.get("year_col"))
+    years = years[(years >= 1900) & (years <= 2100)]
+    return sorted(years.astype(int).unique().tolist())
+
+def get_dashboard_file_preview(filename, limit=10):
+    df = pd.read_excel(_safe_dashboard_path(filename), nrows=limit)
+    df = df.where(pd.notnull(df), "")
+    return {
+        "columns": [str(col) for col in df.columns],
+        "rows": df.astype(str).values.tolist(),
+    }
+
+def summarize_dashboard_file(filename, behavior="", cancers=None, year_start="", year_end=""):
+    df = pd.read_excel(_safe_dashboard_path(filename))
+    cols = get_column_names(df)
+    years = get_dashboard_file_years(filename)
+    year_start = str(year_start or years[0]) if years else ""
+    year_end = str(year_end or year_start) if years else ""
+    filtered_df = filter_dashboard_data(df, cols, cancers or [], year_start, year_end, behavior)
+    age_data = calculate_age_median(filtered_df, cols)
+    case_data = calculate_analyzable_confirmed_cases(filtered_df, cols)
+    filtered_years = _diagnosis_years(filtered_df, cols.get("year_col"))
+    yearly_counts = {
+        str(int(year)): int(count)
+        for year, count in filtered_years.dropna().astype(int).value_counts().sort_index().items()
+    }
+    period_years = [year for year in years if int(year_start) <= year <= int(year_end)] if year_start and year_end else []
+    year_label = year_start if year_start == year_end else f"{year_start}–{year_end}"
+    year_count = len(period_years)
+
+    return {
+        "filename": os.path.basename(filename or ""),
+        "years": years,
+        "year_label": year_label or "無法偵測",
+        "year_start": year_start,
+        "year_end": year_end,
+        "year_count": year_count,
+        "total_count": int(len(filtered_df)),
+        "annual_average": round(len(filtered_df) / year_count, 1) if year_count else 0,
+        "yearly_counts": yearly_counts,
+        "male_count": int(age_data["male_count"]),
+        "female_count": int(age_data["female_count"]),
+        "median_age": age_data["total"],
+        "analyzable_count": int(case_data["analyzable_count"]),
+        "confirmed_count": int(case_data["confirmed_count"]),
+        "confirmed_percent": case_data["confirmed_percent"],
+    }
+
+def compare_dashboard_files(main_filename, target_filename, behavior="", cancers=None, compare_items=None,
+                            main_year="", target_year="", main_year_end="", target_year_end="",
+                            compare_mode="single"):
+    main_end = main_year if compare_mode == "single" else (main_year_end or main_year)
+    target_end = target_year if compare_mode == "single" else (target_year_end or target_year)
+    main_data = summarize_dashboard_file(main_filename, behavior, cancers, main_year, main_end)
+    target_data = summarize_dashboard_file(target_filename, behavior, cancers, target_year, target_end)
+
+    diff = target_data["total_count"] - main_data["total_count"]
+    diff_percent = ""
+    if main_data["total_count"] > 0:
+        diff_percent = f"{round(diff / main_data['total_count'] * 100, 1):.1f}%"
+    annual_average_diff = round(target_data["annual_average"] - main_data["annual_average"], 1)
+
+    return {
+        "main": main_data,
+        "target": target_data,
+        "analysis_data": {
+            "main": analyze_dashboard_file(main_filename, cancers or [], main_year, main_end, behavior),
+            "target": analyze_dashboard_file(target_filename, cancers or [], target_year, target_end, behavior),
+            "items": compare_items or [],
+        },
+        "compare_mode": compare_mode,
+        "diff": {
+            "total_count": diff,
+            "total_percent": diff_percent,
+            "annual_average": annual_average_diff,
+        }
+    }
