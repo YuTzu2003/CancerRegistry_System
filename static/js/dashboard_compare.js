@@ -120,6 +120,32 @@
     return Array.from(document.querySelectorAll('.compare-subitem-check:checked')).map(input => input.value);
   }
 
+  function selectedCompareStageOptions() {
+    const systems = Array.from(document.querySelectorAll('.compare-stage-system-checkbox:checked')).map(input => input.nextElementSibling?.textContent?.trim() || input.value);
+    const classGroups = Array.from(document.querySelectorAll('.compare-stage-class-card')).flatMap(card => {
+      const classCheckbox = card.querySelector('.compare-stage-class-checkbox');
+      if (!classCheckbox?.checked) return [];
+      return [classCheckbox.value];
+    });
+    return { systems, class_groups: classGroups };
+  }
+
+  function updateCompareStageState() {
+    const ajccCheckbox = document.getElementById('compareItemStageAjcc');
+    const classOptions = document.getElementById('compareAjccClassOptions');
+    if (!ajccCheckbox || !classOptions) return;
+    const enabled = ajccCheckbox.checked && !ajccCheckbox.disabled;
+    classOptions.classList.toggle('d-none', !ajccCheckbox.checked);
+    document.querySelectorAll('.compare-stage-class-card').forEach(card => {
+      const classCheckbox = card.querySelector('.compare-stage-class-checkbox');
+      if (classCheckbox) {
+        classCheckbox.disabled = !enabled;
+        if (!ajccCheckbox.checked) classCheckbox.checked = false;
+      }
+      card.classList.toggle('is-disabled', !enabled);
+    });
+  }
+
   function markResultsStale() {
     if (hasRenderedResult) resultStale.classList.remove('d-none');
   }
@@ -162,6 +188,7 @@
     document.querySelectorAll('input[name="compareType"], .compare-subitem-check').forEach(input => {
       input.disabled = !cancerIsReady;
     });
+    updateCompareStageState();
     document.getElementById('btnSelectAllCompareItems').disabled = !topicIsSelected;
     document.getElementById('btnClearCompareItems').disabled = !topicIsSelected;
     analysisStep?.classList.toggle('opacity-50', !cancerIsReady);
@@ -192,6 +219,12 @@
       ? (selectedCancerTitle && selectedCancerTitle !== 'XX' ? selectedCancerTitle : `${selectedCancerValues().length} 個癌別`)
       : '尚未選擇';
     const items = selectedCompareItems();
+    const stageOptions = selectedCompareStageOptions();
+    const summaryItems = items.filter(item => !item.includes('期別分佈'));
+    if (stageOptions.systems.length) {
+      const classDetail = stageOptions.class_groups.join('、');
+      summaryItems.push(`期別（${stageOptions.systems.join('、')}${classDetail ? `；${classDetail}` : ''}）`);
+    }
 
     document.getElementById('summaryCompareMode').textContent = selectedCompareMode() === 'range' ? '年度區間比較' : '單一年度比較';
     document.getElementById('summaryMainData').textContent = formatDataSelection(mainFile, mainYear, mainYearEnd);
@@ -199,7 +232,7 @@
     document.getElementById('summaryBehavior').textContent = behaviorText || '尚未選擇';
     document.getElementById('summaryCancer').textContent = cancerText;
     document.getElementById('summaryModeAi').textContent = modeAi.selectedOptions[0]?.textContent?.trim() || '平穩客觀';
-    document.getElementById('summaryItems').textContent = items.length ? items.join('、') : '尚未選擇';
+    document.getElementById('summaryItems').textContent = summaryItems.length ? summaryItems.join('、') : '尚未選擇';
   }
 
   function updateTopicCounts() {
@@ -264,6 +297,46 @@
     previewEl.appendChild(table);
   }
 
+  function refreshYearPreview(fileEl, yearEl, yearEndEl, previewEl) {
+    const isRange = selectedCompareMode() === 'range';
+    const yearStart = yearEl.value;
+    const yearEnd = isRange ? yearEndEl.value : yearStart;
+    const metaEl = fileEl === mainFile ? mainMeta : targetMeta;
+    const years = fileEl === mainFile ? mainYears : targetYears;
+    const toggleEl = document.querySelector(`[data-preview-target="${previewEl.id}"]`);
+
+    if (!fileEl.value || !yearStart || !yearEnd) {
+      showPreviewMessage(previewEl, isRange ? '請先選擇完整年度區間' : '請先選擇年度');
+      metaEl.textContent = `${fileEl.value || '尚未選擇檔案'}｜年度 ${yearText(years)}｜等待選擇預覽年度`;
+      toggleEl?.classList.add('d-none');
+      return Promise.resolve();
+    }
+
+    showPreviewMessage(previewEl, '年度資料預覽載入中...');
+    return fetch('/api/dashboard/file_years', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        file_id: fileEl.value,
+        year_start: yearStart,
+        year_end: yearEnd
+      })
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (!data.ok) throw new Error(data.error || '資料預覽載入失敗');
+        renderPreview(previewEl, data.preview);
+        const period = yearStart === yearEnd ? `${yearStart} 年` : `${yearStart}-${yearEnd} 年`;
+        metaEl.textContent = `${fileEl.value}｜年度 ${yearText(data.years || years)}｜預覽 ${period}資料前 ${data.preview?.rows?.length || 0} 筆`;
+        toggleEl?.classList.remove('d-none');
+      })
+      .catch(err => {
+        showPreviewMessage(previewEl, err.message);
+        metaEl.textContent = `${fileEl.value}｜年度預覽讀取失敗`;
+        toggleEl?.classList.remove('d-none');
+      });
+  }
+
   function detectYears(selectEl, inputEl, previewEl) {
     const endInput = selectEl === mainFile ? mainYearEnd : targetYearEnd;
     inputEl.innerHTML = '<option value="" selected>偵測中...</option>';
@@ -292,9 +365,13 @@
         if (selectEl === targetFile) targetYears = data.years || [];
         fillYearSelect(inputEl, data.years || []);
         fillYearSelect(endInput, data.years || []);
-        renderPreview(previewEl, data.preview);
-        metaEl.textContent = `${selectEl.value}｜年度 ${yearText(data.years || [])}｜預覽 ${data.preview?.rows?.length || 0} 筆`;
-        toggleEl?.classList.remove('d-none');
+        if (inputEl.value) {
+          refreshYearPreview(selectEl, inputEl, endInput, previewEl);
+        } else {
+          showPreviewMessage(previewEl, '請先選擇年度');
+          metaEl.textContent = `${selectEl.value}｜年度 ${yearText(data.years || [])}｜等待選擇預覽年度`;
+          toggleEl?.classList.add('d-none');
+        }
       })
       .catch(err => {
         if (selectEl === mainFile) mainYears = [];
@@ -323,6 +400,41 @@
 
   function sum(values) {
     return (values || []).reduce((total, value) => total + Number(value || 0), 0);
+  }
+
+  function axisLabelLines(value, maxLength = 68) {
+    const lines = [];
+    const segments = String(value ?? '')
+      .trim()
+      .replace(/\s*(?=[\[［])/g, '\n')
+      .split('\n')
+      .filter(Boolean);
+    segments.forEach(segment => {
+      let line = '';
+      const segmentMaxLength = /^[\[［]/.test(segment) ? 88 : 82;
+      segment.split(/\s+/).filter(Boolean).forEach(word => {
+        const candidate = line ? `${line} ${word}` : word;
+        if (line && candidate.length > segmentMaxLength) {
+          lines.push(line);
+          line = word;
+        } else {
+          line = candidate;
+        }
+      });
+      if (line) lines.push(line);
+    });
+    return lines.length ? lines : [''];
+  }
+
+  function rightAlignedAxisLabel(value, maxLength = 68) {
+    return axisLabelLines(value, maxLength)
+      .map(text => `{${/^[\[［]/.test(text) ? 'bracket' : 'right'}|${text}}`)
+      .join('\n');
+  }
+
+  function histologyRowHeight(names) {
+    const maxLines = Math.max(1, ...names.map(name => axisLabelLines(name).length));
+    return Math.max(40, maxLines * 18 + 8);
   }
 
   function normalizeGenderAgeData(genderAgeData) {
@@ -355,13 +467,21 @@
         textStyle: { fontSize: 16, fontWeight: 'bold' }
       },
       tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-      grid: { left: 50, right: 35, top: 62, bottom: 72, containLabel: true },
-      legend: { data: ['男性', '女性', '總計'], bottom: 20 },
-      toolbox: { right: 8, top: 0, feature: { dataView: { show: true, readOnly: false }, saveAsImage: { show: true } } },
+      grid: { left: 72, right: 72, top: 70, bottom: 78, containLabel: false },
+      legend: { data: ['男性', '女性', '總計'], bottom: 28, itemGap: 12 },
+      toolbox: {
+        right: 16,
+        top: 0,
+        feature: {
+          dataView: { show: true, readOnly: false, title: '數據檢視', lang: ['數據檢視', '關閉', '更新'] },
+          saveAsImage: { show: true, title: '下載圖片' }
+        }
+      },
       xAxis: [{
         type: 'category',
         data: data.categories,
         axisPointer: { type: 'shadow' },
+        axisTick: { alignWithLabel: true },
         axisLabel: { interval: 0 }
       }],
       yAxis: [{
@@ -369,12 +489,14 @@
         name: '個案數',
         min: 0,
         max: yMax,
-        minInterval: 1
+        minInterval: 1,
+        splitNumber: 5,
+        splitLine: { lineStyle: { color: '#e5eaf3' } }
       }],
       series: [
-        { name: '男性', type: 'bar', data: data.male, itemStyle: { color: '#5470C6' } },
-        { name: '女性', type: 'bar', data: data.female, itemStyle: { color: '#EE6666' } },
-        { name: '總計', type: 'line', data: data.total, symbol: 'circle', itemStyle: { color: '#91CC75' }, lineStyle: { color: '#91CC75', width: 2 } }
+        { name: '男性', type: 'bar', data: data.male, barWidth: 20, barGap: '20%', barCategoryGap: '42%', itemStyle: { color: '#5470C6' } },
+        { name: '女性', type: 'bar', data: data.female, barWidth: 20, itemStyle: { color: '#EE6666' } },
+        { name: '總計', type: 'line', data: data.total, symbol: 'circle', symbolSize: 5, smooth: false, z: 5, itemStyle: { color: '#91CC75' }, lineStyle: { color: '#91CC75', width: 2 } }
       ]
     };
   }
@@ -494,6 +616,7 @@
         }).join('<br>')}</div>`
       : '';
     const validData = histologyData.filter(item => item.name !== 'Unknown / 未對應組織型態');
+    const noDataReason = escapeHtml(chartData?.histologyNoDataReason || '查無符合條件的組織型態資料。');
     const totalCount = validData.reduce((total, item) => total + Number(item.count || 0), 0);
     const rows = validData.length
       ? validData.map(item => {
@@ -513,19 +636,25 @@
             <td>${totalCount}</td>
             <td>${validData.length ? '100.0%' : '0.0%'}</td>
           </tr>`
-      : '<tr><td colspan="4" class="text-center py-4">無資料</td></tr>';
+      : `<tr><td colspan="4" class="text-center">無資料<br><span class="text-muted small">${noDataReason}</span></td></tr>`;
 
     return `
       ${viewSwitchBlock()}
       <div data-compare-view-panel="chart">
         <div id="${chartId}" class="compare-chart" style="height: 450px;"></div>
-        <div class="compare-chart-caption">圖、${yearTitle}年新診斷${getCancerTitleForSentence(cancerTitle)}病患組織型態分佈圖</div>
+        <div class="compare-chart-caption">圖、${yearTitle}年${getCancerTitleForSentence(cancerTitle)}組織型態分佈圖</div>
         ${chartNotes}
       </div>
       <div data-compare-view-panel="table" class="d-none">
         <div class="annual-report-table-wrap">
-          <table class="annual-report-table">
+          <table class="annual-report-table compare-histology-table">
             <caption>表、${yearTitle}年${getCancerTitleForSentence(cancerTitle)}組織型態分佈表<br><span class="text-muted fw-normal" style="font-size: 0.85em;">資料來源：癌症登記資料庫</span></caption>
+            <colgroup>
+              <col style="width: 10%;">
+              <col style="width: 75%;">
+              <col style="width: 7.5%;">
+              <col style="width: 7.5%;">
+            </colgroup>
             <thead>
               <tr>
                 <th>ICD-O編碼</th>
@@ -600,7 +729,7 @@
       ${viewSwitchBlock()}
       <div data-compare-view-panel="chart">
         <div id="${chartId}" class="compare-chart" style="height: 450px;"></div>
-        <div class="compare-chart-caption">圖、${yearTitle}年新診斷${getCancerTitleForSentence(cancerTitle)}病患個案分類分佈圖</div>
+        <div class="compare-chart-caption">圖、${yearTitle}年${getCancerTitleForSentence(cancerTitle)}個案分類分佈圖</div>
       </div>
       <div data-compare-view-panel="table" class="d-none">
         <div class="annual-report-table-wrap mb-4">
@@ -648,7 +777,7 @@
     setTimeout(() => chart.resize(), 50);
   }
 
-  function renderHistologyChart(chartId, chartData, sharedScale) {
+  function renderHistologyChart(chartId, chartData, yearTitle, cancerTitle, sharedScale) {
     if (!window.echarts) return;
     const chartEl = document.getElementById(chartId);
     if (!chartEl) return;
@@ -658,15 +787,54 @@
     const histologyData = Array.isArray(chartData?.histologyData) ? chartData.histologyData : [];
     const validData = histologyData.filter(item => item.name !== 'Unknown / 未對應組織型態');
     const totalCount = validData.reduce((total, item) => total + Number(item.count || 0), 0);
-    const names = validData.map(item => item.name);
-    const values = validData.map(item => {
+    // 與年報分析頁一致：由低比例到高比例排列，長清單依項目數自動增高。
+    const displayData = [...validData].reverse();
+    const names = displayData.map(item => item.name);
+    const noDataReason = chartData?.histologyNoDataReason || '查無符合條件的組織型態資料。';
+    const values = displayData.map(item => {
       const value = totalCount > 0 ? Number((Number(item.count || 0) / totalCount * 100).toFixed(1)) : 0;
       return { value, count: Number(item.count || 0) };
     });
 
+    chartEl.style.height = `${Math.max(450, names.length * histologyRowHeight(names))}px`;
+    const reportCancerTitle = getCancerTitleForSentence(cancerTitle);
+    const chartTitle = `${yearTitle}年${reportCancerTitle} 組織型態分佈圖`;
+
     const chart = echarts.init(chartEl);
+    if (!names.length) {
+      chartEl.style.height = '450px';
+      chart.setOption({
+        animation: false,
+        title: { text: chartTitle, subtext: '資料來源：癌症登記資料庫', left: 'center' },
+        tooltip: { show: false },
+        toolbox: { show: false },
+        xAxis: { show: false },
+        yAxis: { show: false },
+        series: [],
+        graphic: [{
+          type: 'text',
+          left: 'center',
+          top: 'middle',
+          style: {
+            text: `無資料\n${noDataReason}`,
+            fill: '#6b7280',
+            fontSize: 14,
+            fontWeight: 500,
+            lineHeight: 24,
+            textAlign: 'center'
+          }
+        }]
+      });
+      setTimeout(() => chart.resize(), 50);
+      return;
+    }
     chart.setOption({
-      title: { text: '組織型態分佈圖', subtext: '資料來源：癌症登記資料庫', left: 'center' },
+      animation: false,
+      title: {
+        text: chartTitle,
+        subtext: '資料來源：癌症登記資料庫',
+        left: 'center'
+      },
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'shadow' },
@@ -678,11 +846,30 @@
           return `${p.name}<br/>${p.marker}個案比例: ${val}% (${count}人)`;
         }
       },
-      grid: { left: 300, right: 170, bottom: 50, top: 60, containLabel: false },
+      grid: { left: 500, right: 60, bottom: 50, top: 60, containLabel: false },
       legend: { show: false },
-      toolbox: { feature: { dataView: { show: true, readOnly: false }, saveAsImage: { show: true } } },
+      toolbox: {
+        feature: {
+          dataView: { show: true, readOnly: false, title: '數據檢視', lang: ['數據檢視', '關閉', '更新'] },
+          saveAsImage: { show: true, title: '下載圖片' }
+        }
+      },
       xAxis: { type: 'value', name: '百分比 (%)', nameLocation: 'middle', nameGap: 30, min: 0, max: sharedScale?.histologyMax, interval: 10, axisLabel: { formatter: value => Number(value).toFixed(1) + '%' } },
-      yAxis: { type: 'category', data: names, inverse: true, axisLabel: { width: 280, overflow: 'break', lineHeight: 16, align: 'right', margin: 12 } },
+      yAxis: {
+        type: 'category',
+        data: names,
+        inverse: true,
+        axisLabel: {
+          width: 420,
+          align: 'right',
+          margin: 20,
+          formatter: value => rightAlignedAxisLabel(value),
+          rich: {
+            right: { width: 420, align: 'right', lineHeight: 18, fontSize: 12 },
+            bracket: { width: 420, align: 'right', lineHeight: 18, fontSize: 10.5 }
+          }
+        }
+      },
       series: [{
         name: '個案比例',
         type: 'bar',
@@ -691,9 +878,10 @@
         label: {
           show: true,
           position: 'right',
-          color: '#111827',
-          fontSize: 12,
-          formatter: params => `${Number(params.value || 0).toFixed(1)}%（${Number(params.data?.count || 0)}人）`
+          color: '#333',
+          fontSize: 13,
+          distance: 8,
+          formatter: params => `${Number(params.value || 0).toFixed(1)}% (${Number(params.data?.count || 0)} 人)`
         }
       }]
     });
@@ -720,9 +908,10 @@
 
     const chart = echarts.init(chartEl);
     chart.setOption({
+      animation: false,
       title: { text: '個案分類分佈圖', subtext: '資料來源：癌症登記資料庫', left: 'center', textStyle: { fontSize: 20, fontWeight: 'bold', color: '#333' } },
       toolbox: { show: true, feature: { dataView: { show: true, readOnly: false, title: '數據檢視', lang: ['數據檢視', '關閉', '更新'] }, saveAsImage: { show: true, title: '下載圖片' } } },
-      legend: { orient: 'vertical', right: '2%', top: 'middle', itemWidth: 14, itemHeight: 14, data: labels, textStyle: { fontSize: 14, lineHeight: 24, width: 450, overflow: 'break' } },
+      legend: { orient: 'vertical', right: '2%', top: 'middle', itemWidth: 14, itemHeight: 14, data: labels, textStyle: { fontSize: 14, lineHeight: 22, width: 450, overflow: 'break' } },
       tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
       grid: { left: '3%', right: '32%', top: '15%', bottom: '3%', containLabel: true },
       xAxis: [{ type: 'category', data: ['Class0', 'Class1', 'Class2', 'Class3'], axisTick: { alignWithLabel: true } }],
@@ -832,7 +1021,7 @@
     if (viewSwitch && resultHeading) resultHeading.appendChild(viewSwitch);
     if (item === '性別年齡分佈') renderSexAgeChart(`${chartPrefix}SexAgeChart`, chartData, sharedScale);
     if (item === '組織型態') {
-      renderHistologyChart(`${chartPrefix}HistologyChart`, chartData, sharedScale);
+      renderHistologyChart(`${chartPrefix}HistologyChart`, chartData, meta.year_label, selectedCancerTitle(), sharedScale);
     }
     if (item === '個案分類') renderClassificationChart(`${chartPrefix}ClassificationChart`, chartData, sharedScale);
   }
@@ -1050,6 +1239,10 @@
     document.querySelectorAll('.compare-subitem-check').forEach(input => {
       input.checked = false;
     });
+    document.querySelectorAll('.compare-stage-class-checkbox').forEach(input => {
+      input.checked = false;
+    });
+    updateCompareStageState();
 
     hasRenderedResult = false;
     lastComparisonData = null;
@@ -1116,10 +1309,26 @@
       button.textContent = willShow ? '收合資料預覽' : '查看資料預覽';
     });
   });
-  mainYear.addEventListener('change', () => { markResultsStale(); updateButtonState(); });
-  targetYear.addEventListener('change', () => { markResultsStale(); updateButtonState(); });
-  mainYearEnd.addEventListener('change', () => { markResultsStale(); updateButtonState(); });
-  targetYearEnd.addEventListener('change', () => { markResultsStale(); updateButtonState(); });
+  mainYear.addEventListener('change', () => {
+    markResultsStale();
+    refreshYearPreview(mainFile, mainYear, mainYearEnd, mainPreview);
+    updateButtonState();
+  });
+  targetYear.addEventListener('change', () => {
+    markResultsStale();
+    refreshYearPreview(targetFile, targetYear, targetYearEnd, targetPreview);
+    updateButtonState();
+  });
+  mainYearEnd.addEventListener('change', () => {
+    markResultsStale();
+    refreshYearPreview(mainFile, mainYear, mainYearEnd, mainPreview);
+    updateButtonState();
+  });
+  targetYearEnd.addEventListener('change', () => {
+    markResultsStale();
+    refreshYearPreview(targetFile, targetYear, targetYearEnd, targetPreview);
+    updateButtonState();
+  });
   document.querySelectorAll('input[name="compareMode"]').forEach(input => {
     input.addEventListener('change', updateCompareMode);
   });
@@ -1140,15 +1349,33 @@
     });
   });
   document.querySelectorAll('.compare-subitem-check').forEach(input => {
-    input.addEventListener('change', () => { markResultsStale(); updateButtonState(); });
+    input.addEventListener('change', () => {
+      markResultsStale();
+      updateCompareStageState();
+      updateButtonState();
+    });
+  });
+  document.querySelectorAll('.compare-stage-class-checkbox').forEach(input => {
+    input.addEventListener('change', () => {
+      markResultsStale();
+      updateSelectionSummary();
+    });
   });
   document.getElementById('btnSelectAllCompareItems').addEventListener('click', () => {
     document.querySelectorAll(`[data-compare-subitems="${selectedCompareType()}"] .compare-subitem-check:not(:disabled)`).forEach(input => { input.checked = true; });
+    if (selectedCompareType() === 'stage') {
+      document.querySelectorAll('.compare-stage-class-checkbox').forEach(input => { input.checked = true; });
+    }
+    updateCompareStageState();
     markResultsStale();
     updateButtonState();
   });
   document.getElementById('btnClearCompareItems').addEventListener('click', () => {
     document.querySelectorAll(`[data-compare-subitems="${selectedCompareType()}"] .compare-subitem-check`).forEach(input => { input.checked = false; });
+    if (selectedCompareType() === 'stage') {
+      document.querySelectorAll('.compare-stage-class-checkbox').forEach(input => { input.checked = false; });
+    }
+    updateCompareStageState();
     markResultsStale();
     updateButtonState();
   });

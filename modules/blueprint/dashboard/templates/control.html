@@ -187,10 +187,30 @@
               </div>
 
               <!-- 期別 細項 -->
-              <div id="subItems-stage" class="d-none d-flex flex-wrap gap-3">
-                <div class="form-check">
-                  <input class="form-check-input item-checkbox" type="checkbox" name="subTab_stage" id="chkStageDistribution" data-parent="stage" value="期別分佈" disabled>
-                  <label class="form-check-label text-dark" for="chkStageDistribution" style="cursor: pointer;">期別分佈</label>
+              <div id="subItems-stage" class="d-none w-100 annual-stage-panel">
+                <div class="annual-stage-system-row">
+                  <div class="form-check">
+                    <input class="form-check-input item-checkbox annual-stage-system-checkbox" type="checkbox" name="subTab_stage" id="chkStageAjcc" data-parent="stage" value="AJCC期別分佈" disabled>
+                    <label class="form-check-label text-dark" for="chkStageAjcc" style="cursor: pointer;">AJCC</label>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input item-checkbox annual-stage-system-checkbox" type="checkbox" name="subTab_stage" id="chkStageOtherSystems" data-parent="stage" value="FIGO/MAC/BCLC/SCLC期別分佈" disabled>
+                    <label class="form-check-label text-dark" for="chkStageOtherSystems" style="cursor: pointer;">FIGO／MAC／BCLC／SCLC…</label>
+                  </div>
+                </div>
+                <div id="annualAjccClassOptions" class="annual-stage-class-row d-none">
+                  <div class="form-check">
+                    <input class="form-check-input annual-stage-class-checkbox" type="checkbox" id="chkStageClass1" value="Class1" disabled>
+                    <label class="form-check-label text-dark" for="chkStageClass1">Class1</label>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input annual-stage-class-checkbox" type="checkbox" id="chkStageClass2" value="Class2" disabled>
+                    <label class="form-check-label text-dark" for="chkStageClass2">Class2</label>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input annual-stage-class-checkbox" type="checkbox" id="chkStageClass12" value="Class1+2" disabled>
+                    <label class="form-check-label text-dark" for="chkStageClass12">Class1+2</label>
+                  </div>
                 </div>
               </div>
 

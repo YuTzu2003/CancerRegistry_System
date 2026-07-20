@@ -524,6 +524,24 @@
   white-space: nowrap;
 }
 
+/* 年報分析期別：與其他分析細項相同的勾選框格式 */
+.annual-stage-system-row,
+.annual-stage-class-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.annual-stage-class-row {
+  margin-top: 12px;
+  padding-left: 24px;
+}
+
+@media (max-width: 768px) {
+  .annual-stage-class-row {
+    padding-left: 20px;
+  }
+}
 
 .annual-analyzable-note {
   margin-top: 6px;

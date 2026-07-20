@@ -317,6 +317,16 @@
       min-width: 0;
       width: 100%;
     }
+    .compare-result-item .compare-histology-table {
+      table-layout: fixed;
+    }
+    .compare-result-item .compare-histology-table th,
+    .compare-result-item .compare-histology-table td {
+      box-sizing: border-box;
+    }
+    .compare-result-item .compare-histology-table td:nth-child(2) {
+      overflow-wrap: anywhere;
+    }
     .compare-result-item .annual-report-table th,
     .compare-result-item .annual-report-table td,
     .compare-result-item .annual-report-table caption {
@@ -362,6 +372,41 @@
     }
     .compare-note-lines {
       padding-left: 12px;
+    }
+    .compare-stage-panel {
+      width: 100%;
+    }
+    .compare-stage-system-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .compare-stage-system-label {
+      font-weight: 400;
+      color: inherit;
+      cursor: pointer;
+    }
+    .compare-stage-class-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-top: 12px;
+      padding-left: 24px;
+    }
+    .compare-stage-class-card {
+      padding: 0;
+    }
+    .compare-stage-class-title {
+      margin-bottom: 0;
+      font-weight: 400;
+    }
+    .compare-stage-class-card.is-disabled {
+      opacity: 0.5;
+    }
+    @media (max-width: 768px) {
+      .compare-stage-class-row {
+        padding-left: 20px;
+      }
     }
     .compare-cancer-source > section {
       display: none !important;
@@ -557,10 +602,36 @@
         <label class="form-check-label" for="compareItemClassification">個案分類</label>
       </div>
     </div>
-    <div class="compare-subitem-row d-none d-flex flex-wrap gap-3" data-compare-subitems="stage">
-      <div class="form-check">
-        <input class="form-check-input compare-subitem-check" type="checkbox" id="compareItemStageDistribution" value="期別分佈" disabled>
-        <label class="form-check-label" for="compareItemStageDistribution">期別分佈</label>
+    <div class="compare-subitem-row d-none compare-stage-panel" data-compare-subitems="stage">
+      <div class="compare-stage-system-row">
+        <div class="form-check">
+          <input class="form-check-input compare-subitem-check compare-stage-system-checkbox" type="checkbox" id="compareItemStageAjcc" value="AJCC期別分佈" disabled>
+          <label class="form-check-label compare-stage-system-label" for="compareItemStageAjcc">AJCC</label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input compare-subitem-check compare-stage-system-checkbox" type="checkbox" id="compareItemStageOtherSystems" value="FIGO/MAC/BCLC/SCLC期別分佈" disabled>
+          <label class="form-check-label compare-stage-system-label" for="compareItemStageOtherSystems">FIGO／MAC／BCLC／SCLC…</label>
+        </div>
+      </div>
+      <div id="compareAjccClassOptions" class="compare-stage-class-row d-none">
+        <div class="compare-stage-class-card" data-compare-stage-group="class1">
+          <div class="form-check compare-stage-class-title">
+            <input class="form-check-input compare-stage-class-checkbox" type="checkbox" id="compareStageClass1" value="Class1" disabled>
+            <label class="form-check-label" for="compareStageClass1">Class1</label>
+          </div>
+        </div>
+        <div class="compare-stage-class-card" data-compare-stage-group="class2">
+          <div class="form-check compare-stage-class-title">
+            <input class="form-check-input compare-stage-class-checkbox" type="checkbox" id="compareStageClass2" value="Class2" disabled>
+            <label class="form-check-label" for="compareStageClass2">Class2</label>
+          </div>
+        </div>
+        <div class="compare-stage-class-card" data-compare-stage-group="class12">
+          <div class="form-check compare-stage-class-title">
+            <input class="form-check-input compare-stage-class-checkbox" type="checkbox" id="compareStageClass12" value="Class1+2" disabled>
+            <label class="form-check-label" for="compareStageClass12">Class1+2</label>
+          </div>
+        </div>
       </div>
     </div>
     <div class="compare-subitem-row d-none d-flex flex-wrap gap-3" data-compare-subitems="treatment">

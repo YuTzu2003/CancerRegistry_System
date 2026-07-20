@@ -408,6 +408,8 @@ def analyze_dashboard_file_route():
 def dashboard_file_years_route():
     data = request.json or {}
     file_id = data.get("file_id", "")
+    year_start = str(data.get("year_start", "")).strip()
+    year_end = str(data.get("year_end", "")).strip()
     owned_file = _get_owned_dashboard_file(file_id, session.get("id"))
     if not owned_file:
         return jsonify({"ok": False, "error": "未提供檔案名稱"}), 400
@@ -415,7 +417,9 @@ def dashboard_file_years_route():
     try:
         from modules.blueprint.dashboard.chart_analytics import get_dashboard_file_preview, get_dashboard_file_years
         years = get_dashboard_file_years(owned_file["storage_path"])
-        preview = get_dashboard_file_preview(owned_file["storage_path"], 10)
+        preview = get_dashboard_file_preview(
+            owned_file["storage_path"], 10, year_start, year_end
+        )
         return jsonify({"ok": True, "years": years, "preview": preview}), 200
     except Exception as e:
         logging.error(f"Error detecting dashboard file years: {e}")

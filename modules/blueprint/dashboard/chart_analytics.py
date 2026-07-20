@@ -48,7 +48,7 @@ def get_column_names(df):
 
 # 性別年齡分布圖
 
-def _empty_dashboard_response(message="查無符合條件資料！"):
+def _empty_dashboard_response(message="查無符合條件資料！", histology_reason=""):
     labels = ['<=19', '20-24', '25-29', '30-34', '35-39', '40-44', '45-49', '50-54', '55-59', '60-64', '65-69', '70-74', '75-79', '80-84', '>=85']
     return {
         "noDataWarning": message,
@@ -62,6 +62,7 @@ def _empty_dashboard_response(message="查無符合條件資料！"):
         "analyzableConfirmedData": [],
         "histologyData": [],
         "histologyWarnings": [],
+        "histologyNoDataReason": histology_reason or message,
         "diagnosisClassificationData": []
     }
 
@@ -377,6 +378,31 @@ def calculate_histology_distribution(df, cols, return_warnings=False):
 
     return hist_dist_data
 
+def get_histology_no_data_reason(df, cols, histology_data, histology_warnings):
+    valid_histology = [
+        item for item in histology_data
+        if item.get("name") != "Unknown / 未對應組織型態"
+    ]
+    if valid_histology:
+        return ""
+
+    required_columns = {
+        "個案分類": cols.get("class_col"),
+        "組織型態": cols.get("hist_col"),
+        "性態碼": cols.get("behavior_col"),
+    }
+    missing = [name for name, column in required_columns.items() if not column or column not in df.columns]
+    if missing:
+        return f"缺少{'、'.join(missing)}欄位，無法產生組織型態統計。"
+
+    class_col = cols.get("class_col")
+    eligible_count = int(df[class_col].apply(normalize_case_code).isin(["1", "2"]).sum())
+    if eligible_count == 0:
+        return "個案分類不符合分析條件；組織型態僅納入 Class1 與 Class2 個案。"
+    if histology_warnings:
+        return "符合個案分類的資料皆未通過組織型態規則，可能與組織代碼、診斷年度或原發部位條件不符。"
+    return "符合篩選條件的個案沒有可統計的組織型態資料。"
+
 def calculate_diagnosis_classification(df, cols):
     data = {
         "class0_total": 0, "0_1_0": 0, "0_1_2": 0,
@@ -432,16 +458,27 @@ def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", beh
         cols = get_column_names(df)
 
         if _query_year_range_outside_data(df, cols, year_start, year_end):
-            return _empty_dashboard_response()
+            return _empty_dashboard_response(
+                histology_reason="所選年度區間不在檔案的診斷年度範圍內。"
+            )
 
+        year_filtered_df = filter_dashboard_data(df, cols, [], year_start, year_end, "")
+        if year_filtered_df.empty:
+            return _empty_dashboard_response(histology_reason="所選年度內沒有可分析個案。")
+        behavior_filtered_df = filter_dashboard_data(df, cols, [], year_start, year_end, behavior)
+        if behavior_filtered_df.empty:
+            return _empty_dashboard_response(histology_reason="所選年度內沒有符合性態碼條件的個案。")
         df = filter_dashboard_data(df, cols, cancers, year_start, year_end, behavior)
         if df.empty:
-            return _empty_dashboard_response()
+            return _empty_dashboard_response(histology_reason="沒有同時符合所選年度、性態碼與癌別條件的個案。")
         
         gender_age_data = calculate_gender_age_distribution(df, cols)
         age_median_data = calculate_age_median(df, cols)
         analyzable_confirmed_data = calculate_analyzable_confirmed_cases(df, cols)
         histology_data, histology_warnings = calculate_histology_distribution(df, cols, return_warnings=True)
+        histology_no_data_reason = get_histology_no_data_reason(
+            df, cols, histology_data, histology_warnings
+        )
         diagnosis_classification_data = calculate_diagnosis_classification(df, cols)
   
         return {
@@ -450,6 +487,7 @@ def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", beh
             "analyzableConfirmedData": analyzable_confirmed_data,
             "histologyData": histology_data,
             "histologyWarnings": histology_warnings,
+            "histologyNoDataReason": histology_no_data_reason,
             "diagnosisClassificationData": diagnosis_classification_data
         }
     except Exception as e:
@@ -463,8 +501,22 @@ def get_dashboard_file_years(filename):
     years = years[(years >= 1900) & (years <= 2100)]
     return sorted(years.astype(int).unique().tolist())
 
-def get_dashboard_file_preview(filename, limit=10):
-    df = pd.read_excel(_safe_dashboard_path(filename), nrows=limit)
+def get_dashboard_file_preview(filename, limit=10, year_start="", year_end=""):
+    df = pd.read_excel(_safe_dashboard_path(filename))
+    if year_start:
+        cols = get_column_names(df)
+        year_col = cols.get("year_col")
+        if year_col:
+            try:
+                start = int(year_start)
+                end = int(year_end or year_start)
+                year_values = pd.to_numeric(
+                    df[year_col].astype(str).str[:4], errors="coerce"
+                )
+                df = df.loc[year_values.between(start, end)]
+            except (TypeError, ValueError):
+                df = df.iloc[0:0]
+    df = df.head(limit)
     df = df.where(pd.notnull(df), "")
     return {
         "columns": [str(col) for col in df.columns],

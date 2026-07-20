@@ -7,6 +7,38 @@ window.DashboardRenderer.t = function(key, options) {
 window.DashboardRenderer.sourceLine = function() {
     return `<br><span class="text-muted fw-normal" style="font-size: 0.85em;">${this.t('source')}</span>`;
 };
+window.DashboardRenderer.axisLabelLines = function(value, maxLength = 68) {
+    const lines = [];
+    const segments = String(value ?? '')
+        .trim()
+        .replace(/\s*(?=[\[［])/g, '\n')
+        .split('\n')
+        .filter(Boolean);
+    segments.forEach(segment => {
+        let line = '';
+        const segmentMaxLength = /^[\[［]/.test(segment) ? 88 : 82;
+        segment.split(/\s+/).filter(Boolean).forEach(word => {
+            const candidate = line ? `${line} ${word}` : word;
+            if (line && candidate.length > segmentMaxLength) {
+                lines.push(line);
+                line = word;
+            } else {
+                line = candidate;
+            }
+        });
+        if (line) lines.push(line);
+    });
+    return lines.length ? lines : [''];
+};
+window.DashboardRenderer.rightAlignedAxisLabel = function(value, maxLength = 68) {
+    return this.axisLabelLines(value, maxLength)
+        .map(text => `{${/^[\[［]/.test(text) ? 'bracket' : 'right'}|${text}}`)
+        .join('\n');
+};
+window.DashboardRenderer.histologyRowHeight = function(names) {
+    const maxLines = Math.max(1, ...names.map(name => this.axisLabelLines(name).length));
+    return Math.max(40, maxLines * 18 + 8);
+};
 window.DashboardRenderer.reportCaption = function(kind, yearTitle, cancerTitle, description, options = {}) {
     const isEnglish = window.DashboardI18n?.getLanguage() === 'en';
     const prefix = kind === 'table' ? this.t('table') : this.t('chart');
@@ -149,8 +181,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }
           },
           grid: {
-            left: 300,
-            right: 110,
+            left: 500,
+            right: 60,
             bottom: 50,
             top: 60,
             containLabel: false
@@ -180,11 +212,16 @@ document.addEventListener('DOMContentLoaded', function() {
             data: [], 
             inverse: true,
             axisLabel: {
-              width: 280,
-              overflow: 'break',
-              lineHeight: 16,
+              width: 420,
               align: 'right',
-              margin: 20
+              margin: 20,
+              formatter: function(value) {
+                return window.DashboardRenderer.rightAlignedAxisLabel(value);
+              },
+              rich: {
+                right: { width: 420, align: 'right', lineHeight: 18, fontSize: 12 },
+                bracket: { width: 420, align: 'right', lineHeight: 18, fontSize: 10.5 }
+              }
             }
           },
           series: [
@@ -475,7 +512,7 @@ window.DashboardRenderer.renderColonHistologyTableNote = function(histologyWarni
     };
 
 /* ── 組織型態分佈表 ── */
-window.DashboardRenderer.renderHistologyTable = function(histologyData, yearTitle, cancerTitle) {
+window.DashboardRenderer.renderHistologyTable = function(histologyData, yearTitle, cancerTitle, noDataReason = '') {
         const body = document.getElementById('annualHistologyTableBody');
         const caption = document.getElementById('annualHistologyCaption');
         if (!body) return;
@@ -487,7 +524,8 @@ window.DashboardRenderer.renderHistologyTable = function(histologyData, yearTitl
                 : this.reportCaption('table', yearTitle, selectedCancer, `${this.t('histology')}${this.t('distribution')}`);
         }
         if (!histologyData || histologyData.length === 0) {
-            body.innerHTML = `<tr><td colspan="4" class="text-center py-4">${this.t('noData')}</td></tr>`;
+            const reason = this.escapeHtml(noDataReason || '查無符合條件的組織型態資料。');
+            body.innerHTML = `<tr><td colspan="4" class="text-center py-4">${this.t('noData')}<br><span class="text-muted small">${reason}</span></td></tr>`;
             this.renderColonHistologyTableNote([]);
             return;}
 
@@ -808,7 +846,7 @@ window.DashboardRenderer.regenerateInsightsForLanguage = function() {
         return Promise.all(buttons.map(button => button.onclick()));
     };
 
-window.DashboardRenderer.updateHistologyChart = function(histologyData) {
+window.DashboardRenderer.updateHistologyChart = function(histologyData, noDataReason = '') {
         if (!window.dashboardHistologyChartInstance || !histologyData) return;
         const yearTitle = this.getSelectedYearTitle();
         const cancerTitle = this.getCancerTitleForSentence(this.getSelectedCancerTitle());
@@ -822,28 +860,58 @@ window.DashboardRenderer.updateHistologyChart = function(histologyData) {
             count: item.count
         }));
         const chartDom = document.getElementById('histologyChart');
+        const chartTitle = isEnglish
+            ? `Histological Distribution of ${this.getEnglishCancerPatientLabel(cancerTitle)}, ${yearTitle}`
+            : `${yearTitle} ${cancerTitle} ${this.t('histologyDistribution')}`;
         if (chartDom) {
-            chartDom.style.height = `${Math.max(450, categories.length * 40)}px`;
+            chartDom.style.height = `${Math.max(450, categories.length * this.histologyRowHeight(categories))}px`;
             window.dashboardHistologyChartInstance.resize();
+        }
+        if (categories.length === 0) {
+            if (chartDom) chartDom.style.height = '450px';
+            window.dashboardHistologyChartInstance.setOption({
+                title: { text: chartTitle, subtext: this.t('source'), left: 'center' },
+                tooltip: { show: false },
+                toolbox: { show: false },
+                xAxis: { show: false, data: [] },
+                yAxis: { show: false, data: [] },
+                series: [{ data: [] }],
+                graphic: [{
+                    type: 'text',
+                    left: 'center',
+                    top: 'middle',
+                    style: {
+                        text: `${this.t('noData')}\n${noDataReason || '查無符合條件的組織型態資料。'}`,
+                        fill: '#6b7280',
+                        fontSize: 14,
+                        fontWeight: 500,
+                        lineHeight: 24,
+                        textAlign: 'center'
+                    }
+                }]
+            }, { replaceMerge: ['graphic'] });
+            window.dashboardHistologyChartInstance.resize();
+            return;
         }
         window.dashboardHistologyChartInstance.setOption({
             title: {
-                text: isEnglish
-                    ? `Histological Distribution of ${this.getEnglishCancerPatientLabel(cancerTitle)}, ${yearTitle}`
-                    : `${yearTitle} ${cancerTitle} ${this.t('histologyDistribution')}`,
+                text: chartTitle,
                 subtext: this.t('source'),
                 left: 'center'
             },
-            xAxis: { name: `${this.t('percentage')} (%)` },
+            tooltip: { show: true },
+            graphic: [],
+            xAxis: { show: true, name: `${this.t('percentage')} (%)` },
+            yAxis: { show: true, data: categories },
             toolbox: {
+                show: true,
                 feature: {
                     dataView: { show: true, readOnly: false, title: this.t('dataView'), lang: [this.t('dataView'), this.t('close'), this.t('refresh')] },
                     saveAsImage: { show: true, title: this.t('downloadImage') }
                 }
             },
-            series: [{ name: this.t('caseRatio'), data: chartSeriesData }],
-            yAxis: { data: categories }
-        });
+            series: [{ name: this.t('caseRatio'), data: chartSeriesData }]
+        }, { replaceMerge: ['graphic'] });
     };
 
 window.DashboardRenderer.rerenderDashboardLanguage = function(options = {}) {
@@ -867,14 +935,14 @@ window.DashboardRenderer.rerenderDashboardLanguage = function(options = {}) {
         this.renderSexAgeTable(window.lastChartData.genderAgeData, yearTitle, cancerTitle);
         this.renderAgeMedianTable(window.lastChartData.ageMedianData, yearTitle, cancerTitle);
         this.renderAnalyzableConfirmedTable(window.lastChartData.analyzableConfirmedData, yearTitle, cancerTitle);
-        this.renderHistologyTable(window.lastChartData.histologyData, yearTitle, cancerTitle);
+        this.renderHistologyTable(window.lastChartData.histologyData, yearTitle, cancerTitle, window.lastChartData.histologyNoDataReason);
         this.renderColonHistologyTableNote(window.lastChartData.histologyWarnings || []);
         this.renderHistologyWarningButton(this.currentHistologyWarnings);
         this.renderDiagnosisClassificationTable(window.lastChartData.diagnosisClassificationData, yearTitle, cancerTitle);
         this.renderDiagnosisClassificationChart(window.lastChartData.diagnosisClassificationData, yearTitle, cancerTitle);
         this.updateChartCaptions(yearTitle, cancerTitle);
         if (window.dashboardChartInstance) window.dashboardChartInstance.setOption(this.getGenderAgeChartOption(window.lastChartData.genderAgeData), true);
-        this.updateHistologyChart(window.lastChartData.histologyData);
+        this.updateHistologyChart(window.lastChartData.histologyData, window.lastChartData.histologyNoDataReason);
         if (options.regenerateInsights) this.regenerateInsightsForLanguage();
     };
 
