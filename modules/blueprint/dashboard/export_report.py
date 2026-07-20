@@ -10,8 +10,9 @@ from docx.enum.section import WD_ORIENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from playwright.sync_api import sync_playwright
 
-def generate_export_files(format_pdf, format_word, charts_data, output_dir):
+def generate_export_files(format_pdf, format_word, charts_data, output_dir, export_language="zh-TW"):
     os.makedirs(output_dir, exist_ok=True)
+    insight_heading = "AI-generated narrative:" if export_language == "en" else "語言模型敘述："
     html_content = """
     <!DOCTYPE html>
     <html>
@@ -71,7 +72,7 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir):
         if chart.get('includeAi', True):
             llm_text = chart.get('llmText', '')
             if llm_text:
-                html_content += f'<div class="llm-text"><strong>AI 分析敘述:</strong><br/>{llm_text}</div>'
+                html_content += f'<div class="llm-text"><strong>{insight_heading}</strong><br/>{llm_text}</div>'
         html_content += '</div>'    
     html_content += "</body></html>"
     

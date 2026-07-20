@@ -36,17 +36,41 @@ STYLE_PROMPTS = {
             """
 }
 
+INSIGHT_LANGUAGE_INSTRUCTIONS = {
+    "zh-TW": "Reply only in Traditional Chinese.",
+    "en": "Reply only in English. Use professional medical and cancer-registry terminology.",
+}
+
 def get_chart_insight_logic(data):
     field_key = data.get("field_key", "")
     chart_data = data.get("data", {})
     fields = data.get("fields", [])
     mode_ai = data.get("mode_ai", "balanced")
+    source_text = str(data.get("source_text", "")).strip()
+    insight_language = data.get("language", "zh-TW")
+    if insight_language not in INSIGHT_LANGUAGE_INSTRUCTIONS:
+        insight_language = "zh-TW"
     year_start = data.get("year_start", "")
     year_end = data.get("year_end", "")
     selected_year_range = f"{year_start}-{year_end}" if year_start and year_end else year_start or year_end or "Not specified"
     definitions = []
-    
-    if fields:
+
+    if source_text and insight_language == "en":
+        prompt = f"""
+                Translate the following Traditional Chinese cancer-registry narrative into
+                professional English. Do not reanalyse the data. Preserve every factual
+                statement, numerical value, percentage, case count, and level of certainty.
+                Do not add, omit, reinterpret, or reorder substantive findings. Use standard
+                medical and cancer-registry terminology. Reply with the translated narrative
+                only, without a heading, greeting, notes, or markdown.
+
+                [Traditional Chinese Narrative]
+                {source_text}
+            """
+    else:
+        prompt = None
+
+    if not prompt and fields:
         conn = get_conn()
         cursor = conn.cursor()
         placeholders = ','.join(['?'] * len(fields))
@@ -60,13 +84,13 @@ def get_chart_insight_logic(data):
                 definitions.append(f"- {col_name}: {str(col_def).strip()}")
         conn.close()
 
-    if definitions:
-        def_section = f"[Related Field Definitions]:\n" + "\n".join(definitions)
-    else:
-        def_section = ""
-    style_instruction = STYLE_PROMPTS.get(mode_ai)
-
-    prompt = f"""
+    if not prompt:
+        if definitions:
+            def_section = f"[Related Field Definitions]:\n" + "\n".join(definitions)
+        else:
+            def_section = ""
+        style_instruction = STYLE_PROMPTS.get(mode_ai)
+        prompt = f"""
                 You are a professional medical and oncology data analysis expert.
                 Please provide a rigorous analysis based strictly on the cancer registry
                 statistical chart data provided below.
@@ -96,9 +120,9 @@ def get_chart_insight_logic(data):
         response = client.chat.completions.create(
             model=model_name, 
             messages=[
-                {"role": "system", "content": "You are a professional cancer and medical data analysis expert. Please be sure to reply in Traditional Chinese."},
+                {"role": "system", "content": f"You are a professional cancer and medical data analysis expert. {INSIGHT_LANGUAGE_INSTRUCTIONS[insight_language]}"},
                 {"role": "user", "content": prompt}
-            ],temperature=0.3
+            ],temperature=0 if source_text and insight_language == "en" else 0.3
         )
         content = response.choices[0].message.content
         insight = re.sub(r'[*#`\n\t]+', '', content).strip()

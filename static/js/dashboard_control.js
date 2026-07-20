@@ -69,6 +69,27 @@
     
     window.selectedCancers = new Set(selectedValues);
     window.dashboardSelectedCancerIds = selectedValues;
+    const displayCancerKeys = [];
+    if (isAllSelected || (specificSelectedCount === leafNodes.length && leafNodes.length > 0)) {
+        displayCancerKeys.push('All_Cancers');
+    } else {
+        const selectedGroups = new Set();
+        document.querySelectorAll('.cancer-cb-group:not([data-group="All_Cancers"])').forEach(group => {
+            if (group.checked) {
+                selectedGroups.add(group.dataset.group);
+                displayCancerKeys.push(group.dataset.group);
+            }
+        });
+        leafNodes.forEach(node => {
+            if (!node.checked || isDisplayOnlyLungParent(node)) return;
+            const parentKey = node.dataset.parent;
+            const grandparentKey = node.dataset.grandparent;
+            if (!selectedGroups.has(parentKey) && !selectedGroups.has(grandparentKey)) {
+                displayCancerKeys.push(node.value);
+            }
+        });
+    }
+    window.dashboardSelectedCancerDisplayKeys = [...new Set(displayCancerKeys)];
     
     const totalSpecificCount = leafNodes.length;
     
@@ -692,17 +713,17 @@
     return true;
   };
 
-  window.loadDashboardFileYearRange = function(filename) {
+  window.loadDashboardFileYearRange = function(fileId) {
     window.dashboardFileYearRange = null;
     window.dashboardYearRangeAlertKey = '';
     setYearSelectPlaceholder(yearStartInput, '起始');
     setYearSelectPlaceholder(yearEndInput, '結束');
-    if (!filename) return Promise.resolve(null);
+    if (!fileId) return Promise.resolve(null);
 
     return fetch('/api/dashboard/year_range', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filename })
+      body: JSON.stringify({ file_id: fileId })
     })
       .then(res => res.json())
       .then(data => {
@@ -725,6 +746,7 @@
   };
 
   function resetDashboardFilters() {
+    window.DashboardRenderer?.clearInsightCache?.();
     if (window.dashboardFileYearRange) {
       populateYearSelects(window.dashboardFileYearRange);
     } else {
@@ -750,6 +772,7 @@
 
     window.selectedCancers = new Set();
     window.dashboardSelectedCancerIds = [];
+    window.dashboardSelectedCancerDisplayKeys = [];
     window.dashboardSelectedCancerTitle = 'XX';
 
     document.querySelectorAll('.chart-pane').forEach(pane => {
@@ -962,23 +985,25 @@ function initDashboardControl() {
       if(activeLink) activeLink.classList.replace('text-dark', 'text-primary');
       const activeBadge = row.querySelector('.status-badge-selected');
       if(activeBadge) activeBadge.style.display = 'inline-block';
-      const selectedFilename = activeLink ? activeLink.innerText.trim() : '';
+      const selectedFileId = row.dataset.fileId || '';
       if (window.loadDashboardFileYearRange) {
-          window.loadDashboardFileYearRange(selectedFilename);
+          window.loadDashboardFileYearRange(selectedFileId);
       }
   });
 
   /* ── 查詢按鈕執行邏輯 ── */
   const btnRunQuery = document.getElementById('btnRunQuery');
   if (btnRunQuery) {
-      btnRunQuery.addEventListener('click', function() {
+      btnRunQuery.addEventListener('click', async function() {
+          await window.DashboardI18n?.setLanguage('zh-TW');
+          window.DashboardRenderer?.clearInsightCache?.();
           document.querySelectorAll('.chart-pane').forEach(pane => {pane.classList.add('d-none');});
 
-          let selectedFile = '';
+          let selectedFileId = '';
           const activeRow = document.querySelector('#dashFileListBody tr.table-active');
           if (activeRow) {
               const link = activeRow.querySelector('a');
-              if (link) selectedFile = link.innerText.trim();
+              selectedFileId = activeRow.dataset.fileId || '';
           }
 
           const yearStartVal = document.getElementById('filterYearStart')?.value.trim();
@@ -1001,7 +1026,7 @@ function initDashboardControl() {
               return;
           }
 
-          if (!selectedFile) {
+          if (!selectedFileId) {
               utils.alert('請先從上方檔案列表點選要分析的檔案！', 'warning');
               return;
           }
@@ -1013,7 +1038,7 @@ function initDashboardControl() {
           }
 
           const dashboardAnalyzePayload = {
-              filename: selectedFile,
+              file_id: selectedFileId,
               cancers: Array.from(window.selectedCancers || []),
               year_start: yearStartVal,
               year_end: yearEndVal,
@@ -1107,7 +1132,8 @@ function initDashboardControl() {
                       const btn = document.getElementById(cfg.btnId);
                       if (btn) {
                           btn.style.display = 'block';
-                          btn.innerHTML = '重新產生敘述';
+                          btn.innerHTML = window.DashboardRenderer.t('regenerateInsight');
+                          btn.dataset.insightFieldKey = cfg.title;
                           btn.onclick = () => {
                               let dataToSend = window.lastChartData[cfg.dataKey];
                               if (cfg.btnId === 'btnAiHistology' && dataToSend) {
@@ -1124,13 +1150,26 @@ function initDashboardControl() {
                                       };
                                   });
                               }
-                              return window.DashboardRenderer.fetchLlmInsight(cfg.title, dataToSend, cfg.fields, cfg.respId, cfg.btnId);
+                              const currentLanguage = window.DashboardI18n?.getLanguage() || 'zh-TW';
+                              const currentRequest = window.DashboardRenderer.fetchLlmInsight(
+                                  cfg.title, dataToSend, cfg.fields, cfg.respId, cfg.btnId
+                              );
+                              if (currentLanguage === 'zh-TW') {
+                                  currentRequest.then(result => {
+                                      if (!result.success) return;
+                                      return window.DashboardRenderer.fetchLlmInsight(
+                                          cfg.title, dataToSend, cfg.fields, cfg.respId, cfg.btnId,
+                                          { language: 'en', display: false, manageButton: false, sourceText: result.insight }
+                                      );
+                                  });
+                              }
+                              return currentRequest;
                           };
                       }
                   });
 
                   document.querySelectorAll('[id^="llmResponse"]').forEach(el => {
-                      el.innerText = '（系統將自動產生分析敘述）';
+                      el.innerText = window.DashboardRenderer.t('autoInsight');
                   });
 
                   if (window.DashboardRenderer) {
@@ -1145,18 +1184,7 @@ function initDashboardControl() {
                       window.DashboardRenderer.renderDiagnosisClassificationTable(chartData.diagnosisClassificationData, yearTitle, cancerTitle);
                       window.DashboardRenderer.renderDiagnosisClassificationChart(chartData.diagnosisClassificationData, yearTitle, cancerTitle);
                       window.DashboardRenderer.showAnnualDataContent();
-                      const chartCaption = document.getElementById('annualSexAgeChartCaption');
-                      if (chartCaption) {
-                          chartCaption.innerHTML = `圖、${yearTitle}年新診斷${window.DashboardRenderer.getCancerTitleForSentence(cancerTitle)}病患性別及年齡分佈圖<br><span class="text-muted fw-normal" style="font-size: 0.85em;">資料來源：癌症登記資料庫</span>`;
-                      }
-                      const histologyChartCaption = document.getElementById('annualHistologyChartCaption');
-                      if (histologyChartCaption) {
-                          histologyChartCaption.innerHTML = `圖、${yearTitle}年${window.DashboardRenderer.getCancerTitleForSentence(cancerTitle)}組織型態分佈圖<br><span class="text-muted fw-normal" style="font-size: 0.85em;">資料來源：癌症登記資料庫</span>`;
-                      }
-                      const classificationChartCaption = document.getElementById('annualDiagnosisClassificationChartCaption');
-                      if (classificationChartCaption) {
-                          classificationChartCaption.innerHTML = `圖、${yearTitle}年${window.DashboardRenderer.getCancerTitleForSentence(cancerTitle)}個案分類分佈圖<br><span class="text-muted fw-normal" style="font-size: 0.85em;">資料來源：癌症登記資料庫</span>`;
-                      }
+                      window.DashboardRenderer.updateChartCaptions(yearTitle, cancerTitle);
                   }
 
                   if (window.dashboardChartInstance) {
@@ -1173,42 +1201,7 @@ function initDashboardControl() {
                       window.dashboardChartInstance.setOption(genderAgeOption, true);
                   }
 
-                  if (window.dashboardHistologyChartInstance && chartData.histologyData) {
-                      const yearTitle = window.DashboardRenderer ? window.DashboardRenderer.getSelectedYearTitle() : '';
-                      const cancerTitle = window.DashboardRenderer ? window.DashboardRenderer.getSelectedCancerTitle() : '';
-                      const cancerTitleSent = window.DashboardRenderer ? window.DashboardRenderer.getCancerTitleForSentence(cancerTitle) : '';
-                      const validData = chartData.histologyData.filter(item => item.name !== 'Unknown / 未對應組織型態');
-                      const totalValid = validData.reduce((sum, item) => sum + item.count, 0);
-                      const topData = validData.reverse();
-                      const categories = topData.map(item => item.name);
-                      const chartSeriesData = topData.map(item => {
-                          const pct = totalValid > 0 ? parseFloat(((item.count / totalValid) * 100).toFixed(1)) : 0;
-                          return {
-                              value: pct,
-                              count: item.count
-                          };
-                      });
-
-                      // 動態調整圖表高度，防止柱狀圖項目過多時擠壓重疊
-                      const chartDom = document.getElementById('histologyChart');
-                      if (chartDom) {
-                          const computedHeight = Math.max(450, categories.length * 40); // 每筆資料給予 40px 的垂直空間，最低 450px
-                          chartDom.style.height = computedHeight + 'px';
-                          window.dashboardHistologyChartInstance.resize();
-                      }
-
-                      window.dashboardHistologyChartInstance.setOption({
-                          title: { 
-                              text: `${yearTitle}年${cancerTitleSent}組織型態分佈圖`, 
-                              subtext: '資料來源：癌症登記資料庫',
-                              left: 'center'
-                          },
-                          yAxis: { data: categories },
-                          series: [
-                              { data: chartSeriesData }
-                          ]
-                      });
-                  }
+                  if (window.DashboardRenderer) window.DashboardRenderer.updateHistologyChart(chartData.histologyData);
                   
                   // Collect all AI promises before showing the charts
                   let aiPromises = [];
@@ -1322,6 +1315,7 @@ function initDashboardControl() {
       if (!btn) return;
       
       const name = btn.dataset.name;
+      const fileId = btn.dataset.fileId;
       Swal.fire({
           title: '確定刪除？',
           text: `將刪除 ${name}`,
@@ -1337,7 +1331,7 @@ function initDashboardControl() {
           fetch('/dashboard/delete', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ filename: name })
+              body: JSON.stringify({ file_id: fileId })
           })
           .then(r => r.json())
           .then(data => {

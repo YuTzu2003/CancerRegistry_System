@@ -283,7 +283,7 @@
     fetch('/api/dashboard/file_years', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filename: selectEl.value })
+      body: JSON.stringify({ file_id: selectEl.value })
     })
       .then(r => r.json())
       .then(data => {
@@ -1201,8 +1201,8 @@
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        main_filename: mainFile.value,
-        target_filename: targetFile.value,
+        main_file_id: mainFile.value,
+        target_file_id: targetFile.value,
         main_year: mainYear.value,
         target_year: targetYear.value,
         main_year_end: selectedCompareMode() === 'range' ? mainYearEnd.value : mainYear.value,

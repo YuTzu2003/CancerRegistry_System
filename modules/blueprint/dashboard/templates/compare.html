@@ -405,7 +405,7 @@
         <select id="mainCompareFile" class="form-select">
           <option value="" selected disabled>選擇主要檔案...</option>
           {% for f in uploaded_files %}
-          <option value="{{ f.name }}">{{ f.name }}</option>
+          <option value="{{ f.id }}">{{ f.name }}</option>
           {% endfor %}
         </select>
       </div>
@@ -444,7 +444,7 @@
         <select id="targetCompareFile" class="form-select">
           <option value="" selected disabled>選擇比較檔案...</option>
           {% for f in uploaded_files %}
-          <option value="{{ f.name }}">{{ f.name }}</option>
+          <option value="{{ f.id }}">{{ f.name }}</option>
           {% endfor %}
         </select>
       </div>
@@ -666,5 +666,5 @@
   {% include "control.html" %}
 </div>
 
-<script src="{{ url_for('static', filename='js/dashboard_compare.js') }}?v=20260719-compare-loading"></script>
+<script src="{{ url_for('static', filename='js/dashboard_compare.js') }}?v=20260720-user-files"></script>
 {% endblock %}

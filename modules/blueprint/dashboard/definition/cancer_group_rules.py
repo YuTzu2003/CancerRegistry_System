@@ -168,13 +168,13 @@ BREAST = solid_rule(
         subgroup(
             "Breast_in_situ",
             "乳癌原位癌",
-            "Breast in situ",
+            "Breast Carcinoma in Situ",
             behavior_include=["2"]
         ),
         subgroup(
             "Breast_invasive",
             "乳癌侵襲癌",
-            "Breast invasive",
+            "Invasive Breast Cancer",
             behavior_include=["3"]
         )
     ]
@@ -238,11 +238,13 @@ CERVIX_UTERI = solid_rule(
         subgroup(
             "Cervix_cin3_in_situ", 
             "子宮頸 CIN3 及原位癌", 
+            "Cervical CIS/CIN3 (HSIL)",
             behavior_include=["2"]
         ),
         subgroup(
             "Cervix_invasive", 
             "子宮頸侵襲癌", 
+            "Invasive Cervical Cancer",
             behavior_include=["3"]
         )
     ]
@@ -267,11 +269,13 @@ BLADDER = solid_rule(
         subgroup(
             "Bladder_in_situ",
             "膀胱癌原位癌",
+            "Bladder Carcinoma in Situ",
             behavior_include=["2"]
         ),
         subgroup(
             "Bladder_invasive",
             "膀胱癌侵襲癌",
+            "Invasive Bladder Cancer",
             behavior_include=["3"]
         )
     ]

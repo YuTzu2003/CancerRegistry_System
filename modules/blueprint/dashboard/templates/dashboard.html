@@ -3,7 +3,31 @@
 {% block page_title %}年報分析{% endblock %}
 {% block extra_head %}
   <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/i18next@25.3.2/dist/umd/i18next.min.js"></script>
   <link rel="stylesheet" href="/static/css/dashboard.css?v=20260715-year-start-end-align">
+  <style>
+    .dashboard-language-picker { position: relative; min-width: 132px; }
+    .dashboard-language-picker summary {
+      align-items: center; background: var(--white); border: 1px solid var(--gray-300); border-radius: 4px;
+      cursor: pointer; display: flex; font-size: .875rem; height: 31px; justify-content: center;
+      list-style: none; padding: .25rem 2rem .25rem .5rem; position: relative;
+    }
+    .dashboard-language-picker summary::-webkit-details-marker { display: none; }
+    .dashboard-language-picker summary::after {
+      border: solid currentColor; border-width: 0 1px 1px 0; content: ''; height: 6px; position: absolute;
+      right: .75rem; top: 10px; transform: rotate(45deg); width: 6px;
+    }
+    .dashboard-language-picker-menu {
+      background: var(--white); border: 1px solid var(--gray-300); border-radius: 4px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, .12); left: 0; margin-top: 4px;
+      overflow: hidden; position: absolute; right: 0; z-index: 20;
+    }
+    .dashboard-language-option {
+      background: transparent; border: 0; cursor: pointer; display: block; font-size: .875rem;
+      padding: .45rem .5rem; text-align: center; width: 100%;
+    }
+    .dashboard-language-option:hover { background: var(--gray-100); }
+  </style>
 {% endblock %}
 
 {% block content %}
@@ -19,7 +43,23 @@
 <!-- 圖表分頁按鈕區 -->
 <div id="chartTabsArea" class="row mb-1 mt-0 d-none">
   <div class="col-12">
-    <div class="d-flex flex-wrap justify-content-center gap-3" id="chartTabsContainer"></div>
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+      <div id="chartTabsContainer" class="d-flex flex-wrap justify-content-start gap-3"></div>
+      <div id="dashboardLanguageControl" class="d-flex align-items-center gap-2">
+        <span class="small text-secondary mb-0">語言</span>
+        <select id="dashboardLanguageSelect" class="visually-hidden" aria-hidden="true" tabindex="-1">
+          <option value="zh-TW">繁體中文</option>
+          <option value="en">English</option>
+        </select>
+        <details class="dashboard-language-picker" id="dashboardLanguagePicker">
+          <summary id="dashboardLanguageLabel">繁體中文</summary>
+          <div class="dashboard-language-picker-menu" role="listbox" aria-label="語言">
+            <button type="button" class="dashboard-language-option" data-language="zh-TW">繁體中文</button>
+            <button type="button" class="dashboard-language-option" data-language="en">English</button>
+          </div>
+        </details>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -43,7 +83,7 @@
         <div class="mt-4 p-3 rounded" style="background-color: rgba(209, 231, 221, 0.5); border: 1px solid #a3cfbb;">
           <div class="d-flex align-items-center mb-2 justify-content-between">
             <div class="d-flex align-items-center">
-              <h6 class="mb-0 fw-bold text-dark">語言模型敘述</h6>
+              <h6 class="mb-0 fw-bold text-dark llm-insight-title">語言模型敘述</h6>
             </div>
             <button id="btnAiMain" class="btn btn-sm" style="display: none; background-color: transparent; border: 1px solid #495057; color: #212529; font-weight: 500;">重新產生敘述</button>
           </div>
@@ -68,7 +108,7 @@
         <div class="mt-4 p-3 rounded" style="background-color: rgba(209, 231, 221, 0.5); border: 1px solid #a3cfbb;">
           <div class="d-flex align-items-center mb-2 justify-content-between">
             <div class="d-flex align-items-center">
-              <h6 class="mb-0 fw-bold text-dark">語言模型敘述</h6>
+              <h6 class="mb-0 fw-bold text-dark llm-insight-title">語言模型敘述</h6>
             </div>
             <button id="btnAiMedian" class="btn btn-sm" style="display: none; background-color: transparent; border: 1px solid #495057; color: #212529; font-weight: 500;">重新產生敘述</button>
           </div>
@@ -93,7 +133,7 @@
           <div class="mt-4 p-3 rounded" style="background-color: rgba(209, 231, 221, 0.5); border: 1px solid #a3cfbb;">
             <div class="d-flex align-items-center mb-2 justify-content-between">
               <div class="d-flex align-items-center">
-                <h6 class="mb-0 fw-bold text-dark">語言模型敘述</h6>
+                <h6 class="mb-0 fw-bold text-dark llm-insight-title">語言模型敘述</h6>
               </div>
               <button id="btnAiAnalyzable" class="btn btn-sm" style="display: none; background-color: transparent; border: 1px solid #495057; color: #212529; font-weight: 500;">重新產生敘述</button>
             </div>
@@ -115,10 +155,10 @@
               <caption id="annualHistologyCaption">表、XXXX年XX癌組織型態分佈表</caption>
               <thead>
                 <tr>
-                  <th>ICD-O編碼</th>
-                  <th>組織型態</th>
-                  <th>人數</th>
-                  <th>百分比%</th>
+                  <th id="histologyCodeHeader">ICD-O編碼</th>
+                  <th id="histologyNameHeader">組織型態</th>
+                  <th id="histologyCountHeader">人數</th>
+                  <th id="histologyPercentageHeader">百分比%</th>
                 </tr>
               </thead>
               <tbody id="annualHistologyTableBody"></tbody>
@@ -132,7 +172,7 @@
         <div class="mt-4 p-3 rounded" style="background-color: rgba(209, 231, 221, 0.5); border: 1px solid #a3cfbb;">
           <div class="d-flex align-items-center mb-2 justify-content-between">
             <div class="d-flex align-items-center">
-              <h6 class="mb-0 fw-bold text-dark">語言模型敘述</h6>
+              <h6 class="mb-0 fw-bold text-dark llm-insight-title">語言模型敘述</h6>
             </div>
             <button id="btnAiHistology" class="btn btn-sm" style="display: none; background-color: transparent; border: 1px solid #495057; color: #212529; font-weight: 500;">重新產生敘述</button>
           </div>
@@ -161,7 +201,7 @@
           <div class="mt-4 p-3 rounded" style="background-color: rgba(209, 231, 221, 0.5); border: 1px solid #a3cfbb;">
             <div class="d-flex align-items-center mb-2 justify-content-between">
               <div class="d-flex align-items-center">
-                <h6 class="mb-0 fw-bold text-dark">語言模型敘述</h6>
+                <h6 class="mb-0 fw-bold text-dark llm-insight-title">語言模型敘述</h6>
               </div>
               <button id="btnAiDiagnosisClassification" class="btn btn-sm" style="display: none; background-color: transparent; border: 1px solid #495057; color: #212529; font-weight: 500;">重新產生敘述</button>
             </div>
@@ -183,5 +223,9 @@
   </div>
 </div>
 
-<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=20260709-histology-raw"></script>
+<script>
+  window.dashboardCancerNameTranslations = {{ cancer_name_translations | tojson }};
+</script>
+<script src="{{ url_for('static', filename='js/dashboard_i18n.js') }}?v=20260720-export-language"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=20260720-class-legend-consistent"></script>
 {% endblock %}

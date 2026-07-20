@@ -10,10 +10,11 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.pa
 DASHBOARD_DATA = f"{BASE_DIR}/tasks/data"
 
 def _safe_dashboard_path(filename):
-    safe_name = os.path.basename(filename or "")
-    fpath = os.path.abspath(os.path.join(DASHBOARD_DATA, safe_name))
+    relative_path = str(filename or "")
+    fpath = os.path.abspath(os.path.join(DASHBOARD_DATA, relative_path))
     data_dir = os.path.abspath(DASHBOARD_DATA)
-    if not safe_name or not fpath.startswith(data_dir) or not os.path.isfile(fpath):
+    if (not relative_path or os.path.commonpath([data_dir, fpath]) != data_dir
+            or not os.path.isfile(fpath)):
         raise FileNotFoundError("找不到指定的 Excel 檔案")
     return fpath
 

@@ -62,6 +62,7 @@
   .export-section .format-row {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: 24px;
     padding-bottom: 16px;
     margin-bottom: 16px;
@@ -73,6 +74,59 @@
     color: var(--text);
     cursor: pointer;
   }
+  .export-language-picker {
+    position: relative;
+    min-width: 132px;
+  }
+  .export-language-picker summary {
+    align-items: center;
+    background: var(--white);
+    border: 1px solid var(--gray-300);
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    font-size: .875rem;
+    height: 31px;
+    justify-content: center;
+    list-style: none;
+    padding: .25rem 2rem .25rem .5rem;
+    position: relative;
+  }
+  .export-language-picker summary::-webkit-details-marker { display: none; }
+  .export-language-picker summary::after {
+    border: solid currentColor;
+    border-width: 0 1px 1px 0;
+    content: '';
+    height: 6px;
+    position: absolute;
+    right: .75rem;
+    top: 10px;
+    transform: rotate(45deg);
+    width: 6px;
+  }
+  .export-language-picker-menu {
+    background: var(--white);
+    border: 1px solid var(--gray-300);
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, .12);
+    left: 0;
+    margin-top: 4px;
+    overflow: hidden;
+    position: absolute;
+    right: 0;
+    z-index: 20;
+  }
+  .export-language-option {
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    display: block;
+    font-size: .875rem;
+    padding: .45rem .5rem;
+    text-align: center;
+    width: 100%;
+  }
+  .export-language-option:hover { background: var(--gray-100); }
   .export-section .action-row {
     margin-top: 16px;
     padding-top: 16px;
@@ -121,6 +175,7 @@
     <ul class="mb-0" style="color: var(--muted); line-height: 1.8; font-size: 14px;">
       <li><strong>調整順序：</strong>您可以直接點選下方任一圖表區塊並上下拖曳，即可改變匯出報表的排列順序。</li>
       <li><strong>自訂內容：</strong>每個分析項目右側的勾選框，可讓您自由決定是否要在報告中包含該項目的「圖表」、「表格」或「AI 描述」。</li>
+      <li><strong>匯出語言：</strong>可選擇繁體中文或 English，預覽及下載的報表會依所選語言產生。</li>
       <li><strong>預覽功能：</strong>建議在正式下載前，先點擊「預覽 PDF」以確認排版與圖表呈現是否符合您的需求。</li>
       <li><strong>產生時間：</strong>若勾選的圖表數量較多，產生 PDF 或 Word 檔案可能需要數秒鐘，請耐心等候。</li>
     </ul>
@@ -135,6 +190,20 @@
 
     <!-- Format Selection -->
     <div class="format-row">
+      <div class="d-flex align-items-center gap-2">
+        <label for="exportLanguage" class="mb-0">匯出語言</label>
+        <select id="exportLanguage" class="visually-hidden" aria-hidden="true" tabindex="-1">
+          <option value="zh-TW">繁體中文</option>
+          <option value="en">English</option>
+        </select>
+        <details class="export-language-picker" id="exportLanguagePicker">
+          <summary id="exportLanguageLabel">繁體中文</summary>
+          <div class="export-language-picker-menu" role="listbox" aria-label="匯出語言">
+            <button type="button" class="export-language-option" data-language="zh-TW">繁體中文</button>
+            <button type="button" class="export-language-option" data-language="en">English</button>
+          </div>
+        </details>
+      </div>
       <div class="form-check">
         <input class="form-check-input" type="checkbox" id="exportPdf" checked style="cursor: pointer;">
         <label class="form-check-label" for="exportPdf">輸出成 PDF 檔</label>
@@ -176,10 +245,58 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
     
-    const exportData = JSON.parse(rawData);
+    const storedExportData = JSON.parse(rawData);
+    const exportDataByLanguage = Array.isArray(storedExportData)
+        ? { 'zh-TW': storedExportData }
+        : (storedExportData.languages || {});
+    const exportLanguageSelect = document.getElementById('exportLanguage');
+    const exportLanguagePicker = document.getElementById('exportLanguagePicker');
+    const exportLanguageLabel = document.getElementById('exportLanguageLabel');
     const listContainer = document.getElementById('exportItemList');
-    
-    exportData.forEach((item, index) => {
+
+    const languageLabels = { 'zh-TW': '繁體中文', en: 'English' };
+    const updateExportLanguageLabel = () => {
+        exportLanguageLabel.textContent = languageLabels[exportLanguageSelect.value] || '繁體中文';
+    };
+
+    document.querySelectorAll('.export-language-option').forEach(option => {
+        option.addEventListener('click', () => {
+            exportLanguageSelect.value = option.dataset.language;
+            updateExportLanguageLabel();
+            exportLanguagePicker.open = false;
+            exportLanguageSelect.dispatchEvent(new Event('change'));
+        });
+    });
+
+    if (!exportDataByLanguage['zh-TW']?.length && !exportDataByLanguage.en?.length) {
+        utils.alert('找不到可匯出的內容，請返回儀表板重新準備。', 'error');
+        return;
+    }
+
+    if (!exportDataByLanguage.en?.length) {
+        exportLanguageSelect.value = 'zh-TW';
+        exportLanguageSelect.disabled = true;
+        exportLanguagePicker.setAttribute('hidden', '');
+    }
+
+    updateExportLanguageLabel();
+
+    const getCurrentExportData = () => exportDataByLanguage[exportLanguageSelect.value]
+        || exportDataByLanguage['zh-TW']
+        || exportDataByLanguage.en
+        || [];
+    const exportItemLabels = {
+        'chartPane-IncidenceAge': '性別年齡分布',
+        'chartPane-IncidenceMedian': '年齡中位數',
+        'chartPane-DiagnosisAnalyzable': '可分析個案與確診個案',
+        'chartPane-DiagnosisHistology': '組織型態',
+        'chartPane-DiagnosisClassification': '個案分類'
+    };
+
+    function renderExportItems() {
+        const exportData = getCurrentExportData();
+        listContainer.innerHTML = '';
+        exportData.forEach((item, index) => {
         const div = document.createElement('div');
         div.className = 'export-item';
         div.dataset.id = item.id;
@@ -191,7 +308,7 @@ document.addEventListener('DOMContentLoaded', function() {
         div.innerHTML = `
             <div class="d-flex align-items-center flex-grow-1">
                 <i class="bi bi-grip-vertical text-muted fs-4 drag-handle-icon"></i>
-                <div class="export-item-title ms-2"><i class="bi bi-graph-up-arrow text-primary me-2"></i> ${item.title}</div>
+                <div class="export-item-title ms-2"><i class="bi bi-graph-up-arrow text-primary me-2"></i> ${exportItemLabels[item.id] || item.title}</div>
                 <div class="d-flex align-items-center gap-3 ms-4 flex-wrap" onmousedown="event.stopPropagation()">
                     ${hasChart ? '<div class="form-check"><input class="form-check-input item-cb-chart" type="checkbox" checked id="cb_chart_'+item.id+'"><label class="form-check-label" for="cb_chart_'+item.id+'">圖表</label></div>' : ''}
                     ${hasTable ? '<div class="form-check"><input class="form-check-input item-cb-table" type="checkbox" checked id="cb_table_'+item.id+'"><label class="form-check-label" for="cb_table_'+item.id+'">表格</label></div>' : ''}
@@ -202,23 +319,27 @@ document.addEventListener('DOMContentLoaded', function() {
                 <span class="badge bg-secondary">Item <span class="order-number">${index + 1}</span></span>
             </div>
         `;
-        listContainer.appendChild(div);
-    });
-
-    if (typeof Sortable !== 'undefined') {
-        new Sortable(listContainer, {
-            animation: 150,
-            ghostClass: 'sortable-ghost',
-            onEnd: function() {
-                // Update order numbers after drag
-                document.querySelectorAll('.order-number').forEach((el, idx) => {
-                    el.innerText = idx + 1;
-                });
-            }
+            listContainer.appendChild(div);
         });
+
+        if (typeof Sortable !== 'undefined') {
+            new Sortable(listContainer, {
+                animation: 150,
+                ghostClass: 'sortable-ghost',
+                onEnd: function() {
+                    document.querySelectorAll('.order-number').forEach((el, idx) => {
+                        el.innerText = idx + 1;
+                    });
+                }
+            });
+        }
     }
 
+    renderExportItems();
+    exportLanguageSelect.addEventListener('change', renderExportItems);
+
     function doExport(isPreview) {
+        const exportData = getCurrentExportData();
         let doPdf = document.getElementById('exportPdf').checked;
         let doWord = document.getElementById('exportWord').checked;
         
@@ -250,6 +371,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const payload = {
             format_pdf: doPdf,
             format_word: doWord,
+            export_language: exportLanguageSelect.value,
             charts: sortedData
         };
 
