@@ -211,6 +211,26 @@
       </div>
     </div>
 
+    <!--存活率-->
+    <div id="chartPane-CrossYearSurvival" class="chart-pane d-none">
+      <div class="bg-white border border-secondary-subtle rounded shadow-sm p-4 mt-2">
+        <div class="annual-data-content d-none">
+          <div class="d-flex justify-content-end mb-2">
+            <button type="button" id="survivalExclusionButton" class="btn btn-outline-secondary btn-sm">排除資料說明</button>
+          </div>
+          <div class="annual-report-table-wrap">
+            <table class="annual-report-table">
+              <caption id="annualSurvivalCaption">表、XXXX年XX癌Kaplan–Meier存活率表</caption>
+              <thead id="annualSurvivalTableHead"></thead>
+              <tbody id="annualSurvivalTableBody"></tbody>
+            </table>
+          </div>
+          <div id="annualSurvivalChart" style="width: 100%; height: 560px; margin-top: 24px;"></div>
+          <div id="annualSurvivalChartCaption" class="annual-chart-caption">圖、XXXX年XX癌Kaplan–Meier存活曲線圖</div>
+        </div>
+      </div>
+    </div>
+
     <!--空白佔位區 (尚未實作圖表) -->
     <div id="chartPane-Empty" class="chart-pane d-none">
       <div class="bg-white border border-secondary-subtle rounded shadow-sm p-5 mt-2 text-center text-muted">
@@ -236,5 +256,5 @@
   }
 </script>
 <script src="{{ url_for('static', filename='js/dashboard_i18n.js') }}?v=20260721-analysis-eligible-asterisk"></script>
-<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=20260721-session-insights"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=20260721-km-initial-layout"></script>
 {% endblock %}

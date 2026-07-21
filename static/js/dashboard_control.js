@@ -1141,6 +1141,9 @@ function initDashboardControl() {
                                                   const inst = echarts.getInstanceByDom(c);
                                                   if (inst) inst.resize();
                                               });
+                                              if (targetPane.id === 'chartPane-CrossYearSurvival') {
+                                                  window.DashboardRenderer?.updateSurvivalChartLayout?.();
+                                              }
                                               
                                               if (window.lastChartData) {
                                                   const aiBtn = targetPane.querySelector('button[id^="btnAi"]');
@@ -1216,6 +1219,7 @@ function initDashboardControl() {
                       window.DashboardRenderer.renderHistologyWarningButton(histologyChecked ? histologyWarnings : []);
                       window.DashboardRenderer.renderDiagnosisClassificationTable(chartData.diagnosisClassificationData, yearTitle, cancerTitle);
                       window.DashboardRenderer.renderDiagnosisClassificationChart(chartData.diagnosisClassificationData, yearTitle, cancerTitle);
+                      window.DashboardRenderer.renderSurvivalTable(chartData.survivalData, yearTitle, cancerTitle);
                       window.DashboardRenderer.showAnnualDataContent();
                       window.DashboardRenderer.updateChartCaptions(yearTitle, cancerTitle);
                   }

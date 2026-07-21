@@ -225,7 +225,7 @@
               <!-- 跨年度分析 細項 -->
               <div id="subItems-cross_year" class="d-none d-flex flex-wrap gap-3">
                 <div class="form-check">
-                  <input class="form-check-input item-checkbox" type="checkbox" name="subTab_cross" id="chkCrossYearSurvival" data-parent="cross_year" value="存活率" disabled>
+                  <input class="form-check-input item-checkbox" type="checkbox" name="subTab_cross" id="chkCrossYearSurvival" data-parent="cross_year" value="存活率" data-target="#chartPane-CrossYearSurvival" disabled>
                   <label class="form-check-label text-dark" for="chkCrossYearSurvival" style="cursor: pointer;">存活率</label>
                 </div>
                 <div class="form-check">
@@ -695,4 +695,4 @@
   </div>
 </div>
 
-<script src="{{ url_for('static', filename='js/dashboard_control.js') }}?v=20260721-session-insights"></script>
+<script src="{{ url_for('static', filename='js/dashboard_control.js') }}?v=20260721-km-initial-layout"></script>

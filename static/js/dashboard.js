@@ -1,5 +1,6 @@
 window.dashboardChartInstance = null;
 window.dashboardHistologyChartInstance = null;
+window.dashboardSurvivalChartInstance = null;
 window.DashboardRenderer = {};
 window.DashboardRenderer.t = function(key, options) {
     return window.DashboardI18n ? window.DashboardI18n.t(key, options) : key;
@@ -572,6 +573,207 @@ window.DashboardRenderer.renderAgeMedianTable = function(medianData, yearTitle, 
         body.innerHTML = `<tr><td>${this.t('medianN')}</td><td>${medianData.male_count}</td><td>${medianData.female_count}</td></tr><tr><td>${this.t('medianAgeYears')}</td><td>${medianData.male}</td><td>${medianData.female}</td></tr><tr><td>${this.t('medianMaleToFemaleRatio')}</td><td>${medianData.male_ratio}</td><td>${medianData.female_ratio}</td></tr>`;
     };
 
+/* ── 存活觀察值摘要表 ── */
+window.DashboardRenderer.renderSurvivalExclusionButton = function(summary) {
+        const button = document.getElementById('survivalExclusionButton');
+        if (!button) return;
+        const isEnglish = window.DashboardI18n?.getLanguage() === 'en';
+        button.textContent = isEnglish ? 'Excluded data details' : '排除資料說明';
+        this.currentSurvivalExclusionSummary = summary || {};
+
+        button.onclick = () => {
+            const isEnglish = window.DashboardI18n?.getLanguage() === 'en';
+            const item = this.currentSurvivalExclusionSummary || {};
+            const reasons = isEnglish ? [
+                ['Class0 excluded', item.class0], ['Class3 excluded', item.class3], ['Other case classes excluded', item.other_class],
+                ['Invalid diagnosis date', item.invalid_diagnosis_date], ['Invalid last-contact/death date', item.invalid_last_contact_date],
+                ['Invalid vital status', item.invalid_vital_status], ['Last-contact date earlier than diagnosis', item.last_contact_before_diagnosis],
+                ['Stage 0 not shown in this table', item.stage0], ['No usable pathological or clinical stage', item.no_usable_stage],
+                ['Stage IV without usable M0/M1', item.stage4_missing_m]
+            ] : [
+                ['排除 Class0', item.class0], ['排除 Class3', item.class3], ['排除其他個案分類', item.other_class],
+                ['診斷日期無效或不完整', item.invalid_diagnosis_date], ['最後聯絡或死亡日期無效或不完整', item.invalid_last_contact_date],
+                ['生存狀態不是 0 或 1', item.invalid_vital_status], ['最後聯絡或死亡日期早於診斷日期', item.last_contact_before_diagnosis],
+                ['Stage 0 未列入本表', item.stage0], ['病理與臨床期別皆無法使用', item.no_usable_stage],
+                ['Stage IV 無法判斷 M0／M1', item.stage4_missing_m]
+            ];
+            const reasonRows = reasons.filter(([, count]) => Number(count || 0) > 0)
+                .map(([label, count]) => `<tr><td class="text-start">${this.escapeHtml(label)}</td><td class="text-end">${Number(count)} 筆</td></tr>`).join('');
+            const html = `
+                <div class="table-responsive">
+                  <table class="table table-bordered table-sm align-middle mb-2">
+                    <tbody>
+                      <tr class="table-light fw-bold"><td class="text-start">${isEnglish ? 'Records after selected filters' : '符合查詢條件的原始資料'}</td><td class="text-end">${Number(item.source_count || 0)} ${isEnglish ? 'records' : '筆'}</td></tr>
+                      ${reasonRows || `<tr><td colspan="2">${isEnglish ? 'No records were excluded.' : '沒有資料被排除。'}</td></tr>`}
+                      <tr class="table-light fw-bold"><td class="text-start">${isEnglish ? 'Total excluded' : '排除合計'}</td><td class="text-end">${Number(item.excluded_count || 0)} ${isEnglish ? 'records' : '筆'}</td></tr>
+                      <tr class="table-success fw-bold"><td class="text-start">${isEnglish ? 'Included in table' : '最後納入表格'}</td><td class="text-end">${Number(item.included_count || 0)} ${isEnglish ? 'records' : '筆'}</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="small text-muted text-start">${isEnglish
+                    ? 'Current rule: Class1/2 only; pathological stage is used first, with clinical stage as fallback.'
+                    : '目前規則：僅納入 Class1、Class2；病理期別優先，無可用病理期別時改採臨床期別。'}</div>`;
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    title: isEnglish ? 'Excluded data details' : '排除資料說明',
+                    html,
+                    width: 720,
+                    confirmButtonText: isEnglish ? 'OK' : '確定',
+                    confirmButtonColor: '#212529'
+                });
+            } else {
+                const text = reasons.filter(([, count]) => Number(count || 0) > 0).map(([label, count]) => `${label}：${count} 筆`).join('\n');
+                alert(`${isEnglish ? 'Excluded data details' : '排除資料說明'}\n\n${text}`);
+            }
+        };
+    };
+
+window.DashboardRenderer.renderSurvivalChart = function(survivalData, yearTitle, cancerTitle) {
+        const chartDom = document.getElementById('annualSurvivalChart');
+        const caption = document.getElementById('annualSurvivalChartCaption');
+        if (!chartDom || typeof echarts === 'undefined') return;
+        if (window.dashboardSurvivalChartInstance) window.dashboardSurvivalChartInstance.dispose();
+        window.dashboardSurvivalChartInstance = echarts.init(chartDom);
+
+        const isEnglish = window.DashboardI18n?.getLanguage() === 'en';
+        const selectedCancer = this.getCancerTitleForSentence(cancerTitle);
+        const seriesData = Array.isArray(survivalData?.chart_series) ? survivalData.chart_series : [];
+        const includedCount = Number(survivalData?.exclusion_summary?.included_count || 0);
+        const colors = ['#5470c6', '#2fb344', '#d6c66b', '#7030a0', '#f59f00'];
+        const plusSymbol = 'path://M-6,-1 L-1,-1 L-1,-6 L1,-6 L1,-1 L6,-1 L6,1 L1,1 L1,6 L-1,6 L-1,1 L-6,1 Z';
+        const visibleContainerWidth = document.querySelector('#chartsArea > .col-12')?.clientWidth || window.innerWidth;
+        const initialChartWidth = chartDom.clientWidth || Math.max(320, visibleContainerWidth - 50);
+        const legendLeft = Math.max(0, initialChartWidth - 260);
+        const chartSeries = [];
+        seriesData.forEach((item, index) => {
+            const color = colors[index % colors.length];
+            chartSeries.push({
+                name: item.stage,
+                type: 'line',
+                step: 'end',
+                showSymbol: false,
+                symbol: 'none',
+                animation: false,
+                data: item.curve || [],
+                lineStyle: { width: 3, color },
+                itemStyle: { color },
+                emphasis: { focus: 'series' }
+            });
+            chartSeries.push({
+                name: `${item.stage}-${isEnglish ? 'censored' : '設限'}`,
+                type: 'scatter',
+                symbol: plusSymbol,
+                symbolSize: 9,
+                data: item.censored || [],
+                itemStyle: { color },
+                tooltip: {
+                    valueFormatter: value => String(value)
+                }
+            });
+        });
+
+        const title = isEnglish
+            ? `Kaplan–Meier Survival Curve (N=${includedCount})`
+            : `Kaplan–Meier存活曲線圖 (N=${includedCount})`;
+        window.dashboardSurvivalChartInstance.setOption({
+            animation: false,
+            color: colors,
+            title: { text: title, subtext: this.t('source'), left: 'center' },
+            tooltip: {
+                trigger: 'item',
+                formatter: params => {
+                    const value = params.value?.value || params.value;
+                    const months = Number(value?.[0] || 0).toFixed(1);
+                    const survival = (Number(value?.[1] || 0) * 100).toFixed(1);
+                    const count = Number(params.data?.count || 0);
+                    return `${params.seriesName}<br>${isEnglish ? 'Months' : '存活月數'}：${months}<br>${isEnglish ? 'Survival' : '累積存活率'}：${survival}%${count ? `<br>${isEnglish ? 'Censored' : '設限數'}：${count}` : ''}`;
+                }
+            },
+            legend: {
+                type: 'scroll', orient: 'vertical', left: legendLeft, top: 116, bottom: 38,
+                itemWidth: 18, itemHeight: 8, itemGap: 4,
+                textStyle: { fontSize: 11, lineHeight: 14 }
+            },
+            toolbox: {
+                right: 12,
+                feature: {
+                    dataView: { show: true, readOnly: true, title: this.t('dataView'), lang: [this.t('dataView'), this.t('close'), this.t('refresh')] },
+                    saveAsImage: { show: true, title: this.t('downloadImage') }
+                }
+            },
+            grid: { left: 78, right: 280, top: 70, bottom: 70 },
+            xAxis: {
+                type: 'value', min: 0, name: isEnglish ? 'Surv_Months' : '存活月數',
+                nameLocation: 'middle', nameGap: 38,
+                splitLine: { lineStyle: { color: '#e5e7eb' } }
+            },
+            yAxis: {
+                type: 'value', min: 0, max: 1, interval: 0.2,
+                name: isEnglish ? 'Cum Survival' : '累積存活率',
+                nameLocation: 'middle', nameGap: 52,
+                axisLabel: { formatter: value => Number(value).toFixed(1) },
+                splitLine: { lineStyle: { color: '#e5e7eb' } }
+            },
+            series: chartSeries,
+            graphic: [{
+                id: 'survivalLegendTitle', type: 'group', left: legendLeft, top: 92,
+                children: [
+                    { type: 'rect', shape: { x: 0, y: 0, width: 190, height: 18 }, style: { fill: 'transparent' }, silent: true },
+                    { type: 'text', x: 0, y: 0, style: { text: 'AJCC 8th', fill: '#4b5563', fontSize: 12, fontWeight: 600 } }
+                ]
+            }, ...(seriesData.length ? [] : [{
+                type: 'text', left: 'center', top: 'middle',
+                style: { text: this.t('noData'), fill: '#6b7280', fontSize: 14 }
+            }])]
+        }, true);
+        if (caption) {
+            caption.innerHTML = isEnglish
+                ? `Figure. Kaplan–Meier Survival Curves of ${this.getEnglishCancerPatientLabel(selectedCancer)}, ${yearTitle}${this.sourceLine()}`
+                : this.reportCaption('chart', yearTitle, selectedCancer, 'Kaplan–Meier存活曲線');
+        }
+    };
+
+window.DashboardRenderer.updateSurvivalChartLayout = function() {
+        const chart = window.dashboardSurvivalChartInstance;
+        if (!chart) return;
+        chart.resize();
+        const legendLeft = Math.max(0, chart.getWidth() - 260);
+        chart.setOption({
+            legend: { left: legendLeft },
+            graphic: [{ id: 'survivalLegendTitle', left: legendLeft }]
+        });
+    };
+
+window.DashboardRenderer.renderSurvivalTable = function(survivalData, yearTitle, cancerTitle) {
+        const head = document.getElementById('annualSurvivalTableHead');
+        const body = document.getElementById('annualSurvivalTableBody');
+        const caption = document.getElementById('annualSurvivalCaption');
+        if (!head || !body) return;
+
+        const isEnglish = window.DashboardI18n?.getLanguage() === 'en';
+        const selectedCancer = this.getCancerTitleForSentence(cancerTitle);
+        if (caption) {
+            caption.innerHTML = isEnglish
+                ? `Table. Kaplan–Meier Survival of ${this.getEnglishCancerPatientLabel(selectedCancer)}, ${yearTitle}${this.sourceLine()}`
+                : this.reportCaption('table', yearTitle, selectedCancer, 'Kaplan–Meier存活率');
+        }
+        head.innerHTML = isEnglish
+            ? '<tr><th rowspan="2">AJCC8th</th><th rowspan="2">Total</th><th rowspan="2">Events</th><th colspan="2">Censored</th></tr><tr><th>Count</th><th>Percentage</th></tr>'
+            : '<tr><th rowspan="2">AJCC8th</th><th rowspan="2">總數</th><th rowspan="2">事件<br>數目</th><th colspan="2">設限</th></tr><tr><th>數目</th><th>百分比</th></tr>';
+
+        const rows = Array.isArray(survivalData?.rows) ? survivalData.rows : [];
+        body.innerHTML = rows.length
+            ? rows.map(item => `
+                <tr class="${item.stage === 'Overall' ? 'fw-bold table-light' : ''}">
+                  <td>${this.escapeHtml(item.stage)}</td><td>${Number(item.total || 0)}</td>
+                  <td>${Number(item.events || 0)}</td><td>${Number(item.censored || 0)}</td>
+                  <td>${Number(item.percentage || 0).toFixed(1)}%</td>
+                </tr>`).join('')
+            : `<tr><td colspan="5" class="text-center py-4">${this.t('noData')}<br><span class="text-muted small">${this.escapeHtml(survivalData?.no_data_reason || '查無符合條件的存活資料。')}</span></td></tr>`;
+        this.renderSurvivalExclusionButton(survivalData?.exclusion_summary || {});
+        this.renderSurvivalChart(survivalData, yearTitle, cancerTitle);
+    };
+
 /* ── 癌症登記可分析個案與確診個案表 ── */
 window.DashboardRenderer.renderAnalyzableConfirmedTable = function(tableData, yearTitle, cancerTitle) {
         const head = document.getElementById('annualAnalyzableConfirmedTableHead');
@@ -1007,6 +1209,7 @@ window.DashboardRenderer.rerenderDashboardLanguage = function(options = {}) {
         this.renderHistologyWarningButton(this.currentHistologyWarnings);
         this.renderDiagnosisClassificationTable(window.lastChartData.diagnosisClassificationData, yearTitle, cancerTitle);
         this.renderDiagnosisClassificationChart(window.lastChartData.diagnosisClassificationData, yearTitle, cancerTitle);
+        this.renderSurvivalTable(window.lastChartData.survivalData, yearTitle, cancerTitle);
         this.updateChartCaptions(yearTitle, cancerTitle);
         if (window.dashboardChartInstance) window.dashboardChartInstance.setOption(this.getGenderAgeChartOption(window.lastChartData.genderAgeData), true);
         this.updateHistologyChart(window.lastChartData.histologyData, window.lastChartData.histologyNoDataReason);
@@ -1073,7 +1276,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 'chartPane-IncidenceMedian': '年齡中位數',
                 'chartPane-DiagnosisAnalyzable': '癌症登記可分析個案與確診個案',
                 'chartPane-DiagnosisHistology': '組織型態分佈',
-                'chartPane-DiagnosisClassification': '個案分類'
+                'chartPane-DiagnosisClassification': '個案分類',
+                'chartPane-CrossYearSurvival': '存活率'
             };
             
             const activeTargets = Array.from(document.querySelectorAll('#chartTabsContainer .chart-tab-btn')).map(btn => btn.dataset.target);
@@ -1097,6 +1301,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (paneId === 'chartPane-DiagnosisClassification' && window.DashboardRenderer && window.DashboardRenderer.classificationChartInst) {
                             window.DashboardRenderer.classificationChartInst.resize();
                         }
+                        if (paneId === 'chartPane-CrossYearSurvival' && window.dashboardSurvivalChartInstance) {
+                            window.dashboardSurvivalChartInstance.resize();
+                        }
                     }
 
                     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
@@ -1115,6 +1322,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     } else if (paneId === 'chartPane-DiagnosisClassification' && window.DashboardRenderer && window.DashboardRenderer.classificationChartInst) {
                         chartImage = await captureChartImage(window.DashboardRenderer.classificationChartInst);
+                    } else if (paneId === 'chartPane-CrossYearSurvival' && window.dashboardSurvivalChartInstance) {
+                        chartImage = await captureChartImage(window.dashboardSurvivalChartInstance);
                     }
                     
                     const tableWrap = pane.querySelector('.annual-report-table-wrap');
@@ -1145,6 +1354,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     else if (paneId === 'chartPane-DiagnosisAnalyzable') title = window.DashboardRenderer.t('chartAnalyzable');
                     else if (paneId === 'chartPane-DiagnosisHistology') title = window.DashboardRenderer.t('chartHistology');
                     else if (paneId === 'chartPane-DiagnosisClassification') title = window.DashboardRenderer.t('chartClassification');
+                    else if (paneId === 'chartPane-CrossYearSurvival') title = window.DashboardI18n?.getLanguage() === 'en' ? 'Survival' : '存活率';
 
                     exportData.push({
                         id: paneId,

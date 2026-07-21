@@ -1055,7 +1055,10 @@
       if (analysisItem === '性別年齡分佈') selectedAnalysis.gender_age = analysis?.genderAgeData || {};
       if (analysisItem === '年齡中位數') selectedAnalysis.age_median = analysis?.ageMedianData || {};
       if (analysisItem === '可分析個案與確診個案') selectedAnalysis.analyzable_confirmed = analysis?.analyzableConfirmedData || {};
-      if (analysisItem === '組織型態') selectedAnalysis.histology = (analysis?.histologyData || []).filter(item => item.name !== 'Unknown / 未對應組織型態');
+      if (analysisItem === '組織型態') {
+        selectedAnalysis.histology = (analysis?.histologyData || []).filter(item => item.name !== 'Unknown / 未對應組織型態');
+        selectedAnalysis.no_data_reason = analysis?.histologyNoDataReason || '';
+      }
       if (analysisItem === '個案分類') selectedAnalysis.diagnosis_classification = analysis?.diagnosisClassificationData || {};
       return selectedAnalysis;
     };

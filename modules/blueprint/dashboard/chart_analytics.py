@@ -44,6 +44,12 @@ def get_column_names(df):
         "diag_status_col": _find_column(df, ["診斷狀態分類", "診斷狀態"]),
         "treat_status_col": _find_column(df, ["治療狀態分類", "治療狀態"]),
         "patient_id_col": _find_column(df, ["病歷號碼", "user", "id"]),
+        "last_contact_col": _find_column(df, ["最後聯絡或死亡日期", "最後聯絡日期", "last contact"]),
+        "vital_status_col": _find_column(df, ["生存狀態", "vital status"]),
+        "clinical_stage_col": _find_column(df, ["臨床期別組合", "clinical stage"]),
+        "pathological_stage_col": _find_column(df, ["病理期別組合", "pathological stage"]),
+        "clinical_m_col": _find_column(df, ["臨床M", "clinical m"]),
+        "pathological_m_col": _find_column(df, ["病理M", "pathological m"]),
     }
 
 # 性別年齡分布圖
@@ -63,7 +69,11 @@ def _empty_dashboard_response(message="查無符合條件資料！", histology_r
         "histologyData": [],
         "histologyWarnings": [],
         "histologyNoDataReason": histology_reason or message,
-        "diagnosisClassificationData": []
+        "diagnosisClassificationData": [],
+        "survivalData": {
+            "rows": [],
+            "no_data_reason": message,
+        },
     }
 
 
@@ -450,6 +460,162 @@ def calculate_diagnosis_classification(df, cols):
                 if d == "3" and t == "2": data["3_3_2"] += 1
     return data
 
+# 存活率（Kaplan–Meier）
+def _parse_registry_date(series):
+    text = series.astype(str).str.strip().str.replace(r"\.0$", "", regex=True)
+    text = text.where(text.str.match(r"^\d{4}/\d{1,2}/\d{1,2}$"))
+    return pd.to_datetime(text, format="%Y/%m/%d", errors="coerce")
+
+
+def _normalize_stage(value):
+    text = str(value or "").upper().replace("STAGE", "").strip()
+    if not text or text in {"NAN", "NONE", "999", "888", "BBB"}:
+        return ""
+    compact = text.replace(" ", "").replace(".", "")
+    if compact.startswith("0"):
+        return "Stage 0"
+    if compact.startswith("1") or compact.startswith("I") and not compact.startswith(("II", "IV")):
+        return "Stage I"
+    if compact.startswith("2") or compact.startswith("II") and not compact.startswith("III"):
+        return "Stage II"
+    if compact.startswith("3") or compact.startswith("III"):
+        return "Stage III"
+    if compact.startswith("4") or compact.startswith("IV"):
+        return "Stage IV"
+    return ""
+
+
+def calculate_survival_table(df, cols):
+    required = [cols.get("year_col"), cols.get("last_contact_col"), cols.get("vital_status_col")]
+    if not all(required):
+        return {"rows": [], "no_data_reason": "檔案缺少診斷日期、最後聯絡或死亡日期或生存狀態欄位。"}
+
+    data = df.copy()
+    source_count = int(len(data))
+    exclusion_summary = {
+        "source_count": source_count,
+        "class0": 0,
+        "class3": 0,
+        "other_class": 0,
+        "invalid_diagnosis_date": 0,
+        "invalid_last_contact_date": 0,
+        "invalid_vital_status": 0,
+        "last_contact_before_diagnosis": 0,
+        "stage0": 0,
+        "no_usable_stage": 0,
+        "stage4_missing_m": 0,
+        "included_count": 0,
+        "excluded_count": 0,
+    }
+    class_col = cols.get("class_col")
+    if class_col:
+        case_class = data[class_col].astype(str).str.replace(r"\.0$", "", regex=True).str.strip()
+        exclusion_summary["class0"] = int((case_class == "0").sum())
+        exclusion_summary["class3"] = int((case_class == "3").sum())
+        exclusion_summary["other_class"] = int((~case_class.isin(["0", "1", "2", "3"])).sum())
+        data = data.loc[case_class.isin(["1", "2"])].copy()
+    if data.empty:
+        exclusion_summary["excluded_count"] = source_count
+        return {"rows": [], "no_data_reason": "所選資料沒有 Class1 或 Class2 可分析個案。", "exclusion_summary": exclusion_summary}
+
+    diagnosis_date = _parse_registry_date(data[cols["year_col"]])
+    last_contact_date = _parse_registry_date(data[cols["last_contact_col"]])
+    vital_status = pd.to_numeric(data[cols["vital_status_col"]], errors="coerce")
+    invalid_diagnosis = diagnosis_date.isna()
+    invalid_last_contact = ~invalid_diagnosis & last_contact_date.isna()
+    invalid_status = ~invalid_diagnosis & ~invalid_last_contact & ~vital_status.isin([0, 1])
+    reversed_dates = ~invalid_diagnosis & ~invalid_last_contact & ~invalid_status & (last_contact_date < diagnosis_date)
+    exclusion_summary["invalid_diagnosis_date"] = int(invalid_diagnosis.sum())
+    exclusion_summary["invalid_last_contact_date"] = int(invalid_last_contact.sum())
+    exclusion_summary["invalid_vital_status"] = int(invalid_status.sum())
+    exclusion_summary["last_contact_before_diagnosis"] = int(reversed_dates.sum())
+    valid = ~(invalid_diagnosis | invalid_last_contact | invalid_status | reversed_dates)
+    data = data.loc[valid].copy()
+    if data.empty:
+        exclusion_summary["excluded_count"] = source_count
+        return {"rows": [], "no_data_reason": "沒有同時具備有效診斷日期、追蹤日期與生存狀態的個案。", "exclusion_summary": exclusion_summary}
+
+    data["_survival_months"] = (last_contact_date.loc[valid] - diagnosis_date.loc[valid]).dt.days / 30.4375
+    data["_survival_event"] = (vital_status.loc[valid] == 0).astype(int)
+    pathological = cols.get("pathological_stage_col")
+    clinical = cols.get("clinical_stage_col")
+    pathological_stage = data[pathological].map(_normalize_stage) if pathological else pd.Series("", index=data.index)
+    clinical_stage = data[clinical].map(_normalize_stage) if clinical else pd.Series("", index=data.index)
+    data["_survival_stage"] = pathological_stage.where(pathological_stage != "", clinical_stage)
+
+    def normalize_m(value):
+        text = str(value or "").upper().replace("M", "").replace(".", "").strip()
+        if text == "0":
+            return "M0"
+        if text.startswith("1"):
+            return "M1"
+        return ""
+
+    pathological_m_col = cols.get("pathological_m_col")
+    clinical_m_col = cols.get("clinical_m_col")
+    pathological_m = data[pathological_m_col].map(normalize_m) if pathological_m_col else pd.Series("", index=data.index)
+    clinical_m = data[clinical_m_col].map(normalize_m) if clinical_m_col else pd.Series("", index=data.index)
+    data["_survival_m"] = pathological_m.where(pathological_m != "", clinical_m)
+    stage_iv = data["_survival_stage"] == "Stage IV"
+    data.loc[stage_iv & (data["_survival_m"] == "M0"), "_survival_stage"] = "Stage IV(M0)"
+    data.loc[stage_iv & (data["_survival_m"] == "M1"), "_survival_stage"] = "Stage IV(M1)"
+    exclusion_summary["stage0"] = int((data["_survival_stage"] == "Stage 0").sum())
+    exclusion_summary["no_usable_stage"] = int((data["_survival_stage"] == "").sum())
+    exclusion_summary["stage4_missing_m"] = int((data["_survival_stage"] == "Stage IV").sum())
+
+    def row_for(label, group):
+        total = int(len(group))
+        event_count = int(group["_survival_event"].sum())
+        return {
+            "stage": label,
+            "total": total,
+            "events": event_count,
+            "censored": total - event_count,
+            "percentage": round((total - event_count) / total * 100, 1) if total else 0.0,
+        }
+
+    def curve_for(label, group):
+        survival = 1.0
+        curve = [[0.0, 1.0]]
+        censored = []
+        for time_value in sorted(group["_survival_months"].unique()):
+            at_risk = int((group["_survival_months"] >= time_value).sum())
+            deaths = int(((group["_survival_months"] == time_value) & (group["_survival_event"] == 1)).sum())
+            if deaths and at_risk:
+                survival *= 1 - deaths / at_risk
+                curve.append([round(float(time_value), 2), round(survival, 6)])
+            censored_count = int(((group["_survival_months"] == time_value) & (group["_survival_event"] == 0)).sum())
+            if censored_count:
+                censored.append({
+                    "value": [round(float(time_value), 2), round(survival, 6)],
+                    "count": censored_count,
+                })
+        max_months = round(float(group["_survival_months"].max()), 2)
+        if curve[-1][0] < max_months:
+            curve.append([max_months, round(survival, 6)])
+        return {"stage": label, "count": int(len(group)), "curve": curve, "censored": censored}
+
+    rows = []
+    chart_series = []
+    report_stages = ["Stage I", "Stage II", "Stage III", "Stage IV(M0)", "Stage IV(M1)"]
+    for stage in report_stages:
+        stage_data = data.loc[data["_survival_stage"] == stage]
+        if not stage_data.empty:
+            rows.append(row_for(stage, stage_data))
+            chart_series.append(curve_for(stage, stage_data))
+    report_data = data.loc[data["_survival_stage"].isin(report_stages)]
+    exclusion_summary["included_count"] = int(len(report_data))
+    exclusion_summary["excluded_count"] = source_count - exclusion_summary["included_count"]
+    if not report_data.empty:
+        rows.append(row_for("Overall", report_data))
+    return {
+        "rows": rows,
+        "chart_series": chart_series,
+        "exclusion_summary": exclusion_summary,
+        "no_data_reason": "" if rows else "沒有符合 AJCC Stage I–IV(M0/M1) 的有效存活資料。",
+    }
+
+
 # 個案分類(表,圖)
 def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", behavior=""):
     fpath = _safe_dashboard_path(filename)
@@ -480,6 +646,7 @@ def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", beh
             df, cols, histology_data, histology_warnings
         )
         diagnosis_classification_data = calculate_diagnosis_classification(df, cols)
+        survival_data = calculate_survival_table(df, cols)
   
         return {
             "genderAgeData": gender_age_data,
@@ -488,7 +655,8 @@ def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", beh
             "histologyData": histology_data,
             "histologyWarnings": histology_warnings,
             "histologyNoDataReason": histology_no_data_reason,
-            "diagnosisClassificationData": diagnosis_classification_data
+            "diagnosisClassificationData": diagnosis_classification_data,
+            "survivalData": survival_data,
         }
     except Exception as e:
         logging.error(f"error {filename}: {str(e)}")

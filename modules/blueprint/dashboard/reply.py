@@ -151,6 +151,22 @@ def get_compare_insight_logic(data):
         return {"success": False, "error": "比較分析資料不完整"}
 
     style_instruction = STYLE_PROMPTS.get(mode_ai, STYLE_PROMPTS["balanced"])
+    histology_no_data_instruction = ""
+    if analysis_item == "組織型態":
+        histology_no_data_instruction = """
+                [Histology No-Data Rule]
+                This rule overrides any general requirement to compare both datasets.
+                Evaluate the baseline and comparison histology datasets separately. Keep a
+                normal factual narrative for every side that contains valid histology data.
+                For a side whose histology data is empty or has zero cases, use only that
+                side's no_data_reason to explain the absence of data. If its reason is that
+                the records do not meet the case-classification criteria, state that no
+                eligible cases are available for that side. When only one side has data,
+                describe that side's distribution but do not claim a difference, trend, or
+                comparison against the side with no data. If both sides have no data, report
+                their reasons only. Never generate clinical explanations or unsupported
+                inferences for a side with no eligible cases.
+            """
     prompt = f"""
                 You are a professional medical and oncology data comparison expert.
                 Compare the baseline and comparison cancer registry datasets below.
@@ -174,6 +190,7 @@ def get_compare_insight_logic(data):
                 3. Do not infer unsupported causes or clinical outcomes.
                 4. Do not confuse absolute differences with percentage differences.
                 5. Keep the response within 160 words.
+                {histology_no_data_instruction}
             """
 
     try:
