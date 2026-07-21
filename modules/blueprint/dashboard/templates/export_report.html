@@ -249,6 +249,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const exportDataByLanguage = Array.isArray(storedExportData)
         ? { 'zh-TW': storedExportData }
         : (storedExportData.languages || {});
+    const sharedChartImages = storedExportData.sharedChartImages || {};
     const exportLanguageSelect = document.getElementById('exportLanguage');
     const exportLanguagePicker = document.getElementById('exportLanguagePicker');
     const exportLanguageLabel = document.getElementById('exportLanguageLabel');
@@ -281,10 +282,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
     updateExportLanguageLabel();
 
-    const getCurrentExportData = () => exportDataByLanguage[exportLanguageSelect.value]
-        || exportDataByLanguage['zh-TW']
-        || exportDataByLanguage.en
-        || [];
+    const getCurrentExportData = () => {
+        const items = exportDataByLanguage[exportLanguageSelect.value]
+            || exportDataByLanguage['zh-TW']
+            || exportDataByLanguage.en
+            || [];
+        return items.map(item => ({
+            ...item,
+            chartImage: item.chartImage || sharedChartImages[item.chartImageKey] || ''
+        }));
+    };
     const exportItemLabels = {
         'chartPane-IncidenceAge': '性別年齡分布',
         'chartPane-IncidenceMedian': '年齡中位數',

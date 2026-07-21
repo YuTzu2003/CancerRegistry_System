@@ -1071,6 +1071,7 @@ function initDashboardControl() {
               utils.alert('請先從上方檔案列表點選要分析的檔案！', 'warning');
               return;
           }
+          window.dashboardAnalysisFileId = selectedFileId;
 
           if (window.utils && window.utils.showLoading) {
               window.utils.showLoading('分析中，請稍候...');
@@ -1175,7 +1176,7 @@ function initDashboardControl() {
                           btn.style.display = 'block';
                           btn.innerHTML = window.DashboardRenderer.t('regenerateInsight');
                           btn.dataset.insightFieldKey = cfg.title;
-                          btn.onclick = () => {
+                          btn.onclick = (event) => {
                               let dataToSend = window.lastChartData[cfg.dataKey];
                               if (cfg.btnId === 'btnAiHistology' && dataToSend) {
                                   // 過濾掉 Unknown / 未對應組織型態，並重新計算百分比以與表格配平
@@ -1191,19 +1192,10 @@ function initDashboardControl() {
                                       };
                                   });
                               }
-                              const currentLanguage = window.DashboardI18n?.getLanguage() || 'zh-TW';
                               const currentRequest = window.DashboardRenderer.fetchLlmInsight(
-                                  cfg.title, dataToSend, cfg.fields, cfg.respId, cfg.btnId
+                                  cfg.title, dataToSend, cfg.fields, cfg.respId, cfg.btnId,
+                                  { forceRefresh: event?.isTrusted === true }
                               );
-                              if (currentLanguage === 'zh-TW') {
-                                  currentRequest.then(result => {
-                                      if (!result.success) return;
-                                      return window.DashboardRenderer.fetchLlmInsight(
-                                          cfg.title, dataToSend, cfg.fields, cfg.respId, cfg.btnId,
-                                          { language: 'en', display: false, manageButton: false, sourceText: result.insight }
-                                      );
-                                  });
-                              }
                               return currentRequest;
                           };
                       }

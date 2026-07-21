@@ -36,41 +36,41 @@ STYLE_PROMPTS = {
             """
 }
 
-INSIGHT_LANGUAGE_INSTRUCTIONS = {
-    "zh-TW": "Reply only in Traditional Chinese.",
-    "en": "Reply only in English. Use professional medical and cancer-registry terminology.",
-}
+INSIGHT_LANGUAGES = ("zh-TW", "en")
+
+
+def _clean_insight_text(value):
+    text = re.sub(r'[*#`\n\t]+', '', str(value or '')).strip()
+    return text.replace(r'\ge', '>=').replace(r'\le', '<=').replace(r'\neq', '!=').replace('$', '')
+
+
+def _parse_bilingual_insights(content):
+    raw = str(content or '').strip()
+    if raw.startswith('```'):
+        raw = re.sub(r'^```(?:json)?\s*|\s*```$', '', raw, flags=re.IGNORECASE)
+    start, end = raw.find('{'), raw.rfind('}')
+    if start < 0 or end <= start:
+        raise ValueError('AI response does not contain bilingual JSON')
+    payload = json.loads(raw[start:end + 1])
+    insights = {language: _clean_insight_text(payload.get(language)) for language in INSIGHT_LANGUAGES}
+    if not all(insights.values()):
+        raise ValueError('AI response is missing a Chinese or English narrative')
+    return insights
 
 def get_chart_insight_logic(data):
     field_key = data.get("field_key", "")
     chart_data = data.get("data", {})
     fields = data.get("fields", [])
     mode_ai = data.get("mode_ai", "balanced")
-    source_text = str(data.get("source_text", "")).strip()
     insight_language = data.get("language", "zh-TW")
-    if insight_language not in INSIGHT_LANGUAGE_INSTRUCTIONS:
+    if insight_language not in INSIGHT_LANGUAGES:
         insight_language = "zh-TW"
     year_start = data.get("year_start", "")
     year_end = data.get("year_end", "")
     selected_year_range = f"{year_start}-{year_end}" if year_start and year_end else year_start or year_end or "Not specified"
     definitions = []
 
-    if source_text and insight_language == "en":
-        prompt = f"""
-                Translate the following Traditional Chinese cancer-registry narrative into
-                professional English. Do not reanalyse the data. Preserve every factual
-                statement, numerical value, percentage, case count, and level of certainty.
-                Do not add, omit, reinterpret, or reorder substantive findings. Use standard
-                medical and cancer-registry terminology. Reply with the translated narrative
-                only, without a heading, greeting, notes, or markdown.
-
-                [Traditional Chinese Narrative]
-                {source_text}
-            """
-    else:
-        prompt = None
-
-    if not prompt and fields:
+    if fields:
         conn = get_conn()
         cursor = conn.cursor()
         placeholders = ','.join(['?'] * len(fields))
@@ -84,16 +84,16 @@ def get_chart_insight_logic(data):
                 definitions.append(f"- {col_name}: {str(col_def).strip()}")
         conn.close()
 
-    if not prompt:
-        if definitions:
-            def_section = f"[Related Field Definitions]:\n" + "\n".join(definitions)
-        else:
-            def_section = ""
-        style_instruction = STYLE_PROMPTS.get(mode_ai)
-        prompt = f"""
+    if definitions:
+        def_section = f"[Related Field Definitions]:\n" + "\n".join(definitions)
+    else:
+        def_section = ""
+    style_instruction = STYLE_PROMPTS.get(mode_ai, STYLE_PROMPTS["balanced"])
+    prompt = f"""
                 You are a professional medical and oncology data analysis expert.
-                Please provide a rigorous analysis based strictly on the cancer registry
-                statistical chart data provided below.
+                Produce matching Traditional Chinese and English narratives from the same
+                cancer-registry chart data. Both versions must contain exactly the same
+                facts, numbers, percentages, trends, level of certainty, and conclusions.
                 [Chart Topic]{field_key}
                 [Definition]{def_section}
                 [Selected Year Range]{selected_year_range}
@@ -112,22 +112,26 @@ def get_chart_insight_logic(data):
                 3. Do not infer causes that cannot be supported by the data.
                 4. Do not include irrelevant background information.
                 5. Treat the selected year range as the scope of the analysis.
-                6. Keep the response within 130 words.
-            """
+                6. Keep each language version within 130 words.
+                7. When regenerating, vary sentence structure and presentation order while
+                   preserving every number, percentage, trend, and conclusion supported by the data.
+                8. Use Traditional Chinese for zh-TW and professional medical English for en.
+                9. Return valid JSON only, without markdown or explanatory text, using exactly:
+                   {{"zh-TW":"中文分析敘述","en":"English analysis narrative"}}
+        """
 
     try:
         client, model_name = get_llm_client()
         response = client.chat.completions.create(
             model=model_name, 
             messages=[
-                {"role": "system", "content": f"You are a professional cancer and medical data analysis expert. {INSIGHT_LANGUAGE_INSTRUCTIONS[insight_language]}"},
+                {"role": "system", "content": "You are a professional cancer-registry data analyst. Return valid bilingual JSON only."},
                 {"role": "user", "content": prompt}
-            ],temperature=0 if source_text and insight_language == "en" else 0.3
+            ],temperature=0.5
         )
         content = response.choices[0].message.content
-        insight = re.sub(r'[*#`\n\t]+', '', content).strip()
-        insight = (insight.replace(r'\ge', '>=').replace(r'\le', '<=').replace(r'\neq', '!=').replace('$', ''))
-        return {"success": True, "insight": insight}
+        insights = _parse_bilingual_insights(content)
+        return {"success": True, "insight": insights[insight_language], "insights": insights}
     
     except Exception as e:
         logging.error(f"Error in AI analysis: {e}")

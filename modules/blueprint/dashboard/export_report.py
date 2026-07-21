@@ -3,12 +3,50 @@ import io
 import uuid
 import zipfile
 import base64
+from PIL import Image, ImageStat
 from bs4 import BeautifulSoup
 from docx import Document
 from docx.shared import Pt, Inches, RGBColor
 from docx.enum.section import WD_ORIENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from playwright.sync_api import sync_playwright
+
+
+def _split_tall_chart_at_blank_rows(image_bytes, max_height_ratio=0.62):
+    """Split one continuous chart only at visually blank rows for safe report page breaks."""
+    image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    max_chunk_height = max(1, int(image.width * max_height_ratio))
+    if image.height <= max_chunk_height:
+        return [image_bytes]
+
+    gray = image.convert("L")
+    chunks = []
+    top = 0
+    while image.height - top > max_chunk_height:
+        target = top + max_chunk_height
+        search_radius = min(max(40, image.height // 100), max_chunk_height // 8)
+        search_start = max(top + max_chunk_height // 2, target - search_radius)
+        search_end = min(image.height - 1, target + search_radius)
+        best_y = target
+        best_score = None
+        for y in range(search_start, search_end + 1):
+            band = gray.crop((0, max(0, y - 3), gray.width, min(gray.height, y + 4)))
+            score = 255 - ImageStat.Stat(band).mean[0]
+            if best_score is None or score < best_score:
+                best_y, best_score = y, score
+        if best_y <= top:
+            best_y = min(image.height, top + max_chunk_height)
+        chunk = image.crop((0, top, image.width, best_y))
+        buffer = io.BytesIO()
+        chunk.save(buffer, format="PNG")
+        chunks.append(buffer.getvalue())
+        top = best_y
+
+    if top < image.height:
+        buffer = io.BytesIO()
+        image.crop((0, top, image.width, image.height)).save(buffer, format="PNG")
+        chunks.append(buffer.getvalue())
+    return chunks
 
 def generate_export_files(format_pdf, format_word, charts_data, output_dir, export_language="zh-TW"):
     os.makedirs(output_dir, exist_ok=True)
@@ -19,7 +57,7 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir, expo
     <head>
         <meta charset="utf-8">
         <style>
-            body { font-family: sans-serif; }
+            body { font-family: sans-serif; margin: 0; }
             .chart-section { margin-bottom: 40px; page-break-after: always; }
             .annual-report-table { 
                 border-collapse: collapse; width: 100%; font-size: 10px; margin-bottom: 20px;
@@ -32,6 +70,24 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir, expo
             #annualAnalyzableConfirmedNote { margin-top: 6px !important; font-size: 10px !important; line-height: 1.45 !important; text-align: left !important; }
             #annualAnalyzableConfirmedNote .annual-analyzable-note-item { margin-left: 12px !important; }
             .chart-img { max-width: 100%; height: auto; margin-bottom: 15px; display: block; }
+            .chart-img-wrapper.tall-chart { break-before: page; }
+            .tall-chart .chart-img-page {
+                height: 18cm;
+                box-sizing: border-box;
+                padding: 0.35cm 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                break-inside: avoid;
+                break-after: page;
+            }
+            .tall-chart .chart-img-page:last-child { break-after: auto; }
+            .tall-chart .chart-img {
+                width: 100%;
+                max-height: 17.3cm;
+                object-fit: contain;
+                margin: 0;
+            }
             .llm-text { background: #f8f9fa; padding: 15px; border-radius: 5px; font-size: 12px; white-space: pre-wrap; margin-top: 15px; }
             .text-center { text-align: center !important; }
             .text-start { text-align: left !important; }
@@ -64,9 +120,21 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir, expo
         if chart.get('includeChart', True):
             b64_image = chart.get('chartImage', '')
             if b64_image and b64_image.startswith('data:image'):
-                html_content += f'<div class="chart-img-wrapper"><img src="{b64_image}" class="chart-img" data-idx="{idx}" /></div>'
                 header, encoded = b64_image.split(",", 1)
-                image_bytes_map[str(idx)] = base64.b64decode(encoded)
+                image_bytes = base64.b64decode(encoded)
+                image_parts = (_split_tall_chart_at_blank_rows(image_bytes)
+                               if chart.get("id") == "chartPane-DiagnosisHistology"
+                               else [image_bytes])
+                image_bytes_map[str(idx)] = image_parts
+                wrapper_class = "chart-img-wrapper tall-chart" if len(image_parts) > 1 else "chart-img-wrapper"
+                html_content += f'<div class="{wrapper_class}">'
+                for part_idx, part in enumerate(image_parts):
+                    part_b64 = base64.b64encode(part).decode("ascii")
+                    image_html = (f'<img src="data:image/png;base64,{part_b64}" '
+                                  f'class="chart-img chart-img-part" data-idx="{idx}" data-part="{part_idx}" />')
+                    html_content += (f'<div class="chart-img-page">{image_html}</div>'
+                                     if len(image_parts) > 1 else image_html)
+                html_content += '</div>'
                 
         # LLM text
         if chart.get('includeAi', True):
@@ -240,13 +308,15 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir, expo
                                 run.font.size = Pt(8)
                                 run.font.color.rgb = RGBColor(220, 53, 69)
                                             
-                img_node = sec.find('img', class_='chart-img')
-                if img_node and img_node.get('data-idx'):
-                    idx_str = img_node.get('data-idx')
-                    if idx_str in image_bytes_map:
+                img_nodes = sec.find_all('img', class_='chart-img')
+                if img_nodes:
+                    idx_str = img_nodes[0].get('data-idx')
+                    image_parts = image_bytes_map.get(idx_str, [])
+                    for part_idx, image_part in enumerate(image_parts):
+                        if part_idx > 0:
+                            doc.add_page_break()
                         doc.add_paragraph()
-                        img_stream = io.BytesIO(image_bytes_map[idx_str])
-                        doc.add_picture(img_stream, width=Inches(9.0))
+                        doc.add_picture(io.BytesIO(image_part), width=Inches(9.0))
                         
                 llm_node = sec.find('div', class_='llm-text')
                 if llm_node:

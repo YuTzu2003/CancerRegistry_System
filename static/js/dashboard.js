@@ -680,12 +680,18 @@ window.DashboardRenderer.fetchLlmInsight = function(fieldKey, chartData, fields,
         const language = options.language || window.DashboardI18n?.getLanguage() || 'zh-TW';
         const shouldDisplay = options.display !== false;
         const shouldManageButton = options.manageButton !== false;
+        const yearStart = document.getElementById('filterYearStart')?.value.trim() || '';
+        const yearEnd = document.getElementById('filterYearEnd')?.value.trim() || '';
+        const sessionKey = this.getInsightSessionKey(fieldKey, chartData, fields, modeAi, yearStart, yearEnd);
         const cacheKey = `${language}|${modeAi}|${fieldKey}`;
-        const sourceText = options.sourceText || (language === 'en'
-            ? this.insightCache.get(`zh-TW|${modeAi}|${fieldKey}`) || ''
-            : '');
-        const cachedInsight = this.insightCache.get(cacheKey);
-        if (cachedInsight) {
+        const storedInsights = options.forceRefresh === true ? null : this.getSessionInsights(sessionKey);
+        if (storedInsights) {
+            Object.entries(storedInsights).forEach(([storedLanguage, insight]) => {
+                this.insightCache.set(`${storedLanguage}|${modeAi}|${fieldKey}`, insight);
+            });
+        }
+        const cachedInsight = storedInsights?.[language] || this.insightCache.get(cacheKey);
+        if (cachedInsight && options.forceRefresh !== true) {
             if (shouldDisplay && container) container.innerText = cachedInsight;
             if (shouldManageButton && button) button.disabled = false;
             return Promise.resolve({ success: true, cached: true });
@@ -694,12 +700,13 @@ window.DashboardRenderer.fetchLlmInsight = function(fieldKey, chartData, fields,
         const showResult = (result) => {
             if (!shouldDisplay || (window.DashboardI18n?.getLanguage() || 'zh-TW') !== language) return;
             if (result.success) {
-                if (container) container.innerText = result.insight;
+                if (container) container.innerText = result.insights?.[language] || result.insight;
             } else if (container) {
                 container.innerText = this.t('insightFailed') + (result.error || 'error');
             }
         };
-        const pendingRequest = this.insightRequests.get(cacheKey);
+        const requestKey = sessionKey;
+        const pendingRequest = this.insightRequests.get(requestKey);
         if (pendingRequest) {
             if (shouldDisplay && container) container.innerText = this.t('generatingInsight');
             return pendingRequest.then(result => {
@@ -711,22 +718,25 @@ window.DashboardRenderer.fetchLlmInsight = function(fieldKey, chartData, fields,
         if (shouldDisplay && container) container.innerText = this.t('generatingInsight');
         if (shouldManageButton && button) button.disabled = true;
 
-        const yearStart = document.getElementById('filterYearStart')?.value.trim() || '';
-        const yearEnd = document.getElementById('filterYearEnd')?.value.trim() || '';
         const cacheGeneration = this.insightCacheGeneration;
-        const request = fetch('/api/chart_insight', {method: 'POST',headers: { 'Content-Type': 'application/json' },body: JSON.stringify({ field_key: fieldKey, data: chartData, fields: fields, mode_ai: modeAi, year_start: yearStart, year_end: yearEnd, language, source_text: sourceText })})
+        const request = fetch('/api/chart_insight', {method: 'POST',headers: { 'Content-Type': 'application/json' },body: JSON.stringify({ field_key: fieldKey, data: chartData, fields: fields, mode_ai: modeAi, year_start: yearStart, year_end: yearEnd, language })})
         .then(res => res.json())
         .then(data => {
             if (data.success) {
-                if (this.insightCacheGeneration === cacheGeneration) this.insightCache.set(cacheKey, data.insight);
+                if (this.insightCacheGeneration === cacheGeneration) {
+                    Object.entries(data.insights || {}).forEach(([resultLanguage, insight]) => {
+                        this.insightCache.set(`${resultLanguage}|${modeAi}|${fieldKey}`, insight);
+                    });
+                    this.setSessionInsights(sessionKey, data.insights);
+                }
             }
             return data;
         })
         .catch(() => ({ success: false, error: 'error' }))
         .finally(() => {
-            if (this.insightRequests.get(cacheKey) === request) this.insightRequests.delete(cacheKey);
+            if (this.insightRequests.get(requestKey) === request) this.insightRequests.delete(requestKey);
         });
-        this.insightRequests.set(cacheKey, request);
+        this.insightRequests.set(requestKey, request);
         return request.then(result => {
             if (shouldManageButton && button) button.disabled = false;
             showResult(result);
@@ -772,6 +782,53 @@ window.DashboardRenderer.getCancerTitleForSentence = function(cancerTitle) {
 window.DashboardRenderer.insightCache = new Map();
 window.DashboardRenderer.insightRequests = new Map();
 window.DashboardRenderer.insightCacheGeneration = 0;
+window.DashboardRenderer.insightSessionPrefix = 'dashboard-bilingual-insight-v1:';
+
+window.DashboardRenderer.hashInsightContext = function(value) {
+        let first = 0x811c9dc5;
+        let second = 0x9e3779b9;
+        for (let index = 0; index < value.length; index += 1) {
+            const code = value.charCodeAt(index);
+            first = Math.imul(first ^ code, 0x01000193);
+            second = Math.imul(second ^ code, 0x85ebca6b);
+        }
+        return `${(first >>> 0).toString(16).padStart(8, '0')}${(second >>> 0).toString(16).padStart(8, '0')}`;
+    };
+
+window.DashboardRenderer.getInsightSessionKey = function(fieldKey, chartData, fields, modeAi, yearStart, yearEnd) {
+        const context = JSON.stringify({
+            version: 'v1-bilingual',
+            fileId: window.dashboardAnalysisFileId || '',
+            fieldKey,
+            chartData,
+            fields,
+            modeAi,
+            yearStart,
+            yearEnd
+        });
+        return `${this.insightSessionPrefix}${this.hashInsightContext(context)}`;
+    };
+
+window.DashboardRenderer.getSessionInsights = function(sessionKey) {
+        try {
+            const value = JSON.parse(window.sessionStorage.getItem(sessionKey) || 'null');
+            return value?.['zh-TW'] && value?.en ? value : null;
+        } catch (_) {
+            return null;
+        }
+    };
+
+window.DashboardRenderer.setSessionInsights = function(sessionKey, insights) {
+        if (!insights?.['zh-TW'] || !insights?.en) return;
+        try {
+            window.sessionStorage.setItem(sessionKey, JSON.stringify({
+                'zh-TW': insights['zh-TW'],
+                en: insights.en
+            }));
+        } catch (_) {
+            // Storage may be unavailable or full; the in-memory cache still supports this page session.
+        }
+    };
 
 window.DashboardRenderer.clearInsightCache = function() {
         this.insightCache.clear();
@@ -844,6 +901,16 @@ window.DashboardRenderer.regenerateInsightsForLanguage = function() {
         const buttons = Array.from(document.querySelectorAll('button[id^="btnAi"]'))
             .filter(button => button.style.display !== 'none' && typeof button.onclick === 'function');
         return Promise.all(buttons.map(button => button.onclick()));
+    };
+
+window.DashboardRenderer.ensureInsightsForLanguage = async function({ retry = true } = {}) {
+        const run = () => this.regenerateInsightsForLanguage();
+        let results = await run();
+        if (retry && results.some(result => !result?.success)) results = await run();
+        if (results.some(result => !result?.success)) {
+            throw new Error('部分語言模型敘述尚未準備完成');
+        }
+        return results;
     };
 
 window.DashboardRenderer.updateHistologyChart = function(histologyData, noDataReason = '') {
@@ -969,7 +1036,34 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         window.DashboardRenderer.rerenderDashboardLanguage();
     }
-    const collectExportData = async () => {
+    const captureChartImage = async (chart, optionOverrides = {}) => {
+            const originalOption = chart.getOption();
+            const captureOption = {
+                ...originalOption,
+                animation: false,
+                animationDuration: 0,
+                animationDurationUpdate: 0
+            };
+            if (optionOverrides.title?.show === false) {
+                captureOption.title = (originalOption.title || []).map(title => ({ ...title, show: false }));
+            }
+            if (optionOverrides.xAxis?.name === '') {
+                captureOption.xAxis = (originalOption.xAxis || []).map(axis => ({ ...axis, name: '' }));
+            }
+            chart.getZr()?.animation?.stop?.();
+            chart.clear();
+            chart.setOption(captureOption, true);
+            chart.resize();
+            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+            chart.getZr()?.flush?.();
+            const image = chart.getDataURL({ type: 'png', backgroundColor: '#fff', pixelRatio: 2 });
+            chart.clear();
+            chart.setOption(originalOption, true);
+            chart.resize();
+            return image;
+    };
+
+    const collectExportData = async (sharedChartImages = {}) => {
             const exportData = [];
             let orderIndex = 0;
             const exportLanguage = window.DashboardI18n?.getLanguage() || 'zh-TW';
@@ -1007,35 +1101,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
                     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
-                    const chartInstance = paneId === 'chartPane-IncidenceAge'
-                        ? window.dashboardChartInstance
-                        : paneId === 'chartPane-DiagnosisHistology'
-                            ? window.dashboardHistologyChartInstance
-                            : paneId === 'chartPane-DiagnosisClassification'
-                                ? window.DashboardRenderer?.classificationChartInst
-                                : null;
-                    if (chartInstance) {
-                        await new Promise(resolve => {
-                            let completed = false;
-                            const finish = () => {
-                                if (completed) return;
-                                completed = true;
-                                chartInstance.off('finished', finish);
-                                resolve();
-                            };
-                            chartInstance.on('finished', finish);
-                            chartInstance.resize();
-                            setTimeout(finish, 500);
-                        });
-                    }
-
                     let chartImage = '';
+                    let chartImageKey = '';
                     if (paneId === 'chartPane-IncidenceAge' && window.dashboardChartInstance) {
-                        chartImage = window.dashboardChartInstance.getDataURL({ type: 'png', backgroundColor: '#fff', pixelRatio: 2 });
+                        chartImage = await captureChartImage(window.dashboardChartInstance);
                     } else if (paneId === 'chartPane-DiagnosisHistology' && window.dashboardHistologyChartInstance) {
-                        chartImage = window.dashboardHistologyChartInstance.getDataURL({ type: 'png', backgroundColor: '#fff', pixelRatio: 2 });
+                        chartImageKey = 'histology-full';
+                        if (!sharedChartImages[chartImageKey]) {
+                            sharedChartImages[chartImageKey] = await captureChartImage(
+                                window.dashboardHistologyChartInstance,
+                                { title: { show: false }, xAxis: { name: '' } }
+                            );
+                        }
                     } else if (paneId === 'chartPane-DiagnosisClassification' && window.DashboardRenderer && window.DashboardRenderer.classificationChartInst) {
-                        chartImage = window.DashboardRenderer.classificationChartInst.getDataURL({ type: 'png', backgroundColor: '#fff', pixelRatio: 2 });
+                        chartImage = await captureChartImage(window.DashboardRenderer.classificationChartInst);
                     }
                     
                     const tableWrap = pane.querySelector('.annual-report-table-wrap');
@@ -1073,6 +1152,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         title: title,
                         tableHtml: tableHtml,
                         chartImage: chartImage,
+                        chartImageKey: chartImageKey,
                         llmText: llmText
                     });
                 }
@@ -1086,6 +1166,7 @@ document.addEventListener('DOMContentLoaded', function() {
         btnPrepareExport.addEventListener('click', async function() {
             const originalLanguage = window.DashboardI18n?.getLanguage() || 'zh-TW';
             const exportDataByLanguage = {};
+            const sharedChartImages = {};
             let preparationError = null;
             btnPrepareExport.disabled = true;
             if (window.utils?.showLoading) {
@@ -1094,14 +1175,13 @@ document.addEventListener('DOMContentLoaded', function() {
             try {
                 for (const language of ['zh-TW', 'en']) {
                     await window.DashboardI18n?.setLanguage(language);
-                    await window.DashboardRenderer?.regenerateInsightsForLanguage?.();
-                    exportDataByLanguage[language] = await collectExportData();
+                    await window.DashboardRenderer?.ensureInsightsForLanguage?.();
+                    exportDataByLanguage[language] = await collectExportData(sharedChartImages);
                 }
             } catch (error) {
                 preparationError = error;
             } finally {
                 await window.DashboardI18n?.setLanguage(originalLanguage);
-                await window.DashboardRenderer?.regenerateInsightsForLanguage?.();
                 btnPrepareExport.disabled = false;
             }
 
@@ -1118,8 +1198,9 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             localStorage.setItem('dashboard_export_data', JSON.stringify({
-                version: 2,
-                languages: exportDataByLanguage
+                version: 3,
+                languages: exportDataByLanguage,
+                sharedChartImages: sharedChartImages
             }));
             window.location.href = '/dashboard/export_report';
         });

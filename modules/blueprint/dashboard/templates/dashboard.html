@@ -223,9 +223,18 @@
   </div>
 </div>
 
-<script>
-  window.dashboardCancerNameTranslations = {{ cancer_name_translations | tojson }};
+<script id="dashboardCancerNameTranslationsData" type="application/json">
+  {{ cancer_name_translations | tojson }}
 </script>
-<script src="{{ url_for('static', filename='js/dashboard_i18n.js') }}?v=20260720-export-language"></script>
-<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=20260720-class-legend-consistent"></script>
+<script>
+  const dashboardCancerNameTranslationsData = document.getElementById('dashboardCancerNameTranslationsData');
+  try {
+    window.dashboardCancerNameTranslations = JSON.parse(dashboardCancerNameTranslationsData?.textContent || '{}');
+  } catch (error) {
+    console.error('癌別翻譯資料解析失敗：', error);
+    window.dashboardCancerNameTranslations = {};
+  }
+</script>
+<script src="{{ url_for('static', filename='js/dashboard_i18n.js') }}?v=20260721-analysis-eligible-asterisk"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=20260721-session-insights"></script>
 {% endblock %}
