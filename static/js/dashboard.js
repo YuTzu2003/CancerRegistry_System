@@ -63,7 +63,8 @@ window.DashboardRenderer.getEnglishCancerPatientLabel = function(cancerTitle) {
 };
 
 window.DashboardRenderer.getGenderAgeChartOption = function(genderAgeData) {
-        const categories = genderAgeData?.categories || ['<=19', '20-24', '25-29', '30-34', '35-39', '40-44', '45-49', '50-54', '55-59', '60-64', '65-69', '70-74', '75-79', '80-84', '>=85'];
+        const categories = (genderAgeData?.categories || ['≦19', '20-24', '25-29', '30-34', '35-39', '40-44', '45-49', '50-54', '55-59', '60-64', '65-69', '70-74', '75-79', '80-84', '≧85'])
+            .map(label => ['<=19', '≤19', '≦19'].includes(label) ? '≦19' : ['>=85', '≥85', '≧85'].includes(label) ? '≧85' : label);
         const male = genderAgeData?.male || [];
         const female = genderAgeData?.female || [];
         const total = genderAgeData?.total || [];
@@ -73,7 +74,7 @@ window.DashboardRenderer.getGenderAgeChartOption = function(genderAgeData) {
         const selectedCancer = this.getCancerTitleForSentence(this.getSelectedCancerTitle());
         const titleText = isEnglish
             ? `Age and Sex Distribution of Newly Diagnosed with ${this.getEnglishCancerPatientLabel(selectedCancer)} Patients, ${this.getSelectedYearTitle()}`
-            : this.t('sexAge') + this.t('distribution');
+            : `${this.getSelectedYearTitle()}年新診斷${selectedCancer}病患${this.t('sexAge')}${this.t('distribution')}${this.t('chart')}`;
 
         return {
           title: {
@@ -81,12 +82,12 @@ window.DashboardRenderer.getGenderAgeChartOption = function(genderAgeData) {
             subtext: this.t('source'),
             left: 'center',
             top: 0,
-            textStyle: { fontSize: 16, fontWeight: 'bold' },
+            textStyle: { fontSize: 18, fontWeight: 'bold' },
             subtextStyle: { fontSize: 12 }
           },
           tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-          grid: { left: 72, right: 72, top: 70, bottom: 78, containLabel: false },
-          legend: { data: [this.t('male'), this.t('female'), this.t('total')], bottom: 28, itemGap: 12 },
+          grid: { left: 72, right: 72, top: 98, bottom: 74, containLabel: false },
+          legend: { data: [this.t('male'), this.t('female'), this.t('total')], top: 52, left: 'center', itemGap: 12 },
           toolbox: {
             right: 16,
             top: 0,
@@ -98,13 +99,15 @@ window.DashboardRenderer.getGenderAgeChartOption = function(genderAgeData) {
           xAxis: [{
             type: 'category',
             data: categories,
+            name: this.t('age'),
+            nameLocation: 'middle',
+            nameGap: 30,
             axisPointer: { type: 'shadow' },
             axisTick: { alignWithLabel: true },
             axisLabel: { interval: 0 }
           }],
           yAxis: [{
             type: 'value',
-            name: this.t('cases'),
             min: 0,
             max: yMax,
             minInterval: 1,
@@ -168,7 +171,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var myHistChart = echarts.init(histChartDom);
         window.dashboardHistologyChartInstance = myHistChart;
         var histOption = {
-          title: { text: window.DashboardRenderer.t('histologyDistribution'), subtext: window.DashboardRenderer.t('source'), left: 'center' },
+          title: { text: window.DashboardRenderer.t('histologyDistribution'), subtext: window.DashboardRenderer.t('source'), left: 'center', textStyle: { fontSize: 18, fontWeight: 'bold' } },
           tooltip: { 
             trigger: 'axis', 
             axisPointer: { type: 'shadow' },
@@ -271,7 +274,7 @@ window.DashboardRenderer.renderDiagnosisClassificationChart = function(chartData
         const selectedCancer = this.getCancerTitleForSentence(cancerTitle);
         const chartTitle = isEnglish
             ? `${this.getEnglishCancerPatientLabel(selectedCancer)} Case Class Distribution, ${yearTitle}`
-            : this.t('classificationDistribution');
+            : `${yearTitle}年${selectedCancer}${this.t('classificationDistribution')}`;
         chartDom.style.height = '450px';
         this.classificationChartInst.resize();
         const labels = [
@@ -284,7 +287,7 @@ window.DashboardRenderer.renderDiagnosisClassificationChart = function(chartData
                 text: chartTitle,
                 subtext: this.t('source'),
                 left: 'center',
-                textStyle: {fontSize: 20,fontWeight: 'bold',color: '#333'}
+                textStyle: {fontSize: 18,fontWeight: 'bold',color: '#333'}
             },
             toolbox: {
                 show: true,
@@ -380,19 +383,21 @@ window.DashboardRenderer.renderSexAgeTable = function(genderAgeData, yearTitle, 
         const caption = document.getElementById('annualSexAgeCaption');
         if (!head || !body) return;
 
-        const ageLabels = genderAgeData.categories || [];
+        const ageLabels = (genderAgeData.categories || [])
+            .map(label => ['<=19', '≤19', '≦19'].includes(label) ? '≦19' : ['>=85', '≥85', '≧85'].includes(label) ? '≧85' : label);
         if (caption) {
             const selectedCancer = this.getCancerTitleForSentence(cancerTitle);
             caption.innerHTML = window.DashboardI18n?.getLanguage() === 'en'
-                ? `Table . Age and Sex Distribution of Newly Diagnosed with ${this.getEnglishCancerPatientLabel(selectedCancer)} Patients, ${yearTitle}${this.sourceLine()}`
+                ? `Table . Age and Sex Distribution of Newly Diagnosed with ${this.getEnglishCancerPatientLabel(selectedCancer)} Patients,\u00a0${yearTitle}${this.sourceLine()}`
                 : this.reportCaption('table', yearTitle, selectedCancer, `${this.t('sexAge')}${this.t('distribution')}`, { newDiagnosis: true });
         }
 
-        head.innerHTML = `<tr><th rowspan="2">${this.t('sex')}</th><th colspan="${ageLabels.length}">${this.t('ageGroup')}</th><th rowspan="2">${this.t('total')}</th></tr><tr>${ageLabels.map(label => `<th>${label}</th>`).join('')}</tr>`;
+        head.innerHTML = `<tr><th rowspan="2">${this.t('sex')}</th><th colspan="${ageLabels.length}">${this.t('ageGroup')}</th><th rowspan="2">${this.t('subtotal')}</th><th rowspan="2">${this.t('percent')}</th></tr><tr>${ageLabels.map(label => `<th>${label}</th>`).join('')}</tr>`;
         const sumMale = genderAgeData.male.reduce((a, b) => a + b, 0);
         const sumFemale = genderAgeData.female.reduce((a, b) => a + b, 0);
         const sumTotal = genderAgeData.total.reduce((a, b) => a + b, 0);
-        body.innerHTML = `<tr><td>${this.t('male')}</td>${genderAgeData.male.map(value => `<td>${value}</td>`).join('')}<td>${sumMale}</td></tr><tr><td>${this.t('female')}</td>${genderAgeData.female.map(value => `<td>${value}</td>`).join('')}<td>${sumFemale}</td></tr><tr><td>${this.t('total')}</td>${genderAgeData.total.map(value => `<td>${value}</td>`).join('')}<td>${sumTotal}</td></tr>`;
+        const percentage = (value) => sumTotal ? `${((value / sumTotal) * 100).toFixed(1)}%` : '0.0%';
+        body.innerHTML = `<tr><td>${this.t('male')}</td>${genderAgeData.male.map(value => `<td>${value}</td>`).join('')}<td>${sumMale}</td><td>${percentage(sumMale)}</td></tr><tr><td>${this.t('female')}</td>${genderAgeData.female.map(value => `<td>${value}</td>`).join('')}<td>${sumFemale}</td><td>${percentage(sumFemale)}</td></tr><tr><td>${this.t('total')}</td>${genderAgeData.total.map(value => `<td>${value}</td>`).join('')}<td>${sumTotal}</td><td>${percentage(sumTotal)}</td></tr><tr><td>${this.t('percent')}</td>${genderAgeData.total.map(value => `<td>${percentage(value)}</td>`).join('')}<td>${percentage(sumTotal)}</td><td>-</td></tr>`;
     };
 
 /* ── 組織型態不適用個案說明按鈕 ── */
@@ -460,7 +465,7 @@ window.DashboardRenderer.showHistologyWarningDetails = function(histologyWarning
                 const detail = warningText.detail;
                 return `${user}：${message}${rawDataMessage}\n${this.t('details')}：${detail}`;
             }).join('\n\n');
-            alert(`${this.t('warningDetails')}\n\n${alertLines}`);
+            window.utils?.alert(`${this.t('warningDetails')}\n\n${alertLines}`, 'warning');
         }
     };
 
@@ -521,7 +526,7 @@ window.DashboardRenderer.renderHistologyTable = function(histologyData, yearTitl
         const selectedCancer = this.getCancerTitleForSentence(cancerTitle);
         if (caption) {
             caption.innerHTML = isEnglish
-                ? `Table. Histological Distribution of ${this.getEnglishCancerPatientLabel(selectedCancer)}, ${yearTitle}${this.sourceLine()}`
+                ? `Table. Histological Distribution of ${this.getEnglishCancerPatientLabel(selectedCancer)},\u00a0${yearTitle}${this.sourceLine()}`
                 : this.reportCaption('table', yearTitle, selectedCancer, `${this.t('histology')}${this.t('distribution')}`);
         }
         if (!histologyData || histologyData.length === 0) {
@@ -565,7 +570,7 @@ window.DashboardRenderer.renderAgeMedianTable = function(medianData, yearTitle, 
         const selectedCancer = this.getCancerTitleForSentence(cancerTitle);
         if (caption) {
             caption.innerHTML = window.DashboardI18n?.getLanguage() === 'en'
-                ? `Table . Median Age of Patients Newly Diagnosed with ${this.getEnglishCancerPatientLabel(selectedCancer)}, ${yearTitle}${this.sourceLine()}`
+                ? `Table . Median Age of Patients Newly Diagnosed with ${this.getEnglishCancerPatientLabel(selectedCancer)},\u00a0${yearTitle}${this.sourceLine()}`
                 : this.reportCaption('table', yearTitle, selectedCancer, this.t('ageMedian'), { newDiagnosis: true });
         }
 
@@ -623,7 +628,7 @@ window.DashboardRenderer.renderSurvivalExclusionButton = function(summary) {
                 });
             } else {
                 const text = reasons.filter(([, count]) => Number(count || 0) > 0).map(([label, count]) => `${label}：${count} 筆`).join('\n');
-                alert(`${isEnglish ? 'Excluded data details' : '排除資料說明'}\n\n${text}`);
+                window.utils?.alert(`${isEnglish ? 'Excluded data details' : '排除資料說明'}\n\n${text}`, 'warning');
             }
         };
     };
@@ -678,7 +683,7 @@ window.DashboardRenderer.renderSurvivalChart = function(survivalData, yearTitle,
         window.dashboardSurvivalChartInstance.setOption({
             animation: false,
             color: colors,
-            title: { text: title, subtext: this.t('source'), left: 'center' },
+            title: { text: title, subtext: this.t('source'), left: 'center', textStyle: { fontSize: 18, fontWeight: 'bold' } },
             tooltip: {
                 trigger: 'item',
                 formatter: params => {
@@ -754,7 +759,7 @@ window.DashboardRenderer.renderSurvivalTable = function(survivalData, yearTitle,
         const selectedCancer = this.getCancerTitleForSentence(cancerTitle);
         if (caption) {
             caption.innerHTML = isEnglish
-                ? `Table. Kaplan–Meier Survival of ${this.getEnglishCancerPatientLabel(selectedCancer)}, ${yearTitle}${this.sourceLine()}`
+                ? `Table. Kaplan–Meier Survival of ${this.getEnglishCancerPatientLabel(selectedCancer)},\u00a0${yearTitle}${this.sourceLine()}`
                 : this.reportCaption('table', yearTitle, selectedCancer, 'Kaplan–Meier存活率');
         }
         head.innerHTML = isEnglish
@@ -786,7 +791,7 @@ window.DashboardRenderer.renderAnalyzableConfirmedTable = function(tableData, ye
         const selectedCancer = this.getCancerTitleForSentence(cancerTitle);
         if (caption) {
             caption.innerHTML = isEnglish
-                ? `Table . Analysis-Eligible and Confirmed Cases of ${this.getEnglishCancerPatientLabel(selectedCancer)} in the Cancer Registry, ${yearTitle}${this.sourceLine()}`
+                ? `Table . Analysis-Eligible and Confirmed Cases of ${this.getEnglishCancerPatientLabel(selectedCancer)} in the Cancer Registry,\u00a0${yearTitle}${this.sourceLine()}`
                 : this.reportCaption('table', yearTitle, selectedCancer, this.t('analyzableConfirmed'));
         }
 
@@ -809,7 +814,7 @@ window.DashboardRenderer.renderDiagnosisClassificationTable = function(tableData
         if (caption) {
             const selectedCancer = this.getCancerTitleForSentence(cancerTitle);
             caption.innerHTML = window.DashboardI18n?.getLanguage() === 'en'
-                ? `Table . ${this.getEnglishCancerPatientLabel(selectedCancer)} Case Class Distribution, ${yearTitle}${this.sourceLine()}`
+                ? `Table . ${this.getEnglishCancerPatientLabel(selectedCancer)} Case Class Distribution,\u00a0${yearTitle}${this.sourceLine()}`
                 : this.reportCaption('table', yearTitle, selectedCancer, `${this.t('classification')}${this.t('distribution')}`);
         }
 
@@ -1131,7 +1136,7 @@ window.DashboardRenderer.updateHistologyChart = function(histologyData, noDataRe
         const chartDom = document.getElementById('histologyChart');
         const chartTitle = isEnglish
             ? `Histological Distribution of ${this.getEnglishCancerPatientLabel(cancerTitle)}, ${yearTitle}`
-            : `${yearTitle} ${cancerTitle} ${this.t('histologyDistribution')}`;
+            : `${yearTitle}年${cancerTitle}${this.t('histologyDistribution')}`;
         if (chartDom) {
             chartDom.style.height = `${Math.max(450, categories.length * this.histologyRowHeight(categories))}px`;
             window.dashboardHistologyChartInstance.resize();
@@ -1139,7 +1144,7 @@ window.DashboardRenderer.updateHistologyChart = function(histologyData, noDataRe
         if (categories.length === 0) {
             if (chartDom) chartDom.style.height = '450px';
             window.dashboardHistologyChartInstance.setOption({
-                title: { text: chartTitle, subtext: this.t('source'), left: 'center' },
+                title: { text: chartTitle, subtext: this.t('source'), left: 'center', textStyle: { fontSize: 18, fontWeight: 'bold' } },
                 tooltip: { show: false },
                 toolbox: { show: false },
                 xAxis: { show: false, data: [] },
@@ -1166,7 +1171,8 @@ window.DashboardRenderer.updateHistologyChart = function(histologyData, noDataRe
             title: {
                 text: chartTitle,
                 subtext: this.t('source'),
-                left: 'center'
+                left: 'center',
+                textStyle: { fontSize: 18, fontWeight: 'bold' }
             },
             tooltip: { show: true },
             graphic: [],

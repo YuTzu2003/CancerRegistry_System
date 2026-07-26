@@ -3,8 +3,16 @@
 {% block page_title %}年度比較{% endblock %}
 {% block extra_head %}
   <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
-  <link rel="stylesheet" href="/static/css/dashboard.css">
+  <script src="https://cdn.jsdelivr.net/npm/i18next@25.3.2/dist/umd/i18next.min.js"></script>
+  <link rel="stylesheet" href="/static/css/dashboard.css?v=20260726-table-title-size">
   <style>
+    .dashboard-language-picker { position: relative; min-width: 132px; }
+    .dashboard-language-picker summary { align-items: center; background: var(--white); border: 1px solid var(--gray-300); border-radius: 4px; cursor: pointer; display: flex; font-size: .875rem; height: 31px; justify-content: center; list-style: none; padding: .25rem 2rem .25rem .5rem; position: relative; }
+    .dashboard-language-picker summary::-webkit-details-marker { display: none; }
+    .dashboard-language-picker summary::after { border: solid currentColor; border-width: 0 1px 1px 0; content: ''; height: 6px; position: absolute; right: .75rem; top: 10px; transform: rotate(45deg); width: 6px; }
+    .dashboard-language-picker-menu { background: var(--white); border: 1px solid var(--gray-300); border-radius: 4px; box-shadow: 0 4px 12px rgba(0, 0, 0, .12); left: 0; margin-top: 4px; overflow: hidden; position: absolute; right: 0; z-index: 20; }
+    .dashboard-language-option { background: transparent; border: 0; cursor: pointer; display: block; font-size: .875rem; padding: .45rem .5rem; text-align: center; width: 100%; }
+    .dashboard-language-option:hover { background: var(--gray-100); }
     .compare-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -710,8 +718,18 @@
 </section>
 
 <section id="compareResult" class="compare-settings d-none">
-  <div class="section-head px-0 pt-0">
+  <div class="section-head px-0 pt-0 d-flex justify-content-between align-items-center gap-3">
     <h2><span class="dot" style="background:var(--warning)"></span> 分析結果</h2>
+    <div id="compareLanguageControl" class="d-flex align-items-center gap-2">
+      <span class="small text-secondary mb-0">語言</span>
+      <details class="dashboard-language-picker" id="compareLanguagePicker">
+        <summary id="compareLanguageLabel">繁體中文</summary>
+        <div class="dashboard-language-picker-menu" role="listbox" aria-label="語言">
+          <button type="button" class="dashboard-language-option" data-compare-language="zh-TW">繁體中文</button>
+          <button type="button" class="dashboard-language-option" data-compare-language="en">English</button>
+        </div>
+      </details>
+    </div>
   </div>
   <div id="compareResultStale" class="alert alert-warning d-none" role="status">
     <i class="bi bi-exclamation-triangle me-1"></i>分析條件已變更，請重新按下「開始比較」以更新結果。
@@ -737,5 +755,14 @@
   {% include "control.html" %}
 </div>
 
-<script src="{{ url_for('static', filename='js/dashboard_compare.js') }}?v=20260721-histology-no-data-reason"></script>
+<script id="dashboardCancerNameTranslationsData" type="application/json">{{ cancer_name_translations | tojson }}</script>
+<script>
+  try {
+    window.dashboardCancerNameTranslations = JSON.parse(document.getElementById('dashboardCancerNameTranslationsData')?.textContent || '{}');
+  } catch (error) {
+    window.dashboardCancerNameTranslations = {};
+  }
+</script>
+<script src="{{ url_for('static', filename='js/dashboard_i18n.js') }}?v=20260726-compare-language"></script>
+<script src="{{ url_for('static', filename='js/dashboard_compare.js') }}?v=20260726-hide-file-uuid"></script>
 {% endblock %}

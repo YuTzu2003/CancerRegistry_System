@@ -1,11 +1,16 @@
 from flask import Blueprint, request, session, jsonify
-from modules.services.auth import login_required
+from modules.services.auth import login_required, admin_required
 from modules.services.db import get_conn
 from modules.blueprint.dashboard import load_user_favorites, save_user_favorites
 from modules.blueprint.dashboard.reply import get_chart_insight_logic, get_compare_insight_logic
 from modules.blueprint.dashboard.definition.cancer_group_rules import CANCER_GROUP_RULES
 from flask import send_file
 from modules.blueprint.dashboard.export_report import generate_export_files
+from modules.blueprint.dashboard.pbi_settings import (
+    get_pbi_publish_path,
+    get_pbi_publish_settings,
+    save_pbi_publish_path,
+)
 import os
 import re
 import logging
@@ -190,13 +195,20 @@ def dashboard():
         active="dashboard",
         uploaded_files=uploaded_files,
         cancer_name_translations=_get_cancer_name_translations(),
+        can_publish_pbi=session.get("position") == "Admin",
+        pbi_publish_path=get_pbi_publish_path() if session.get("position") == "Admin" else "",
     )
 
 @dashboard_bp.route("/dashboard/compare")
 @login_required
 def compare():
     uploaded_files = _get_uploaded_dashboard_files(session.get("id"))
-    return render_template("compare.html", active="compare", uploaded_files=uploaded_files)
+    return render_template(
+        "compare.html",
+        active="compare",
+        uploaded_files=uploaded_files,
+        cancer_name_translations=_get_cancer_name_translations(),
+    )
 
 @dashboard_bp.route("/dashboard/upload", methods=["POST"])
 @login_required
@@ -401,6 +413,63 @@ def analyze_dashboard_file_route():
         import logging
         logging.error(f"Error analyzing dashboard file: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@dashboard_bp.route('/api/dashboard/publish_pbi', methods=['POST'])
+@admin_required
+def publish_dashboard_selection_to_pbi():
+    data = request.json or {}
+    file_id = data.get("file_id", "")
+    cancers = data.get("cancers", [])
+    year_start = str(data.get("year_start", "")).strip()
+    year_end = str(data.get("year_end", "")).strip()
+    behavior = str(data.get("behavior", "")).strip()
+    owned_file = _get_owned_dashboard_file(file_id, session.get("id"))
+    if not owned_file:
+        return jsonify({"ok": False, "error": "找不到已選擇的年報檔案"}), 400
+    if not year_start or not year_end or not cancers:
+        return jsonify({"ok": False, "error": "請先完成年度、性態碼與癌別選擇"}), 400
+
+    publish_path = get_pbi_publish_path()
+    if not publish_path:
+        return jsonify({"ok": False, "error": "尚未設定 Power BI 發布路徑，請先由管理者完成設定"}), 400
+
+    try:
+        from modules.blueprint.dashboard.pbi_export import export_pbi_dataset
+        result = export_pbi_dataset(
+            _absolute_dashboard_path(owned_file["storage_path"]),
+            publish_path,
+            cancers=cancers,
+            year_start=year_start,
+            year_end=year_end,
+            behavior=behavior,
+        )
+        logging.info("Dashboard selection published to PBI by user %s: %s rows", session.get("userid"), result["rows"])
+        return jsonify({"ok": True, "rows": result["rows"], "message": "已更新 Power BI 發布資料，報表將於下一次刷新後顯示。"})
+    except Exception as exc:
+        logging.exception("Failed to publish dashboard selection to PBI")
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@dashboard_bp.route('/api/dashboard/pbi_settings', methods=['GET'])
+@admin_required
+def get_pbi_settings_route():
+    settings = get_pbi_publish_settings()
+    return jsonify({"ok": True, "settings": settings})
+
+
+@dashboard_bp.route('/api/dashboard/pbi_settings', methods=['PUT'])
+@admin_required
+def save_pbi_settings_route():
+    path = (request.json or {}).get("publish_path", "")
+    try:
+        settings = save_pbi_publish_path(path, session.get("userid") or session.get("id"))
+        return jsonify({"ok": True, "settings": settings})
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        logging.exception("Failed to save Power BI publish settings")
+        return jsonify({"ok": False, "error": str(exc)}), 500
 
 @dashboard_bp.route('/api/dashboard/file_years', methods=['POST'])
 @login_required

@@ -146,6 +146,9 @@ def get_compare_insight_logic(data):
     comparison_data = data.get("comparison", {})
     total_difference = data.get("total_difference", {})
     mode_ai = data.get("mode_ai", "balanced")
+    insight_language = data.get("language", "zh-TW")
+    if insight_language not in INSIGHT_LANGUAGES:
+        insight_language = "zh-TW"
 
     if not analysis_item or not isinstance(baseline_data, dict) or not isinstance(comparison_data, dict):
         return {"success": False, "error": "比較分析資料不完整"}
@@ -189,7 +192,9 @@ def get_compare_insight_logic(data):
                 2. Base every conclusion strictly on the two supplied datasets.
                 3. Do not infer unsupported causes or clinical outcomes.
                 4. Do not confuse absolute differences with percentage differences.
-                5. Keep the response within 160 words.
+                5. Keep each language version within 160 words.
+                6. Return valid JSON only, without markdown or explanatory text, using exactly:
+                   {{"zh-TW": "Traditional Chinese narrative", "en": "English narrative"}}
                 {histology_no_data_instruction}
             """
 
@@ -198,15 +203,14 @@ def get_compare_insight_logic(data):
         response = client.chat.completions.create(
             model=model_name,
             messages=[
-                {"role": "system", "content": "You are a professional cancer registry data comparison expert. Reply in Traditional Chinese."},
+                {"role": "system", "content": "You are a professional cancer registry data comparison expert. Return professional Traditional Chinese and English narratives as valid JSON."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.3
         )
         content = response.choices[0].message.content
-        insight = re.sub(r'[*#`\n\t]+', '', content).strip()
-        insight = insight.replace(r'\ge', '>=').replace(r'\le', '<=').replace(r'\neq', '!=').replace('$', '')
-        return {"success": True, "insight": insight}
+        insights = _parse_bilingual_insights(content)
+        return {"success": True, "insight": insights[insight_language], "insights": insights}
     except Exception as e:
         logging.error(f"Error in AI comparison analysis: {e}")
         return {"success": False, "error": str(e)}

@@ -21,10 +21,40 @@
   let lastComparisonData = null;
   let activeAiNarrativeItem = '';
   let aiNarrativeRequestId = 0;
+  let activeResultIndex = 0;
   const aiNarrativeCache = new Map();
   const viewPreferences = { main: 'chart', target: 'chart' };
   const customYearControls = new Map();
   const yearSelects = [mainYear, mainYearEnd, targetYear, targetYearEnd];
+
+  function t(key, options) {
+    return window.DashboardI18n?.t(key, options) || key;
+  }
+
+  function isEnglish() {
+    return window.DashboardI18n?.getLanguage() === 'en';
+  }
+
+  function sourceLine() {
+    return `<br><span class="text-muted fw-normal" style="font-size: 0.85em;">${t('source')}</span>`;
+  }
+
+  function selectedCancerEnglishTitle() {
+    const translations = window.dashboardCancerNameTranslations || {};
+    const values = selectedCancerValues();
+    const names = values.map(value => translations[value]?.en).filter(Boolean);
+    const fallback = selectedCancerTitle();
+    return names.length ? names.join(', ') : (translations[fallback]?.en || fallback || 'Cancer');
+  }
+
+  function englishCancerPatientLabel() {
+    const cancer = selectedCancerEnglishTitle();
+    return /cancer|carcinoma|lymphoma|leukemia/i.test(cancer) ? cancer : `${cancer} Cancer`;
+  }
+
+  function reportCancerTitle(cancerTitle) {
+    return isEnglish() ? englishCancerPatientLabel() : getCancerTitleForSentence(cancerTitle);
+  }
 
   function closeCustomYearMenus(exceptSelect = null) {
     customYearControls.forEach((control, select) => {
@@ -205,13 +235,14 @@
   }
 
   function updateSelectionSummary() {
-    const formatDataSelection = (fileSelect, yearSelect, yearEndSelect) => {
+    const sameFile = Boolean(mainFile.value) && mainFile.value === targetFile.value;
+    const formatDataSelection = (fileSelect, yearSelect, yearEndSelect, includeFileName) => {
       if (!fileSelect.value && !yearSelect.value) return '尚未選擇';
-      const fileText = fileSelect.value || '尚未選擇檔案';
+      const fileText = fileSelect.selectedOptions[0]?.textContent?.trim() || '尚未選擇檔案';
       const yearTextValue = yearSelect.value || '尚未選擇年度';
       const period = selectedCompareMode() === 'range' && yearEndSelect.value
         ? `${yearTextValue}–${yearEndSelect.value}` : yearTextValue;
-      return `${fileText}｜${period}`;
+      return includeFileName ? `${fileText}｜${period}` : period;
     };
     const behaviorText = behavior.value ? behavior.selectedOptions[0]?.textContent?.trim() : '尚未選擇';
     const selectedCancerTitle = String(window.dashboardSelectedCancerTitle || '').trim();
@@ -227,8 +258,8 @@
     }
 
     document.getElementById('summaryCompareMode').textContent = selectedCompareMode() === 'range' ? '年度區間比較' : '單一年度比較';
-    document.getElementById('summaryMainData').textContent = formatDataSelection(mainFile, mainYear, mainYearEnd);
-    document.getElementById('summaryTargetData').textContent = formatDataSelection(targetFile, targetYear, targetYearEnd);
+    document.getElementById('summaryMainData').textContent = formatDataSelection(mainFile, mainYear, mainYearEnd, !sameFile);
+    document.getElementById('summaryTargetData').textContent = formatDataSelection(targetFile, targetYear, targetYearEnd, !sameFile);
     document.getElementById('summaryBehavior').textContent = behaviorText || '尚未選擇';
     document.getElementById('summaryCancer').textContent = cancerText;
     document.getElementById('summaryModeAi').textContent = modeAi.selectedOptions[0]?.textContent?.trim() || '平穩客觀';
@@ -307,7 +338,7 @@
 
     if (!fileEl.value || !yearStart || !yearEnd) {
       showPreviewMessage(previewEl, isRange ? '請先選擇完整年度區間' : '請先選擇年度');
-      metaEl.textContent = `${fileEl.value || '尚未選擇檔案'}｜年度 ${yearText(years)}｜等待選擇預覽年度`;
+      metaEl.textContent = `年度 ${yearText(years)}｜等待選擇預覽年度`;
       toggleEl?.classList.add('d-none');
       return Promise.resolve();
     }
@@ -327,12 +358,12 @@
         if (!data.ok) throw new Error(data.error || '資料預覽載入失敗');
         renderPreview(previewEl, data.preview);
         const period = yearStart === yearEnd ? `${yearStart} 年` : `${yearStart}-${yearEnd} 年`;
-        metaEl.textContent = `${fileEl.value}｜年度 ${yearText(data.years || years)}｜預覽 ${period}資料前 ${data.preview?.rows?.length || 0} 筆`;
+        metaEl.textContent = `年度 ${yearText(data.years || years)}｜預覽 ${period}資料前 ${data.preview?.rows?.length || 0} 筆`;
         toggleEl?.classList.remove('d-none');
       })
       .catch(err => {
         showPreviewMessage(previewEl, err.message);
-        metaEl.textContent = `${fileEl.value}｜年度預覽讀取失敗`;
+        metaEl.textContent = '年度預覽讀取失敗';
         toggleEl?.classList.remove('d-none');
       });
   }
@@ -347,7 +378,7 @@
     showPreviewMessage(previewEl, '資料預覽載入中...');
     const metaEl = selectEl === mainFile ? mainMeta : targetMeta;
     const toggleEl = document.querySelector(`[data-preview-target="${previewEl.id}"]`);
-    metaEl.textContent = `${selectEl.value}｜讀取中…`;
+    metaEl.textContent = '讀取中…';
     toggleEl?.classList.add('d-none');
     markResultsStale();
     if (selectEl === mainFile) mainYears = [];
@@ -369,7 +400,7 @@
           refreshYearPreview(selectEl, inputEl, endInput, previewEl);
         } else {
           showPreviewMessage(previewEl, '請先選擇年度');
-          metaEl.textContent = `${selectEl.value}｜年度 ${yearText(data.years || [])}｜等待選擇預覽年度`;
+          metaEl.textContent = `年度 ${yearText(data.years || [])}｜等待選擇預覽年度`;
           toggleEl?.classList.add('d-none');
         }
       })
@@ -381,7 +412,7 @@
         endInput.innerHTML = '<option value="" selected>偵測失敗</option>';
         endInput.disabled = true;
         showPreviewMessage(previewEl, err.message);
-        metaEl.textContent = `${selectEl.value}｜讀取失敗`;
+        metaEl.textContent = '讀取失敗';
       })
       .finally(updateButtonState);
   }
@@ -438,7 +469,7 @@
   }
 
   function normalizeGenderAgeData(genderAgeData) {
-    const labels = ['<=19', '20-24', '25-29', '30-34', '35-39', '40-44', '45-49', '50-54', '55-59', '60-64', '65-69', '70-74', '75-79', '80-84', '>=85'];
+    const labels = ['≦19', '20-24', '25-29', '30-34', '35-39', '40-44', '45-49', '50-54', '55-59', '60-64', '65-69', '70-74', '75-79', '80-84', '≧85'];
     const categories = genderAgeData?.categories?.length ? genderAgeData.categories : labels;
     const fillValues = values => {
       const source = Array.isArray(values) ? values : [];
@@ -464,7 +495,7 @@
         subtext: '資料來源：癌症登記資料庫',
         left: 'center',
         top: 0,
-        textStyle: { fontSize: 16, fontWeight: 'bold' }
+        textStyle: { fontSize: 18, fontWeight: 'bold' }
       },
       tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
       grid: { left: 72, right: 72, top: 70, bottom: 78, containLabel: false },
@@ -532,26 +563,92 @@
     `;
   }
 
+  function getUpdatedGenderAgeChartOption(genderAgeData, sharedMax = null, yearTitle = '', cancerTitle = '') {
+    const raw = normalizeGenderAgeData(genderAgeData);
+    const data = {
+      ...raw,
+      categories: raw.categories.map(label => ['<=19', '≤19', '≦19'].includes(label) ? '≦19' : ['>=85', '≥85', '≧85'].includes(label) ? '≧85' : label)
+    };
+    const maxValue = Math.max(0, ...data.male, ...data.female, ...data.total);
+    const yMax = sharedMax || Math.max(10, Math.ceil((maxValue * 1.15) / 5) * 5);
+    const cancer = reportCancerTitle(cancerTitle);
+    const title = isEnglish()
+      ? `Age and Sex Distribution of Newly Diagnosed with ${cancer} Patients, ${yearTitle}`
+      : (yearTitle ? `${yearTitle}年新診斷${cancer}病患性別及年齡分佈圖` : '性別及年齡分佈圖');
+    const legendLabels = [t('male'), t('female'), t('total')];
+
+    return {
+      title: { text: title, subtext: t('source'), left: 'center', top: 0, textStyle: { fontSize: 18, fontWeight: 'bold' }, subtextStyle: { fontSize: 12 } },
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      grid: { left: 72, right: 72, top: 98, bottom: 74, containLabel: false },
+      legend: { data: legendLabels, top: 52, left: 'center', itemGap: 12 },
+      toolbox: { right: 16, top: 0, feature: { dataView: { show: true, readOnly: false, title: t('dataView'), lang: [t('dataView'), t('close'), t('refresh')] }, saveAsImage: { show: true, title: t('downloadImage') } } },
+      xAxis: [{ type: 'category', data: data.categories, name: t('age'), nameLocation: 'middle', nameGap: 30, axisPointer: { type: 'shadow' }, axisTick: { alignWithLabel: true }, axisLabel: { interval: 0 } }],
+      yAxis: [{ type: 'value', min: 0, max: yMax, minInterval: 1, splitNumber: 5, splitLine: { lineStyle: { color: '#e5eaf3' } } }],
+      series: [
+        { name: legendLabels[0], type: 'bar', data: data.male, barWidth: 20, barGap: '20%', barCategoryGap: '42%', itemStyle: { color: '#5470C6' } },
+        { name: legendLabels[1], type: 'bar', data: data.female, barWidth: 20, itemStyle: { color: '#EE6666' } },
+        { name: legendLabels[2], type: 'line', data: data.total, symbol: 'circle', symbolSize: 5, smooth: false, z: 5, itemStyle: { color: '#91CC75' }, lineStyle: { color: '#91CC75', width: 2 } }
+      ]
+    };
+  }
+
+  function sexAgeBlockV2(chartData, yearTitle, cancerTitle, chartId) {
+    const genderAgeData = normalizeGenderAgeData(chartData?.genderAgeData || {});
+    const ageLabels = genderAgeData.categories.map(label => ['<=19', '≤19', '≦19'].includes(label) ? '≦19' : ['>=85', '≥85', '≧85'].includes(label) ? '≧85' : label);
+    const male = genderAgeData.male || [];
+    const female = genderAgeData.female || [];
+    const total = genderAgeData.total || [];
+    const totalCount = sum(total);
+    const percentage = value => totalCount ? `${(Number(value || 0) / totalCount * 100).toFixed(1)}%` : '0.0%';
+    const cancer = reportCancerTitle(cancerTitle);
+    return `
+      ${viewSwitchBlock()}
+      <div data-compare-view-panel="chart">
+        <div id="${chartId}" class="compare-chart"></div>
+        <div class="compare-chart-caption">${isEnglish() ? `Figure : Age and Sex Distribution of Newly Diagnosed with ${cancer} Patients, ${yearTitle}` : `圖、${yearTitle}年新診斷${cancer}病患性別及年齡分佈圖`}</div>
+      </div>
+      <div data-compare-view-panel="table" class="d-none">
+        <div class="annual-report-table-wrap">
+          <table class="annual-report-table">
+            <caption>${isEnglish() ? `Table . Age and Sex Distribution of Newly Diagnosed with ${cancer} Patients,\u00a0${yearTitle}` : `表、${yearTitle}年新診斷${cancer}病患性別及年齡分佈表`}${sourceLine()}</caption>
+            <thead>
+              <tr><th rowspan="2">${t('sex')}</th><th colspan="${ageLabels.length}">${t('ageGroup')}</th><th rowspan="2">${t('subtotal')}</th><th rowspan="2">${t('percent')}</th></tr>
+              <tr>${ageLabels.map(label => `<th>${label}</th>`).join('')}</tr>
+            </thead>
+            <tbody>
+              <tr><td>${t('male')}</td>${male.map(value => `<td>${value}</td>`).join('')}<td>${sum(male)}</td><td>${percentage(sum(male))}</td></tr>
+              <tr><td>${t('female')}</td>${female.map(value => `<td>${value}</td>`).join('')}<td>${sum(female)}</td><td>${percentage(sum(female))}</td></tr>
+              <tr><td>${t('total')}</td>${total.map(value => `<td>${value}</td>`).join('')}<td>${totalCount}</td><td>${percentage(totalCount)}</td></tr>
+              <tr><td>%</td>${total.map(value => `<td>${percentage(value)}</td>`).join('')}<td>${percentage(totalCount)}</td><td>-</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
   function viewSwitchBlock() {
     return `
       <div class="compare-view-switch" role="group" aria-label="結果顯示方式">
-        <button type="button" class="compare-view-button active" data-compare-view="chart"><i class="bi bi-bar-chart me-1"></i>圖表</button>
-        <button type="button" class="compare-view-button" data-compare-view="table"><i class="bi bi-table me-1"></i>表格</button>
+        <button type="button" class="compare-view-button active" data-compare-view="chart"><i class="bi bi-bar-chart me-1"></i>${t('chart')}</button>
+        <button type="button" class="compare-view-button" data-compare-view="table"><i class="bi bi-table me-1"></i>${t('table')}</button>
       </div>
     `;
   }
 
   function ageMedianBlock(chartData, yearTitle, cancerTitle) {
     const item = chartData?.ageMedianData || {};
+    const cancer = reportCancerTitle(cancerTitle);
     return `
       <div class="annual-report-table-wrap compare-compact-table">
         <table class="annual-report-table">
-          <caption>表、${yearTitle}年新診斷${getCancerTitleForSentence(cancerTitle)}病患年齡中位數表<br><span class="text-muted fw-normal" style="font-size: 0.85em;">資料來源：癌症登記資料庫</span></caption>
-          <thead><tr><th rowspan="2">項目</th><th colspan="2">發生個案</th></tr><tr><th>男性</th><th>女性</th></tr></thead>
+          <caption>${isEnglish() ? `Table . Median Age of Patients Newly Diagnosed with ${cancer},\u00a0${yearTitle}` : `表、${yearTitle}年新診斷${cancer}病患年齡中位數表`}${sourceLine()}</caption>
+          <thead><tr><th rowspan="2">${t('medianCharacteristic')}</th><th colspan="2">${t('medianSex')}</th></tr><tr><th>${t('male')}</th><th>${t('female')}</th></tr></thead>
           <tbody>
-            <tr><td>個案數(人)</td><td>${item.male_count || 0}</td><td>${item.female_count || 0}</td></tr>
-            <tr><td>年齡中位數</td><td>${item.male || 0}</td><td>${item.female || 0}</td></tr>
-            <tr><td>性別比</td><td>${item.male_ratio || '0.00'}</td><td>${item.female_ratio || '0.00'}</td></tr>
+            <tr><td>${t('medianN')}</td><td>${item.male_count || 0}</td><td>${item.female_count || 0}</td></tr>
+            <tr><td>${t('medianAgeYears')}</td><td>${item.male || 0}</td><td>${item.female || 0}</td></tr>
+            <tr><td>${t('medianMaleToFemaleRatio')}</td><td>${item.male_ratio || '0.00'}</td><td>${item.female_ratio || '0.00'}</td></tr>
           </tbody>
         </table>
       </div>
@@ -560,17 +657,18 @@
 
   function analyzableBlock(chartData, yearTitle, cancerTitle) {
     const item = chartData?.analyzableConfirmedData || {};
+    const cancer = reportCancerTitle(cancerTitle);
     return `
       <div class="annual-report-table-wrap compare-analyzable-table">
         <table class="annual-report-table">
-          <caption>表、${yearTitle}年${getCancerTitleForSentence(cancerTitle)}－癌症登記可分析個案與確診個案<br><span class="text-muted fw-normal" style="font-size: 0.85em;">資料來源：癌症登記資料庫</span></caption>
+          <caption>${isEnglish() ? `Table . Analysis-Eligible and Confirmed Cases of ${cancer} in the Cancer Registry,\u00a0${yearTitle}` : `表、${yearTitle}年${cancer}-癌症登記可分析個案與確診個案`}${sourceLine()}</caption>
           <thead>
             <tr>
-              <th>${yearTitle}年癌症總數<br>(A)</th>
-              <th>*可分析個案數<br>(B)</th>
-              <th>可分析個案百分比 %<br>(B/A)</th>
-              <th>顯微鏡檢確診個案數<br>(C)</th>
-              <th>確診個案百分比 %<br>(C/B)</th>
+              <th>${isEnglish() ? `${t('cancerTotal')}, ${yearTitle}` : `${yearTitle}年癌症總數`}<br>(A)</th>
+              <th>${t('analysisEligibleCases')}<br>(B)</th>
+              <th>${t('analysisEligiblePercent')}<br>(B/A)</th>
+              <th>${t('microscopicallyConfirmedCases')}<br>(C)</th>
+              <th>${t('microscopicallyConfirmedPercent')}<br>(C/B)</th>
             </tr>
           </thead>
           <tbody>
@@ -585,9 +683,9 @@
         </table>
       </div>
       <div class="compare-note">
-        <div>* 可分析個案包含：</div>
-        <div class="compare-note-lines">Class1 本院診斷，並於本院接受全部或部分首次治療。</div>
-        <div class="compare-note-lines">Class2 他院診斷，於本院接受全部或部分首次治療。</div>
+        <div>${t('analysisEligibleNote')}</div>
+        <div class="compare-note-lines">${t('analysisEligibleClass1')}</div>
+        <div class="compare-note-lines">${t('analysisEligibleClass2')}</div>
       </div>
     `;
   }
@@ -631,24 +729,26 @@
           `;
         }).join('') + `
           <tr class="fw-bold" style="background-color: var(--gray-50);">
-            <td>合計</td>
+            <td>${t('total')}</td>
             <td></td>
             <td>${totalCount}</td>
             <td>${validData.length ? '100.0%' : '0.0%'}</td>
           </tr>`
-      : `<tr><td colspan="4" class="text-center">無資料<br><span class="text-muted small">${noDataReason}</span></td></tr>`;
+      : `<tr><td colspan="4" class="text-center">${t('noData')}<br><span class="text-muted small">${noDataReason}</span></td></tr>`;
+
+    const cancer = reportCancerTitle(cancerTitle);
 
     return `
       ${viewSwitchBlock()}
       <div data-compare-view-panel="chart">
         <div id="${chartId}" class="compare-chart" style="height: 450px;"></div>
-        <div class="compare-chart-caption">圖、${yearTitle}年${getCancerTitleForSentence(cancerTitle)}組織型態分佈圖</div>
+        <div class="compare-chart-caption">${isEnglish() ? `Figure. Histological Distribution of ${cancer}, ${yearTitle}` : `圖、${yearTitle}年${cancer}組織型態分佈圖`}</div>
         ${chartNotes}
       </div>
       <div data-compare-view-panel="table" class="d-none">
         <div class="annual-report-table-wrap">
           <table class="annual-report-table compare-histology-table">
-            <caption>表、${yearTitle}年${getCancerTitleForSentence(cancerTitle)}組織型態分佈表<br><span class="text-muted fw-normal" style="font-size: 0.85em;">資料來源：癌症登記資料庫</span></caption>
+            <caption>${isEnglish() ? `Table. Histological Distribution of ${cancer},\u00a0${yearTitle}` : `表、${yearTitle}年${cancer}組織型態分佈表`}${sourceLine()}</caption>
             <colgroup>
               <col style="width: 10%;">
               <col style="width: 75%;">
@@ -657,10 +757,10 @@
             </colgroup>
             <thead>
               <tr>
-                <th>ICD-O編碼</th>
-                <th>組織型態</th>
-                <th>人數</th>
-                <th>百分比%</th>
+                <th>${t('icdoCode')}</th>
+                <th>${t('histology')}</th>
+                <th>${t('people')}</th>
+                <th>${isEnglish() ? '%' : `${t('percentage')}%`}</th>
               </tr>
             </thead>
             <tbody>${rows}</tbody>
@@ -673,36 +773,36 @@
   function diagnosisClassificationMappings() {
     return [
       {
-        title: 'Class0 本院診斷，未於本院接受首次治療',
+        title: t('class0'),
         totalKey: 'class0_total',
         subClasses: [
-          { key: '0_1_0', label: '未接受任何治療即死亡或病危(0.1.0)' },
-          { key: '0_1_2', label: '首次療程未於本院進行，或本院僅提供支援／諮詢(0.1.2)' }
+          { key: '0_1_0', label: t('class010') },
+          { key: '0_1_2', label: t('class012') }
         ]
       },
       {
-        title: 'Class1 本院診斷，並於本院接受全部或部分首次治療。',
+        title: t('class1'),
         totalKey: 'class1_total',
         subClasses: [
-          { key: '1_1_1', label: '首次療程僅於本院完成(1.1.1)' },
-          { key: '1_1_3', label: '首次療程由本院與他院共同完成(1.1.3)' },
-          { key: '1_1_4', label: '首次療程為觀察、支持性或緩和治療(1.1.4)' }
+          { key: '1_1_1', label: t('class111') },
+          { key: '1_1_3', label: t('class113') },
+          { key: '1_1_4', label: t('class114') }
         ]
       },
       {
-        title: 'Class2 他院診斷，於本院接受全部或部分首次治療。',
+        title: t('class2'),
         totalKey: 'class2_total',
         subClasses: [
-          { key: '2_2_1', label: '首次療程僅於本院完成(2.2.1)' },
-          { key: '2_2_3', label: '首次療程由本院與他院共同完成(2.2.3)' }
+          { key: '2_2_1', label: t('class221') },
+          { key: '2_2_3', label: t('class223') }
         ]
       },
       {
-        title: 'Class3 他院診斷，未於本院接受首次治療，或因復發／持續癌症問題至本院就診。',
+        title: t('class3'),
         totalKey: 'class3_total',
         subClasses: [
-          { key: '3_2_0', label: '未接受任何治療即死亡或病危(3.2.0)' },
-          { key: '3_3_2', label: '首次療程未於本院進行，或本院僅提供支援／諮詢(3.3.2)' }
+          { key: '3_2_0', label: t('class320') },
+          { key: '3_3_2', label: t('class332') }
         ]
       }
     ];
@@ -723,19 +823,21 @@
       });
     });
 
-    rows += `<tr class="table-secondary fw-bold" style="font-weight: bold; border-top: 2px solid #6c757d;"><td class="text-center">總計</td><td class="text-center">${total}</td><td class="text-center">${total > 0 ? '100.0%' : '0.0%'}</td></tr>`;
+    rows += `<tr class="table-secondary fw-bold" style="font-weight: bold; border-top: 2px solid #6c757d;"><td class="text-center">${t('total')}</td><td class="text-center">${total}</td><td class="text-center">${total > 0 ? '100.0%' : '0.0%'}</td></tr>`;
+
+    const cancer = reportCancerTitle(cancerTitle);
 
     return `
       ${viewSwitchBlock()}
       <div data-compare-view-panel="chart">
         <div id="${chartId}" class="compare-chart" style="height: 450px;"></div>
-        <div class="compare-chart-caption">圖、${yearTitle}年${getCancerTitleForSentence(cancerTitle)}個案分類分佈圖</div>
+        <div class="compare-chart-caption">${isEnglish() ? `Figure. ${cancer} Case Class Distribution, ${yearTitle}` : `圖、${yearTitle}年${cancer}個案分類分佈圖`}</div>
       </div>
       <div data-compare-view-panel="table" class="d-none">
         <div class="annual-report-table-wrap mb-4">
           <table class="annual-report-table text-start" style="width: 100%;">
-            <caption>表、${yearTitle}年${getCancerTitleForSentence(cancerTitle)}個案分類分佈表<br><span class="text-muted fw-normal" style="font-size: 0.85em;">資料來源：癌症登記資料庫</span></caption>
-            <thead><tr><th class="text-center">個案分類</th><th class="text-center">人數</th><th class="text-center">百分比%</th></tr></thead>
+            <caption>${isEnglish() ? `Table . ${cancer} Case Class Distribution,\u00a0${yearTitle}` : `表、${yearTitle}年${cancer}個案分類分佈表`}${sourceLine()}</caption>
+            <thead><tr><th class="text-center">${isEnglish() ? 'Class' : '個案分類'}</th><th class="text-center">${t('people')}</th><th class="text-center">${isEnglish() ? '%' : `${t('percentage')}%`}</th></tr></thead>
             <tbody>${rows}</tbody>
           </table>
         </div>
@@ -766,14 +868,14 @@
     applyView(viewPreferences[side] || 'chart');
   }
 
-  function renderSexAgeChart(chartId, chartData, sharedScale) {
+  function renderSexAgeChart(chartId, chartData, sharedScale, yearTitle, cancerTitle) {
     if (!window.echarts) return;
     const chartEl = document.getElementById(chartId);
     if (!chartEl) return;
     const oldChart = echarts.getInstanceByDom(chartEl);
     if (oldChart) oldChart.dispose();
     const chart = echarts.init(chartEl);
-    chart.setOption(getGenderAgeChartOption(chartData?.genderAgeData || {}, sharedScale?.genderAgeMax));
+    chart.setOption(getUpdatedGenderAgeChartOption(chartData?.genderAgeData || {}, sharedScale?.genderAgeMax, yearTitle, cancerTitle));
     setTimeout(() => chart.resize(), 50);
   }
 
@@ -797,15 +899,17 @@
     });
 
     chartEl.style.height = `${Math.max(450, names.length * histologyRowHeight(names))}px`;
-    const reportCancerTitle = getCancerTitleForSentence(cancerTitle);
-    const chartTitle = `${yearTitle}年${reportCancerTitle} 組織型態分佈圖`;
+    const cancer = reportCancerTitle(cancerTitle);
+    const chartTitle = isEnglish()
+      ? `Histological Distribution of ${cancer}, ${yearTitle}`
+      : `${yearTitle}年${cancer}組織型態分佈圖`;
 
     const chart = echarts.init(chartEl);
     if (!names.length) {
       chartEl.style.height = '450px';
       chart.setOption({
         animation: false,
-        title: { text: chartTitle, subtext: '資料來源：癌症登記資料庫', left: 'center' },
+        title: { text: chartTitle, subtext: t('source'), left: 'center', textStyle: { fontSize: 18, fontWeight: 'bold' } },
         tooltip: { show: false },
         toolbox: { show: false },
         xAxis: { show: false },
@@ -816,7 +920,7 @@
           left: 'center',
           top: 'middle',
           style: {
-            text: `無資料\n${noDataReason}`,
+            text: `${t('noData')}\n${noDataReason}`,
             fill: '#6b7280',
             fontSize: 14,
             fontWeight: 500,
@@ -832,8 +936,9 @@
       animation: false,
       title: {
         text: chartTitle,
-        subtext: '資料來源：癌症登記資料庫',
-        left: 'center'
+        subtext: t('source'),
+        left: 'center',
+        textStyle: { fontSize: 18, fontWeight: 'bold' }
       },
       tooltip: {
         trigger: 'axis',
@@ -843,18 +948,18 @@
           if (!p || p.value === undefined || p.value === '-') return '';
           const count = p.data && p.data.count !== undefined ? p.data.count : '-';
           const val = typeof p.value === 'number' ? p.value.toFixed(1) : p.value;
-          return `${p.name}<br/>${p.marker}個案比例: ${val}% (${count}人)`;
+          return `${p.name}<br/>${p.marker}${t('caseRatio')}: ${val}% (${isEnglish() ? `N = ${count}` : `${count} 人`})`;
         }
       },
       grid: { left: 500, right: 60, bottom: 50, top: 60, containLabel: false },
       legend: { show: false },
       toolbox: {
         feature: {
-          dataView: { show: true, readOnly: false, title: '數據檢視', lang: ['數據檢視', '關閉', '更新'] },
-          saveAsImage: { show: true, title: '下載圖片' }
+          dataView: { show: true, readOnly: false, title: t('dataView'), lang: [t('dataView'), t('close'), t('refresh')] },
+          saveAsImage: { show: true, title: t('downloadImage') }
         }
       },
-      xAxis: { type: 'value', name: '百分比 (%)', nameLocation: 'middle', nameGap: 30, min: 0, max: sharedScale?.histologyMax, interval: 10, axisLabel: { formatter: value => Number(value).toFixed(1) + '%' } },
+      xAxis: { type: 'value', name: isEnglish() ? '%' : '百分比 (%)', nameLocation: 'middle', nameGap: 30, min: 0, max: sharedScale?.histologyMax, interval: 10, axisLabel: { formatter: value => Number(value).toFixed(1) + '%' } },
       yAxis: {
         type: 'category',
         data: names,
@@ -881,14 +986,14 @@
           color: '#333',
           fontSize: 13,
           distance: 8,
-          formatter: params => `${Number(params.value || 0).toFixed(1)}% (${Number(params.data?.count || 0)} 人)`
+          formatter: params => `${Number(params.value || 0).toFixed(1)}% (${isEnglish() ? `N = ${Number(params.data?.count || 0)}` : `${Number(params.data?.count || 0)} 人`})`
         }
       }]
     });
     setTimeout(() => chart.resize(), 50);
   }
 
-  function renderClassificationChart(chartId, chartData, sharedScale) {
+  function renderClassificationChart(chartId, chartData, sharedScale, yearTitle, cancerTitle) {
     if (!window.echarts) return;
     const chartEl = document.getElementById(chartId);
     if (!chartEl) return;
@@ -898,19 +1003,17 @@
     const data = chartData?.diagnosisClassificationData || {};
     const total = data.total_count || 1;
     const calcPctNum = value => Number((Number(value || 0) / total * 100).toFixed(1));
-    const labels = [
-      'Class0 本院診斷，未於本院接受首次治療',
-      'Class1 本院診斷，並於本院接受全部或部分首次治療。',
-      'Class2 他院診斷，於本院接受全部或部分首次治療。',
-      'Class3 他院診斷，未於本院接受首次治療，或因復發／持續癌症問題至本院就診。'
-    ];
+    const labels = [t('class0'), t('class1'), t('class2'), t('class3')];
     const colors = ['#5470C6', '#91CC75', '#FAC858', '#EE6666'];
+    const chartTitle = isEnglish()
+      ? `${reportCancerTitle(cancerTitle)} Case Class Distribution, ${yearTitle}`
+      : `${yearTitle}年${reportCancerTitle(cancerTitle)}個案分類分佈圖`;
 
     const chart = echarts.init(chartEl);
     chart.setOption({
       animation: false,
-      title: { text: '個案分類分佈圖', subtext: '資料來源：癌症登記資料庫', left: 'center', textStyle: { fontSize: 20, fontWeight: 'bold', color: '#333' } },
-      toolbox: { show: true, feature: { dataView: { show: true, readOnly: false, title: '數據檢視', lang: ['數據檢視', '關閉', '更新'] }, saveAsImage: { show: true, title: '下載圖片' } } },
+      toolbox: { show: true, feature: { dataView: { show: true, readOnly: false, title: t('dataView'), lang: [t('dataView'), t('close'), t('refresh')] }, saveAsImage: { show: true, title: t('downloadImage') } } },
+      title: { text: chartTitle, subtext: t('source'), left: 'center', textStyle: { fontSize: 18, fontWeight: 'bold', color: '#333' } },
       legend: { orient: 'vertical', right: '2%', top: 'middle', itemWidth: 14, itemHeight: 14, data: labels, textStyle: { fontSize: 14, lineHeight: 22, width: 450, overflow: 'break' } },
       tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
       grid: { left: '3%', right: '32%', top: '15%', bottom: '3%', containLabel: true },
@@ -928,7 +1031,7 @@
 
   function reportBlock(item, chartData, meta, chartPrefix) {
     const cancerTitle = selectedCancerTitle();
-    if (item === '性別年齡分佈') return sexAgeBlock(chartData, meta.year_label, cancerTitle, `${chartPrefix}SexAgeChart`);
+    if (item === '性別年齡分佈') return sexAgeBlockV2(chartData, meta.year_label, cancerTitle, `${chartPrefix}SexAgeChart`);
     if (item === '年齡中位數') return ageMedianBlock(chartData, meta.year_label, cancerTitle);
     if (item === '可分析個案與確診個案') return analyzableBlock(chartData, meta.year_label, cancerTitle);
     if (item === '組織型態') return histologyBlock(chartData, meta.year_label, cancerTitle, `${chartPrefix}HistologyChart`);
@@ -1019,14 +1122,15 @@
     const viewSwitch = container.querySelector('.compare-view-switch');
     const resultHeading = container.closest('.compare-result-item')?.querySelector('.compare-result-heading');
     if (viewSwitch && resultHeading) resultHeading.appendChild(viewSwitch);
-    if (item === '性別年齡分佈') renderSexAgeChart(`${chartPrefix}SexAgeChart`, chartData, sharedScale);
+    if (item === '性別年齡分佈') renderSexAgeChart(`${chartPrefix}SexAgeChart`, chartData, sharedScale, meta.year_label, selectedCancerTitle());
     if (item === '組織型態') {
       renderHistologyChart(`${chartPrefix}HistologyChart`, chartData, meta.year_label, selectedCancerTitle(), sharedScale);
     }
-    if (item === '個案分類') renderClassificationChart(`${chartPrefix}ClassificationChart`, chartData, sharedScale);
+    if (item === '個案分類') renderClassificationChart(`${chartPrefix}ClassificationChart`, chartData, sharedScale, meta.year_label, selectedCancerTitle());
   }
 
   function renderResultItem(data, item, index) {
+    activeResultIndex = index;
     document.querySelectorAll('.compare-result-tab').forEach((button, buttonIndex) => {
       button.classList.toggle('active', buttonIndex === index);
     });
@@ -1035,11 +1139,11 @@
     document.getElementById('compareResultPanel').innerHTML = `
       <div class="compare-result-grid">
         <section class="compare-result-item is-main">
-          <div class="compare-result-heading"><div><h3>基準資料｜${escapeHtml(data.main?.year_label || '—')}</h3></div></div>
+          <div class="compare-result-heading"><div><h3>${isEnglish() ? 'Baseline' : '基準資料'}｜${escapeHtml(data.main?.year_label || '—')}</h3></div></div>
           <div id="mainAnnualReport"></div>
         </section>
         <section class="compare-result-item is-target">
-          <div class="compare-result-heading"><div><h3>對照資料｜${escapeHtml(data.target?.year_label || '—')}</h3></div></div>
+          <div class="compare-result-heading"><div><h3>${isEnglish() ? 'Comparison' : '對照資料'}｜${escapeHtml(data.target?.year_label || '—')}</h3></div></div>
           <div id="targetAnnualReport"></div>
         </section>
       </div>
@@ -1089,8 +1193,9 @@
   }
 
   function fetchAiNarrative(data, analysisItem, force = false) {
-    if (!force && aiNarrativeCache.has(analysisItem)) {
-      return Promise.resolve(aiNarrativeCache.get(analysisItem));
+    const cacheKey = `${window.DashboardI18n?.getLanguage() || 'zh-TW'}|${analysisItem}`;
+    if (!force && aiNarrativeCache.has(cacheKey)) {
+      return Promise.resolve(aiNarrativeCache.get(cacheKey));
     }
 
     const comparisonPayload = buildAiComparisonPayload(data, analysisItem);
@@ -1104,19 +1209,22 @@
         baseline: comparisonPayload.baseline,
         comparison: comparisonPayload.comparison,
         total_difference: comparisonPayload.total_difference,
-        mode_ai: modeAi.value
+        mode_ai: modeAi.value,
+        language: window.DashboardI18n?.getLanguage() || 'zh-TW'
       })
     })
       .then(response => response.json())
       .then(result => {
         if (!result.success) throw new Error(result.error || '語言模型分析產生失敗');
         const insight = result.insight || '語言模型未回傳分析內容。';
-        aiNarrativeCache.set(analysisItem, insight);
+        const insights = result.insights || {};
+        Object.entries(insights).forEach(([language, value]) => aiNarrativeCache.set(`${language}|${analysisItem}`, value));
+        aiNarrativeCache.set(cacheKey, insight);
         return insight;
       })
       .catch(() => {
         const errorText = '語言模型比較敘述暫時無法產生，請確認模型服務設定或稍後再試。';
-        aiNarrativeCache.set(analysisItem, errorText);
+        aiNarrativeCache.set(cacheKey, errorText);
         return errorText;
       });
   }
@@ -1128,10 +1236,11 @@
     activeAiNarrativeItem = analysisItem;
     section.classList.remove('d-none');
     retryButton.disabled = true;
-    if (!force && aiNarrativeCache.has(analysisItem)) {
-      text.textContent = aiNarrativeCache.get(analysisItem);
+    const cacheKey = `${window.DashboardI18n?.getLanguage() || 'zh-TW'}|${analysisItem}`;
+    if (!force && aiNarrativeCache.has(cacheKey)) {
+      text.textContent = aiNarrativeCache.get(cacheKey);
       retryButton.disabled = false;
-      return Promise.resolve(aiNarrativeCache.get(analysisItem));
+      return Promise.resolve(aiNarrativeCache.get(cacheKey));
     }
     const requestId = ++aiNarrativeRequestId;
     text.innerHTML = '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>語言模型正在整理兩年度的比較差異，請稍候…';
@@ -1156,16 +1265,18 @@
     const targetCounts = data.target?.yearly_counts || {};
     const years = Array.from(new Set([...Object.keys(mainCounts), ...Object.keys(targetCounts)]))
       .sort((a, b) => Number(a) - Number(b));
+    const baselineLabel = isEnglish() ? 'Baseline' : '基準';
+    const comparisonLabel = isEnglish() ? 'Comparison' : '對照';
     const chart = echarts.getInstanceByDom(container) || echarts.init(container);
     chart.setOption({
       color: ['#2563eb', '#f97316'],
-      title: { text: '年度區間個案數趨勢', left: 'center', top: 18, textStyle: { fontSize: 16 } },
+      title: { text: isEnglish() ? 'Annual Case Count Trend' : '年度區間個案數趨勢', left: 'center', top: 18, textStyle: { fontSize: 18 } },
       tooltip: { trigger: 'axis' },
-      legend: { top: 52, data: [`基準 ${data.main?.year_label || ''}`, `對照 ${data.target?.year_label || ''}`] },
+      legend: { top: 52, data: [`${baselineLabel} ${data.main?.year_label || ''}`, `${comparisonLabel} ${data.target?.year_label || ''}`] },
       grid: { left: 50, right: 35, top: 92, bottom: 30, containLabel: true },
       xAxis: {
         type: 'category',
-        name: '年度',
+        name: isEnglish() ? 'Year' : '年度',
         nameLocation: 'middle',
         nameGap: 30,
         data: years,
@@ -1173,17 +1284,17 @@
         axisTick: { alignWithLabel: true },
         axisLabel: { margin: 10 }
       },
-      yAxis: { type: 'value', name: '個案數', minInterval: 1 },
+      yAxis: { type: 'value', name: isEnglish() ? 'Cases' : '個案數', minInterval: 1 },
       series: [
         {
-          name: `基準 ${data.main?.year_label || ''}`,
+          name: `${baselineLabel} ${data.main?.year_label || ''}`,
           type: 'line',
           connectNulls: false,
           symbolSize: 8,
           data: years.map(year => Object.prototype.hasOwnProperty.call(mainCounts, year) ? mainCounts[year] : null)
         },
         {
-          name: `對照 ${data.target?.year_label || ''}`,
+          name: `${comparisonLabel} ${data.target?.year_label || ''}`,
           type: 'line',
           connectNulls: false,
           symbolSize: 8,
@@ -1218,9 +1329,28 @@
     if (items.length > 0) renderAiNarrative(data, items[0]);
   }
 
+  window.DashboardCompare = {
+    rerenderCompareLanguage() {
+      const languageLabel = document.getElementById('compareLanguageLabel');
+      if (languageLabel) languageLabel.textContent = isEnglish() ? 'English' : '繁體中文';
+      const narrativeHeading = document.querySelector('#compareAiNarrative h6');
+      if (narrativeHeading) narrativeHeading.textContent = t('llmInsight');
+      const retryButton = document.getElementById('btnRetryAiNarrative');
+      if (retryButton) retryButton.innerHTML = `<i class="bi bi-arrow-clockwise me-1"></i>${t('regenerateInsight')}`;
+      if (!lastComparisonData || !hasRenderedResult) return;
+      const items = selectedCompareItems();
+      const item = items[activeResultIndex] || items[0];
+      if (!item) return;
+      renderDifferenceSummary(lastComparisonData);
+      renderRangeTrend(lastComparisonData);
+      renderResultItem(lastComparisonData, item, activeResultIndex);
+      renderAiNarrative(lastComparisonData, item);
+    }
+  };
+
   function showAlert(title, text) {
     if (window.Swal) Swal.fire({ icon: 'warning', title, text, confirmButtonColor: '#2563eb' });
-    else alert(text || title);
+    else window.utils?.alert(text || title, 'warning');
   }
 
   function resetComparison() {
@@ -1394,6 +1524,14 @@
   });
   document.addEventListener('DOMContentLoaded', () => {
     setTimeout(updateButtonState, 0);
+    const languagePicker = document.getElementById('compareLanguagePicker');
+    document.querySelectorAll('[data-compare-language]').forEach(option => {
+      option.addEventListener('click', () => {
+        if (languagePicker) languagePicker.open = false;
+        window.DashboardI18n?.setLanguage(option.dataset.compareLanguage);
+      });
+    });
+    window.DashboardCompare.rerenderCompareLanguage();
   });
 
   runButton.addEventListener('click', () => {

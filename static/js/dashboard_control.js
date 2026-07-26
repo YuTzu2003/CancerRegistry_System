@@ -114,22 +114,12 @@
   }
 
   function updateLungHistologyChildrenVisibility() {
-      const lungParent = document.getElementById('chk_Lung_and_Bronchus');
       const childRows = document.querySelectorAll('.lung-histology-child');
-      const childChecks = document.querySelectorAll('.lung-histology-child input[type="checkbox"]');
-      if (!lungParent || childRows.length === 0) return;
-
-      const hasCheckedChild = Array.from(childChecks).some(cb => cb.checked);
-      const shouldShow = lungParent.checked || hasCheckedChild;
-
+      if (childRows.length === 0) return;
       childRows.forEach(row => {
-          row.classList.toggle('d-none', !shouldShow);
-          row.classList.toggle('d-flex', shouldShow);
+          row.classList.remove('d-none');
+          row.classList.add('d-flex');
       });
-
-      if (!shouldShow) {
-          childChecks.forEach(cb => { cb.checked = false; });
-      }
   }
 
   /* ── 癌別選擇事件綁定 ── */
@@ -1033,6 +1023,92 @@ function initDashboardControl() {
   });
 
   /* ── 查詢按鈕執行邏輯 ── */
+  const btnConfigurePbi = document.getElementById('btnConfigurePbi');
+  if (btnConfigurePbi) {
+      btnConfigurePbi.addEventListener('click', async function() {
+          let currentPath = '';
+          try {
+              const response = await fetch('/api/dashboard/pbi_settings');
+              const result = await response.json();
+              if (!result.ok) throw new Error(result.error || '讀取設定失敗');
+              currentPath = result.settings?.publish_path || '';
+          } catch (error) {
+              utils.alert(`無法讀取 Power BI 發布設定：${error.message}`, 'error');
+              return;
+          }
+
+          const entered = await Swal.fire({
+              title: 'Power BI 發布設定',
+              text: '請輸入唯一的 Power BI 發布檔案 UNC 路徑。儲存時會測試是否可寫入。',
+              input: 'text',
+              inputValue: currentPath,
+              inputPlaceholder: '\\\\伺服器\\共享資料夾\\powerbi_dataset.xlsx',
+              showCancelButton: true,
+              confirmButtonText: '測試並儲存',
+              cancelButtonText: '取消',
+              confirmButtonColor: '#dc3545',
+              cancelButtonColor: '#6c757d',
+              inputValidator: (value) => value?.trim() ? undefined : '請輸入 Power BI 發布檔案路徑。'
+          });
+          if (!entered.isConfirmed) return;
+
+          try {
+              const response = await fetch('/api/dashboard/pbi_settings', {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ publish_path: entered.value.trim() })
+              });
+              const result = await response.json();
+              if (!result.ok) throw new Error(result.error || '儲存設定失敗');
+              utils.alert('Power BI 發布路徑已儲存。之後將固定發布到此位置。', 'success');
+          } catch (error) {
+              utils.alert(`無法儲存 Power BI 發布路徑：${error.message}`, 'error');
+          }
+      });
+  }
+
+  const btnPublishPbi = document.getElementById('btnPublishPbi');
+  if (btnPublishPbi) {
+      btnPublishPbi.addEventListener('click', async function() {
+          const activeRow = document.querySelector('#dashFileListBody tr.table-active');
+          const fileId = activeRow?.dataset.fileId || '';
+          const yearStart = document.getElementById('filterYearStart')?.value.trim() || '';
+          const yearEnd = document.getElementById('filterYearEnd')?.value.trim() || '';
+          const behavior = document.getElementById('filterBehavior')?.value || '';
+          const cancers = Array.from(window.selectedCancers || []);
+
+          if (!fileId || !yearStart || !yearEnd || cancers.length === 0) {
+              utils.alert('請先完成檔案、年度、性態碼與癌別選擇。', 'warning');
+              return;
+          }
+          const confirmed = await utils.confirm(
+              '確定要發布目前篩選資料至共用 Power BI 報表嗎？這會覆蓋目前的 Power BI 發布資料。',
+              '確認發布'
+          );
+          if (!confirmed.isConfirmed) {
+              return;
+          }
+
+          btnPublishPbi.disabled = true;
+          if (window.utils?.showLoading) window.utils.showLoading('正在產生 Power BI 發布資料，請稍候…');
+          try {
+              const response = await fetch('/api/dashboard/publish_pbi', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ file_id: fileId, cancers, year_start: yearStart, year_end: yearEnd, behavior })
+              });
+              const result = await response.json();
+              if (!result.ok) throw new Error(result.error || '發布失敗');
+              utils.alert(`已發布 ${result.rows} 筆資料至 Power BI；報表將於下一次刷新後更新。`, 'success');
+          } catch (error) {
+              utils.alert(`Power BI 發布失敗：${error.message}`, 'error');
+          } finally {
+              btnPublishPbi.disabled = false;
+              if (window.utils?.hideLoading) window.utils.hideLoading();
+          }
+      });
+  }
+
   const btnRunQuery = document.getElementById('btnRunQuery');
   if (btnRunQuery) {
       btnRunQuery.addEventListener('click', async function() {

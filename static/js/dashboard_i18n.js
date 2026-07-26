@@ -4,7 +4,7 @@ window.DashboardI18n = (function() {
             translation: {
                 language: '語言', source: '資料來源：癌症登記資料庫', table: '表', chart: '圖', chartSexAge: '性別與年齡分佈', chartAgeMedian: '年齡中位數', chartAnalyzable: '可分析個案與確診個案', chartHistology: '組織型態', chartClassification: '個案分類',
                 newDiagnosis: '新診斷', cancer: '癌', patient: '病患', distribution: '分佈',
-                sexAge: '性別及年齡', ageGroup: '年齡層次', sex: '性別', male: '男', female: '女', total: '總計', cases: '個案數',
+                sexAge: '性別及年齡', age: '年齡', ageGroup: '年齡層', sex: '性別', male: '男性', female: '女性', total: '總計', subtotal: '小計', percent: '%', cases: '個案數',
                 ageMedian: '年齡中位數', item: '項目', incidentCases: '發生個案', sexRatio: '性別比',
                 medianCharacteristic: '項目', medianN: '個案數(人)', medianAgeYears: '年齡中位數', medianMaleToFemaleRatio: '性別比', medianSex: '發生個案',
                 analyzableConfirmed: '癌症登記可分析個案與確診個案', cancerTotal: '癌症總數', analyzableCases: '可分析個案數',
@@ -31,7 +31,7 @@ window.DashboardI18n = (function() {
             translation: {
                 language: 'Language', source: 'Source: Cancer Registry Database', table: 'Table', chart: 'Figure', chartSexAge: 'Sex and age distribution', chartAgeMedian: 'Median age', chartAnalyzable: 'Analyzable and confirmed cases', chartHistology: 'Histology', chartClassification: 'Class',
                 newDiagnosis: 'Newly diagnosed ', cancer: ' cancer', patient: ' patients', distribution: ' distribution',
-                sexAge: 'Sex and age', ageGroup: 'Age', sex: 'Sex', male: 'Male', female: 'Female', total: 'Total', cases: 'Cases',
+                sexAge: 'Sex and age', age: 'Age', ageGroup: 'Age', sex: 'Sex', male: 'Male', female: 'Female', total: 'Total', subtotal: 'Total', percent: '%', cases: 'Cases',
                 ageMedian: 'Median age', item: 'Item', incidentCases: 'Incident cases', sexRatio: 'Sex ratio',
                 medianCharacteristic: 'Characteristic', medianN: 'N', medianAgeYears: 'Median Age (years)', medianMaleToFemaleRatio: 'Male-to-Female Ratio', medianSex: 'Sex',
                 analyzableConfirmed: 'Analyzable and microscopically confirmed cancer cases', cancerTotal: 'Total Cancer Cases', analyzableCases: 'Analyzable cases',
@@ -75,6 +75,9 @@ window.DashboardI18n = (function() {
             document.documentElement.lang = nextLanguage;
             if (window.DashboardRenderer?.rerenderDashboardLanguage) {
                 window.DashboardRenderer.rerenderDashboardLanguage({ regenerateInsights: true });
+            }
+            if (window.DashboardCompare?.rerenderCompareLanguage) {
+                window.DashboardCompare.rerenderCompareLanguage();
             }
         }
     };
