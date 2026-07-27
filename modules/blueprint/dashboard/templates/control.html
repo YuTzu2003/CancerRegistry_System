@@ -217,8 +217,12 @@
               <!-- 治療方式 細項 -->
               <div id="subItems-treatment" class="d-none d-flex flex-wrap gap-3">
                 <div class="form-check">
-                  <input class="form-check-input item-checkbox" type="checkbox" name="subTab_treatment" id="chkTreatmentStats" data-parent="treatment" value="治療方式統計" disabled>
-                  <label class="form-check-label text-dark" for="chkTreatmentStats" style="cursor: pointer;">治療方式統計</label>
+                  <input class="form-check-input item-checkbox" type="checkbox" name="subTab_treatment" id="chkTreatmentFirstCourse" data-parent="treatment" value="分期與首次療程" disabled>
+                  <label class="form-check-label text-dark" for="chkTreatmentFirstCourse" style="cursor: pointer;">分期與首次療程</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input item-checkbox" type="checkbox" name="subTab_treatment" id="chkTreatmentSurgery" data-parent="treatment" value="分期與手術術式" disabled>
+                  <label class="form-check-label text-dark" for="chkTreatmentSurgery" style="cursor: pointer;">分期與手術術式</label>
                 </div>
               </div>
 
@@ -617,9 +621,9 @@
                   <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Hodgkin_lymphomahodgkin" value="Hodgkin_lymphomahodgkin" data-parent="Lymphoma">
                   <label class="form-check-label text-secondary" for="chk_Hodgkin_lymphomahodgkin">何杰金氏淋巴瘤 (Hodgkin lymphoma)</label>
                 </div>
-                <div class="form-check mb-2 ms-3 mt-3 d-flex align-items-center gap-2">
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
                   <input type="checkbox" class="form-check-input mt-0 cancer-cb-subgroup" id="chk_group_Non_Hodgkin_lymphoma" data-group="Non_Hodgkin_lymphoma" data-parent="Lymphoma">
-                  <label class="form-check-label fw-semibold text-dark border-bottom pb-1 mb-1 w-100" for="chk_group_Non_Hodgkin_lymphoma">非何杰金氏淋巴瘤 (Non-Hodgkin lymphoma)</label>
+                  <label class="form-check-label text-secondary" for="chk_group_Non_Hodgkin_lymphoma">非何杰金氏淋巴瘤 (Non-Hodgkin lymphoma)</label>
                 </div>
                 <div class="form-check mb-2 ms-5 d-flex align-items-center gap-2">
                   <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_B-cell_lymphoid_neoplasms" value="B-cell_lymphoid_neoplasms" data-parent="Non_Hodgkin_lymphoma" data-grandparent="Lymphoma">
@@ -629,16 +633,16 @@
                   <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_T/NK-cell_lymphoid_neoplasms" value="T/NK-cell_lymphoid_neoplasms" data-parent="Non_Hodgkin_lymphoma" data-grandparent="Lymphoma">
                   <label class="form-check-label text-secondary" for="chk_T/NK-cell_lymphoid_neoplasms">T/NK細胞淋巴系腫瘤 (T/NK-cell lymphoid neoplasms)</label>
                 </div>
-                <div class="form-check mb-2 ms-5 d-flex align-items-center gap-2">
-                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Plasma_cell_neoplasms" value="Plasma_cell_neoplasms" data-parent="Non_Hodgkin_lymphoma" data-grandparent="Lymphoma">
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Plasma_cell_neoplasms" value="Plasma_cell_neoplasms" data-parent="Lymphoma">
                   <label class="form-check-label text-secondary" for="chk_Plasma_cell_neoplasms">漿細胞腫瘤 (Plasma cell neoplasms)</label>
                 </div>
-                <div class="form-check mb-2 ms-5 d-flex align-items-center gap-2">
-                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Histiocytic_and_dendritic_cell_neoplasms" value="Histiocytic_and_dendritic_cell_neoplasms" data-parent="Non_Hodgkin_lymphoma" data-grandparent="Lymphoma">
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Histiocytic_and_dendritic_cell_neoplasms" value="Histiocytic_and_dendritic_cell_neoplasms" data-parent="Lymphoma">
                   <label class="form-check-label text-secondary" for="chk_Histiocytic_and_dendritic_cell_neoplasms">組織球與樹突細胞腫瘤 (Histiocytic and dendritic cell neoplasms)</label>
                 </div>
-                <div class="form-check mb-2 ms-5 d-flex align-items-center gap-2">
-                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Malignant_lymphoma_NOS_and_others" value="Malignant_lymphoma_NOS_and_others" data-parent="Non_Hodgkin_lymphoma" data-grandparent="Lymphoma">
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Malignant_lymphoma_NOS_and_others" value="Malignant_lymphoma_NOS_and_others" data-parent="Lymphoma">
                   <label class="form-check-label text-secondary" for="chk_Malignant_lymphoma_NOS_and_others">未分類及其他惡性淋巴瘤 (Malignant lymphoma, NOS and others)</label>
                 </div>
               </div>

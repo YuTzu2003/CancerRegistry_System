@@ -302,9 +302,6 @@ LYMPHOMA = blood_rule(
             child_keys=[
                 "B-cell_lymphoid_neoplasms",
                 "T/NK-cell_lymphoid_neoplasms",
-                "Plasma_cell_neoplasms",
-                "Histiocytic_and_dendritic_cell_neoplasms",
-                "Malignant_lymphoma_NOS_and_others",
             ]
         ),
         subgroup(

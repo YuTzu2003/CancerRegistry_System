@@ -333,6 +333,16 @@
     if (preset.sub_category) {
       const subCatIds = preset.sub_category.split(',');
       subCatIds.forEach(id => {
+        if (id === 'chkTreatmentStats') {
+          ['chkTreatmentFirstCourse', 'chkTreatmentSurgery'].forEach(treatmentId => {
+            const treatmentItem = document.getElementById(treatmentId);
+            if (treatmentItem) {
+              treatmentItem.checked = true;
+              treatmentItem.dispatchEvent(new Event('change'));
+            }
+          });
+          return;
+        }
         const subCat = document.getElementById(id);
         if (subCat) {
           subCat.checked = true;
