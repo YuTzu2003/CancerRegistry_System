@@ -527,7 +527,7 @@
       series: [
         { name: '男性', type: 'bar', data: data.male, barWidth: 20, barGap: '20%', barCategoryGap: '42%', itemStyle: { color: '#5470C6' } },
         { name: '女性', type: 'bar', data: data.female, barWidth: 20, itemStyle: { color: '#EE6666' } },
-        { name: '總計', type: 'line', data: data.total, symbol: 'circle', symbolSize: 5, smooth: false, z: 5, itemStyle: { color: '#91CC75' }, lineStyle: { color: '#91CC75', width: 2 } }
+        { name: '總計', type: 'bar', data: data.total, barWidth: 20, z: 5, itemStyle: { color: '#91CC75' } }
       ]
     };
   }
@@ -588,7 +588,7 @@
       series: [
         { name: legendLabels[0], type: 'bar', data: data.male, barWidth: 20, barGap: '20%', barCategoryGap: '42%', itemStyle: { color: '#5470C6' } },
         { name: legendLabels[1], type: 'bar', data: data.female, barWidth: 20, itemStyle: { color: '#EE6666' } },
-        { name: legendLabels[2], type: 'line', data: data.total, symbol: 'circle', symbolSize: 5, smooth: false, z: 5, itemStyle: { color: '#91CC75' }, lineStyle: { color: '#91CC75', width: 2 } }
+        { name: legendLabels[2], type: 'bar', data: data.total, barWidth: 20, z: 5, itemStyle: { color: '#91CC75' } }
       ]
     };
   }
@@ -1265,11 +1265,12 @@
     const targetCounts = data.target?.yearly_counts || {};
     const years = Array.from(new Set([...Object.keys(mainCounts), ...Object.keys(targetCounts)]))
       .sort((a, b) => Number(a) - Number(b));
+
     const baselineLabel = isEnglish() ? 'Baseline' : '基準';
     const comparisonLabel = isEnglish() ? 'Comparison' : '對照';
     const chart = echarts.getInstanceByDom(container) || echarts.init(container);
     chart.setOption({
-      color: ['#2563eb', '#f97316'],
+      color: ['#144abe', '#e45f00'],
       title: { text: isEnglish() ? 'Annual Case Count Trend' : '年度區間個案數趨勢', left: 'center', top: 18, textStyle: { fontSize: 18 } },
       tooltip: { trigger: 'axis' },
       legend: { top: 52, data: [`${baselineLabel} ${data.main?.year_label || ''}`, `${comparisonLabel} ${data.target?.year_label || ''}`] },
@@ -1291,6 +1292,7 @@
           type: 'line',
           connectNulls: false,
           symbolSize: 8,
+          label: { show: true, position: 'top' },
           data: years.map(year => Object.prototype.hasOwnProperty.call(mainCounts, year) ? mainCounts[year] : null)
         },
         {
@@ -1298,6 +1300,7 @@
           type: 'line',
           connectNulls: false,
           symbolSize: 8,
+          label: { show: true, position: 'top' },
           data: years.map(year => Object.prototype.hasOwnProperty.call(targetCounts, year) ? targetCounts[year] : null)
         }
       ]

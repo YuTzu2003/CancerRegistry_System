@@ -195,8 +195,7 @@ def dashboard():
         active="dashboard",
         uploaded_files=uploaded_files,
         cancer_name_translations=_get_cancer_name_translations(),
-        can_publish_pbi=session.get("position") == "Admin",
-        pbi_publish_path=get_pbi_publish_path() if session.get("position") == "Admin" else "",
+        pbi_publish_path=get_pbi_publish_path(),
     )
 
 @dashboard_bp.route("/dashboard/compare")

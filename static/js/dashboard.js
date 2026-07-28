@@ -134,14 +134,11 @@ window.DashboardRenderer.getGenderAgeChartOption = function(genderAgeData) {
             },
             {
               name: this.t('total'),
-              type: 'line',
+              type: 'bar',
               data: total,
-              symbol: 'circle',
-              symbolSize: 5,
-              smooth: false,
+              barWidth: 20,
               z: 5,
-              itemStyle: { color: '#91CC75' },
-              lineStyle: { color: '#91CC75', width: 2 }
+              itemStyle: { color: '#91CC75' }
             }
           ]
         };
