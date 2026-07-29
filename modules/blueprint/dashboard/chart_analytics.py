@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import logging
+from functools import lru_cache
 from modules.blueprint.dashboard.definition.cancer_grouping import classify_cancer_group
 from modules.blueprint.dashboard.definition.cancer_group_rules import CANCER_GROUP_RULES
 from modules.blueprint.dashboard.definition.histology_mapping import get_histology_rules
@@ -10,12 +11,25 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.pa
 DASHBOARD_DATA = f"{BASE_DIR}/tasks/data"
 
 def _safe_dashboard_path(filename):
-    safe_name = os.path.basename(filename or "")
-    fpath = os.path.abspath(os.path.join(DASHBOARD_DATA, safe_name))
+    relative_path = str(filename or "")
+    fpath = os.path.abspath(os.path.join(DASHBOARD_DATA, relative_path))
     data_dir = os.path.abspath(DASHBOARD_DATA)
-    if not safe_name or not fpath.startswith(data_dir) or not os.path.isfile(fpath):
+    if (not relative_path or os.path.commonpath([data_dir, fpath]) != data_dir
+            or not os.path.isfile(fpath)):
         raise FileNotFoundError("找不到指定的 Excel 檔案")
     return fpath
+
+
+@lru_cache(maxsize=8)
+def _read_dashboard_excel_cached(fpath, modified_ns, file_size):
+    """Reuse parsed workbooks until the source file changes."""
+    return pd.read_excel(fpath)
+
+
+def _read_dashboard_excel(filename):
+    fpath = _safe_dashboard_path(filename)
+    stat = os.stat(fpath)
+    return _read_dashboard_excel_cached(fpath, stat.st_mtime_ns, stat.st_size)
 
 def _find_column(df, candidates):
     for col in df.columns:
@@ -43,12 +57,18 @@ def get_column_names(df):
         "diag_status_col": _find_column(df, ["診斷狀態分類", "診斷狀態"]),
         "treat_status_col": _find_column(df, ["治療狀態分類", "治療狀態"]),
         "patient_id_col": _find_column(df, ["病歷號碼", "user", "id"]),
+        "last_contact_col": _find_column(df, ["最後聯絡或死亡日期", "最後聯絡日期", "last contact"]),
+        "vital_status_col": _find_column(df, ["生存狀態", "vital status"]),
+        "clinical_stage_col": _find_column(df, ["臨床期別組合", "clinical stage"]),
+        "pathological_stage_col": _find_column(df, ["病理期別組合", "pathological stage"]),
+        "clinical_m_col": _find_column(df, ["臨床M", "clinical m"]),
+        "pathological_m_col": _find_column(df, ["病理M", "pathological m"]),
     }
 
 # 性別年齡分布圖
 
-def _empty_dashboard_response(message="查無符合條件資料！"):
-    labels = ['<=19', '20-24', '25-29', '30-34', '35-39', '40-44', '45-49', '50-54', '55-59', '60-64', '65-69', '70-74', '75-79', '80-84', '>=85']
+def _empty_dashboard_response(message="查無符合條件資料！", histology_reason=""):
+    labels = ['≦19', '20-24', '25-29', '30-34', '35-39', '40-44', '45-49', '50-54', '55-59', '60-64', '65-69', '70-74', '75-79', '80-84', '≧85']
     return {
         "noDataWarning": message,
         "genderAgeData": {
@@ -61,7 +81,12 @@ def _empty_dashboard_response(message="查無符合條件資料！"):
         "analyzableConfirmedData": [],
         "histologyData": [],
         "histologyWarnings": [],
-        "diagnosisClassificationData": []
+        "histologyNoDataReason": histology_reason or message,
+        "diagnosisClassificationData": [],
+        "survivalData": {
+            "rows": [],
+            "no_data_reason": message,
+        },
     }
 
 
@@ -376,6 +401,31 @@ def calculate_histology_distribution(df, cols, return_warnings=False):
 
     return hist_dist_data
 
+def get_histology_no_data_reason(df, cols, histology_data, histology_warnings):
+    valid_histology = [
+        item for item in histology_data
+        if item.get("name") != "Unknown / 未對應組織型態"
+    ]
+    if valid_histology:
+        return ""
+
+    required_columns = {
+        "個案分類": cols.get("class_col"),
+        "組織型態": cols.get("hist_col"),
+        "性態碼": cols.get("behavior_col"),
+    }
+    missing = [name for name, column in required_columns.items() if not column or column not in df.columns]
+    if missing:
+        return f"缺少{'、'.join(missing)}欄位，無法產生組織型態統計。"
+
+    class_col = cols.get("class_col")
+    eligible_count = int(df[class_col].apply(normalize_case_code).isin(["1", "2"]).sum())
+    if eligible_count == 0:
+        return "個案分類不符合分析條件；組織型態僅納入 Class1 與 Class2 個案。"
+    if histology_warnings:
+        return "符合個案分類的資料皆未通過組織型態規則，可能與組織代碼、診斷年度或原發部位條件不符。"
+    return "符合篩選條件的個案沒有可統計的組織型態資料。"
+
 def calculate_diagnosis_classification(df, cols):
     data = {
         "class0_total": 0, "0_1_0": 0, "0_1_2": 0,
@@ -423,60 +473,261 @@ def calculate_diagnosis_classification(df, cols):
                 if d == "3" and t == "2": data["3_3_2"] += 1
     return data
 
-# 個案分類(表,圖)
-def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", behavior=""):
-    fpath = _safe_dashboard_path(filename)
-    try:
-        df = pd.read_excel(fpath)
-        cols = get_column_names(df)
+# 存活率（Kaplan–Meier）
+def _parse_registry_date(series):
+    text = series.astype(str).str.strip().str.replace(r"\.0$", "", regex=True)
+    text = text.where(text.str.match(r"^\d{4}/\d{1,2}/\d{1,2}$"))
+    return pd.to_datetime(text, format="%Y/%m/%d", errors="coerce")
 
-        if _query_year_range_outside_data(df, cols, year_start, year_end):
-            return _empty_dashboard_response()
 
-        df = filter_dashboard_data(df, cols, cancers, year_start, year_end, behavior)
-        if df.empty:
-            return _empty_dashboard_response()
-        
-        gender_age_data = calculate_gender_age_distribution(df, cols)
-        age_median_data = calculate_age_median(df, cols)
-        analyzable_confirmed_data = calculate_analyzable_confirmed_cases(df, cols)
-        histology_data, histology_warnings = calculate_histology_distribution(df, cols, return_warnings=True)
-        diagnosis_classification_data = calculate_diagnosis_classification(df, cols)
-  
+def _normalize_stage(value):
+    text = str(value or "").upper().replace("STAGE", "").strip()
+    if not text or text in {"NAN", "NONE", "999", "888", "BBB"}:
+        return ""
+    compact = text.replace(" ", "").replace(".", "")
+    if compact.startswith("0"):
+        return "Stage 0"
+    if compact.startswith("1") or compact.startswith("I") and not compact.startswith(("II", "IV")):
+        return "Stage I"
+    if compact.startswith("2") or compact.startswith("II") and not compact.startswith("III"):
+        return "Stage II"
+    if compact.startswith("3") or compact.startswith("III"):
+        return "Stage III"
+    if compact.startswith("4") or compact.startswith("IV"):
+        return "Stage IV"
+    return ""
+
+
+def calculate_survival_table(df, cols):
+    required = [cols.get("year_col"), cols.get("last_contact_col"), cols.get("vital_status_col")]
+    if not all(required):
+        return {"rows": [], "no_data_reason": "檔案缺少診斷日期、最後聯絡或死亡日期或生存狀態欄位。"}
+
+    data = df.copy()
+    source_count = int(len(data))
+    exclusion_summary = {
+        "source_count": source_count,
+        "class0": 0,
+        "class3": 0,
+        "other_class": 0,
+        "invalid_diagnosis_date": 0,
+        "invalid_last_contact_date": 0,
+        "invalid_vital_status": 0,
+        "last_contact_before_diagnosis": 0,
+        "stage0": 0,
+        "no_usable_stage": 0,
+        "stage4_missing_m": 0,
+        "included_count": 0,
+        "excluded_count": 0,
+    }
+    class_col = cols.get("class_col")
+    if class_col:
+        case_class = data[class_col].astype(str).str.replace(r"\.0$", "", regex=True).str.strip()
+        exclusion_summary["class0"] = int((case_class == "0").sum())
+        exclusion_summary["class3"] = int((case_class == "3").sum())
+        exclusion_summary["other_class"] = int((~case_class.isin(["0", "1", "2", "3"])).sum())
+        data = data.loc[case_class.isin(["1", "2"])].copy()
+    if data.empty:
+        exclusion_summary["excluded_count"] = source_count
+        return {"rows": [], "no_data_reason": "所選資料沒有 Class1 或 Class2 可分析個案。", "exclusion_summary": exclusion_summary}
+
+    diagnosis_date = _parse_registry_date(data[cols["year_col"]])
+    last_contact_date = _parse_registry_date(data[cols["last_contact_col"]])
+    vital_status = pd.to_numeric(data[cols["vital_status_col"]], errors="coerce")
+    invalid_diagnosis = diagnosis_date.isna()
+    invalid_last_contact = ~invalid_diagnosis & last_contact_date.isna()
+    invalid_status = ~invalid_diagnosis & ~invalid_last_contact & ~vital_status.isin([0, 1])
+    reversed_dates = ~invalid_diagnosis & ~invalid_last_contact & ~invalid_status & (last_contact_date < diagnosis_date)
+    exclusion_summary["invalid_diagnosis_date"] = int(invalid_diagnosis.sum())
+    exclusion_summary["invalid_last_contact_date"] = int(invalid_last_contact.sum())
+    exclusion_summary["invalid_vital_status"] = int(invalid_status.sum())
+    exclusion_summary["last_contact_before_diagnosis"] = int(reversed_dates.sum())
+    valid = ~(invalid_diagnosis | invalid_last_contact | invalid_status | reversed_dates)
+    data = data.loc[valid].copy()
+    if data.empty:
+        exclusion_summary["excluded_count"] = source_count
+        return {"rows": [], "no_data_reason": "沒有同時具備有效診斷日期、追蹤日期與生存狀態的個案。", "exclusion_summary": exclusion_summary}
+
+    data["_survival_months"] = (last_contact_date.loc[valid] - diagnosis_date.loc[valid]).dt.days / 30.4375
+    data["_survival_event"] = (vital_status.loc[valid] == 0).astype(int)
+    pathological = cols.get("pathological_stage_col")
+    clinical = cols.get("clinical_stage_col")
+    pathological_stage = data[pathological].map(_normalize_stage) if pathological else pd.Series("", index=data.index)
+    clinical_stage = data[clinical].map(_normalize_stage) if clinical else pd.Series("", index=data.index)
+    data["_survival_stage"] = pathological_stage.where(pathological_stage != "", clinical_stage)
+
+    def normalize_m(value):
+        text = str(value or "").upper().replace("M", "").replace(".", "").strip()
+        if text == "0":
+            return "M0"
+        if text.startswith("1"):
+            return "M1"
+        return ""
+
+    pathological_m_col = cols.get("pathological_m_col")
+    clinical_m_col = cols.get("clinical_m_col")
+    pathological_m = data[pathological_m_col].map(normalize_m) if pathological_m_col else pd.Series("", index=data.index)
+    clinical_m = data[clinical_m_col].map(normalize_m) if clinical_m_col else pd.Series("", index=data.index)
+    data["_survival_m"] = pathological_m.where(pathological_m != "", clinical_m)
+    stage_iv = data["_survival_stage"] == "Stage IV"
+    data.loc[stage_iv & (data["_survival_m"] == "M0"), "_survival_stage"] = "Stage IV(M0)"
+    data.loc[stage_iv & (data["_survival_m"] == "M1"), "_survival_stage"] = "Stage IV(M1)"
+    exclusion_summary["stage0"] = int((data["_survival_stage"] == "Stage 0").sum())
+    exclusion_summary["no_usable_stage"] = int((data["_survival_stage"] == "").sum())
+    exclusion_summary["stage4_missing_m"] = int((data["_survival_stage"] == "Stage IV").sum())
+
+    def row_for(label, group):
+        total = int(len(group))
+        event_count = int(group["_survival_event"].sum())
         return {
-            "genderAgeData": gender_age_data,
-            "ageMedianData": age_median_data,
-            "analyzableConfirmedData": analyzable_confirmed_data,
-            "histologyData": histology_data,
-            "histologyWarnings": histology_warnings,
-            "diagnosisClassificationData": diagnosis_classification_data
+            "stage": label,
+            "total": total,
+            "events": event_count,
+            "censored": total - event_count,
+            "percentage": round((total - event_count) / total * 100, 1) if total else 0.0,
         }
+
+    def curve_for(label, group):
+        survival = 1.0
+        curve = [[0.0, 1.0]]
+        censored = []
+        for time_value in sorted(group["_survival_months"].unique()):
+            at_risk = int((group["_survival_months"] >= time_value).sum())
+            deaths = int(((group["_survival_months"] == time_value) & (group["_survival_event"] == 1)).sum())
+            if deaths and at_risk:
+                survival *= 1 - deaths / at_risk
+                curve.append([round(float(time_value), 2), round(survival, 6)])
+            censored_count = int(((group["_survival_months"] == time_value) & (group["_survival_event"] == 0)).sum())
+            if censored_count:
+                censored.append({
+                    "value": [round(float(time_value), 2), round(survival, 6)],
+                    "count": censored_count,
+                })
+        max_months = round(float(group["_survival_months"].max()), 2)
+        if curve[-1][0] < max_months:
+            curve.append([max_months, round(survival, 6)])
+        return {"stage": label, "count": int(len(group)), "curve": curve, "censored": censored}
+
+    rows = []
+    chart_series = []
+    report_stages = ["Stage I", "Stage II", "Stage III", "Stage IV(M0)", "Stage IV(M1)"]
+    for stage in report_stages:
+        stage_data = data.loc[data["_survival_stage"] == stage]
+        if not stage_data.empty:
+            rows.append(row_for(stage, stage_data))
+            chart_series.append(curve_for(stage, stage_data))
+    report_data = data.loc[data["_survival_stage"].isin(report_stages)]
+    exclusion_summary["included_count"] = int(len(report_data))
+    exclusion_summary["excluded_count"] = source_count - exclusion_summary["included_count"]
+    if not report_data.empty:
+        rows.append(row_for("Overall", report_data))
+    return {
+        "rows": rows,
+        "chart_series": chart_series,
+        "exclusion_summary": exclusion_summary,
+        "no_data_reason": "" if rows else "沒有符合 AJCC Stage I–IV(M0/M1) 的有效存活資料。",
+    }
+
+
+# 個案分類(表,圖)
+def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", behavior="",
+                           analysis_items=None, source_df=None, cols=None, filtered_df=None):
+    try:
+        source_df = source_df if source_df is not None else _read_dashboard_excel(filename)
+        cols = cols or get_column_names(source_df)
+
+        if _query_year_range_outside_data(source_df, cols, year_start, year_end):
+            return _empty_dashboard_response(
+                histology_reason="所選年度區間不在檔案的診斷年度範圍內。"
+            )
+
+        year_filtered_df = filter_dashboard_data(source_df, cols, [], year_start, year_end, "")
+        if year_filtered_df.empty:
+            return _empty_dashboard_response(histology_reason="所選年度內沒有可分析個案。")
+        behavior_filtered_df = filter_dashboard_data(source_df, cols, [], year_start, year_end, behavior)
+        if behavior_filtered_df.empty:
+            return _empty_dashboard_response(histology_reason="所選年度內沒有符合性態碼條件的個案。")
+        df = filtered_df if filtered_df is not None else filter_dashboard_data(
+            source_df, cols, cancers, year_start, year_end, behavior
+        )
+        if df.empty:
+            return _empty_dashboard_response(histology_reason="沒有同時符合所選年度、性態碼與癌別條件的個案。")
+        
+        selected = set(analysis_items or [])
+        calculate_all = not selected
+        incidence_selected = calculate_all or bool(
+            selected.intersection({"性別年齡分佈", "年齡中位數"})
+        )
+        diagnosis_selected = calculate_all or bool(
+            selected.intersection({"可分析個案與確診個案", "組織型態", "個案分類"})
+        )
+        result = _empty_dashboard_response()
+        result.pop("noDataWarning", None)
+        result["histologyNoDataReason"] = ""
+
+        if incidence_selected:
+            result["genderAgeData"] = calculate_gender_age_distribution(df, cols)
+            result["ageMedianData"] = calculate_age_median(df, cols)
+        if diagnosis_selected:
+            result["analyzableConfirmedData"] = calculate_analyzable_confirmed_cases(df, cols)
+        if diagnosis_selected:
+            histology_data, histology_warnings = calculate_histology_distribution(
+                df, cols, return_warnings=True
+            )
+            result["histologyData"] = histology_data
+            result["histologyWarnings"] = histology_warnings
+            result["histologyNoDataReason"] = get_histology_no_data_reason(
+                df, cols, histology_data, histology_warnings
+            )
+        if diagnosis_selected:
+            result["diagnosisClassificationData"] = calculate_diagnosis_classification(df, cols)
+        if calculate_all or "存活率" in selected:
+            result["survivalData"] = calculate_survival_table(df, cols)
+
+        return result
     except Exception as e:
         logging.error(f"error {filename}: {str(e)}")
         raise e
 
-def get_dashboard_file_years(filename):
-    df = pd.read_excel(_safe_dashboard_path(filename))
-    cols = get_column_names(df)
+def get_dashboard_file_years(filename, source_df=None, cols=None):
+    df = source_df if source_df is not None else _read_dashboard_excel(filename)
+    cols = cols or get_column_names(df)
     years = _diagnosis_years(df, cols.get("year_col"))
     years = years[(years >= 1900) & (years <= 2100)]
     return sorted(years.astype(int).unique().tolist())
 
-def get_dashboard_file_preview(filename, limit=10):
-    df = pd.read_excel(_safe_dashboard_path(filename), nrows=limit)
+def get_dashboard_file_preview(filename, limit=10, year_start="", year_end="", source_df=None, cols=None):
+    df = source_df if source_df is not None else _read_dashboard_excel(filename)
+    if year_start:
+        cols = cols or get_column_names(df)
+        year_col = cols.get("year_col")
+        if year_col:
+            try:
+                start = int(year_start)
+                end = int(year_end or year_start)
+                year_values = pd.to_numeric(
+                    df[year_col].astype(str).str[:4], errors="coerce"
+                )
+                df = df.loc[year_values.between(start, end)]
+            except (TypeError, ValueError):
+                df = df.iloc[0:0]
+    df = df.head(limit)
     df = df.where(pd.notnull(df), "")
     return {
         "columns": [str(col) for col in df.columns],
         "rows": df.astype(str).values.tolist(),
     }
 
-def summarize_dashboard_file(filename, behavior="", cancers=None, year_start="", year_end=""):
-    df = pd.read_excel(_safe_dashboard_path(filename))
-    cols = get_column_names(df)
-    years = get_dashboard_file_years(filename)
+def summarize_dashboard_file(filename, behavior="", cancers=None, year_start="", year_end="",
+                             source_df=None, cols=None, filtered_df=None):
+    df = source_df if source_df is not None else _read_dashboard_excel(filename)
+    cols = cols or get_column_names(df)
+    years = get_dashboard_file_years(filename, df, cols)
     year_start = str(year_start or years[0]) if years else ""
     year_end = str(year_end or year_start) if years else ""
-    filtered_df = filter_dashboard_data(df, cols, cancers or [], year_start, year_end, behavior)
+    filtered_df = filtered_df if filtered_df is not None else filter_dashboard_data(
+        df, cols, cancers or [], year_start, year_end, behavior
+    )
     age_data = calculate_age_median(filtered_df, cols)
     case_data = calculate_analyzable_confirmed_cases(filtered_df, cols)
     filtered_years = _diagnosis_years(filtered_df, cols.get("year_col"))
@@ -511,8 +762,24 @@ def compare_dashboard_files(main_filename, target_filename, behavior="", cancers
                             compare_mode="single"):
     main_end = main_year if compare_mode == "single" else (main_year_end or main_year)
     target_end = target_year if compare_mode == "single" else (target_year_end or target_year)
-    main_data = summarize_dashboard_file(main_filename, behavior, cancers, main_year, main_end)
-    target_data = summarize_dashboard_file(target_filename, behavior, cancers, target_year, target_end)
+    main_source = _read_dashboard_excel(main_filename)
+    target_source = _read_dashboard_excel(target_filename)
+    main_cols = get_column_names(main_source)
+    target_cols = get_column_names(target_source)
+    main_filtered = filter_dashboard_data(
+        main_source, main_cols, cancers or [], main_year, main_end, behavior
+    )
+    target_filtered = filter_dashboard_data(
+        target_source, target_cols, cancers or [], target_year, target_end, behavior
+    )
+    main_data = summarize_dashboard_file(
+        main_filename, behavior, cancers, main_year, main_end,
+        main_source, main_cols, main_filtered
+    )
+    target_data = summarize_dashboard_file(
+        target_filename, behavior, cancers, target_year, target_end,
+        target_source, target_cols, target_filtered
+    )
 
     diff = target_data["total_count"] - main_data["total_count"]
     diff_percent = ""
@@ -524,8 +791,14 @@ def compare_dashboard_files(main_filename, target_filename, behavior="", cancers
         "main": main_data,
         "target": target_data,
         "analysis_data": {
-            "main": analyze_dashboard_file(main_filename, cancers or [], main_year, main_end, behavior),
-            "target": analyze_dashboard_file(target_filename, cancers or [], target_year, target_end, behavior),
+            "main": analyze_dashboard_file(
+                main_filename, cancers or [], main_year, main_end, behavior,
+                compare_items, main_source, main_cols, main_filtered
+            ),
+            "target": analyze_dashboard_file(
+                target_filename, cancers or [], target_year, target_end, behavior,
+                compare_items, target_source, target_cols, target_filtered
+            ),
             "items": compare_items or [],
         },
         "compare_mode": compare_mode,

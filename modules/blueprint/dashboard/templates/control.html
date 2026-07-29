@@ -45,7 +45,7 @@
                 <tbody id="dashFileListBody">
                   {% if uploaded_files %}
                     {% for f in uploaded_files %}
-                    <tr>
+                    <tr data-file-id="{{ f.id }}">
                       <td class="ps-3 py-2.5">
                         <div class="d-flex align-items-center gap-2">
                           <i class="bi bi-filetype-xlsx text-success fs-5"></i>
@@ -57,7 +57,7 @@
                         {{ f.time }}
                       </td>
                       <td class="text-end pe-3 py-2.5">
-                        <button type="button" class="btn btn-link text-danger p-0 border-0 btn-del-file" data-name="{{ f.name }}" style="font-size: 13px; text-decoration: none;"><i class="bi bi-trash me-1"></i>刪除</button>
+                        <button type="button" class="btn btn-link text-danger p-0 border-0 btn-del-file" data-file-id="{{ f.id }}" data-name="{{ f.name }}" style="font-size: 13px; text-decoration: none;"><i class="bi bi-trash me-1"></i>刪除</button>
                       </td>
                     </tr>
                     {% endfor %}
@@ -117,6 +117,14 @@
             <button type="button" class="form-select text-start d-flex justify-content-between align-items-center" data-bs-toggle="modal" data-bs-target="#cancerPickerModal" style="width: 100%; min-width: 220px;" id="btnCancerPicker" disabled>
               <span id="btnCancerPickerText">所有癌別</span>
             </button>
+          </div>
+          <div class="filter-group">
+            <label>敘述風格</label>
+            <select id="mode_ai" style="min-width: 130px;">
+                <option value="balanced" selected>平穩客觀</option>
+                <option value="formal">正式報告</option>
+                <option value="concise">精簡摘要</option>
+            </select>
           </div>
         </div>
 
@@ -179,25 +187,49 @@
               </div>
 
               <!-- 期別 細項 -->
-              <div id="subItems-stage" class="d-none d-flex flex-wrap gap-3">
-                <div class="form-check">
-                  <input class="form-check-input item-checkbox" type="checkbox" name="subTab_stage" id="chkStageDistribution" data-parent="stage" value="期別分佈" disabled>
-                  <label class="form-check-label text-dark" for="chkStageDistribution" style="cursor: pointer;">期別分佈</label>
+              <div id="subItems-stage" class="d-none w-100 annual-stage-panel">
+                <div class="annual-stage-system-row">
+                  <div class="form-check">
+                    <input class="form-check-input item-checkbox annual-stage-system-checkbox" type="checkbox" name="subTab_stage" id="chkStageAjcc" data-parent="stage" value="AJCC期別分佈" disabled>
+                    <label class="form-check-label text-dark" for="chkStageAjcc" style="cursor: pointer;">AJCC</label>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input item-checkbox annual-stage-system-checkbox" type="checkbox" name="subTab_stage" id="chkStageOtherSystems" data-parent="stage" value="FIGO/MAC/BCLC/SCLC期別分佈" disabled>
+                    <label class="form-check-label text-dark" for="chkStageOtherSystems" style="cursor: pointer;">FIGO／MAC／BCLC／SCLC…</label>
+                  </div>
+                </div>
+                <div id="annualAjccClassOptions" class="annual-stage-class-row d-none">
+                  <div class="form-check">
+                    <input class="form-check-input annual-stage-class-checkbox" type="checkbox" id="chkStageClass1" value="Class1" disabled>
+                    <label class="form-check-label text-dark" for="chkStageClass1">Class1</label>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input annual-stage-class-checkbox" type="checkbox" id="chkStageClass2" value="Class2" disabled>
+                    <label class="form-check-label text-dark" for="chkStageClass2">Class2</label>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input annual-stage-class-checkbox" type="checkbox" id="chkStageClass12" value="Class1+2" disabled>
+                    <label class="form-check-label text-dark" for="chkStageClass12">Class1+2</label>
+                  </div>
                 </div>
               </div>
 
               <!-- 治療方式 細項 -->
               <div id="subItems-treatment" class="d-none d-flex flex-wrap gap-3">
                 <div class="form-check">
-                  <input class="form-check-input item-checkbox" type="checkbox" name="subTab_treatment" id="chkTreatmentStats" data-parent="treatment" value="治療方式統計" disabled>
-                  <label class="form-check-label text-dark" for="chkTreatmentStats" style="cursor: pointer;">治療方式統計</label>
+                  <input class="form-check-input item-checkbox" type="checkbox" name="subTab_treatment" id="chkTreatmentFirstCourse" data-parent="treatment" value="分期與首次療程" disabled>
+                  <label class="form-check-label text-dark" for="chkTreatmentFirstCourse" style="cursor: pointer;">分期與首次療程</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input item-checkbox" type="checkbox" name="subTab_treatment" id="chkTreatmentSurgery" data-parent="treatment" value="分期與手術術式" disabled>
+                  <label class="form-check-label text-dark" for="chkTreatmentSurgery" style="cursor: pointer;">分期與手術術式</label>
                 </div>
               </div>
 
               <!-- 跨年度分析 細項 -->
               <div id="subItems-cross_year" class="d-none d-flex flex-wrap gap-3">
                 <div class="form-check">
-                  <input class="form-check-input item-checkbox" type="checkbox" name="subTab_cross" id="chkCrossYearSurvival" data-parent="cross_year" value="存活率" disabled>
+                  <input class="form-check-input item-checkbox" type="checkbox" name="subTab_cross" id="chkCrossYearSurvival" data-parent="cross_year" value="存活率" data-target="#chartPane-CrossYearSurvival" disabled>
                   <label class="form-check-label text-dark" for="chkCrossYearSurvival" style="cursor: pointer;">存活率</label>
                 </div>
                 <div class="form-check">
@@ -211,6 +243,10 @@
                 <div class="form-check">
                   <input class="form-check-input item-checkbox" type="checkbox" name="subTab_cross" id="chkCrossYearNewCases" data-parent="cross_year" value="歷年新診斷件數" disabled>
                   <label class="form-check-label text-dark" for="chkCrossYearNewCases" style="cursor: pointer;">歷年新診斷件數</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input item-checkbox" type="checkbox" name="subTab_cross" id="chkCrossYearCommonCancers" data-parent="cross_year" value="本院常見癌症" disabled>
+                  <label class="form-check-label text-dark" for="chkCrossYearCommonCancers" style="cursor: pointer;">本院常見癌症</label>
                 </div>
               </div>
               
@@ -238,6 +274,12 @@
           <button id="btnRunQuery" class="btn-black d-flex justify-content-center align-items-center gap-2" type="button" style="padding: 7px 16px; font-size: 14px; height: 38px; border-radius: var(--radius-sm);">
             <i class="bi bi-search"></i> 查詢
           </button>
+          <button id="btnPublishPbi" class="btn btn-outline-primary d-flex justify-content-center align-items-center gap-2" type="button" style="padding: 7px 16px; font-size: 14px; height: 38px; border-radius: var(--radius-sm);">
+            <i class="bi bi-cloud-arrow-up"></i> 發布至 Power BI
+          </button>
+          <button id="btnConfigurePbi" class="btn btn-outline-secondary d-flex justify-content-center align-items-center gap-2" type="button" style="padding: 7px 12px; font-size: 14px; height: 38px; border-radius: var(--radius-sm);" title="設定 Power BI 發布位置">
+            <i class="bi bi-gear"></i> Power BI 設定
+          </button>
           <button id="btnResetFilters" class="btn-black-outline d-flex justify-content-center align-items-center gap-2" type="button" style="padding: 7px 16px; font-size: 14px; height: 38px; border-radius: var(--radius-sm);">
             <i class="bi bi-arrow-counterclockwise"></i> 重置
           </button>
@@ -246,23 +288,27 @@
 
       <!-- 右側：已選條件摘要 -->
       <div class="col-lg-3 border-start border-secondary-subtle ps-4 d-flex flex-column mt-4 mt-lg-0">
-        <h6 class="fw-bold text-dark mb-3">已選取分析條件</h6>
+        <h6 class="fw-bold text-dark mb-3 w-100 text-center">已選取分析條件</h6>
         <div class="flex-grow-1" style="font-size: 14px; line-height: 2;">
           <div class="d-flex mb-2">
-            <span class="text-secondary" style="width: 70px; flex-shrink: 0;">年份：</span>
-            <span id="summaryYear" class="text-dark fw-medium">尚未選擇</span>
+            <span class="text-secondary d-flex" style="width: 80px; flex-shrink: 0;"><span style="flex-grow: 1; text-align-last: justify;">年份</span>：</span>
+            <span id="summaryYear" class="text-dark fw-medium ms-1">尚未選擇</span>
           </div>
           <div class="d-flex mb-2">
-            <span class="text-secondary" style="width: 70px; flex-shrink: 0;">性態碼：</span>
-            <span id="summaryBehavior" class="text-dark fw-medium">尚未選擇</span>
+            <span class="text-secondary d-flex" style="width: 80px; flex-shrink: 0;"><span style="flex-grow: 1; text-align-last: justify;">性態碼</span>：</span>
+            <span id="summaryBehavior" class="text-dark fw-medium ms-1">尚未選擇</span>
           </div>
           <div class="d-flex mb-2">
-            <span class="text-secondary" style="width: 70px; flex-shrink: 0;">癌別：</span>
-            <span id="summaryCancer" class="text-dark fw-medium">尚未選擇</span>
+            <span class="text-secondary d-flex" style="width: 80px; flex-shrink: 0;"><span style="flex-grow: 1; text-align-last: justify;">敘述風格</span>：</span>
+            <span id="summaryAiStyle" class="text-dark fw-medium ms-1">平穩客觀</span>
           </div>
           <div class="d-flex mb-2">
-            <span class="text-secondary" style="width: 70px; flex-shrink: 0;">分析項目：</span>
-            <span id="summaryAnalysis" class="text-dark fw-medium">尚未選擇</span>
+            <span class="text-secondary d-flex" style="width: 80px; flex-shrink: 0;"><span style="flex-grow: 1; text-align-last: justify;">癌別</span>：</span>
+            <span id="summaryCancer" class="text-dark fw-medium ms-1">尚未選擇</span>
+          </div>
+          <div class="d-flex mb-2">
+            <span class="text-secondary d-flex" style="width: 80px; flex-shrink: 0;"><span style="flex-grow: 1; text-align-last: justify;">分析項目</span>：</span>
+            <span id="summaryAnalysis" class="text-dark fw-medium ms-1">尚未選擇</span>
           </div>
         </div>
         <button type="button" class="btn btn-success w-100 d-flex justify-content-center align-items-center" id="btnPrepareExport">匯出</button>
@@ -285,7 +331,7 @@
           <div class="col-md-4 border-end bg-light">
             <div class="list-group list-group-flush" id="cancerCategoryList" role="tablist" style="max-height: 60vh; overflow-y: auto; font-size: 14px;">
               <div class="list-group-item bg-light border-0 py-2 fw-bold text-secondary text-uppercase" style="font-size: 11px; letter-spacing: 0.5px; cursor: default; pointer-events: none; margin-bottom: 5px;">不分癌別</div>
-              <a class="list-group-item list-group-item-action active bg-transparent border-0 py-3 cat-nav-btn text-primary fw-bold" id="list-All_Cancers-list" data-bs-toggle="list" href="#list-All_Cancers" role="tab" style="border-left: 4px solid #0d6efd;">全癌別(C00-C80)
+              <a class="list-group-item list-group-item-action active bg-transparent border-0 py-3 cat-nav-btn text-primary fw-bold" id="list-All_Cancers-list" data-bs-toggle="list" href="#list-All_Cancers" role="tab" style="border-left: 4px solid #0d6efd;">全癌別
                 <span class="cat-badge float-end"></span>
               </a>
 
@@ -311,16 +357,16 @@
               <a class="list-group-item list-group-item-action bg-transparent border-0 py-3 cat-nav-btn text-secondary" id="list-Pancreas-list" data-bs-toggle="list" href="#list-Pancreas" role="tab" style="border-left: 4px solid transparent;">胰臟 Pancreas
                 <span class="cat-badge float-end"></span>
               </a>
-              <a class="list-group-item list-group-item-action bg-transparent border-0 py-3 cat-nav-btn text-secondary" id="list-Colon_and_Rectum_Anus-list" data-bs-toggle="list" href="#list-Colon_and_Rectum_Anus" role="tab" style="border-left: 4px solid transparent;">結腸、直腸及肛門 Colon and Rectum、Anus
+              <a class="list-group-item list-group-item-action bg-transparent border-0 py-3 cat-nav-btn text-secondary" id="list-Colon_and_Rectum_Anus-list" data-bs-toggle="list" href="#list-Colon_and_Rectum_Anus" role="tab" style="border-left: 4px solid transparent;">結腸、直腸及肛門
                 <span class="cat-badge float-end"></span>
               </a>
-              <a class="list-group-item list-group-item-action bg-transparent border-0 py-3 cat-nav-btn text-secondary" id="list-Liver_and_Intrahepatic_bile_duct-list" data-bs-toggle="list" href="#list-Liver_and_Intrahepatic_bile_duct" role="tab" style="border-left: 4px solid transparent;">肝及肝內膽管 Liver and Intrahepatic bile duct
+              <a class="list-group-item list-group-item-action bg-transparent border-0 py-3 cat-nav-btn text-secondary" id="list-Liver_and_Intrahepatic_bile_duct-list" data-bs-toggle="list" href="#list-Liver_and_Intrahepatic_bile_duct" role="tab" style="border-left: 4px solid transparent;">肝及肝內膽管
                 <span class="cat-badge float-end"></span>
               </a>
-              <a class="list-group-item list-group-item-action bg-transparent border-0 py-3 cat-nav-btn text-secondary" id="list-Breast-list" data-bs-toggle="list" href="#list-Breast" role="tab" style="border-left: 4px solid transparent;">乳房 Breast
+              <a class="list-group-item list-group-item-action bg-transparent border-0 py-3 cat-nav-btn text-secondary" id="list-Breast-list" data-bs-toggle="list" href="#list-Breast" role="tab" style="border-left: 4px solid transparent;">乳房
                 <span class="cat-badge float-end"></span>
               </a>
-              <a class="list-group-item list-group-item-action bg-transparent border-0 py-3 cat-nav-btn text-secondary" id="list-Lung_and_Bronchus_Trachea-list" data-bs-toggle="list" href="#list-Lung_and_Bronchus_Trachea" role="tab" style="border-left: 4px solid transparent;">肺、支氣管、氣管 Lung and Bronchus、Trachea
+              <a class="list-group-item list-group-item-action bg-transparent border-0 py-3 cat-nav-btn text-secondary" id="list-Lung_and_Bronchus_Trachea-list" data-bs-toggle="list" href="#list-Lung_and_Bronchus_Trachea" role="tab" style="border-left: 4px solid transparent;">肺、支氣管、氣管
                 <span class="cat-badge float-end"></span>
               </a>
               <a class="list-group-item list-group-item-action bg-transparent border-0 py-3 cat-nav-btn text-secondary" id="list-Cervix_Uteri-list" data-bs-toggle="list" href="#list-Cervix_Uteri" role="tab" style="border-left: 4px solid transparent;">子宮頸 Cervix Uteri
@@ -338,7 +384,7 @@
               <a class="list-group-item list-group-item-action bg-transparent border-0 py-3 cat-nav-btn text-secondary" id="list-Bladder-list" data-bs-toggle="list" href="#list-Bladder" role="tab" style="border-left: 4px solid transparent;">膀胱 Bladder
                 <span class="cat-badge float-end"></span>
               </a>
-              <a class="list-group-item list-group-item-action bg-transparent border-0 py-3 cat-nav-btn text-secondary" id="list-Lymphoma-list" data-bs-toggle="list" href="#list-Lymphoma" role="tab" style="border-left: 4px solid transparent;">惡性淋巴瘤 （Lymphoma）
+              <a class="list-group-item list-group-item-action bg-transparent border-0 py-3 cat-nav-btn text-secondary" id="list-Lymphoma-list" data-bs-toggle="list" href="#list-Lymphoma" role="tab" style="border-left: 4px solid transparent;">惡性淋巴瘤 (Lymphoma)
                 <span class="cat-badge float-end"></span>
               </a>
               <a class="list-group-item list-group-item-action bg-transparent border-0 py-3 cat-nav-btn text-secondary" id="list-Leukemia_and_myeloid_neoplasm-list" data-bs-toggle="list" href="#list-Leukemia_and_myeloid_neoplasm" role="tab" style="border-left: 4px solid transparent;">白血病及骨髓瘤 (Leukemia and myeloid neoplasm)
@@ -353,11 +399,11 @@
               <div class="tab-pane fade show active p-4" id="list-All_Cancers" role="tabpanel">
                 <div class="form-check mb-3 pb-2 border-bottom d-flex align-items-center gap-2">
                   <input type="checkbox" class="form-check-input mt-0 cancer-cb-group" id="chk_group_All_Cancers" data-group="All_Cancers" style="transform: scale(1.2);">
-                  <label class="form-check-label fw-bold text-dark fs-6" for="chk_group_All_Cancers">全癌別(C00-C80) (全選)</label>
+                  <label class="form-check-label fw-bold text-dark fs-6" for="chk_group_All_Cancers">全癌別 (全選)</label>
                 </div>
                 <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
                   <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_All_Cancers" value="All_Cancers" data-parent="All_Cancers">
-                  <label class="form-check-label text-secondary" for="chk_All_Cancers">全癌別(C00-C80)</label>
+                  <label class="form-check-label text-secondary" for="chk_All_Cancers">全癌別</label>
                 </div>
               </div>
               <div class="tab-pane fade  p-4" id="list-Oral_group" role="tabpanel">
@@ -475,7 +521,7 @@
                 </div>
                 <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
                   <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Intrahepatic_bile_duct" value="Intrahepatic_bile_duct" data-parent="Liver_and_Intrahepatic_bile_duct">
-                  <label class="form-check-label text-secondary" for="chk_Intrahepatic_bile_duct">肝內膽管Intrahepatic bile duct</label>
+                  <label class="form-check-label text-secondary" for="chk_Intrahepatic_bile_duct">肝內膽管 Intrahepatic bile duct</label>
                 </div>
               </div>
               <div class="tab-pane fade  p-4" id="list-Breast" role="tabpanel">
@@ -571,35 +617,35 @@
               <div class="tab-pane fade  p-4" id="list-Lymphoma" role="tabpanel">
                 <div class="form-check mb-3 pb-2 border-bottom d-flex align-items-center gap-2">
                   <input type="checkbox" class="form-check-input mt-0 cancer-cb-group" id="chk_group_Lymphoma" data-group="Lymphoma" style="transform: scale(1.2);">
-                  <label class="form-check-label fw-bold text-dark fs-6" for="chk_group_Lymphoma">惡性淋巴瘤 （Lymphoma） (全選)</label>
+                  <label class="form-check-label fw-bold text-dark fs-6" for="chk_group_Lymphoma">惡性淋巴瘤 (Lymphoma) (全選)</label>
                 </div>
                 <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
                   <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Hodgkin_lymphomahodgkin" value="Hodgkin_lymphomahodgkin" data-parent="Lymphoma">
-                  <label class="form-check-label text-secondary" for="chk_Hodgkin_lymphomahodgkin">何杰金氏淋巴瘤（Hodgkin lymphoma）</label>
+                  <label class="form-check-label text-secondary" for="chk_Hodgkin_lymphomahodgkin">何杰金氏淋巴瘤 (Hodgkin lymphoma)</label>
                 </div>
-                <div class="form-check mb-2 ms-3 mt-3 d-flex align-items-center gap-2">
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
                   <input type="checkbox" class="form-check-input mt-0 cancer-cb-subgroup" id="chk_group_Non_Hodgkin_lymphoma" data-group="Non_Hodgkin_lymphoma" data-parent="Lymphoma">
-                  <label class="form-check-label fw-semibold text-dark border-bottom pb-1 mb-1 w-100" for="chk_group_Non_Hodgkin_lymphoma">非何杰金氏淋巴瘤（Non-Hodgkin lymphoma）</label>
+                  <label class="form-check-label text-secondary" for="chk_group_Non_Hodgkin_lymphoma">非何杰金氏淋巴瘤 (Non-Hodgkin lymphoma)</label>
                 </div>
                 <div class="form-check mb-2 ms-5 d-flex align-items-center gap-2">
                   <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_B-cell_lymphoid_neoplasms" value="B-cell_lymphoid_neoplasms" data-parent="Non_Hodgkin_lymphoma" data-grandparent="Lymphoma">
-                  <label class="form-check-label text-secondary" for="chk_B-cell_lymphoid_neoplasms">B細胞淋巴系腫瘤（B-cell lymphoid neoplasms）</label>
+                  <label class="form-check-label text-secondary" for="chk_B-cell_lymphoid_neoplasms">B細胞淋巴系腫瘤 (B-cell lymphoid neoplasms)</label>
                 </div>
                 <div class="form-check mb-2 ms-5 d-flex align-items-center gap-2">
                   <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_T/NK-cell_lymphoid_neoplasms" value="T/NK-cell_lymphoid_neoplasms" data-parent="Non_Hodgkin_lymphoma" data-grandparent="Lymphoma">
-                  <label class="form-check-label text-secondary" for="chk_T/NK-cell_lymphoid_neoplasms">T/NK細胞淋巴系腫瘤（T/NK-cell lymphoid neoplasms）</label>
+                  <label class="form-check-label text-secondary" for="chk_T/NK-cell_lymphoid_neoplasms">T/NK細胞淋巴系腫瘤 (T/NK-cell lymphoid neoplasms)</label>
                 </div>
-                <div class="form-check mb-2 ms-5 d-flex align-items-center gap-2">
-                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Plasma_cell_neoplasms" value="Plasma_cell_neoplasms" data-parent="Non_Hodgkin_lymphoma" data-grandparent="Lymphoma">
-                  <label class="form-check-label text-secondary" for="chk_Plasma_cell_neoplasms">漿細胞腫瘤（Plasma cell neoplasms）</label>
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Plasma_cell_neoplasms" value="Plasma_cell_neoplasms" data-parent="Lymphoma">
+                  <label class="form-check-label text-secondary" for="chk_Plasma_cell_neoplasms">漿細胞腫瘤 (Plasma cell neoplasms)</label>
                 </div>
-                <div class="form-check mb-2 ms-5 d-flex align-items-center gap-2">
-                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Histiocytic_and_dendritic_cell_neoplasms" value="Histiocytic_and_dendritic_cell_neoplasms" data-parent="Non_Hodgkin_lymphoma" data-grandparent="Lymphoma">
-                  <label class="form-check-label text-secondary" for="chk_Histiocytic_and_dendritic_cell_neoplasms">組織球與樹突細胞腫瘤（Histiocytic and dendritic cell neoplasms）</label>
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Histiocytic_and_dendritic_cell_neoplasms" value="Histiocytic_and_dendritic_cell_neoplasms" data-parent="Lymphoma">
+                  <label class="form-check-label text-secondary" for="chk_Histiocytic_and_dendritic_cell_neoplasms">組織球與樹突細胞腫瘤 (Histiocytic and dendritic cell neoplasms)</label>
                 </div>
-                <div class="form-check mb-2 ms-5 d-flex align-items-center gap-2">
-                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Malignant_lymphoma_NOS_and_others" value="Malignant_lymphoma_NOS_and_others" data-parent="Non_Hodgkin_lymphoma" data-grandparent="Lymphoma">
-                  <label class="form-check-label text-secondary" for="chk_Malignant_lymphoma_NOS_and_others">未分類及其他惡性淋巴瘤（Malignant lymphoma, NOS and others）</label>
+                <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Malignant_lymphoma_NOS_and_others" value="Malignant_lymphoma_NOS_and_others" data-parent="Lymphoma">
+                  <label class="form-check-label text-secondary" for="chk_Malignant_lymphoma_NOS_and_others">未分類及其他惡性淋巴瘤 (Malignant lymphoma, NOS and others)</label>
                 </div>
               </div>
               <div class="tab-pane fade  p-4" id="list-Leukemia_and_myeloid_neoplasm" role="tabpanel">
@@ -663,4 +709,5 @@
   </div>
 </div>
 
-<script src="{{ url_for('static', filename='js/dashboard_control.js') }}?v=20260714-year-select"></script>
+<script src="{{ url_for('static', filename='js/annual_report_renderer.js') }}?v=20260729-common-cancers"></script>
+<script src="{{ url_for('static', filename='js/dashboard_control.js') }}?v=20260729-analysis-performance"></script>

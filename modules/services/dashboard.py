@@ -1,46 +1,213 @@
 from flask import Blueprint, request, session, jsonify
-from modules.services.auth import login_required
+from modules.services.auth import login_required, admin_required
+from modules.services.db import get_conn
 from modules.blueprint.dashboard import load_user_favorites, save_user_favorites
-from modules.blueprint.dashboard.reply import get_chart_insight_logic
+from modules.blueprint.dashboard.reply import get_chart_insight_logic, get_compare_insight_logic
+from modules.blueprint.dashboard.definition.cancer_group_rules import CANCER_GROUP_RULES
 from flask import send_file
 from modules.blueprint.dashboard.export_report import generate_export_files
+from modules.blueprint.dashboard.pbi_settings import (
+    get_pbi_publish_path,
+    get_pbi_publish_settings,
+    save_pbi_publish_path,
+)
 import os
 import re
 import logging
-import datetime
+import uuid
 import pandas as pd
 from flask import render_template
 
 dashboard_bp = Blueprint('dashboard', __name__, template_folder='../blueprint/dashboard/templates')
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DASHBOARD_DATA = os.path.join(BASE_DIR, 'tasks', 'data')
+DASHBOARD_UPLOADS = os.path.join(DASHBOARD_DATA, 'dashboard')
 os.makedirs(DASHBOARD_DATA, exist_ok=True)
 
-def _get_uploaded_dashboard_files():
-    uploaded_files = []
-    if os.path.isdir(DASHBOARD_DATA):
-        for fname in os.listdir(DASHBOARD_DATA):
-            if fname.lower().endswith((".xls", ".xlsx")):
-                fpath = os.path.join(DASHBOARD_DATA, fname)
-                mtime = os.path.getmtime(fpath)
-                uploaded_files.append({
-                    "name": fname,
-                    "time": datetime.datetime.fromtimestamp(mtime).strftime("%Y/%m/%d %H:%M")
-                })
-        uploaded_files.sort(key=lambda x: x["time"], reverse=True)
-    return uploaded_files
+def _ensure_dashboard_file_table():
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute("""
+        IF OBJECT_ID(N'dbo.DashboardFile', N'U') IS NULL
+        BEGIN
+            CREATE TABLE dbo.DashboardFile (
+                FileID NVARCHAR(36) NOT NULL PRIMARY KEY,
+                UserID NVARCHAR(50) NOT NULL,
+                DisplayName NVARCHAR(255) NOT NULL,
+                StoragePath NVARCHAR(512) NULL,
+                CreatedAt DATETIME2 NOT NULL DEFAULT SYSDATETIME()
+            );
+            CREATE INDEX IX_DashboardFile_UserID_CreatedAt
+                ON dbo.DashboardFile (UserID, CreatedAt DESC);
+        END
+        IF COL_LENGTH(N'dbo.DashboardFile', N'StoragePath') IS NULL
+            ALTER TABLE dbo.DashboardFile ADD StoragePath NVARCHAR(512) NULL;
+    """)
+    conn.commit()
+    conn.close()
+    if _dashboard_file_has_stored_name():
+        _migrate_legacy_dashboard_files()
+        _remove_dashboard_stored_name_column()
+
+
+def _dashboard_file_has_stored_name():
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute("SELECT COL_LENGTH(N'dbo.DashboardFile', N'StoredName')")
+    exists = cursor.fetchone()[0] is not None
+    conn.close()
+    return exists
+
+
+def _dashboard_storage_path(file_id, stored_name):
+    return os.path.join('dashboard', str(file_id), str(stored_name))
+
+
+def _absolute_dashboard_path(storage_path):
+    data_dir = os.path.abspath(DASHBOARD_DATA)
+    file_path = os.path.abspath(os.path.join(data_dir, storage_path or ''))
+    if os.path.commonpath([data_dir, file_path]) != data_dir:
+        raise ValueError('Invalid dashboard file path')
+    return file_path
+
+
+def _migrate_legacy_dashboard_files():
+    """Move legacy flat dashboard uploads into one folder per FileID."""
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT FileID, StoredName
+        FROM dbo.DashboardFile
+        WHERE StoragePath IS NULL OR StoragePath = ''
+    """)
+    legacy_files = cursor.fetchall()
+    for row in legacy_files:
+        file_id, stored_name = str(row[0]), str(row[1])
+        storage_path = _dashboard_storage_path(file_id, stored_name)
+        legacy_path = os.path.join(DASHBOARD_DATA, stored_name)
+        destination = _absolute_dashboard_path(storage_path)
+        if os.path.isfile(legacy_path):
+            os.makedirs(os.path.dirname(destination), exist_ok=True)
+            os.replace(legacy_path, destination)
+        cursor.execute(
+            "UPDATE dbo.DashboardFile SET StoragePath = ? WHERE FileID = ?",
+            (storage_path, file_id),
+        )
+    conn.commit()
+    conn.close()
+
+
+def _remove_dashboard_stored_name_column():
+    """Remove the legacy physical-filename column after StoragePath migration."""
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute("""
+        DECLARE @constraint_name SYSNAME;
+        SELECT TOP 1 @constraint_name = kc.name
+        FROM sys.key_constraints kc
+        JOIN sys.index_columns ic
+          ON ic.object_id = kc.parent_object_id AND ic.index_id = kc.unique_index_id
+        JOIN sys.columns c
+          ON c.object_id = ic.object_id AND c.column_id = ic.column_id
+        WHERE kc.parent_object_id = OBJECT_ID(N'dbo.DashboardFile')
+          AND c.name = N'StoredName';
+        IF @constraint_name IS NOT NULL
+            EXEC(N'ALTER TABLE dbo.DashboardFile DROP CONSTRAINT [' + @constraint_name + N']');
+
+        DECLARE @index_name SYSNAME;
+        SELECT TOP 1 @index_name = i.name
+        FROM sys.indexes i
+        JOIN sys.index_columns ic
+          ON ic.object_id = i.object_id AND ic.index_id = i.index_id
+        JOIN sys.columns c
+          ON c.object_id = ic.object_id AND c.column_id = ic.column_id
+        WHERE i.object_id = OBJECT_ID(N'dbo.DashboardFile')
+          AND i.is_primary_key = 0 AND i.is_unique_constraint = 0
+          AND c.name = N'StoredName';
+        IF @index_name IS NOT NULL
+            EXEC(N'DROP INDEX [' + @index_name + N'] ON dbo.DashboardFile');
+
+        IF COL_LENGTH(N'dbo.DashboardFile', N'StoredName') IS NOT NULL
+            ALTER TABLE dbo.DashboardFile DROP COLUMN StoredName;
+    """)
+    conn.commit()
+    conn.close()
+
+
+def _get_uploaded_dashboard_files(user_id):
+    _ensure_dashboard_file_table()
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT FileID, DisplayName, CreatedAt
+        FROM dbo.DashboardFile
+        WHERE UserID = ?
+        ORDER BY CreatedAt DESC
+    """, (str(user_id),))
+    files = [
+        {
+            "id": str(row[0]),
+            "name": str(row[1]),
+            "time": row[2].strftime("%Y/%m/%d %H:%M") if row[2] else "—",
+        }
+        for row in cursor.fetchall()
+    ]
+    conn.close()
+    return files
+
+
+def _get_owned_dashboard_file(file_id, user_id):
+    if not file_id:
+        return None
+    _ensure_dashboard_file_table()
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT DisplayName, StoragePath
+        FROM dbo.DashboardFile
+        WHERE FileID = ? AND UserID = ?
+    """, (str(file_id), str(user_id)))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return None
+    return {"name": str(row[0]), "storage_path": str(row[1])}
+
+
+def _get_cancer_name_translations():
+    translations = {"All_Cancers": {"zh": "全癌別", "en": "All cancers"}}
+    for rule in CANCER_GROUP_RULES:
+        for entry in [rule, *rule.get("subgroups", [])]:
+            key = entry.get("key")
+            if key:
+                translations[key] = {
+                    "zh": entry.get("name_zh") or key,
+                    "en": entry.get("name_en") or entry.get("name_zh") or key,
+                }
+    return translations
 
 @dashboard_bp.route("/dashboard")
 @login_required
 def dashboard():
-    uploaded_files = _get_uploaded_dashboard_files()
-    return render_template("dashboard.html", active="dashboard", uploaded_files=uploaded_files)
+    uploaded_files = _get_uploaded_dashboard_files(session.get("id"))
+    return render_template(
+        "dashboard.html",
+        active="dashboard",
+        uploaded_files=uploaded_files,
+        cancer_name_translations=_get_cancer_name_translations(),
+        pbi_publish_path=get_pbi_publish_path(),
+    )
 
 @dashboard_bp.route("/dashboard/compare")
 @login_required
 def compare():
-    uploaded_files = _get_uploaded_dashboard_files()
-    return render_template("compare.html", active="compare", uploaded_files=uploaded_files)
+    uploaded_files = _get_uploaded_dashboard_files(session.get("id"))
+    return render_template(
+        "compare.html",
+        active="compare",
+        uploaded_files=uploaded_files,
+        cancer_name_translations=_get_cancer_name_translations(),
+    )
 
 @dashboard_bp.route("/dashboard/upload", methods=["POST"])
 @login_required
@@ -56,27 +223,46 @@ def dashboard_upload():
     filename = re.sub(r'[\\/:*?"<>|\s]', '_', basename)
     if not filename.strip() or filename == f".{ext}":
         filename = f"uploaded_file.{ext}"
-    save_path = os.path.join(DASHBOARD_DATA, filename)
+    user_id = session.get("id")
+    _ensure_dashboard_file_table()
+    file_id = str(uuid.uuid4())
+    storage_name = f"{file_id}{os.path.splitext(filename)[1].lower()}"
+    storage_path = _dashboard_storage_path(file_id, storage_name)
+    save_path = _absolute_dashboard_path(storage_path)
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
     f.save(save_path)
-    logging.info(f"Dashboard upload: {filename} saved to {save_path}")
-    return jsonify({"ok": True, "filename": filename})
+    try:
+        conn = get_conn()
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO dbo.DashboardFile (FileID, UserID, DisplayName, StoragePath)
+            VALUES (?, ?, ?, ?)
+        """, (file_id, str(user_id), filename, storage_path))
+        conn.commit()
+        conn.close()
+    except Exception:
+        if os.path.isfile(save_path):
+            os.remove(save_path)
+        raise
+    logging.info(f"Dashboard upload: {filename} saved for user {user_id}")
+    return jsonify({"ok": True, "filename": filename, "file_id": file_id})
 
 
 @dashboard_bp.route('/api/dashboard/year_range', methods=['POST'])
 @login_required
 def dashboard_year_range():
     data = request.json or {}
-    filename = os.path.basename(data.get("filename", ""))
-    if not filename:
+    file_id = data.get("file_id", "")
+    owned_file = _get_owned_dashboard_file(file_id, session.get("id"))
+    if not owned_file:
         return jsonify({"ok": False, "error": "未選擇檔案"}), 400
-
-    fpath = os.path.join(DASHBOARD_DATA, filename)
+    fpath = _absolute_dashboard_path(owned_file["storage_path"])
     if not os.path.isfile(fpath):
         return jsonify({"ok": False, "error": "檔案不存在"}), 404
 
     try:
-        from modules.blueprint.dashboard.chart_analytics import get_column_names
-        df = pd.read_excel(fpath)
+        from modules.blueprint.dashboard.chart_analytics import _read_dashboard_excel, get_column_names
+        df = _read_dashboard_excel(owned_file["storage_path"])
         cols = get_column_names(df)
         year_col = cols.get("year_col")
         if not year_col or year_col not in df.columns:
@@ -99,14 +285,24 @@ def dashboard_year_range():
 @login_required
 def dashboard_delete():
     data = request.json or {}
-    filename = data.get("filename", "")
-    if not filename:
+    file_id = data.get("file_id", "")
+    owned_file = _get_owned_dashboard_file(file_id, session.get("id"))
+    if not owned_file:
         return jsonify({"ok": False, "error": "未指定檔案名稱"}), 400
-    fpath = os.path.join(DASHBOARD_DATA, filename)
+    fpath = _absolute_dashboard_path(owned_file["storage_path"])
     if not os.path.isfile(fpath):
         return jsonify({"ok": False, "error": "檔案不存在"}), 404
     os.remove(fpath)
-    logging.info(f"Dashboard delete: {filename}")
+    try:
+        os.rmdir(os.path.dirname(fpath))
+    except OSError:
+        pass
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM dbo.DashboardFile WHERE FileID = ? AND UserID = ?", (str(file_id), str(session.get("id"))))
+    conn.commit()
+    conn.close()
+    logging.info(f"Dashboard delete: {file_id}")
     return jsonify({"ok": True})
 
 @dashboard_bp.route("/api/chart_insight", methods=["POST"])
@@ -118,6 +314,19 @@ def chart_insight_route():
         return jsonify(result), 200
     except Exception as e:
         logging.error(f"Error in chart_insight_route: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@dashboard_bp.route("/api/dashboard/compare_insight", methods=["POST"])
+@login_required
+def compare_insight_route():
+    try:
+        data = request.json or {}
+        result = get_compare_insight_logic(data)
+        status_code = 200 if result.get("success") else 400
+        return jsonify(result), status_code
+    except Exception as e:
+        logging.error(f"Error in compare_insight_route: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 @dashboard_bp.route('/api/favorites', methods=['GET'])
@@ -185,36 +394,109 @@ def delete_favorite(fav_id):
 @login_required
 def analyze_dashboard_file_route():
     data = request.json or {}
-    filename = data.get("filename", "")
+    file_id = data.get("file_id", "")
     cancers = data.get("cancers", [])
     year_start = data.get("year_start", "")
     year_end = data.get("year_end", "")
     behavior = data.get("behavior", "")
+    analysis_items = data.get("analysis_items", [])
     
-    if not filename:
+    owned_file = _get_owned_dashboard_file(file_id, session.get("id"))
+    if not owned_file:
         return jsonify({"ok": False, "error": "未提供檔案名稱"}), 400
         
     try:
         from modules.blueprint.dashboard.chart_analytics import analyze_dashboard_file
-        chart_data = analyze_dashboard_file(filename, cancers, year_start, year_end, behavior)
+        chart_data = analyze_dashboard_file(
+            owned_file["storage_path"], cancers, year_start, year_end, behavior, analysis_items
+        )
         return jsonify({"ok": True, "data": chart_data}), 200
     except Exception as e:
         import logging
         logging.error(f"Error analyzing dashboard file: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
 
+
+@dashboard_bp.route('/api/dashboard/publish_pbi', methods=['POST'])
+@admin_required
+def publish_dashboard_selection_to_pbi():
+    data = request.json or {}
+    file_id = data.get("file_id", "")
+    cancers = data.get("cancers", [])
+    year_start = str(data.get("year_start", "")).strip()
+    year_end = str(data.get("year_end", "")).strip()
+    behavior = str(data.get("behavior", "")).strip()
+    owned_file = _get_owned_dashboard_file(file_id, session.get("id"))
+    if not owned_file:
+        return jsonify({"ok": False, "error": "找不到已選擇的年報檔案"}), 400
+    if not year_start or not year_end or not cancers:
+        return jsonify({"ok": False, "error": "請先完成年度、性態碼與癌別選擇"}), 400
+
+    publish_path = get_pbi_publish_path()
+    if not publish_path:
+        return jsonify({"ok": False, "error": "尚未設定 Power BI 發布路徑，請先由管理者完成設定"}), 400
+
+    try:
+        from modules.blueprint.dashboard.pbi_export import export_pbi_dataset
+        result = export_pbi_dataset(
+            _absolute_dashboard_path(owned_file["storage_path"]),
+            publish_path,
+            cancers=cancers,
+            year_start=year_start,
+            year_end=year_end,
+            behavior=behavior,
+        )
+        logging.info("Dashboard selection published to PBI by user %s: %s rows", session.get("userid"), result["rows"])
+        return jsonify({"ok": True, "rows": result["rows"], "message": "已更新 Power BI 發布資料，報表將於下一次刷新後顯示。"})
+    except Exception as exc:
+        logging.exception("Failed to publish dashboard selection to PBI")
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@dashboard_bp.route('/api/dashboard/pbi_settings', methods=['GET'])
+@admin_required
+def get_pbi_settings_route():
+    settings = get_pbi_publish_settings()
+    return jsonify({"ok": True, "settings": settings})
+
+
+@dashboard_bp.route('/api/dashboard/pbi_settings', methods=['PUT'])
+@admin_required
+def save_pbi_settings_route():
+    path = (request.json or {}).get("publish_path", "")
+    try:
+        settings = save_pbi_publish_path(path, session.get("userid") or session.get("id"))
+        return jsonify({"ok": True, "settings": settings})
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        logging.exception("Failed to save Power BI publish settings")
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
 @dashboard_bp.route('/api/dashboard/file_years', methods=['POST'])
 @login_required
 def dashboard_file_years_route():
     data = request.json or {}
-    filename = data.get("filename", "")
-    if not filename:
+    file_id = data.get("file_id", "")
+    year_start = str(data.get("year_start", "")).strip()
+    year_end = str(data.get("year_end", "")).strip()
+    owned_file = _get_owned_dashboard_file(file_id, session.get("id"))
+    if not owned_file:
         return jsonify({"ok": False, "error": "未提供檔案名稱"}), 400
 
     try:
-        from modules.blueprint.dashboard.chart_analytics import get_dashboard_file_preview, get_dashboard_file_years
-        years = get_dashboard_file_years(filename)
-        preview = get_dashboard_file_preview(filename, 10)
+        from modules.blueprint.dashboard.chart_analytics import (
+            _read_dashboard_excel,
+            get_column_names,
+            get_dashboard_file_preview,
+            get_dashboard_file_years,
+        )
+        source_df = _read_dashboard_excel(owned_file["storage_path"])
+        cols = get_column_names(source_df)
+        years = get_dashboard_file_years(owned_file["storage_path"], source_df, cols)
+        preview = get_dashboard_file_preview(
+            owned_file["storage_path"], 10, year_start, year_end, source_df, cols
+        )
         return jsonify({"ok": True, "years": years, "preview": preview}), 200
     except Exception as e:
         logging.error(f"Error detecting dashboard file years: {e}")
@@ -224,8 +506,8 @@ def dashboard_file_years_route():
 @login_required
 def compare_dashboard_files_route():
     data = request.json or {}
-    main_filename = data.get("main_filename", "")
-    target_filename = data.get("target_filename", "")
+    main_file_id = data.get("main_file_id", "")
+    target_file_id = data.get("target_file_id", "")
     main_year = str(data.get("main_year", "")).strip()
     target_year = str(data.get("target_year", "")).strip()
     main_year_end = str(data.get("main_year_end", "")).strip()
@@ -235,21 +517,23 @@ def compare_dashboard_files_route():
     cancers = data.get("cancers", [])
     compare_items = data.get("compare_items", [])
 
-    if not main_filename or not target_filename:
-        return jsonify({"ok": False, "error": "請選擇基準資料與對照資料"}), 400
+    main_file = _get_owned_dashboard_file(main_file_id, session.get("id"))
+    target_file = _get_owned_dashboard_file(target_file_id, session.get("id"))
+    if not main_file or not target_file:
+        return jsonify({"ok": False, "error": "請選擇基準期資料與比較期資料"}), 400
     if compare_mode not in {"single", "range"}:
         return jsonify({"ok": False, "error": "比較模式不正確"}), 400
     if compare_mode == "single":
         main_year_end = main_year
         target_year_end = target_year
     if not main_year or not target_year or not main_year_end or not target_year_end:
-        return jsonify({"ok": False, "error": "請選擇基準資料與對照資料的年度"}), 400
+        return jsonify({"ok": False, "error": "請選擇基準期資料與比較期資料的年度"}), 400
     if not all(year.isdigit() for year in (main_year, target_year, main_year_end, target_year_end)):
         return jsonify({"ok": False, "error": "年度格式不正確"}), 400
     if int(main_year) > int(main_year_end) or int(target_year) > int(target_year_end):
         return jsonify({"ok": False, "error": "起始年度不可晚於結束年度"}), 400
-    if main_filename == target_filename and main_year == target_year and main_year_end == target_year_end:
-        return jsonify({"ok": False, "error": "同一份 Excel 比較時，基準期間與對照期間不可相同"}), 400
+    if main_file_id == target_file_id and main_year == target_year and main_year_end == target_year_end:
+        return jsonify({"ok": False, "error": "同一份 Excel 比較時，基準期間與比較期間不可相同"}), 400
     if not behavior:
         return jsonify({"ok": False, "error": "請選擇性態碼"}), 400
     if not cancers:
@@ -259,14 +543,14 @@ def compare_dashboard_files_route():
 
     try:
         from modules.blueprint.dashboard.chart_analytics import compare_dashboard_files, get_dashboard_file_years
-        main_years = get_dashboard_file_years(main_filename)
-        target_years = get_dashboard_file_years(target_filename)
+        main_years = get_dashboard_file_years(main_file["storage_path"])
+        target_years = get_dashboard_file_years(target_file["storage_path"])
         if (int(main_year) not in main_years or int(main_year_end) not in main_years
                 or int(target_year) not in target_years or int(target_year_end) not in target_years):
             return jsonify({"ok": False, "error": "選擇的年度不在 Excel 資料範圍內"}), 400
 
         result = compare_dashboard_files(
-            main_filename, target_filename, behavior, cancers, compare_items,
+            main_file["storage_path"], target_file["storage_path"], behavior, cancers, compare_items,
             main_year, target_year, main_year_end, target_year_end, compare_mode
         )
         return jsonify({"ok": True, "data": result}), 200
@@ -288,6 +572,7 @@ def export_report_api():
     format_pdf = data.get('format_pdf', True)
     format_word = data.get('format_word', False)
     charts = data.get('charts', [])
+    export_language = data.get('export_language', 'zh-TW')
     
     if not charts:
         return jsonify({'ok': False, 'error': '沒有圖表資料可匯出'}), 400
@@ -295,7 +580,9 @@ def export_report_api():
     output_dir = os.path.join(DASHBOARD_DATA, 'exports')
     
     try:
-        file_obj, mimetype, dl_name = generate_export_files(format_pdf, format_word, charts, output_dir)
+        file_obj, mimetype, dl_name = generate_export_files(
+            format_pdf, format_word, charts, output_dir, export_language
+        )
         if file_obj:
             return send_file(file_obj, mimetype=mimetype, as_attachment=True, download_name=dl_name)
         else:

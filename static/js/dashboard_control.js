@@ -1,4 +1,6 @@
 (function() {
+  window.AnnualReportRenderer?.applyConditionCatalog(document, 'analysis');
+
   /* ── 狀態管理與介面更新邏輯 ── */
   window.selectedCancers = new Set();
   
@@ -69,6 +71,27 @@
     
     window.selectedCancers = new Set(selectedValues);
     window.dashboardSelectedCancerIds = selectedValues;
+    const displayCancerKeys = [];
+    if (isAllSelected || (specificSelectedCount === leafNodes.length && leafNodes.length > 0)) {
+        displayCancerKeys.push('All_Cancers');
+    } else {
+        const selectedGroups = new Set();
+        document.querySelectorAll('.cancer-cb-group:not([data-group="All_Cancers"])').forEach(group => {
+            if (group.checked) {
+                selectedGroups.add(group.dataset.group);
+                displayCancerKeys.push(group.dataset.group);
+            }
+        });
+        leafNodes.forEach(node => {
+            if (!node.checked || isDisplayOnlyLungParent(node)) return;
+            const parentKey = node.dataset.parent;
+            const grandparentKey = node.dataset.grandparent;
+            if (!selectedGroups.has(parentKey) && !selectedGroups.has(grandparentKey)) {
+                displayCancerKeys.push(node.value);
+            }
+        });
+    }
+    window.dashboardSelectedCancerDisplayKeys = [...new Set(displayCancerKeys)];
     
     const totalSpecificCount = leafNodes.length;
     
@@ -93,22 +116,12 @@
   }
 
   function updateLungHistologyChildrenVisibility() {
-      const lungParent = document.getElementById('chk_Lung_and_Bronchus');
       const childRows = document.querySelectorAll('.lung-histology-child');
-      const childChecks = document.querySelectorAll('.lung-histology-child input[type="checkbox"]');
-      if (!lungParent || childRows.length === 0) return;
-
-      const hasCheckedChild = Array.from(childChecks).some(cb => cb.checked);
-      const shouldShow = lungParent.checked || hasCheckedChild;
-
+      if (childRows.length === 0) return;
       childRows.forEach(row => {
-          row.classList.toggle('d-none', !shouldShow);
-          row.classList.toggle('d-flex', shouldShow);
+          row.classList.remove('d-none');
+          row.classList.add('d-flex');
       });
-
-      if (!shouldShow) {
-          childChecks.forEach(cb => { cb.checked = false; });
-      }
   }
 
   /* ── 癌別選擇事件綁定 ── */
@@ -292,7 +305,10 @@
     
     if (preset.cancers && preset.cancers.length > 0) {
       preset.cancers.forEach(id => {
-        const cb = document.querySelector(`.cancer-cb-leaf[value="${id}"]`);
+        let cb = document.querySelector(`.cancer-cb-leaf[value="${id}"]`);
+        if (!cb) {
+          cb = Array.from(document.querySelectorAll('.cancer-cb-leaf')).find(el => el.value.toLowerCase() === id.toLowerCase());
+        }
         if (cb) cb.checked = true;
       });
     }
@@ -319,6 +335,16 @@
     if (preset.sub_category) {
       const subCatIds = preset.sub_category.split(',');
       subCatIds.forEach(id => {
+        if (id === 'chkTreatmentStats') {
+          ['chkTreatmentFirstCourse', 'chkTreatmentSurgery'].forEach(treatmentId => {
+            const treatmentItem = document.getElementById(treatmentId);
+            if (treatmentItem) {
+              treatmentItem.checked = true;
+              treatmentItem.dispatchEvent(new Event('change'));
+            }
+          });
+          return;
+        }
         const subCat = document.getElementById(id);
         if (subCat) {
           subCat.checked = true;
@@ -510,6 +536,93 @@
   window.dashboardFileYearRange = null;
   window.dashboardYearRangeAlertKey = '';
 
+  const yearSelectUis = new Map();
+
+  function closeYearSelectMenus(exceptUi = null) {
+    yearSelectUis.forEach((ui) => {
+      if (ui !== exceptUi) {
+        ui.classList.remove('is-open');
+        ui.querySelector('.year-select-trigger')?.setAttribute('aria-expanded', 'false');
+      }
+    });
+  }
+
+  function syncYearSelectUi(selectEl) {
+    if (!selectEl) return;
+
+    let ui = yearSelectUis.get(selectEl);
+    if (!ui) {
+      selectEl.classList.add('year-select-native');
+
+      ui = document.createElement('div');
+      ui.className = 'year-select-ui';
+      ui.innerHTML = `
+        <button type="button" class="year-select-trigger" aria-haspopup="listbox" aria-expanded="false">
+          <span class="year-select-label"></span>
+        </button>
+        <div class="year-select-menu" role="listbox"></div>
+      `;
+      selectEl.insertAdjacentElement('afterend', ui);
+      yearSelectUis.set(selectEl, ui);
+
+      const trigger = ui.querySelector('.year-select-trigger');
+      trigger.addEventListener('click', () => {
+        if (selectEl.disabled) return;
+        const shouldOpen = !ui.classList.contains('is-open');
+        closeYearSelectMenus(ui);
+        ui.classList.toggle('is-open', shouldOpen);
+        trigger.setAttribute('aria-expanded', String(shouldOpen));
+      });
+    }
+
+    const trigger = ui.querySelector('.year-select-trigger');
+    const label = ui.querySelector('.year-select-label');
+    const menu = ui.querySelector('.year-select-menu');
+    const selectedOption = selectEl.options[selectEl.selectedIndex] || selectEl.options[0];
+
+    label.textContent = selectedOption ? selectedOption.textContent : '';
+    trigger.disabled = selectEl.disabled;
+    ui.classList.toggle('is-start', selectEl.id === 'filterYearStart');
+    ui.classList.toggle('is-end', selectEl.id === 'filterYearEnd');
+    ui.classList.toggle('is-placeholder', !selectedOption || !selectedOption.value);
+    ui.classList.toggle('is-disabled', selectEl.disabled);
+    if (selectEl.disabled) {
+      ui.classList.remove('is-open');
+      trigger.setAttribute('aria-expanded', 'false');
+    }
+
+    menu.replaceChildren();
+    Array.from(selectEl.options).forEach((option) => {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'year-select-option';
+      item.innerHTML = '<span class="year-select-option-label"></span>';
+      item.querySelector('.year-select-option-label').textContent = option.textContent;
+      item.setAttribute('role', 'option');
+      item.setAttribute('aria-selected', String(option.selected));
+
+      if (!option.value) item.classList.add('is-placeholder');
+      if (option.selected) item.classList.add('is-selected');
+
+      item.addEventListener('click', () => {
+        if (!option.value) return;
+        selectEl.value = option.value;
+        ui.classList.remove('is-open');
+        trigger.setAttribute('aria-expanded', 'false');
+        selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+        syncYearSelectUi(selectEl);
+      });
+
+      menu.appendChild(item);
+    });
+  }
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.year-select-ui')) {
+      closeYearSelectMenus();
+    }
+  });
+
   function setYearSelectPlaceholder(selectEl, text) {
     if (!selectEl) return;
     selectEl.replaceChildren();
@@ -520,6 +633,7 @@
     option.selected = true;
     selectEl.appendChild(option);
     selectEl.disabled = true;
+    syncYearSelectUi(selectEl);
   }
 
   function fillYearOptions(selectEl, start, end) {
@@ -530,6 +644,7 @@
       option.textContent = String(year);
       selectEl.appendChild(option);
     }
+    syncYearSelectUi(selectEl);
   }
 
   function refreshYearEndOptions() {
@@ -554,6 +669,7 @@
     } else {
       yearEndInput.value = '';
     }
+    syncYearSelectUi(yearEndInput);
   }
 
   function populateYearSelects(range) {
@@ -572,6 +688,8 @@
     yearEndInput.disabled = false;
     yearStartInput.value = '';
     yearEndInput.value = '';
+    syncYearSelectUi(yearStartInput);
+    syncYearSelectUi(yearEndInput);
   }
 
   setYearSelectPlaceholder(yearStartInput, '起始');
@@ -597,17 +715,17 @@
     return true;
   };
 
-  window.loadDashboardFileYearRange = function(filename) {
+  window.loadDashboardFileYearRange = function(fileId) {
     window.dashboardFileYearRange = null;
     window.dashboardYearRangeAlertKey = '';
     setYearSelectPlaceholder(yearStartInput, '起始');
     setYearSelectPlaceholder(yearEndInput, '結束');
-    if (!filename) return Promise.resolve(null);
+    if (!fileId) return Promise.resolve(null);
 
     return fetch('/api/dashboard/year_range', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filename })
+      body: JSON.stringify({ file_id: fileId })
     })
       .then(res => res.json())
       .then(data => {
@@ -630,6 +748,7 @@
   };
 
   function resetDashboardFilters() {
+    window.DashboardRenderer?.clearInsightCache?.();
     if (window.dashboardFileYearRange) {
       populateYearSelects(window.dashboardFileYearRange);
     } else {
@@ -645,6 +764,9 @@
     document.querySelectorAll('.item-checkbox, input[name="mainCategoryTab"]').forEach(cb => {
       cb.checked = false;
     });
+    document.querySelectorAll('.annual-stage-class-checkbox').forEach(cb => {
+      cb.checked = false;
+    });
     document.querySelectorAll('[id^="subItems-"]').forEach(div => {
       div.classList.add('d-none');
     });
@@ -655,6 +777,7 @@
 
     window.selectedCancers = new Set();
     window.dashboardSelectedCancerIds = [];
+    window.dashboardSelectedCancerDisplayKeys = [];
     window.dashboardSelectedCancerTitle = 'XX';
 
     document.querySelectorAll('.chart-pane').forEach(pane => {
@@ -665,6 +788,7 @@
 
     updateParentCheckboxes();
     updateStatus();
+    updateAnnualStageState();
     checkFiltersState();
   }
 
@@ -686,9 +810,6 @@
 
     if (behaviorSelect) {
       behaviorSelect.disabled = !isYearValid;
-      if (!isYearValid) {
-        behaviorSelect.value = '';
-      }
     }
 
     const presetElements = [
@@ -715,7 +836,27 @@
     itemRadios.forEach(radio => {
       radio.disabled = !isBehaviorValid;
     });
+    updateAnnualStageState();
     updateSummary();
+  }
+
+  function updateAnnualStageState() {
+    const ajccCheckbox = document.getElementById('chkStageAjcc');
+    const classOptions = document.getElementById('annualAjccClassOptions');
+    if (!ajccCheckbox || !classOptions) return;
+    const enabled = ajccCheckbox.checked && !ajccCheckbox.disabled;
+    classOptions.classList.toggle('d-none', !ajccCheckbox.checked);
+    classOptions.querySelectorAll('.annual-stage-class-checkbox').forEach(checkbox => {
+      checkbox.disabled = !enabled;
+      if (!ajccCheckbox.checked) checkbox.checked = false;
+    });
+  }
+
+  function selectedAnnualStageOptions() {
+    return {
+      systems: Array.from(document.querySelectorAll('.annual-stage-system-checkbox:checked')).map(input => input.nextElementSibling?.textContent?.trim() || input.value),
+      class_groups: Array.from(document.querySelectorAll('.annual-stage-class-checkbox:checked')).map(input => input.value)
+    };
   }
 
   function updateSummary() {
@@ -750,7 +891,13 @@
     if (summaryAnalysis) {
       const checkedItems = document.querySelectorAll('.item-checkbox:checked');
       if (checkedItems.length > 0) {
-        const itemNames = Array.from(checkedItems).map(el => el.nextElementSibling.textContent.trim());
+        const itemNames = Array.from(checkedItems)
+          .filter(el => !el.classList.contains('annual-stage-system-checkbox'))
+          .map(el => el.nextElementSibling.textContent.trim());
+        const stageOptions = selectedAnnualStageOptions();
+        if (stageOptions.systems.length) {
+          itemNames.push(`期別（${stageOptions.systems.join('、')}${stageOptions.class_groups.length ? `；${stageOptions.class_groups.join('、')}` : ''}）`);
+        }
         summaryAnalysis.textContent = itemNames.join('、');
       } else {
         summaryAnalysis.innerHTML = '<span class="text-muted">尚未選擇</span>';
@@ -768,6 +915,14 @@
           }
         }
       });
+
+      const summaryAiStyle = document.getElementById('summaryAiStyle');
+      const modeAiSelect = document.getElementById('mode_ai');
+      if (summaryAiStyle && modeAiSelect) {
+        const selectedOpt = modeAiSelect.options[modeAiSelect.selectedIndex];
+        if (modeAiSelect.value) summaryAiStyle.textContent = selectedOpt.text;
+        else summaryAiStyle.innerHTML = '<span class="text-muted">尚未選擇</span>';
+      }
     }
   }
 
@@ -787,8 +942,24 @@
     behaviorSelect.addEventListener('change', checkFiltersState);
   }
 
+  const modeAiSelect = document.getElementById('mode_ai');
+  if (modeAiSelect) {
+    modeAiSelect.addEventListener('change', updateSummary);
+  }
+
   document.querySelectorAll('.item-checkbox').forEach(cb => {
     cb.addEventListener('change', updateSummary);
+  });
+
+  document.querySelectorAll('.annual-stage-system-checkbox').forEach(checkbox => {
+    checkbox.addEventListener('change', function() {
+      updateAnnualStageState();
+      updateSummary();
+    });
+  });
+
+  document.querySelectorAll('.annual-stage-class-checkbox').forEach(checkbox => {
+    checkbox.addEventListener('change', updateSummary);
   });
 
   document.querySelectorAll('input[name="mainCategoryTab"]').forEach(radio => {
@@ -857,23 +1028,111 @@ function initDashboardControl() {
       if(activeLink) activeLink.classList.replace('text-dark', 'text-primary');
       const activeBadge = row.querySelector('.status-badge-selected');
       if(activeBadge) activeBadge.style.display = 'inline-block';
-      const selectedFilename = activeLink ? activeLink.innerText.trim() : '';
+      const selectedFileId = row.dataset.fileId || '';
       if (window.loadDashboardFileYearRange) {
-          window.loadDashboardFileYearRange(selectedFilename);
+          window.loadDashboardFileYearRange(selectedFileId);
       }
   });
 
   /* ── 查詢按鈕執行邏輯 ── */
+  const btnConfigurePbi = document.getElementById('btnConfigurePbi');
+  if (btnConfigurePbi) {
+      btnConfigurePbi.addEventListener('click', async function() {
+          let currentPath = '';
+          try {
+              const response = await fetch('/api/dashboard/pbi_settings');
+              const result = await response.json();
+              if (!result.ok) throw new Error(result.error || '讀取設定失敗');
+              currentPath = result.settings?.publish_path || '';
+          } catch (error) {
+              utils.alert(`無法讀取 Power BI 發布設定：${error.message}`, 'error');
+              return;
+          }
+
+          const entered = await Swal.fire({
+              title: 'Power BI 發布設定',
+              text: '請輸入唯一的 Power BI 發布檔案 UNC 路徑。儲存時會測試是否可寫入。',
+              input: 'text',
+              inputValue: currentPath,
+              inputPlaceholder: '\\\\伺服器\\共享資料夾\\powerbi_dataset.xlsx',
+              showCancelButton: true,
+              confirmButtonText: '測試並儲存',
+              cancelButtonText: '取消',
+              confirmButtonColor: '#dc3545',
+              cancelButtonColor: '#6c757d',
+              inputValidator: (value) => value?.trim() ? undefined : '請輸入 Power BI 發布檔案路徑。'
+          });
+          if (!entered.isConfirmed) return;
+
+          try {
+              const response = await fetch('/api/dashboard/pbi_settings', {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ publish_path: entered.value.trim() })
+              });
+              const result = await response.json();
+              if (!result.ok) throw new Error(result.error || '儲存設定失敗');
+              utils.alert('Power BI 發布路徑已儲存。之後將固定發布到此位置。', 'success');
+          } catch (error) {
+              utils.alert(`無法儲存 Power BI 發布路徑：${error.message}`, 'error');
+          }
+      });
+  }
+
+  const btnPublishPbi = document.getElementById('btnPublishPbi');
+  if (btnPublishPbi) {
+      btnPublishPbi.addEventListener('click', async function() {
+          const activeRow = document.querySelector('#dashFileListBody tr.table-active');
+          const fileId = activeRow?.dataset.fileId || '';
+          const yearStart = document.getElementById('filterYearStart')?.value.trim() || '';
+          const yearEnd = document.getElementById('filterYearEnd')?.value.trim() || '';
+          const behavior = document.getElementById('filterBehavior')?.value || '';
+          const cancers = Array.from(window.selectedCancers || []);
+
+          if (!fileId || !yearStart || !yearEnd || cancers.length === 0) {
+              utils.alert('請先完成檔案、年度、性態碼與癌別選擇。', 'warning');
+              return;
+          }
+          const confirmed = await utils.confirm(
+              '確定要發布目前篩選資料至共用 Power BI 報表嗎？這會覆蓋目前的 Power BI 發布資料。',
+              '確認發布'
+          );
+          if (!confirmed.isConfirmed) {
+              return;
+          }
+
+          btnPublishPbi.disabled = true;
+          if (window.utils?.showLoading) window.utils.showLoading('正在產生 Power BI 發布資料，請稍候…');
+          try {
+              const response = await fetch('/api/dashboard/publish_pbi', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ file_id: fileId, cancers, year_start: yearStart, year_end: yearEnd, behavior })
+              });
+              const result = await response.json();
+              if (!result.ok) throw new Error(result.error || '發布失敗');
+              utils.alert(`已發布 ${result.rows} 筆資料至 Power BI；報表將於下一次刷新後更新。`, 'success');
+          } catch (error) {
+              utils.alert(`Power BI 發布失敗：${error.message}`, 'error');
+          } finally {
+              btnPublishPbi.disabled = false;
+              if (window.utils?.hideLoading) window.utils.hideLoading();
+          }
+      });
+  }
+
   const btnRunQuery = document.getElementById('btnRunQuery');
   if (btnRunQuery) {
-      btnRunQuery.addEventListener('click', function() {
+      btnRunQuery.addEventListener('click', async function() {
+          await window.DashboardI18n?.setLanguage('zh-TW');
+          window.DashboardRenderer?.clearInsightCache?.();
           document.querySelectorAll('.chart-pane').forEach(pane => {pane.classList.add('d-none');});
 
-          let selectedFile = '';
+          let selectedFileId = '';
           const activeRow = document.querySelector('#dashFileListBody tr.table-active');
           if (activeRow) {
               const link = activeRow.querySelector('a');
-              if (link) selectedFile = link.innerText.trim();
+              selectedFileId = activeRow.dataset.fileId || '';
           }
 
           const yearStartVal = document.getElementById('filterYearStart')?.value.trim();
@@ -896,10 +1155,11 @@ function initDashboardControl() {
               return;
           }
 
-          if (!selectedFile) {
+          if (!selectedFileId) {
               utils.alert('請先從上方檔案列表點選要分析的檔案！', 'warning');
               return;
           }
+          window.dashboardAnalysisFileId = selectedFileId;
 
           if (window.utils && window.utils.showLoading) {
               window.utils.showLoading('分析中，請稍候...');
@@ -908,11 +1168,13 @@ function initDashboardControl() {
           }
 
           const dashboardAnalyzePayload = {
-              filename: selectedFile,
+              file_id: selectedFileId,
               cancers: Array.from(window.selectedCancers || []),
               year_start: yearStartVal,
               year_end: yearEndVal,
-              behavior: behaviorVal
+              behavior: behaviorVal,
+              analysis_items: Array.from(document.querySelectorAll('.item-checkbox:checked'))
+                  .map(item => item.value)
           };
           fetch('/api/dashboard/analyze_file', {
               method: 'POST',
@@ -969,6 +1231,9 @@ function initDashboardControl() {
                                                   const inst = echarts.getInstanceByDom(c);
                                                   if (inst) inst.resize();
                                               });
+                                              if (targetPane.id === 'chartPane-CrossYearSurvival') {
+                                                  window.DashboardRenderer?.updateSurvivalChartLayout?.();
+                                              }
                                               
                                               if (window.lastChartData) {
                                                   const aiBtn = targetPane.querySelector('button[id^="btnAi"]');
@@ -1002,8 +1267,9 @@ function initDashboardControl() {
                       const btn = document.getElementById(cfg.btnId);
                       if (btn) {
                           btn.style.display = 'block';
-                          btn.innerHTML = '重新產生敘述';
-                          btn.onclick = () => {
+                          btn.innerHTML = window.DashboardRenderer.t('regenerateInsight');
+                          btn.dataset.insightFieldKey = cfg.title;
+                          btn.onclick = (event) => {
                               let dataToSend = window.lastChartData[cfg.dataKey];
                               if (cfg.btnId === 'btnAiHistology' && dataToSend) {
                                   // 過濾掉 Unknown / 未對應組織型態，並重新計算百分比以與表格配平
@@ -1019,13 +1285,17 @@ function initDashboardControl() {
                                       };
                                   });
                               }
-                              return window.DashboardRenderer.fetchLlmInsight(cfg.title, dataToSend, cfg.fields, cfg.respId, cfg.btnId);
+                              const currentRequest = window.DashboardRenderer.fetchLlmInsight(
+                                  cfg.title, dataToSend, cfg.fields, cfg.respId, cfg.btnId,
+                                  { forceRefresh: event?.isTrusted === true }
+                              );
+                              return currentRequest;
                           };
                       }
                   });
 
                   document.querySelectorAll('[id^="llmResponse"]').forEach(el => {
-                      el.innerText = '（系統將自動產生分析敘述）';
+                      el.innerText = window.DashboardRenderer.t('autoInsight');
                   });
 
                   if (window.DashboardRenderer) {
@@ -1034,24 +1304,14 @@ function initDashboardControl() {
                       window.DashboardRenderer.renderSexAgeTable(chartData.genderAgeData, yearTitle, cancerTitle);
                       window.DashboardRenderer.renderAgeMedianTable(chartData.ageMedianData, yearTitle, cancerTitle);
                       window.DashboardRenderer.renderAnalyzableConfirmedTable(chartData.analyzableConfirmedData, yearTitle, cancerTitle);
-                      window.DashboardRenderer.renderHistologyTable(chartData.histologyData, yearTitle, cancerTitle);
+                      window.DashboardRenderer.renderHistologyTable(chartData.histologyData, yearTitle, cancerTitle, chartData.histologyNoDataReason);
                       window.DashboardRenderer.renderColonHistologyTableNote(chartData.histologyWarnings);
                       window.DashboardRenderer.renderHistologyWarningButton(histologyChecked ? histologyWarnings : []);
                       window.DashboardRenderer.renderDiagnosisClassificationTable(chartData.diagnosisClassificationData, yearTitle, cancerTitle);
                       window.DashboardRenderer.renderDiagnosisClassificationChart(chartData.diagnosisClassificationData, yearTitle, cancerTitle);
+                      window.DashboardRenderer.renderSurvivalTable(chartData.survivalData, yearTitle, cancerTitle);
                       window.DashboardRenderer.showAnnualDataContent();
-                      const chartCaption = document.getElementById('annualSexAgeChartCaption');
-                      if (chartCaption) {
-                          chartCaption.innerHTML = `圖、${yearTitle}年新診斷${window.DashboardRenderer.getCancerTitleForSentence(cancerTitle)}病患性別及年齡分佈圖<br><span class="text-muted fw-normal" style="font-size: 0.85em;">資料來源：癌症登記資料庫</span>`;
-                      }
-                      const histologyChartCaption = document.getElementById('annualHistologyChartCaption');
-                      if (histologyChartCaption) {
-                          histologyChartCaption.innerHTML = `圖、${yearTitle}年${window.DashboardRenderer.getCancerTitleForSentence(cancerTitle)}組織型態分佈圖<br><span class="text-muted fw-normal" style="font-size: 0.85em;">資料來源：癌症登記資料庫</span>`;
-                      }
-                      const classificationChartCaption = document.getElementById('annualDiagnosisClassificationChartCaption');
-                      if (classificationChartCaption) {
-                          classificationChartCaption.innerHTML = `圖、${yearTitle}年${window.DashboardRenderer.getCancerTitleForSentence(cancerTitle)}個案分類分佈圖<br><span class="text-muted fw-normal" style="font-size: 0.85em;">資料來源：癌症登記資料庫</span>`;
-                      }
+                      window.DashboardRenderer.updateChartCaptions(yearTitle, cancerTitle);
                   }
 
                   if (window.dashboardChartInstance) {
@@ -1068,42 +1328,7 @@ function initDashboardControl() {
                       window.dashboardChartInstance.setOption(genderAgeOption, true);
                   }
 
-                  if (window.dashboardHistologyChartInstance && chartData.histologyData) {
-                      const yearTitle = window.DashboardRenderer ? window.DashboardRenderer.getSelectedYearTitle() : '';
-                      const cancerTitle = window.DashboardRenderer ? window.DashboardRenderer.getSelectedCancerTitle() : '';
-                      const cancerTitleSent = window.DashboardRenderer ? window.DashboardRenderer.getCancerTitleForSentence(cancerTitle) : '';
-                      const validData = chartData.histologyData.filter(item => item.name !== 'Unknown / 未對應組織型態');
-                      const totalValid = validData.reduce((sum, item) => sum + item.count, 0);
-                      const topData = validData.reverse();
-                      const categories = topData.map(item => item.name);
-                      const chartSeriesData = topData.map(item => {
-                          const pct = totalValid > 0 ? parseFloat(((item.count / totalValid) * 100).toFixed(1)) : 0;
-                          return {
-                              value: pct,
-                              count: item.count
-                          };
-                      });
-
-                      // 動態調整圖表高度，防止柱狀圖項目過多時擠壓重疊
-                      const chartDom = document.getElementById('histologyChart');
-                      if (chartDom) {
-                          const computedHeight = Math.max(450, categories.length * 40); // 每筆資料給予 40px 的垂直空間，最低 450px
-                          chartDom.style.height = computedHeight + 'px';
-                          window.dashboardHistologyChartInstance.resize();
-                      }
-
-                      window.dashboardHistologyChartInstance.setOption({
-                          title: { 
-                              text: `${yearTitle}年${cancerTitleSent}組織型態分佈圖`, 
-                              subtext: '資料來源：癌症登記資料庫',
-                              left: 'center'
-                          },
-                          yAxis: { data: categories },
-                          series: [
-                              { data: chartSeriesData }
-                          ]
-                      });
-                  }
+                  if (window.DashboardRenderer) window.DashboardRenderer.updateHistologyChart(chartData.histologyData, chartData.histologyNoDataReason);
                   
                   // Collect all AI promises before showing the charts
                   let aiPromises = [];
@@ -1217,6 +1442,7 @@ function initDashboardControl() {
       if (!btn) return;
       
       const name = btn.dataset.name;
+      const fileId = btn.dataset.fileId;
       Swal.fire({
           title: '確定刪除？',
           text: `將刪除 ${name}`,
@@ -1232,7 +1458,7 @@ function initDashboardControl() {
           fetch('/dashboard/delete', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ filename: name })
+              body: JSON.stringify({ file_id: fileId })
           })
           .then(r => r.json())
           .then(data => {

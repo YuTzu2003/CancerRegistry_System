@@ -93,6 +93,65 @@
   display: inline-block !important;
 }
 
+[data-theme="dark"] .file-list-card {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+[data-theme="dark"] .file-list-header {
+  background: var(--gray-50);
+  border-color: var(--border);
+}
+
+[data-theme="dark"] .file-list-header .text-dark,
+[data-theme="dark"] #dashFileList .text-dark {
+  color: var(--text) !important;
+}
+
+[data-theme="dark"] #dashFileList {
+  --bs-table-bg: var(--surface);
+  --bs-table-color: var(--text);
+  --bs-table-border-color: var(--border);
+  --bs-table-hover-bg: #1f1f23;
+  --bs-table-hover-color: var(--text);
+  --bs-table-active-bg: rgba(59, 130, 246, 0.18);
+  --bs-table-active-color: #dbeafe;
+}
+
+[data-theme="dark"] #dashFileList thead,
+[data-theme="dark"] #dashFileList thead th {
+  background: #18181b !important;
+  color: var(--muted) !important;
+  border-color: var(--border) !important;
+}
+
+[data-theme="dark"] #dashFileListBody tr {
+  background: var(--surface);
+  color: var(--text);
+}
+
+[data-theme="dark"] #dashFileListBody tr:hover {
+  background-color: #1f1f23 !important;
+}
+
+[data-theme="dark"] #dashFileListBody tr.table-active {
+  background-color: rgba(59, 130, 246, 0.18) !important;
+}
+
+[data-theme="dark"] #dashFileListBody tr.table-active .file-display-name {
+  color: #bfdbfe !important;
+}
+
+[data-theme="dark"] #dashFileListBody .text-secondary {
+  color: var(--muted) !important;
+}
+
+[data-theme="dark"] #dashFileListBody .status-badge-selected {
+  background: rgba(59, 130, 246, 0.22) !important;
+  color: #bfdbfe !important;
+  border: 1px solid rgba(96, 165, 250, 0.35);
+}
+
 /* --- 篩選條件設定 --- */
 .filter-bar {
   display: flex;
@@ -107,6 +166,11 @@
   flex-direction: column;
   gap: 5px;
   min-width: 180px;
+}
+
+.filter-bar > .filter-group:last-child {
+  flex: 0 0 243px;
+  max-width: 243px;
 }
 
 .filter-group label {
@@ -133,7 +197,7 @@
 }
 
 .filter-group select.year-select {
-  width: 80px;
+  width: 100px;
   min-width: 0;
   padding: 8px 22px 8px 8px;
   text-align: center;
@@ -143,6 +207,146 @@
 
 .filter-group select.year-select option {
   text-align: center;
+}
+
+.filter-group select.year-select.year-select-native {
+  display: none;
+}
+
+.year-select-ui {
+  position: relative;
+  width: 100px;
+}
+
+.card-flat:has(.year-select-ui),
+.card-flat:has(.year-select-ui) .section-body {
+  overflow: visible;
+}
+
+.year-select-ui.is-open {
+  z-index: 2147483647;
+}
+
+.year-select-trigger {
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 38px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.2;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.year-select-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: translateX(-6px);
+  pointer-events: none;
+}
+
+.year-select-ui.is-start.is-placeholder .year-select-label {
+  transform: translateX(-5.5px);
+}
+
+.year-select-ui.is-end.is-placeholder .year-select-label {
+  transform: translateX(-5px);
+}
+
+.year-select-trigger::after {
+  content: "";
+  position: absolute;
+  right: 7px;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  transform: translateY(-50%);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M2.5 4.5L6 8l3.5-3.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.year-select-trigger:focus,
+.year-select-ui.is-open .year-select-trigger {
+  outline: none;
+  border-color: var(--blue-500);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.year-select-ui.is-disabled .year-select-trigger {
+  color: var(--muted);
+  background-color: var(--gray-100);
+  cursor: not-allowed;
+}
+
+.year-select-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 2147483647;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 1px solid #8a8a8a;
+  background: var(--white);
+  box-shadow: none;
+}
+
+.year-select-menu::after {
+  content: "";
+  position: absolute;
+  left: -1px;
+  right: -1px;
+  bottom: -1px;
+  height: 1px;
+  background: #8a8a8a;
+  pointer-events: none;
+}
+
+.year-select-ui:not(.is-open) .year-select-menu {
+  display: none;
+}
+
+.year-select-option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 5px 8px;
+  border: 0;
+  background: var(--white);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.2;
+  text-align: center;
+  cursor: pointer;
+}
+
+.year-select-option-label {
+  transform: translateX(-3.8px);
+}
+
+.year-select-option:hover,
+.year-select-option.is-selected {
+  background: #0d6efd;
+  color: #fff;
+}
+
+.year-select-option.is-placeholder {
+  background: #bfbfbf;
+  color: #fff;
+  cursor: default;
 }
 
 .filter-group select:focus {
@@ -314,12 +518,31 @@
 .annual-report-table caption {
   caption-side: top;
   color: #111827;
+  font-size: 18px;
   font-weight: 500;
   padding-bottom: 4px;
   text-align: center;
   white-space: nowrap;
 }
 
+/* 年報分析期別：與其他分析細項相同的勾選框格式 */
+.annual-stage-system-row,
+.annual-stage-class-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.annual-stage-class-row {
+  margin-top: 12px;
+  padding-left: 24px;
+}
+
+@media (max-width: 768px) {
+  .annual-stage-class-row {
+    padding-left: 20px;
+  }
+}
 
 .annual-analyzable-note {
   margin-top: 6px;
@@ -394,6 +617,124 @@
   border-color: #212529 !important;
   box-shadow: none !important;
   transform: none !important;
+}
+
+[data-theme="dark"] .upload-container-box,
+[data-theme="dark"] .upload-input-zone,
+[data-theme="dark"] .chart-pane > .bg-white,
+[data-theme="dark"] #chartPane-Empty > .bg-white {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+[data-theme="dark"] .upload-input-zone:hover {
+  background: #1f1f23 !important;
+  border-color: var(--blue-500) !important;
+}
+
+[data-theme="dark"] .filter-group label,
+[data-theme="dark"] .text-dark,
+[data-theme="dark"] .form-check-label.text-dark {
+  color: var(--text) !important;
+}
+
+[data-theme="dark"] .text-secondary,
+[data-theme="dark"] .form-check-label.text-secondary {
+  color: var(--muted) !important;
+}
+
+[data-theme="dark"] .cat-btn-label {
+  background-color: var(--gray-50);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+[data-theme="dark"] .cat-btn-label:hover {
+  background-color: #1f1f23;
+  color: #bfdbfe;
+  border-color: var(--blue-600);
+}
+
+[data-theme="dark"] .btn-check.group-checkbox:checked + .cat-btn-label {
+  background-color: rgba(59, 130, 246, 0.18);
+  color: #bfdbfe;
+  border-color: var(--blue-600);
+  box-shadow: none;
+}
+
+[data-theme="dark"] .btn-black,
+[data-theme="dark"] #btnDashUpload,
+[data-theme="dark"] .chart-tab-btn.active {
+  background-color: var(--blue-600) !important;
+  border-color: var(--blue-600) !important;
+  color: #ffffff !important;
+}
+
+[data-theme="dark"] .btn-black:hover,
+[data-theme="dark"] #btnDashUpload:hover {
+  background-color: #2563eb !important;
+  border-color: #2563eb !important;
+}
+
+[data-theme="dark"] .btn-black-outline,
+[data-theme="dark"] .chart-tab-btn {
+  background-color: var(--gray-50) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+[data-theme="dark"] .btn-black-outline:hover,
+[data-theme="dark"] .chart-tab-btn:hover {
+  background-color: #1f1f23 !important;
+  border-color: var(--blue-600) !important;
+  color: #bfdbfe !important;
+}
+
+[data-theme="dark"] #cancerPickerModal .modal-header,
+[data-theme="dark"] #cancerPickerModal .modal-footer,
+[data-theme="dark"] #cancerPickerModal .bg-light,
+[data-theme="dark"] #cancerPickerModal .bg-white {
+  background-color: var(--surface) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+[data-theme="dark"] #cancerPickerModal .list-group-item.bg-light {
+  background-color: var(--gray-50) !important;
+  color: var(--muted) !important;
+}
+
+[data-theme="dark"] #cancerPickerModal .cat-nav-btn.active {
+  background-color: rgba(59, 130, 246, 0.14) !important;
+  color: #bfdbfe !important;
+}
+
+[data-theme="dark"] .annual-report-table {
+  background: #0b0b0c;
+  color: var(--text);
+}
+
+[data-theme="dark"] .annual-report-table th,
+[data-theme="dark"] .annual-report-table td {
+  border-color: var(--gray-300);
+}
+
+[data-theme="dark"] .annual-report-table caption,
+[data-theme="dark"] .annual-analyzable-note,
+[data-theme="dark"] .annual-chart-caption {
+  color: var(--text);
+}
+
+[data-theme="dark"] .chart-pane .mt-4.p-3.rounded {
+  background-color: #18181b !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+[data-theme="dark"] .chart-pane .mt-4.p-3.rounded .btn-sm {
+  color: #bfdbfe !important;
+  border-color: var(--blue-500) !important;
 }
 
 /* =========================================================================
