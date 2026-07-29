@@ -1,4 +1,6 @@
 (function() {
+  window.AnnualReportRenderer?.applyConditionCatalog(document, 'comparison');
+
   const mainFile = document.getElementById('mainCompareFile');
   const targetFile = document.getElementById('targetCompareFile');
   const mainYear = document.getElementById('mainCompareYear');
@@ -203,7 +205,6 @@
     const filesAreReady = filesReady();
     const behaviorIsReady = filesAreReady && Boolean(behavior.value);
     const cancerIsReady = behaviorIsReady && selectedCancerValues().length > 0;
-    const topicIsSelected = cancerIsReady && Boolean(selectedCompareType());
     const behaviorStep = document.getElementById('compareBehaviorStep');
     const cancerStep = document.getElementById('compareCancerStep');
     const analysisStep = document.getElementById('compareAnalysisStep');
@@ -219,8 +220,8 @@
       input.disabled = !cancerIsReady;
     });
     updateCompareStageState();
-    document.getElementById('btnSelectAllCompareItems').disabled = !topicIsSelected;
-    document.getElementById('btnClearCompareItems').disabled = !topicIsSelected;
+    document.getElementById('btnSelectAllCompareItems').disabled = !cancerIsReady;
+    document.getElementById('btnClearCompareItems').disabled = !cancerIsReady;
     analysisStep?.classList.toggle('opacity-50', !cancerIsReady);
     analysisStep?.classList.toggle('pe-none', !cancerIsReady);
 
@@ -430,10 +431,11 @@
   }
 
   function sum(values) {
-    return (values || []).reduce((total, value) => total + Number(value || 0), 0);
+    return window.AnnualReportRenderer.sum(values);
   }
 
   function axisLabelLines(value, maxLength = 68) {
+    return window.AnnualReportRenderer.axisLabelLines(value, maxLength);
     const lines = [];
     const segments = String(value ?? '')
       .trim()
@@ -458,17 +460,20 @@
   }
 
   function rightAlignedAxisLabel(value, maxLength = 68) {
+    return window.AnnualReportRenderer.rightAlignedAxisLabel(value, maxLength);
     return axisLabelLines(value, maxLength)
       .map(text => `{${/^[\[［]/.test(text) ? 'bracket' : 'right'}|${text}}`)
       .join('\n');
   }
 
   function histologyRowHeight(names) {
+    return window.AnnualReportRenderer.histologyRowHeight(names);
     const maxLines = Math.max(1, ...names.map(name => axisLabelLines(name).length));
     return Math.max(40, maxLines * 18 + 8);
   }
 
   function normalizeGenderAgeData(genderAgeData) {
+    return window.AnnualReportRenderer.normalizeGenderAgeData(genderAgeData);
     const labels = ['≦19', '20-24', '25-29', '30-34', '35-39', '40-44', '45-49', '50-54', '55-59', '60-64', '65-69', '70-74', '75-79', '80-84', '≧85'];
     const categories = genderAgeData?.categories?.length ? genderAgeData.categories : labels;
     const fillValues = values => {
@@ -564,6 +569,23 @@
   }
 
   function getUpdatedGenderAgeChartOption(genderAgeData, sharedMax = null, yearTitle = '', cancerTitle = '') {
+    return window.AnnualReportRenderer.getGenderAgeChartOption(genderAgeData, {
+      sharedMax,
+      title: isEnglish()
+        ? `Age and Sex Distribution of Newly Diagnosed with ${reportCancerTitle(cancerTitle)} Patients, ${yearTitle}`
+        : (yearTitle ? `${yearTitle}年新診斷${reportCancerTitle(cancerTitle)}病患性別及年齡分布圖` : '性別及年齡分布圖'),
+      source: t('source'),
+      labels: {
+        male: t('male'),
+        female: t('female'),
+        total: t('total'),
+        age: t('age'),
+        dataView: t('dataView'),
+        close: t('close'),
+        refresh: t('refresh'),
+        downloadImage: t('downloadImage')
+      }
+    });
     const raw = normalizeGenderAgeData(genderAgeData);
     const data = {
       ...raw,
@@ -691,6 +713,7 @@
   }
 
   function escapeHtml(value) {
+    return window.AnnualReportRenderer.escapeHtml(value);
     return String(value ?? '')
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
@@ -1065,53 +1088,269 @@
 
   function changeNumberText(value, suffix = '') {
     const number = Number(value || 0);
-    if (number === 0) return '持平';
+    if (number === 0) return '無變化 —';
     const amount = Number.isInteger(Math.abs(number)) ? Math.abs(number) : Math.abs(number).toFixed(1);
-    return `${number > 0 ? '增加' : '減少'}${amount}${suffix}`;
+    return `${number > 0 ? '增加' : '減少'}${amount}${suffix} ${number > 0 ? '▲' : '▼'}`;
   }
 
-  function changePercentText(mainValue, targetValue) {
-    const main = Number(mainValue || 0);
-    const target = Number(targetValue || 0);
-    if (!main) return target ? '無法計算' : '持平';
-    const percentage = (target - main) / main * 100;
-    if (percentage === 0) return '持平';
-    return `${percentage > 0 ? '增加' : '減少'}${Math.abs(percentage).toFixed(1)}%`;
-  }
-
-  function changePercentValue(mainValue, targetValue) {
+  function signedPercentText(mainValue, targetValue) {
     const main = Number(mainValue || 0);
     const target = Number(targetValue || 0);
     if (!main) return target ? '無法計算' : '0.0%';
-    return `${Math.abs((target - main) / main * 100).toFixed(1)}%`;
+    const percentage = (target - main) / main * 100;
+    if (percentage === 0) return '0.0%';
+    return `${percentage > 0 ? '+' : '−'}${Math.abs(percentage).toFixed(1)}%`;
   }
 
-  function renderDifferenceSummary(data) {
+  const summaryCardTitles = {
+    diagnosis: [
+      '可分析個案差異',
+      '顯微鏡檢確診個案差異',
+      '主要組織型態差異',
+      '個案分類最大差異'
+    ],
+    stage: [
+      '有效期別個案數差異',
+      '早期期別（Stage I–II）比例差異',
+      '晚期期別（Stage III–IV）比例差異',
+      '個案數差異最大的期別'
+    ],
+    treatment: [
+      '接受初次療程個案數差異',
+      '接受初次療程比例差異',
+      '手術治療個案數差異',
+      '手術治療比例差異'
+    ],
+    cross_year: [
+      '區間總個案數差異',
+      '年平均個案數差異',
+      '單年最高個案數差異',
+      '區間個案數趨勢差異'
+    ]
+  };
+
+  function summaryCategoryForItem(item) {
+    if (['性別年齡分佈', '年齡中位數'].includes(item)) return 'incidence';
+    if (['可分析個案與確診個案', '組織型態', '個案分類'].includes(item)) return 'diagnosis';
+    if (['AJCC期別分佈', 'FIGO/MAC/BCLC/SCLC期別分佈'].includes(item)) return 'stage';
+    if (['初次療程分類', '初次手術方式'].includes(item)) return 'treatment';
+    if (['存活率', '歷年年齡中位數', '歷年期別分佈', '歷年新診斷件數', '本院常見癌症'].includes(item)) return 'cross_year';
+    return 'incidence';
+  }
+
+  function renderSummaryCardPlaceholders(category) {
+    const titles = summaryCardTitles[category] || [];
+    document.getElementById('compareResultSummary').innerHTML = titles.map(() => `
+      <div class="compare-summary-card">
+        <div class="compare-summary-placeholder-value">未設置</div>
+      </div>
+    `).join('');
+  }
+
+  function renderDiagnosisDifferenceSummary(data) {
+    const mainAnalysis = data.analysis_data?.main || {};
+    const targetAnalysis = data.analysis_data?.target || {};
+    const mainCases = mainAnalysis.analyzableConfirmedData || {};
+    const targetCases = targetAnalysis.analyzableConfirmedData || {};
+    const numberValue = value => Number(value || 0);
+    const percentValue = value => {
+      const parsed = Number.parseFloat(String(value ?? '').replace('%', ''));
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+    const valueClass = value => numberValue(value) > 0 ? 'is-up' : numberValue(value) < 0 ? 'is-down' : 'is-flat';
+    const formatPeriod = label => String(label || '').includes('–') ? label : `${label}年`;
+    const mainPeriod = escapeHtml(formatPeriod(data.main?.year_label || '基準期'));
+    const targetPeriod = escapeHtml(formatPeriod(data.target?.year_label || '比較期'));
+
+    const analyzableMain = numberValue(mainCases.analyzable_count);
+    const analyzableTarget = numberValue(targetCases.analyzable_count);
+    const analyzableDiff = analyzableTarget - analyzableMain;
+    const confirmedMain = numberValue(mainCases.confirmed_count);
+    const confirmedTarget = numberValue(targetCases.confirmed_count);
+    const confirmedDiff = confirmedTarget - confirmedMain;
+
+    const validHistology = analysis => (Array.isArray(analysis.histologyData) ? analysis.histologyData : [])
+      .filter(item => item?.name && item.name !== 'Unknown / 未對應組織型態')
+      .sort((a, b) => numberValue(b.count) - numberValue(a.count));
+    const mainHistology = validHistology(mainAnalysis)[0] || null;
+    const targetHistology = validHistology(targetAnalysis)[0] || null;
+    let histologyPrimary = '<span class="is-flat">無法判定 —</span>';
+    let histologyDetail = '兩期皆無可比較的組織型態資料';
+    if (mainHistology && targetHistology && mainHistology.name === targetHistology.name) {
+      const histologyDiff = numberValue(targetHistology.count) - numberValue(mainHistology.count);
+      histologyPrimary = `<span>${escapeHtml(mainHistology.name)}</span> <span class="${valueClass(histologyDiff)}">${changeNumberText(histologyDiff, '人')}（${signedPercentText(mainHistology.count, targetHistology.count)}）</span>`;
+      histologyDetail = `${mainPeriod} ${numberValue(mainHistology.count)}人（${escapeHtml(mainHistology.percentage || '0.0%')}）→ ${targetPeriod} ${numberValue(targetHistology.count)}人（${escapeHtml(targetHistology.percentage || '0.0%')}）`;
+    } else if (mainHistology && targetHistology) {
+      histologyPrimary = '<span class="is-flat">主要型態發生變化 →</span>';
+      histologyDetail = `${mainPeriod} ${escapeHtml(mainHistology.name)}（${escapeHtml(mainHistology.percentage || '0.0%')}）→ ${targetPeriod} ${escapeHtml(targetHistology.name)}（${escapeHtml(targetHistology.percentage || '0.0%')}）`;
+    }
+
+    const mainClass = mainAnalysis.diagnosisClassificationData || {};
+    const targetClass = targetAnalysis.diagnosisClassificationData || {};
+    const classRows = [0, 1, 2, 3].map(classNumber => {
+      const mainCount = numberValue(mainClass[`class${classNumber}_total`]);
+      const targetCount = numberValue(targetClass[`class${classNumber}_total`]);
+      const mainTotal = numberValue(mainClass.total_count);
+      const targetTotal = numberValue(targetClass.total_count);
+      const mainShare = mainTotal ? mainCount / mainTotal * 100 : 0;
+      const targetShare = targetTotal ? targetCount / targetTotal * 100 : 0;
+      return {
+        label: `Class ${classNumber}`,
+        mainCount,
+        targetCount,
+        mainShare,
+        targetShare,
+        difference: targetShare - mainShare
+      };
+    });
+    const biggestClass = classRows.sort(
+      (a, b) => Math.abs(b.difference) - Math.abs(a.difference)
+        || (b.mainCount + b.targetCount) - (a.mainCount + a.targetCount)
+    )[0];
+    const classChangeText = biggestClass
+      ? biggestClass.difference === 0
+        ? '無變化 —'
+        : `${biggestClass.difference > 0 ? '上升' : '下降'}${Math.abs(biggestClass.difference).toFixed(1)}個百分點 ${biggestClass.difference > 0 ? '▲' : '▼'}`
+      : '無法判定';
+
+    document.getElementById('compareResultSummary').innerHTML = `
+      <div class="compare-summary-card">
+        <div class="compare-summary-label">可分析個案差異</div>
+        <div class="compare-summary-value ${valueClass(analyzableDiff)}">${changeNumberText(analyzableDiff, '人')}（${signedPercentText(analyzableMain, analyzableTarget)}）</div>
+        <div class="compare-summary-period-detail">${mainPeriod} ${analyzableMain}人（${escapeHtml(mainCases.analyzable_percent || '0.0%')}）→ ${targetPeriod} ${analyzableTarget}人（${escapeHtml(targetCases.analyzable_percent || '0.0%')}）</div>
+      </div>
+      <div class="compare-summary-card">
+        <div class="compare-summary-label">顯微鏡檢確診個案差異</div>
+        <div class="compare-summary-value ${valueClass(confirmedDiff)}">${changeNumberText(confirmedDiff, '人')}（${signedPercentText(confirmedMain, confirmedTarget)}）</div>
+        <div class="compare-summary-period-detail">${mainPeriod} ${confirmedMain}人（${escapeHtml(mainCases.confirmed_percent || '0.0%')}）→ ${targetPeriod} ${confirmedTarget}人（${escapeHtml(targetCases.confirmed_percent || '0.0%')}）</div>
+      </div>
+      <div class="compare-summary-card">
+        <div class="compare-summary-label">主要組織型態差異</div>
+        <div class="compare-summary-diagnosis-primary">${histologyPrimary}</div>
+        <div class="compare-summary-period-detail compare-summary-diagnosis-detail">${histologyDetail}</div>
+      </div>
+      <div class="compare-summary-card">
+        <div class="compare-summary-label">個案分類最大差異</div>
+        <div class="compare-summary-age-row">
+          <span class="compare-summary-age-group">${escapeHtml(biggestClass?.label || '—')}</span>
+          <span class="compare-summary-age-change ${valueClass(biggestClass?.difference)}">${classChangeText}</span>
+        </div>
+        <div class="compare-summary-period-values">${mainPeriod} ${numberValue(biggestClass?.mainCount)}人（${numberValue(biggestClass?.mainShare).toFixed(1)}%）→ ${targetPeriod} ${numberValue(biggestClass?.targetCount)}人（${numberValue(biggestClass?.targetShare).toFixed(1)}%）</div>
+      </div>
+    `;
+  }
+
+  function renderDifferenceSummary(data, analysisItem = '性別年齡分佈') {
+    const category = summaryCategoryForItem(analysisItem);
+    if (category === 'diagnosis') {
+      renderDiagnosisDifferenceSummary(data);
+      return;
+    }
+    if (category !== 'incidence') {
+      renderSummaryCardPlaceholders(category);
+      return;
+    }
     const mainAnalysis = data.analysis_data?.main || {};
     const targetAnalysis = data.analysis_data?.target || {};
     const mainAge = mainAnalysis.ageMedianData || {};
     const targetAge = targetAnalysis.ageMedianData || {};
     const mainGender = normalizeGenderAgeData(mainAnalysis.genderAgeData || {});
     const targetGender = normalizeGenderAgeData(targetAnalysis.genderAgeData || {});
-    const changes = targetGender.categories.map((label, index) => ({
-      label,
-      value: Number(targetGender.total[index] || 0) - Number(mainGender.total[index] || 0)
-    }));
-    const biggest = changes.sort((a, b) => Math.abs(b.value) - Math.abs(a.value))[0] || { label: '—', value: 0 };
+    const changes = targetGender.categories.map((label, index) => {
+      const mainCount = Number(mainGender.total[index] || 0);
+      const targetCount = Number(targetGender.total[index] || 0);
+      return { label, mainCount, targetCount, value: targetCount - mainCount };
+    });
+    const biggest = changes.sort((a, b) => Math.abs(b.value) - Math.abs(a.value))[0]
+      || { label: '—', mainCount: 0, targetCount: 0, value: 0 };
+    const mainAgeGroupTotal = mainGender.total.reduce((sum, value) => sum + Number(value || 0), 0);
+    const targetAgeGroupTotal = targetGender.total.reduce((sum, value) => sum + Number(value || 0), 0);
+    const mainAgeShare = mainAgeGroupTotal ? biggest.mainCount / mainAgeGroupTotal * 100 : 0;
+    const targetAgeShare = targetAgeGroupTotal ? biggest.targetCount / targetAgeGroupTotal * 100 : 0;
+    const ageShareDiff = targetAgeShare - mainAgeShare;
+    const ageShareDiffText = ageShareDiff > 0
+      ? `+${ageShareDiff.toFixed(1)}%`
+      : ageShareDiff < 0 ? `−${Math.abs(ageShareDiff).toFixed(1)}%` : '0.0%';
+    const formatAgeGroup = label => {
+      const text = String(label || '—').replace(/^(\d+)-(\d+)$/, '$1–$2');
+      return `${text}${text.includes('歲') || text === '—' ? '' : '歲'}`;
+    };
+    const ageGroupLabel = formatAgeGroup(biggest.label);
+    const medianGroup = genderData => {
+      const counts = genderData.total.map(value => Number(value || 0));
+      const total = counts.reduce((sum, value) => sum + value, 0);
+      if (!total) return { index: -1, label: '—' };
+      const medianPosition = (total + 1) / 2;
+      let cumulative = 0;
+      const index = counts.findIndex(value => {
+        cumulative += value;
+        return cumulative >= medianPosition;
+      });
+      return {
+        index,
+        label: index >= 0 ? formatAgeGroup(genderData.categories[index]) : '—'
+      };
+    };
+    const mainMedianGroup = medianGroup(mainGender);
+    const targetMedianGroup = medianGroup(targetGender);
+    const medianGroupDiff = mainMedianGroup.index >= 0 && targetMedianGroup.index >= 0
+      ? targetMedianGroup.index - mainMedianGroup.index
+      : 0;
+    const medianGroupChangeText = mainMedianGroup.index < 0 || targetMedianGroup.index < 0
+      ? '無法判定'
+      : medianGroupDiff > 0
+        ? `上升${medianGroupDiff}個年齡級距 ▲`
+        : medianGroupDiff < 0
+          ? `下降${Math.abs(medianGroupDiff)}個年齡級距 ▼`
+          : '中位年齡層無變化 —';
     const totalDiff = Number(data.target?.total_count || 0) - Number(data.main?.total_count || 0);
-    const medianDiff = Number(targetAge.total || 0) - Number(mainAge.total || 0);
-    const maleChange = changePercentText(mainAge.male_count, targetAge.male_count);
-    const femaleChange = changePercentText(mainAge.female_count, targetAge.female_count);
+    const maleCountDiff = Number(targetAge.male_count || 0) - Number(mainAge.male_count || 0);
+    const femaleCountDiff = Number(targetAge.female_count || 0) - Number(mainAge.female_count || 0);
+    const mainGenderTotal = Number(mainAge.male_count || 0) + Number(mainAge.female_count || 0);
+    const targetGenderTotal = Number(targetAge.male_count || 0) + Number(targetAge.female_count || 0);
+    const mainMaleShare = mainGenderTotal ? Number(mainAge.male_count || 0) / mainGenderTotal * 100 : 0;
+    const targetMaleShare = targetGenderTotal ? Number(targetAge.male_count || 0) / targetGenderTotal * 100 : 0;
+    const mainFemaleShare = mainGenderTotal ? Number(mainAge.female_count || 0) / mainGenderTotal * 100 : 0;
+    const targetFemaleShare = targetGenderTotal ? Number(targetAge.female_count || 0) / targetGenderTotal * 100 : 0;
+    const maleShareDiff = targetMaleShare - mainMaleShare;
+    const femaleShareDiff = targetFemaleShare - mainFemaleShare;
+    const shareChangeText = (mainShare, targetShare) => {
+      const difference = targetShare - mainShare;
+      if (Math.abs(difference) < 0.05) return '0.0%';
+      return `${difference > 0 ? '+' : '−'}${Math.abs(difference).toFixed(1)}%`;
+    };
+    const shareValueClass = difference => difference > 0 ? 'is-up' : difference < 0 ? 'is-down' : '';
     const formatPeriod = label => String(label || '').includes('–') ? label : `${label}年`;
-    const comparisonLabel = escapeHtml(`${formatPeriod(data.target?.year_label || '對照資料')}相較於${formatPeriod(data.main?.year_label || '基準資料')}`);
+    const mainPeriodLabel = escapeHtml(formatPeriod(data.main?.year_label || '基準期'));
+    const targetPeriodLabel = escapeHtml(formatPeriod(data.target?.year_label || '比較期'));
     const rangeAverage = data.compare_mode === 'range'
       ? `<div class="compare-summary-subvalue">年平均${changeNumberText(data.diff?.annual_average, '人')}</div>` : '';
-    const valueClass = value => Number(value) > 0 ? 'is-up' : Number(value) < 0 ? 'is-down' : '';
+    const valueClass = value => Number(value) > 0 ? 'is-up' : Number(value) < 0 ? 'is-down' : 'is-flat';
     document.getElementById('compareResultSummary').innerHTML = `
-      <div class="compare-summary-card"><div class="compare-summary-label">${comparisonLabel}的總個案數差異</div><div class="compare-summary-value ${valueClass(totalDiff)}">${changeNumberText(totalDiff, '人')}（${changePercentValue(data.main?.total_count, data.target?.total_count)}）${rangeAverage}</div></div>
-      <div class="compare-summary-card"><div class="compare-summary-label">${comparisonLabel}的年齡中位數差異</div><div class="compare-summary-value ${valueClass(medianDiff)}">${changeNumberText(medianDiff, '歲')}</div></div>
-      <div class="compare-summary-card"><div class="compare-summary-label">${comparisonLabel}的變化最大的年齡層</div><div class="compare-summary-value ${valueClass(biggest.value)}">${biggest.label}（${changeNumberText(biggest.value, '人')}）</div></div>
-      <div class="compare-summary-card"><div class="compare-summary-label">${comparisonLabel}的性別個案變化</div><div class="compare-summary-value">男 ${maleChange}｜女 ${femaleChange}</div></div>
+      <div class="compare-summary-card">
+        <div class="compare-summary-label">總個案數差異</div>
+        <div class="compare-summary-value ${valueClass(totalDiff)}">${changeNumberText(totalDiff, '人')}（${signedPercentText(data.main?.total_count, data.target?.total_count)}）${rangeAverage}</div>
+        <div class="compare-summary-period-detail">${mainPeriodLabel} ${Number(data.main?.total_count || 0)}人 → ${targetPeriodLabel} ${Number(data.target?.total_count || 0)}人</div>
+      </div>
+      <div class="compare-summary-card">
+        <div class="compare-summary-label">年齡層個案數差異</div>
+        <div class="compare-summary-age-row">
+          <span class="compare-summary-age-group">${escapeHtml(ageGroupLabel)}</span>
+          <span class="compare-summary-age-change ${valueClass(biggest.value)}">${changeNumberText(biggest.value, '人')}（${ageShareDiffText}）</span>
+        </div>
+        <div class="compare-summary-period-values">${escapeHtml(formatPeriod(data.main?.year_label || '基準期'))} ${biggest.mainCount}人（${mainAgeShare.toFixed(1)}%）→ ${escapeHtml(formatPeriod(data.target?.year_label || '比較期'))} ${biggest.targetCount}人（${targetAgeShare.toFixed(1)}%）</div>
+      </div>
+      <div class="compare-summary-card">
+        <div class="compare-summary-label">性別個案數差異</div>
+        <div class="compare-summary-gender-primary"><span class="${valueClass(maleCountDiff)}">男 ${changeNumberText(maleCountDiff, '人')}</span> <span class="${shareValueClass(maleShareDiff)}">（${shareChangeText(mainMaleShare, targetMaleShare)}）</span><span class="compare-summary-divider">｜</span><span class="${valueClass(femaleCountDiff)}">女 ${changeNumberText(femaleCountDiff, '人')}</span> <span class="${shareValueClass(femaleShareDiff)}">（${shareChangeText(mainFemaleShare, targetFemaleShare)}）</span></div>
+        <div class="compare-summary-period-detail">男：${mainPeriodLabel} ${Number(mainAge.male_count || 0)}人（${mainMaleShare.toFixed(1)}%）→ ${targetPeriodLabel} ${Number(targetAge.male_count || 0)}人（${targetMaleShare.toFixed(1)}%）</div>
+        <div class="compare-summary-period-detail compare-summary-period-detail-next">女：${mainPeriodLabel} ${Number(mainAge.female_count || 0)}人（${mainFemaleShare.toFixed(1)}%）→ ${targetPeriodLabel} ${Number(targetAge.female_count || 0)}人（${targetFemaleShare.toFixed(1)}%）</div>
+      </div>
+      <div class="compare-summary-card">
+        <div class="compare-summary-label">全體中位年齡層差異<span class="compare-summary-label-note">（依全體個案的年齡層分布判定）</span></div>
+        <div class="compare-summary-median-change ${valueClass(medianGroupDiff)}">${medianGroupChangeText}</div>
+        <div class="compare-summary-median-period">${mainPeriodLabel} ${escapeHtml(mainMedianGroup.label)} → ${targetPeriodLabel} ${escapeHtml(targetMedianGroup.label)}</div>
+      </div>
     `;
   }
 
@@ -1131,6 +1370,7 @@
 
   function renderResultItem(data, item, index) {
     activeResultIndex = index;
+    renderDifferenceSummary(data, item);
     document.querySelectorAll('.compare-result-tab').forEach((button, buttonIndex) => {
       button.classList.toggle('active', buttonIndex === index);
     });
@@ -1139,11 +1379,11 @@
     document.getElementById('compareResultPanel').innerHTML = `
       <div class="compare-result-grid">
         <section class="compare-result-item is-main">
-          <div class="compare-result-heading"><div><h3>${isEnglish() ? 'Baseline' : '基準資料'}｜${escapeHtml(data.main?.year_label || '—')}</h3></div></div>
+          <div class="compare-result-heading"><div><h3>${isEnglish() ? 'Baseline period' : '基準期資料'}｜${escapeHtml(data.main?.year_label || '—')}</h3></div></div>
           <div id="mainAnnualReport"></div>
         </section>
         <section class="compare-result-item is-target">
-          <div class="compare-result-heading"><div><h3>${isEnglish() ? 'Comparison' : '對照資料'}｜${escapeHtml(data.target?.year_label || '—')}</h3></div></div>
+          <div class="compare-result-heading"><div><h3>${isEnglish() ? 'Comparison period' : '比較期資料'}｜${escapeHtml(data.target?.year_label || '—')}</h3></div></div>
           <div id="targetAnnualReport"></div>
         </section>
       </div>
@@ -1167,8 +1407,8 @@
       return selectedAnalysis;
     };
     return {
-      comparison_definition: '所有差異均以對照資料減去基準資料計算；正值代表對照資料較高，負值代表對照資料較低。',
-      comparison_direction: `${data.target?.year_label || '對照年度'}相較於${data.main?.year_label || '基準年度'}`,
+      comparison_definition: '所有差異均以比較期資料減去基準期資料計算；正值代表比較期資料較高，負值代表比較期資料較低。',
+      comparison_direction: `${data.target?.year_label || '比較期年度'}相較於${data.main?.year_label || '基準期年度'}`,
       selected_conditions: {
         behavior: behavior.selectedOptions[0]?.textContent?.trim() || '',
         cancer: selectedCancerTitle(),
@@ -1266,12 +1506,17 @@
     const years = Array.from(new Set([...Object.keys(mainCounts), ...Object.keys(targetCounts)]))
       .sort((a, b) => Number(a) - Number(b));
 
-    const baselineLabel = isEnglish() ? 'Baseline' : '基準';
-    const comparisonLabel = isEnglish() ? 'Comparison' : '對照';
+    const baselineLabel = isEnglish() ? 'Baseline period' : '基準期';
+    const comparisonLabel = isEnglish() ? 'Comparison period' : '比較期';
     const chart = echarts.getInstanceByDom(container) || echarts.init(container);
     chart.setOption({
-      color: ['#144abe', '#e45f00'],
-      title: { text: isEnglish() ? 'Annual Case Count Trend' : '年度區間個案數趨勢', left: 'center', top: 18, textStyle: { fontSize: 18 } },
+      color: ['#166534', '#c2410c'],
+      title: {
+        text: isEnglish() ? 'Annual Case Count Trend' : '年度區間個案數趨勢',
+        left: 'center',
+        top: 18,
+        textStyle: { fontSize: 18 }
+      },
       tooltip: { trigger: 'axis' },
       legend: { top: 52, data: [`${baselineLabel} ${data.main?.year_label || ''}`, `${comparisonLabel} ${data.target?.year_label || ''}`] },
       grid: { left: 50, right: 35, top: 92, bottom: 30, containLabel: true },
@@ -1291,7 +1536,22 @@
           name: `${baselineLabel} ${data.main?.year_label || ''}`,
           type: 'line',
           connectNulls: false,
+          triggerLineEvent: true,
+          symbol: 'circle',
           symbolSize: 8,
+          lineStyle: { type: 'solid', width: 3, color: '#166534' },
+          itemStyle: { color: '#166534' },
+          emphasis: {
+            focus: 'series',
+            scale: 1.5,
+            lineStyle: { type: 'solid', width: 5, color: '#166534', opacity: 1 },
+            itemStyle: { color: '#166534', borderColor: '#fff', borderWidth: 2, opacity: 1 }
+          },
+          blur: {
+            lineStyle: { opacity: 0.18 },
+            itemStyle: { opacity: 0.18 },
+            label: { opacity: 0.18 }
+          },
           label: { show: true, position: 'top' },
           data: years.map(year => Object.prototype.hasOwnProperty.call(mainCounts, year) ? mainCounts[year] : null)
         },
@@ -1299,7 +1559,22 @@
           name: `${comparisonLabel} ${data.target?.year_label || ''}`,
           type: 'line',
           connectNulls: false,
+          triggerLineEvent: true,
+          symbol: 'circle',
           symbolSize: 8,
+          lineStyle: { type: 'solid', width: 3, color: '#c2410c' },
+          itemStyle: { color: '#c2410c' },
+          emphasis: {
+            focus: 'series',
+            scale: 1.5,
+            lineStyle: { type: 'solid', width: 5, color: '#c2410c', opacity: 1 },
+            itemStyle: { color: '#c2410c', borderColor: '#fff', borderWidth: 2, opacity: 1 }
+          },
+          blur: {
+            lineStyle: { opacity: 0.18 },
+            itemStyle: { opacity: 0.18 },
+            label: { opacity: 0.18 }
+          },
           label: { show: true, position: 'top' },
           data: years.map(year => Object.prototype.hasOwnProperty.call(targetCounts, year) ? targetCounts[year] : null)
         }
@@ -1313,7 +1588,6 @@
     lastComparisonData = data;
     hasRenderedResult = true;
     resultStale.classList.add('d-none');
-    renderDifferenceSummary(data);
     renderRangeTrend(data);
     const tabs = document.getElementById('compareResultTabs');
     tabs.innerHTML = items.map((item, index) => `
@@ -1344,7 +1618,6 @@
       const items = selectedCompareItems();
       const item = items[activeResultIndex] || items[0];
       if (!item) return;
-      renderDifferenceSummary(lastComparisonData);
       renderRangeTrend(lastComparisonData);
       renderResultItem(lastComparisonData, item, activeResultIndex);
       renderAiNarrative(lastComparisonData, item);
@@ -1399,8 +1672,8 @@
 
   function updateCompareMode() {
     const isRange = selectedCompareMode() === 'range';
-    clearDataSelection(mainFile, mainYear, mainYearEnd, mainMeta, mainPreview, '基準資料預覽');
-    clearDataSelection(targetFile, targetYear, targetYearEnd, targetMeta, targetPreview, '對照資料預覽');
+    clearDataSelection(mainFile, mainYear, mainYearEnd, mainMeta, mainPreview, '基準期資料預覽');
+    clearDataSelection(targetFile, targetYear, targetYearEnd, targetMeta, targetPreview, '比較期資料預覽');
     document.getElementById('compareDataGrid').classList.toggle('is-range-mode', isRange);
     document.getElementById('mainYearEndGroup').classList.toggle('d-none', !isRange);
     document.getElementById('targetYearEndGroup').classList.toggle('d-none', !isRange);
@@ -1498,19 +1771,16 @@
     });
   });
   document.getElementById('btnSelectAllCompareItems').addEventListener('click', () => {
-    document.querySelectorAll(`[data-compare-subitems="${selectedCompareType()}"] .compare-subitem-check:not(:disabled)`).forEach(input => { input.checked = true; });
-    if (selectedCompareType() === 'stage') {
-      document.querySelectorAll('.compare-stage-class-checkbox').forEach(input => { input.checked = true; });
-    }
+    document.querySelectorAll('.compare-subitem-check:not(:disabled)').forEach(input => { input.checked = true; });
+    updateCompareStageState();
+    document.querySelectorAll('.compare-stage-class-checkbox:not(:disabled)').forEach(input => { input.checked = true; });
     updateCompareStageState();
     markResultsStale();
     updateButtonState();
   });
   document.getElementById('btnClearCompareItems').addEventListener('click', () => {
-    document.querySelectorAll(`[data-compare-subitems="${selectedCompareType()}"] .compare-subitem-check`).forEach(input => { input.checked = false; });
-    if (selectedCompareType() === 'stage') {
-      document.querySelectorAll('.compare-stage-class-checkbox').forEach(input => { input.checked = false; });
-    }
+    document.querySelectorAll('.compare-subitem-check').forEach(input => { input.checked = false; });
+    document.querySelectorAll('.compare-stage-class-checkbox').forEach(input => { input.checked = false; });
     updateCompareStageState();
     markResultsStale();
     updateButtonState();
@@ -1520,10 +1790,10 @@
   });
   resetButton.addEventListener('click', resetComparison);
   document.getElementById('btnReselectMain').addEventListener('click', () => {
-    reselectData(mainFile, mainYear, mainYearEnd, mainMeta, mainPreview, '基準資料預覽');
+    reselectData(mainFile, mainYear, mainYearEnd, mainMeta, mainPreview, '基準期資料預覽');
   });
   document.getElementById('btnReselectTarget').addEventListener('click', () => {
-    reselectData(targetFile, targetYear, targetYearEnd, targetMeta, targetPreview, '對照資料預覽');
+    reselectData(targetFile, targetYear, targetYearEnd, targetMeta, targetPreview, '比較期資料預覽');
   });
   document.addEventListener('DOMContentLoaded', () => {
     setTimeout(updateButtonState, 0);
@@ -1545,7 +1815,7 @@
       return;
     }
     if (!filesReady()) {
-      showAlert('資料不可相同', '基準資料與對照資料不可使用相同檔案及相同年度。');
+      showAlert('資料不可相同', '基準期資料與比較期資料不可使用相同檔案及相同年度。');
       return;
     }
     if (!behavior.value) {

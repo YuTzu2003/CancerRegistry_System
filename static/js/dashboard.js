@@ -144,6 +144,39 @@ window.DashboardRenderer.getGenderAgeChartOption = function(genderAgeData) {
         };
     };
 
+// Shared annual-report rendering primitives used by both analysis and comparison pages.
+window.DashboardRenderer.axisLabelLines = function(value, maxLength = 68) {
+    return window.AnnualReportRenderer.axisLabelLines(value, maxLength);
+};
+window.DashboardRenderer.rightAlignedAxisLabel = function(value, maxLength = 68) {
+    return window.AnnualReportRenderer.rightAlignedAxisLabel(value, maxLength);
+};
+window.DashboardRenderer.histologyRowHeight = function(names) {
+    return window.AnnualReportRenderer.histologyRowHeight(names);
+};
+window.DashboardRenderer.getGenderAgeChartOption = function(genderAgeData) {
+    const isEnglish = window.DashboardI18n?.getLanguage() === 'en';
+    const selectedCancer = this.getCancerTitleForSentence(this.getSelectedCancerTitle());
+    const titleText = isEnglish
+        ? `Age and Sex Distribution of Newly Diagnosed with ${this.getEnglishCancerPatientLabel(selectedCancer)} Patients, ${this.getSelectedYearTitle()}`
+        : `${this.getSelectedYearTitle()}年新診斷${selectedCancer}病患${this.t('sexAge')}${this.t('distribution')}${this.t('chart')}`;
+
+    return window.AnnualReportRenderer.getGenderAgeChartOption(genderAgeData, {
+        title: titleText,
+        source: this.t('source'),
+        labels: {
+            male: this.t('male'),
+            female: this.t('female'),
+            total: this.t('total'),
+            age: this.t('age'),
+            dataView: this.t('dataView'),
+            close: this.t('close'),
+            refresh: this.t('refresh'),
+            downloadImage: this.t('downloadImage')
+        }
+    });
+};
+
 document.addEventListener('DOMContentLoaded', function() {
     /* ── 性別與年齡分佈圖表 ── */
     var chartDom = document.getElementById('main');

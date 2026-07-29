@@ -248,17 +248,117 @@
 }
 .compare-summary-label {
     color: var(--muted);
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 700;
+}
+.compare-summary-label-note {
+    color: #64748b;
+    font-weight: 500;
 }
 .compare-summary-value {
     margin-top: 4px;
     color: #111827;
     font-size: 17px;
     font-weight: 800;
+    line-height: 1.45;
 }
 .compare-summary-value.is-up { color: #b91c1c; }
 .compare-summary-value.is-down { color: #047857; }
+.compare-summary-value.is-flat { color: #64748b; }
+.compare-summary-placeholder-value {
+    color: #94a3b8;
+    font-size: 17px;
+    font-weight: 400;
+    line-height: 1.45;
+}
+.compare-summary-card .is-up { color: #b91c1c; }
+.compare-summary-card .is-down { color: #047857; }
+.compare-summary-card .is-flat {
+    display: inline-flex;
+    align-items: center;
+    vertical-align: middle;
+    color: #475569;
+    background: #e2e8f0;
+    border-radius: 4px;
+    line-height: 1;
+    padding: 3px 5px;
+}
+.compare-summary-divider {
+    color: #64748b;
+    padding: 0 3px;
+}
+.compare-summary-gender-primary {
+    margin-top: 4px;
+    color: #111827;
+    font-size: 14px;
+    font-weight: 800;
+    line-height: 1.45;
+    white-space: nowrap;
+}
+.compare-summary-diagnosis-primary {
+    margin-top: 4px;
+    color: #111827;
+    font-size: 14px;
+    font-weight: 800;
+    line-height: 1.45;
+    white-space: nowrap;
+}
+.compare-summary-diagnosis-detail {
+    white-space: nowrap;
+}
+.compare-summary-period-detail {
+    margin-top: 5px;
+    color: #475569;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.45;
+}
+.compare-summary-period-detail-next {
+    margin-top: 1px;
+}
+.compare-summary-median-period {
+    margin-top: 5px;
+    color: #475569;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.45;
+}
+.compare-summary-median-change {
+    margin-top: 4px;
+    color: #111827;
+    font-size: 17px;
+    font-weight: 800;
+    line-height: 1.45;
+}
+.compare-summary-age-row {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin-top: 4px;
+    line-height: 1.45;
+    white-space: nowrap;
+}
+.compare-summary-age-group {
+    color: #111827;
+    font-size: 17px;
+    font-weight: 800;
+}
+.compare-summary-period-values {
+    margin-top: 5px;
+    color: #475569;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.45;
+    white-space: nowrap;
+}
+.compare-summary-age-change {
+    color: #111827;
+    font-size: 17px;
+    font-weight: 800;
+}
+.compare-summary-age-change.is-up { color: #b91c1c; }
+.compare-summary-age-change.is-down { color: #047857; }
+.compare-summary-age-change.is-flat { color: #475569; }
 .compare-result-heading {
     display: flex;
     align-items: flex-start;
@@ -270,7 +370,7 @@
 .compare-result-heading .compare-view-switch {
     margin-bottom: 0;
 }
-.compare-result-item.is-main { border-top: 4px solid #144abe; }
+.compare-result-item.is-main { border-top: 4px solid #166534; }
 .compare-result-item.is-target { border-top: 4px solid #e45f00; }
 .compare-ai-narrative {
     margin-top: 20px;
@@ -328,10 +428,14 @@
     overflow-wrap: anywhere;
 }
 .compare-result-item .annual-report-table th,
-.compare-result-item .annual-report-table td,
-.compare-result-item .annual-report-table caption {
+.compare-result-item .annual-report-table td {
     white-space: normal;
     overflow-wrap: anywhere;
+}
+.compare-result-item .annual-report-table caption {
+    white-space: nowrap;
+    overflow-wrap: normal;
+    word-break: keep-all;
 }
 .compare-result-item .annual-report-table th,
 .compare-result-item .annual-report-table td,

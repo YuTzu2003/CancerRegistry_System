@@ -5,14 +5,14 @@
   <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/i18next@25.3.2/dist/umd/i18next.min.js"></script>
   <link rel="stylesheet" href="/static/css/dashboard.css?v=20260726-table-title-size">
-  <link rel="stylesheet" href="/static/css/dashboard_compare.css">
+  <link rel="stylesheet" href="/static/css/dashboard_compare.css?v=20260729-unconfigured-plain">
 {% endblock %}
 
 {% block content %}
 <div class="page-head">
   <div>
     <h1>年度比較</h1>
-    <p class="lead">選擇基準資料與對照資料，檢視不同年度間的癌別統計分析結果。</p>
+    <p class="lead">選擇基準期資料與比較期資料，檢視不同年度間的癌別統計分析結果。</p>
   </div>
 </div>
 
@@ -29,7 +29,7 @@
 <div id="compareDataGrid" class="compare-grid">
   <section class="compare-card">
     <div class="compare-card-head">
-      <h2>基準資料</h2>
+      <h2>基準期資料</h2>
       <button id="btnReselectMain" class="btn-black-outline compare-reselect-button" type="button">
         <i class="bi bi-arrow-counterclockwise me-1"></i>重新選擇
       </button>
@@ -62,13 +62,13 @@
       <button type="button" class="compare-preview-toggle d-none" data-preview-target="mainComparePreview">查看資料預覽</button>
     </div>
     <div id="mainComparePreview" class="compare-preview d-none">
-      <div class="compare-preview-empty">基準資料預覽</div>
+      <div class="compare-preview-empty">基準期資料預覽</div>
     </div>
   </section>
 
   <section class="compare-card">
     <div class="compare-card-head">
-      <h2>對照資料</h2>
+      <h2>比較期資料</h2>
       <button id="btnReselectTarget" class="btn-black-outline compare-reselect-button" type="button">
         <i class="bi bi-arrow-counterclockwise me-1"></i>重新選擇
       </button>
@@ -101,7 +101,7 @@
       <button type="button" class="compare-preview-toggle d-none" data-preview-target="targetComparePreview">查看資料預覽</button>
     </div>
     <div id="targetComparePreview" class="compare-preview d-none">
-      <div class="compare-preview-empty">對照資料預覽</div>
+      <div class="compare-preview-empty">比較期資料預覽</div>
     </div>
   </section>
 </div>
@@ -148,8 +148,8 @@
     <div class="d-flex align-items-center mb-1">
       <h6 class="mb-0 fw-bold text-dark me-3" style="flex-shrink: 0;">分析主題：</h6>
       <div class="ms-auto d-flex align-items-center gap-2" role="group" aria-label="分析項目操作">
-        <button type="button" id="btnSelectAllCompareItems" class="btn btn-link btn-sm text-decoration-none p-0 fw-semibold" title="全選目前主題">全選</button>
-        <button type="button" id="btnClearCompareItems" class="btn btn-link btn-sm text-decoration-none p-0 fw-semibold" title="取消全選">取消全選</button>
+        <button type="button" id="btnSelectAllCompareItems" class="btn btn-link btn-sm text-decoration-none p-0 fw-semibold" title="全選所有分析主題">全選</button>
+        <button type="button" id="btnClearCompareItems" class="btn btn-link btn-sm text-decoration-none p-0 fw-semibold" title="取消全選所有分析主題">取消全選</button>
       </div>
     </div>
     <div class="d-flex flex-wrap gap-2">
@@ -251,6 +251,10 @@
         <input class="form-check-input compare-subitem-check" type="checkbox" id="compareItemCrossNewCases" value="歷年新診斷件數" disabled>
         <label class="form-check-label" for="compareItemCrossNewCases">歷年新診斷件數</label>
       </div>
+      <div class="form-check">
+        <input class="form-check-input compare-subitem-check" type="checkbox" id="compareItemCommonCancers" value="本院常見癌症" disabled>
+        <label class="form-check-label" for="compareItemCommonCancers">本院常見癌症</label>
+      </div>
     </div>
       </div>
     </div>
@@ -274,11 +278,11 @@
             <span id="summaryCompareMode" class="text-dark fw-medium ms-1">單一年度比較</span>
           </div>
           <div class="d-flex mb-2">
-            <span class="text-secondary d-flex" style="width: 80px; flex-shrink: 0;"><span style="flex-grow: 1; text-align-last: justify;">基準資料</span>：</span>
+            <span class="text-secondary d-flex" style="width: 80px; flex-shrink: 0;"><span style="flex-grow: 1; text-align-last: justify;">基準期資料</span>：</span>
             <span id="summaryMainData" class="text-dark fw-medium ms-1">尚未選擇</span>
           </div>
           <div class="d-flex mb-2">
-            <span class="text-secondary d-flex" style="width: 80px; flex-shrink: 0;"><span style="flex-grow: 1; text-align-last: justify;">對照資料</span>：</span>
+            <span class="text-secondary d-flex" style="width: 80px; flex-shrink: 0;"><span style="flex-grow: 1; text-align-last: justify;">比較期資料</span>：</span>
             <span id="summaryTargetData" class="text-dark fw-medium ms-1">尚未選擇</span>
           </div>
           <div class="d-flex mb-2">
@@ -349,6 +353,7 @@
     window.dashboardCancerNameTranslations = {};
   }
 </script>
-<script src="{{ url_for('static', filename='js/dashboard_i18n.js') }}?v=20260726-compare-language"></script>
-<script src="{{ url_for('static', filename='js/dashboard_compare.js') }}?v=20260726-hide-file-uuid"></script>
+<script src="{{ url_for('static', filename='js/dashboard_i18n.js') }}?v=20260729-age-group-label"></script>
+<script src="{{ url_for('static', filename='js/annual_report_renderer.js') }}?v=20260729-common-cancers"></script>
+<script src="{{ url_for('static', filename='js/dashboard_compare.js') }}?v=20260729-negative-green"></script>
 {% endblock %}

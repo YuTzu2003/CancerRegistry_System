@@ -261,8 +261,8 @@ def dashboard_year_range():
         return jsonify({"ok": False, "error": "檔案不存在"}), 404
 
     try:
-        from modules.blueprint.dashboard.chart_analytics import get_column_names
-        df = pd.read_excel(fpath)
+        from modules.blueprint.dashboard.chart_analytics import _read_dashboard_excel, get_column_names
+        df = _read_dashboard_excel(owned_file["storage_path"])
         cols = get_column_names(df)
         year_col = cols.get("year_col")
         if not year_col or year_col not in df.columns:
@@ -399,6 +399,7 @@ def analyze_dashboard_file_route():
     year_start = data.get("year_start", "")
     year_end = data.get("year_end", "")
     behavior = data.get("behavior", "")
+    analysis_items = data.get("analysis_items", [])
     
     owned_file = _get_owned_dashboard_file(file_id, session.get("id"))
     if not owned_file:
@@ -406,7 +407,9 @@ def analyze_dashboard_file_route():
         
     try:
         from modules.blueprint.dashboard.chart_analytics import analyze_dashboard_file
-        chart_data = analyze_dashboard_file(owned_file["storage_path"], cancers, year_start, year_end, behavior)
+        chart_data = analyze_dashboard_file(
+            owned_file["storage_path"], cancers, year_start, year_end, behavior, analysis_items
+        )
         return jsonify({"ok": True, "data": chart_data}), 200
     except Exception as e:
         import logging
@@ -482,10 +485,17 @@ def dashboard_file_years_route():
         return jsonify({"ok": False, "error": "未提供檔案名稱"}), 400
 
     try:
-        from modules.blueprint.dashboard.chart_analytics import get_dashboard_file_preview, get_dashboard_file_years
-        years = get_dashboard_file_years(owned_file["storage_path"])
+        from modules.blueprint.dashboard.chart_analytics import (
+            _read_dashboard_excel,
+            get_column_names,
+            get_dashboard_file_preview,
+            get_dashboard_file_years,
+        )
+        source_df = _read_dashboard_excel(owned_file["storage_path"])
+        cols = get_column_names(source_df)
+        years = get_dashboard_file_years(owned_file["storage_path"], source_df, cols)
         preview = get_dashboard_file_preview(
-            owned_file["storage_path"], 10, year_start, year_end
+            owned_file["storage_path"], 10, year_start, year_end, source_df, cols
         )
         return jsonify({"ok": True, "years": years, "preview": preview}), 200
     except Exception as e:
@@ -510,20 +520,20 @@ def compare_dashboard_files_route():
     main_file = _get_owned_dashboard_file(main_file_id, session.get("id"))
     target_file = _get_owned_dashboard_file(target_file_id, session.get("id"))
     if not main_file or not target_file:
-        return jsonify({"ok": False, "error": "請選擇基準資料與對照資料"}), 400
+        return jsonify({"ok": False, "error": "請選擇基準期資料與比較期資料"}), 400
     if compare_mode not in {"single", "range"}:
         return jsonify({"ok": False, "error": "比較模式不正確"}), 400
     if compare_mode == "single":
         main_year_end = main_year
         target_year_end = target_year
     if not main_year or not target_year or not main_year_end or not target_year_end:
-        return jsonify({"ok": False, "error": "請選擇基準資料與對照資料的年度"}), 400
+        return jsonify({"ok": False, "error": "請選擇基準期資料與比較期資料的年度"}), 400
     if not all(year.isdigit() for year in (main_year, target_year, main_year_end, target_year_end)):
         return jsonify({"ok": False, "error": "年度格式不正確"}), 400
     if int(main_year) > int(main_year_end) or int(target_year) > int(target_year_end):
         return jsonify({"ok": False, "error": "起始年度不可晚於結束年度"}), 400
     if main_file_id == target_file_id and main_year == target_year and main_year_end == target_year_end:
-        return jsonify({"ok": False, "error": "同一份 Excel 比較時，基準期間與對照期間不可相同"}), 400
+        return jsonify({"ok": False, "error": "同一份 Excel 比較時，基準期間與比較期間不可相同"}), 400
     if not behavior:
         return jsonify({"ok": False, "error": "請選擇性態碼"}), 400
     if not cancers:

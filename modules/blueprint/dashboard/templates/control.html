@@ -244,6 +244,10 @@
                   <input class="form-check-input item-checkbox" type="checkbox" name="subTab_cross" id="chkCrossYearNewCases" data-parent="cross_year" value="歷年新診斷件數" disabled>
                   <label class="form-check-label text-dark" for="chkCrossYearNewCases" style="cursor: pointer;">歷年新診斷件數</label>
                 </div>
+                <div class="form-check">
+                  <input class="form-check-input item-checkbox" type="checkbox" name="subTab_cross" id="chkCrossYearCommonCancers" data-parent="cross_year" value="本院常見癌症" disabled>
+                  <label class="form-check-label text-dark" for="chkCrossYearCommonCancers" style="cursor: pointer;">本院常見癌症</label>
+                </div>
               </div>
               
             </div>
@@ -705,4 +709,5 @@
   </div>
 </div>
 
-<script src="{{ url_for('static', filename='js/dashboard_control.js') }}?v=20260726-lung-subtypes"></script>
+<script src="{{ url_for('static', filename='js/annual_report_renderer.js') }}?v=20260729-common-cancers"></script>
+<script src="{{ url_for('static', filename='js/dashboard_control.js') }}?v=20260729-analysis-performance"></script>

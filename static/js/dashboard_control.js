@@ -1,4 +1,6 @@
 (function() {
+  window.AnnualReportRenderer?.applyConditionCatalog(document, 'analysis');
+
   /* ── 狀態管理與介面更新邏輯 ── */
   window.selectedCancers = new Set();
   
@@ -1170,7 +1172,9 @@ function initDashboardControl() {
               cancers: Array.from(window.selectedCancers || []),
               year_start: yearStartVal,
               year_end: yearEndVal,
-              behavior: behaviorVal
+              behavior: behaviorVal,
+              analysis_items: Array.from(document.querySelectorAll('.item-checkbox:checked'))
+                  .map(item => item.value)
           };
           fetch('/api/dashboard/analyze_file', {
               method: 'POST',

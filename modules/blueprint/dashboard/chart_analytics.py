@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import logging
+from functools import lru_cache
 from modules.blueprint.dashboard.definition.cancer_grouping import classify_cancer_group
 from modules.blueprint.dashboard.definition.cancer_group_rules import CANCER_GROUP_RULES
 from modules.blueprint.dashboard.definition.histology_mapping import get_histology_rules
@@ -17,6 +18,18 @@ def _safe_dashboard_path(filename):
             or not os.path.isfile(fpath)):
         raise FileNotFoundError("找不到指定的 Excel 檔案")
     return fpath
+
+
+@lru_cache(maxsize=8)
+def _read_dashboard_excel_cached(fpath, modified_ns, file_size):
+    """Reuse parsed workbooks until the source file changes."""
+    return pd.read_excel(fpath)
+
+
+def _read_dashboard_excel(filename):
+    fpath = _safe_dashboard_path(filename)
+    stat = os.stat(fpath)
+    return _read_dashboard_excel_cached(fpath, stat.st_mtime_ns, stat.st_size)
 
 def _find_column(df, candidates):
     for col in df.columns:
@@ -617,62 +630,76 @@ def calculate_survival_table(df, cols):
 
 
 # 個案分類(表,圖)
-def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", behavior=""):
-    fpath = _safe_dashboard_path(filename)
+def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", behavior="",
+                           analysis_items=None, source_df=None, cols=None, filtered_df=None):
     try:
-        df = pd.read_excel(fpath)
-        cols = get_column_names(df)
+        source_df = source_df if source_df is not None else _read_dashboard_excel(filename)
+        cols = cols or get_column_names(source_df)
 
-        if _query_year_range_outside_data(df, cols, year_start, year_end):
+        if _query_year_range_outside_data(source_df, cols, year_start, year_end):
             return _empty_dashboard_response(
                 histology_reason="所選年度區間不在檔案的診斷年度範圍內。"
             )
 
-        year_filtered_df = filter_dashboard_data(df, cols, [], year_start, year_end, "")
+        year_filtered_df = filter_dashboard_data(source_df, cols, [], year_start, year_end, "")
         if year_filtered_df.empty:
             return _empty_dashboard_response(histology_reason="所選年度內沒有可分析個案。")
-        behavior_filtered_df = filter_dashboard_data(df, cols, [], year_start, year_end, behavior)
+        behavior_filtered_df = filter_dashboard_data(source_df, cols, [], year_start, year_end, behavior)
         if behavior_filtered_df.empty:
             return _empty_dashboard_response(histology_reason="所選年度內沒有符合性態碼條件的個案。")
-        df = filter_dashboard_data(df, cols, cancers, year_start, year_end, behavior)
+        df = filtered_df if filtered_df is not None else filter_dashboard_data(
+            source_df, cols, cancers, year_start, year_end, behavior
+        )
         if df.empty:
             return _empty_dashboard_response(histology_reason="沒有同時符合所選年度、性態碼與癌別條件的個案。")
         
-        gender_age_data = calculate_gender_age_distribution(df, cols)
-        age_median_data = calculate_age_median(df, cols)
-        analyzable_confirmed_data = calculate_analyzable_confirmed_cases(df, cols)
-        histology_data, histology_warnings = calculate_histology_distribution(df, cols, return_warnings=True)
-        histology_no_data_reason = get_histology_no_data_reason(
-            df, cols, histology_data, histology_warnings
+        selected = set(analysis_items or [])
+        calculate_all = not selected
+        incidence_selected = calculate_all or bool(
+            selected.intersection({"性別年齡分佈", "年齡中位數"})
         )
-        diagnosis_classification_data = calculate_diagnosis_classification(df, cols)
-        survival_data = calculate_survival_table(df, cols)
-  
-        return {
-            "genderAgeData": gender_age_data,
-            "ageMedianData": age_median_data,
-            "analyzableConfirmedData": analyzable_confirmed_data,
-            "histologyData": histology_data,
-            "histologyWarnings": histology_warnings,
-            "histologyNoDataReason": histology_no_data_reason,
-            "diagnosisClassificationData": diagnosis_classification_data,
-            "survivalData": survival_data,
-        }
+        diagnosis_selected = calculate_all or bool(
+            selected.intersection({"可分析個案與確診個案", "組織型態", "個案分類"})
+        )
+        result = _empty_dashboard_response()
+        result.pop("noDataWarning", None)
+        result["histologyNoDataReason"] = ""
+
+        if incidence_selected:
+            result["genderAgeData"] = calculate_gender_age_distribution(df, cols)
+            result["ageMedianData"] = calculate_age_median(df, cols)
+        if diagnosis_selected:
+            result["analyzableConfirmedData"] = calculate_analyzable_confirmed_cases(df, cols)
+        if diagnosis_selected:
+            histology_data, histology_warnings = calculate_histology_distribution(
+                df, cols, return_warnings=True
+            )
+            result["histologyData"] = histology_data
+            result["histologyWarnings"] = histology_warnings
+            result["histologyNoDataReason"] = get_histology_no_data_reason(
+                df, cols, histology_data, histology_warnings
+            )
+        if diagnosis_selected:
+            result["diagnosisClassificationData"] = calculate_diagnosis_classification(df, cols)
+        if calculate_all or "存活率" in selected:
+            result["survivalData"] = calculate_survival_table(df, cols)
+
+        return result
     except Exception as e:
         logging.error(f"error {filename}: {str(e)}")
         raise e
 
-def get_dashboard_file_years(filename):
-    df = pd.read_excel(_safe_dashboard_path(filename))
-    cols = get_column_names(df)
+def get_dashboard_file_years(filename, source_df=None, cols=None):
+    df = source_df if source_df is not None else _read_dashboard_excel(filename)
+    cols = cols or get_column_names(df)
     years = _diagnosis_years(df, cols.get("year_col"))
     years = years[(years >= 1900) & (years <= 2100)]
     return sorted(years.astype(int).unique().tolist())
 
-def get_dashboard_file_preview(filename, limit=10, year_start="", year_end=""):
-    df = pd.read_excel(_safe_dashboard_path(filename))
+def get_dashboard_file_preview(filename, limit=10, year_start="", year_end="", source_df=None, cols=None):
+    df = source_df if source_df is not None else _read_dashboard_excel(filename)
     if year_start:
-        cols = get_column_names(df)
+        cols = cols or get_column_names(df)
         year_col = cols.get("year_col")
         if year_col:
             try:
@@ -691,13 +718,16 @@ def get_dashboard_file_preview(filename, limit=10, year_start="", year_end=""):
         "rows": df.astype(str).values.tolist(),
     }
 
-def summarize_dashboard_file(filename, behavior="", cancers=None, year_start="", year_end=""):
-    df = pd.read_excel(_safe_dashboard_path(filename))
-    cols = get_column_names(df)
-    years = get_dashboard_file_years(filename)
+def summarize_dashboard_file(filename, behavior="", cancers=None, year_start="", year_end="",
+                             source_df=None, cols=None, filtered_df=None):
+    df = source_df if source_df is not None else _read_dashboard_excel(filename)
+    cols = cols or get_column_names(df)
+    years = get_dashboard_file_years(filename, df, cols)
     year_start = str(year_start or years[0]) if years else ""
     year_end = str(year_end or year_start) if years else ""
-    filtered_df = filter_dashboard_data(df, cols, cancers or [], year_start, year_end, behavior)
+    filtered_df = filtered_df if filtered_df is not None else filter_dashboard_data(
+        df, cols, cancers or [], year_start, year_end, behavior
+    )
     age_data = calculate_age_median(filtered_df, cols)
     case_data = calculate_analyzable_confirmed_cases(filtered_df, cols)
     filtered_years = _diagnosis_years(filtered_df, cols.get("year_col"))
@@ -732,8 +762,24 @@ def compare_dashboard_files(main_filename, target_filename, behavior="", cancers
                             compare_mode="single"):
     main_end = main_year if compare_mode == "single" else (main_year_end or main_year)
     target_end = target_year if compare_mode == "single" else (target_year_end or target_year)
-    main_data = summarize_dashboard_file(main_filename, behavior, cancers, main_year, main_end)
-    target_data = summarize_dashboard_file(target_filename, behavior, cancers, target_year, target_end)
+    main_source = _read_dashboard_excel(main_filename)
+    target_source = _read_dashboard_excel(target_filename)
+    main_cols = get_column_names(main_source)
+    target_cols = get_column_names(target_source)
+    main_filtered = filter_dashboard_data(
+        main_source, main_cols, cancers or [], main_year, main_end, behavior
+    )
+    target_filtered = filter_dashboard_data(
+        target_source, target_cols, cancers or [], target_year, target_end, behavior
+    )
+    main_data = summarize_dashboard_file(
+        main_filename, behavior, cancers, main_year, main_end,
+        main_source, main_cols, main_filtered
+    )
+    target_data = summarize_dashboard_file(
+        target_filename, behavior, cancers, target_year, target_end,
+        target_source, target_cols, target_filtered
+    )
 
     diff = target_data["total_count"] - main_data["total_count"]
     diff_percent = ""
@@ -745,8 +791,14 @@ def compare_dashboard_files(main_filename, target_filename, behavior="", cancers
         "main": main_data,
         "target": target_data,
         "analysis_data": {
-            "main": analyze_dashboard_file(main_filename, cancers or [], main_year, main_end, behavior),
-            "target": analyze_dashboard_file(target_filename, cancers or [], target_year, target_end, behavior),
+            "main": analyze_dashboard_file(
+                main_filename, cancers or [], main_year, main_end, behavior,
+                compare_items, main_source, main_cols, main_filtered
+            ),
+            "target": analyze_dashboard_file(
+                target_filename, cancers or [], target_year, target_end, behavior,
+                compare_items, target_source, target_cols, target_filtered
+            ),
             "items": compare_items or [],
         },
         "compare_mode": compare_mode,
