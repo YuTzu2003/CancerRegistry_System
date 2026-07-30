@@ -1133,7 +1133,7 @@
     if (['性別年齡分佈', '年齡中位數'].includes(item)) return 'incidence';
     if (['可分析個案與確診個案', '組織型態', '個案分類'].includes(item)) return 'diagnosis';
     if (['AJCC期別分佈', 'FIGO/MAC/BCLC/SCLC期別分佈'].includes(item)) return 'stage';
-    if (['初次療程分類', '初次手術方式'].includes(item)) return 'treatment';
+    if (['期別與首次療程', '期別與手術術式'].includes(item)) return 'treatment';
     if (['存活率', '歷年年齡中位數', '歷年期別分佈', '歷年新診斷件數', '本院常見癌症'].includes(item)) return 'cross_year';
     return 'incidence';
   }
