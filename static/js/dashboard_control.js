@@ -832,8 +832,38 @@
     itemRadios.forEach(radio => {
       radio.disabled = !isBehaviorValid;
     });
+    updateStageModeSelection(isBehaviorValid);
     updateStageSummaryOptions();
     updateSummary();
+  }
+
+  function updateStageModeSelection(isAvailable) {
+    const detailed = document.getElementById('chkStageDetailed');
+    const summary = document.getElementById('chkStageSummary');
+    if (!detailed || !summary) return;
+
+    if (!isAvailable) {
+      detailed.disabled = true;
+      summary.disabled = true;
+      return;
+    }
+
+    if (summary.checked) {
+      detailed.checked = false;
+      detailed.disabled = true;
+      summary.disabled = false;
+      return;
+    }
+
+    if (detailed.checked) {
+      summary.checked = false;
+      summary.disabled = true;
+      detailed.disabled = false;
+      return;
+    }
+
+    detailed.disabled = false;
+    summary.disabled = false;
   }
 
   function updateStageSummaryOptions() {
@@ -852,6 +882,17 @@
     return {
       systems: Array.from(document.querySelectorAll('.annual-stage-system-checkbox:checked')).map(input => input.nextElementSibling?.textContent?.trim() || input.value)
     };
+  }
+
+  function selectedStageSummaryOptions() {
+    const selections = {};
+    document.querySelectorAll('.stage-summary-option:checked').forEach(input => {
+      const system = input.dataset.stageSystem;
+      const label = input.parentElement.textContent.trim();
+      if (!selections[system]) selections[system] = [];
+      selections[system].push(label);
+    });
+    return Object.entries(selections).map(([system, options]) => `${system}：${options.join('、')}`);
   }
 
   function updateSummary() {
@@ -891,7 +932,11 @@
           .map(el => el.nextElementSibling.textContent.trim());
         const stageOptions = selectedAnnualStageOptions();
         if (stageOptions.systems.length) {
-          itemNames.push(`期別（${stageOptions.systems.join('、')}）`);
+          const summaryOptions = selectedStageSummaryOptions();
+          const stageSummary = stageOptions.systems.includes('分期不呈現最細碼') && summaryOptions.length
+            ? `分期不呈現最細碼（${summaryOptions.join('；')}）`
+            : stageOptions.systems.join('、');
+          itemNames.push(`期別（${stageSummary}）`);
         }
         summaryAnalysis.textContent = itemNames.join('、');
       } else {
@@ -948,6 +993,7 @@
 
   document.querySelectorAll('.annual-stage-system-checkbox').forEach(checkbox => {
     checkbox.addEventListener('change', function() {
+      updateStageModeSelection(!checkbox.disabled);
       updateStageSummaryOptions();
       updateSummary();
     });
