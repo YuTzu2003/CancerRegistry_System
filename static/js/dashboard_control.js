@@ -1215,7 +1215,9 @@ function initDashboardControl() {
               year_end: yearEndVal,
               behavior: behaviorVal,
               analysis_items: Array.from(document.querySelectorAll('.item-checkbox:checked'))
-                  .map(item => item.value)
+                  .map(item => item.value),
+              stage_options: Array.from(document.querySelectorAll('.stage-summary-option:checked'))
+                  .map(item => ({ system: item.dataset.stageSystem, option: item.value }))
           };
           fetch('/api/dashboard/analyze_file', {
               method: 'POST',
@@ -1353,6 +1355,17 @@ function initDashboardControl() {
                       window.DashboardRenderer.renderSurvivalTable(chartData.survivalData, yearTitle, cancerTitle);
                       window.DashboardRenderer.showAnnualDataContent();
                       window.DashboardRenderer.updateChartCaptions(yearTitle, cancerTitle);
+                  }
+
+                  const stageTotalBody = document.getElementById('annualStageTotalTableBody');
+                  if (stageTotalBody) {
+                      stageTotalBody.replaceChildren(...(chartData.stageTotals || []).map(item => {
+                          const row = document.createElement('tr');
+                          row.innerHTML = `<td></td><td></td>`;
+                          row.cells[0].textContent = item.option;
+                          row.cells[1].textContent = item.total_count;
+                          return row;
+                      }));
                   }
 
                   if (window.dashboardChartInstance) {

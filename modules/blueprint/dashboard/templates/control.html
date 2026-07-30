@@ -194,7 +194,7 @@
                     <label class="form-check-label text-dark" for="chkStageDetailed" style="cursor: pointer;">分期呈現最細碼</label>
                   </div>
                   <div class="form-check">
-                    <input class="form-check-input item-checkbox annual-stage-system-checkbox" type="checkbox" name="subTab_stage" id="chkStageSummary" data-parent="stage" value="分期不呈現最細碼" disabled>
+                    <input class="form-check-input item-checkbox annual-stage-system-checkbox" type="checkbox" name="subTab_stage" id="chkStageSummary" data-parent="stage" value="分期不呈現最細碼" data-target="#chartPane-StageSummary" disabled>
                     <label class="form-check-label text-dark" for="chkStageSummary" style="cursor: pointer;">分期不呈現最細碼</label>
                   </div>
                 </div>
@@ -755,4 +755,4 @@
 </div>
 
 <script src="{{ url_for('static', filename='js/annual_report_renderer.js') }}?v=20260729-common-cancers"></script>
-<script src="{{ url_for('static', filename='js/dashboard_control.js') }}?v=20260729-analysis-performance"></script>
+<script src="{{ url_for('static', filename='js/dashboard_control.js') }}?v=20260730-stage-totals"></script>

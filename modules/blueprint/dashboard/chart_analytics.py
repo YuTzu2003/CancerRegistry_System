@@ -266,6 +266,14 @@ def normalize_case_code(value):
     except (ValueError, TypeError):
         return text
 
+
+def filter_stage_analysis_cases(df, cols):
+    class_col = cols.get("class_col")
+    if not class_col or class_col not in df.columns:
+        return df.iloc[0:0].copy()
+    return df.loc[df[class_col].apply(normalize_case_code).isin(["1", "2"])].copy()
+
+
 def display_value(value):
     if pd.isna(value):
         return ""
@@ -631,7 +639,7 @@ def calculate_survival_table(df, cols):
 
 # 個案分類(表,圖)
 def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", behavior="",
-                           analysis_items=None, source_df=None, cols=None, filtered_df=None):
+                           analysis_items=None, source_df=None, cols=None, filtered_df=None, stage_options=None):
     try:
         source_df = source_df if source_df is not None else _read_dashboard_excel(filename)
         cols = cols or get_column_names(source_df)
@@ -661,6 +669,9 @@ def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", beh
         diagnosis_selected = calculate_all or bool(
             selected.intersection({"可分析個案與確診個案", "組織型態", "個案分類"})
         )
+        stage_selected = calculate_all or bool(
+            selected.intersection({"分期呈現最細碼", "分期不呈現最細碼"})
+        )
         result = _empty_dashboard_response()
         result.pop("noDataWarning", None)
         result["histologyNoDataReason"] = ""
@@ -681,6 +692,22 @@ def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", beh
             )
         if diagnosis_selected:
             result["diagnosisClassificationData"] = calculate_diagnosis_classification(df, cols)
+        if stage_selected:
+            stage_df = filter_stage_analysis_cases(df, cols)
+            result["stageAnalysisData"] = {
+                "source_count": int(len(df)),
+                "class_1_2_count": int(len(stage_df)),
+            }
+            if stage_options:
+                from modules.blueprint.clean.field_mapping import field_mapping
+                from modules.blueprint.dashboard.period_rule import calculate_stage_totals
+
+                aliases, _ = field_mapping("中文欄位名稱")
+                chinese_df = df.rename(columns={
+                    column: aliases.get(str(column).strip(), str(column).strip())
+                    for column in df.columns
+                })
+                result["stageTotals"] = calculate_stage_totals(chinese_df, stage_options)
         if calculate_all or "存活率" in selected:
             result["survivalData"] = calculate_survival_table(df, cols)
 

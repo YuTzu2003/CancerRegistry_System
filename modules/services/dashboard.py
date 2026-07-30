@@ -400,6 +400,7 @@ def analyze_dashboard_file_route():
     year_end = data.get("year_end", "")
     behavior = data.get("behavior", "")
     analysis_items = data.get("analysis_items", [])
+    stage_options = data.get("stage_options", [])
     
     owned_file = _get_owned_dashboard_file(file_id, session.get("id"))
     if not owned_file:
@@ -408,7 +409,8 @@ def analyze_dashboard_file_route():
     try:
         from modules.blueprint.dashboard.chart_analytics import analyze_dashboard_file
         chart_data = analyze_dashboard_file(
-            owned_file["storage_path"], cancers, year_start, year_end, behavior, analysis_items
+            owned_file["storage_path"], cancers, year_start, year_end, behavior, analysis_items,
+            stage_options=stage_options,
         )
         return jsonify({"ok": True, "data": chart_data}), 200
     except Exception as e:
