@@ -8,15 +8,6 @@
     const status = document.getElementById('cancerPickerStatus');
     const leafNodes = document.querySelectorAll('.cancer-cb-leaf:not([value="All_Cancers"])');
     const allCancersNode = document.querySelector('.cancer-cb-leaf[value="All_Cancers"]');
-    const lungHistologyChildChecks = document.querySelectorAll('.lung-histology-child input[type="checkbox"]');
-    const hasCheckedLungHistologyChild = Array.from(lungHistologyChildChecks).some(cb => cb.checked);
-    const lungTopGroup = document.getElementById('chk_group_Lung_and_Bronchus_Trachea');
-    const isDisplayOnlyLungParent = (node) => (
-        node &&
-        node.value === 'Lung_and_Bronchus' &&
-        hasCheckedLungHistologyChild &&
-        !(lungTopGroup && lungTopGroup.checked)
-    );
     
     let specificSelectedCount = 0;
     const selectedValues = [];
@@ -33,11 +24,14 @@
         window.dashboardSelectedCancerTitle = '全癌別';
     } else {
         leafNodes.forEach(node => {
-            if (node.checked && !isDisplayOnlyLungParent(node)) {
+            if (node.checked) {
                 selectedValues.push(node.value);
                 specificSelectedCount++;
             }
         });
+        if (document.getElementById('chk_group_Lung_and_Bronchus')?.checked) {
+            selectedValues.push('Lung_and_Bronchus');
+        }
         
         if (specificSelectedCount === leafNodes.length && leafNodes.length > 0) {
             window.dashboardSelectedCancerTitle = '全癌別';
@@ -54,7 +48,7 @@
             
             const independentLeaves = [];
             leafNodes.forEach(node => {
-               if(node.checked && !isDisplayOnlyLungParent(node)) {
+               if(node.checked) {
                    const parentGrp = document.getElementById('chk_group_' + node.getAttribute('data-parent')) || 
                                      document.getElementById('chk_group_' + node.getAttribute('data-grandparent'));
                    if(!parentGrp || !parentGrp.checked) {
@@ -83,7 +77,7 @@
             }
         });
         leafNodes.forEach(node => {
-            if (!node.checked || isDisplayOnlyLungParent(node)) return;
+            if (!node.checked) return;
             const parentKey = node.dataset.parent;
             const grandparentKey = node.dataset.grandparent;
             if (!selectedGroups.has(parentKey) && !selectedGroups.has(grandparentKey)) {
@@ -113,15 +107,6 @@
     if (typeof updateSummary === 'function') {
       updateSummary();
     }
-  }
-
-  function updateLungHistologyChildrenVisibility() {
-      const childRows = document.querySelectorAll('.lung-histology-child');
-      if (childRows.length === 0) return;
-      childRows.forEach(row => {
-          row.classList.remove('d-none');
-          row.classList.add('d-flex');
-      });
   }
 
   /* ── 癌別選擇事件綁定 ── */
@@ -160,8 +145,6 @@
               allCancersGroup.indeterminate = allCheckedLeaves.length > 0;
           }
       }
-
-      updateLungHistologyChildrenVisibility();
 
       document.querySelectorAll('.cat-nav-btn').forEach(navBtn => {
           const targetHref = navBtn.getAttribute('href');
@@ -209,10 +192,6 @@
                 cb.indeterminate = false;
             });
         }
-    } else if (target.id === 'chk_Lung_and_Bronchus' && !target.checked) {
-        document.querySelectorAll('.lung-histology-child input[type="checkbox"]').forEach(cb => {
-            cb.checked = false;
-        });
     } else if (target.classList.contains('cancer-cb-subgroup')) {
         const groupId = target.getAttribute('data-group');
         const isChecked = target.checked;
@@ -764,9 +743,6 @@
     document.querySelectorAll('.item-checkbox, input[name="mainCategoryTab"]').forEach(cb => {
       cb.checked = false;
     });
-    document.querySelectorAll('.annual-stage-class-checkbox').forEach(cb => {
-      cb.checked = false;
-    });
     document.querySelectorAll('[id^="subItems-"]').forEach(div => {
       div.classList.add('d-none');
     });
@@ -788,7 +764,6 @@
 
     updateParentCheckboxes();
     updateStatus();
-    updateAnnualStageState();
     checkFiltersState();
   }
 
@@ -836,27 +811,79 @@
     itemRadios.forEach(radio => {
       radio.disabled = !isBehaviorValid;
     });
-    updateAnnualStageState();
+    updateStageModeSelection(isBehaviorValid);
+    updateStageSummaryOptions();
+    updateTreatmentSelection(isBehaviorValid);
     updateSummary();
   }
 
-  function updateAnnualStageState() {
-    const ajccCheckbox = document.getElementById('chkStageAjcc');
-    const classOptions = document.getElementById('annualAjccClassOptions');
-    if (!ajccCheckbox || !classOptions) return;
-    const enabled = ajccCheckbox.checked && !ajccCheckbox.disabled;
-    classOptions.classList.toggle('d-none', !ajccCheckbox.checked);
-    classOptions.querySelectorAll('.annual-stage-class-checkbox').forEach(checkbox => {
-      checkbox.disabled = !enabled;
-      if (!ajccCheckbox.checked) checkbox.checked = false;
+  function updateStageModeSelection(isAvailable) {
+    const detailed = document.getElementById('chkStageDetailed');
+    const summary = document.getElementById('chkStageSummary');
+    if (!detailed || !summary) return;
+
+    if (!isAvailable) {
+      detailed.disabled = true;
+      summary.disabled = true;
+      return;
+    }
+
+    if (summary.checked) {
+      detailed.checked = false;
+      detailed.disabled = true;
+      summary.disabled = false;
+      return;
+    }
+
+    if (detailed.checked) {
+      summary.checked = false;
+      summary.disabled = true;
+      detailed.disabled = false;
+      return;
+    }
+
+    detailed.disabled = false;
+    summary.disabled = false;
+  }
+
+  function updateStageSummaryOptions() {
+    const stageSummary = document.getElementById('chkStageSummary');
+    const options = document.getElementById('stageSummaryOptions');
+    if (!stageSummary || !options) return;
+    const enabled = stageSummary.checked && !stageSummary.disabled;
+    options.classList.toggle('is-open', enabled);
+    options.querySelectorAll('.stage-summary-option').forEach(input => {
+      input.disabled = !enabled;
+      if (!enabled) input.checked = false;
     });
+  }
+
+  function updateTreatmentSelection(isAvailable) {
+    const hasStageAnalysis = Boolean(document.getElementById('chkStageDetailed')?.checked
+      || document.querySelector('.stage-summary-option:checked'));
+    const enabled = Boolean(isAvailable && hasStageAnalysis);
+    document.querySelectorAll('#subItems-treatment .item-checkbox').forEach(input => {
+      input.disabled = !enabled;
+      if (!enabled) input.checked = false;
+    });
+    document.getElementById('treatmentStageRequired')?.classList.toggle('d-none', enabled);
   }
 
   function selectedAnnualStageOptions() {
     return {
-      systems: Array.from(document.querySelectorAll('.annual-stage-system-checkbox:checked')).map(input => input.nextElementSibling?.textContent?.trim() || input.value),
-      class_groups: Array.from(document.querySelectorAll('.annual-stage-class-checkbox:checked')).map(input => input.value)
+      systems: Array.from(document.querySelectorAll('.annual-stage-system-checkbox:checked')).map(input => input.nextElementSibling?.textContent?.trim() || input.value)
     };
+  }
+
+  function selectedStageSummaryOptions() {
+    const selections = {};
+    document.querySelectorAll('.stage-summary-option:checked').forEach(input => {
+      const system = input.dataset.stageSystem;
+      const label = input.parentElement.textContent.trim();
+      if (!selections[system]) selections[system] = [];
+      selections[system].push(label);
+    });
+    return Object.entries(selections).map(([system, options]) => `${system}：${options.join('、')}`);
   }
 
   function updateSummary() {
@@ -896,7 +923,11 @@
           .map(el => el.nextElementSibling.textContent.trim());
         const stageOptions = selectedAnnualStageOptions();
         if (stageOptions.systems.length) {
-          itemNames.push(`期別（${stageOptions.systems.join('、')}${stageOptions.class_groups.length ? `；${stageOptions.class_groups.join('、')}` : ''}）`);
+          const summaryOptions = selectedStageSummaryOptions();
+          const stageSummary = stageOptions.systems.includes('分期不呈現最細碼') && summaryOptions.length
+            ? `分期不呈現最細碼（${summaryOptions.join('；')}）`
+            : stageOptions.systems.join('、');
+          itemNames.push(`期別（${stageSummary}）`);
         }
         summaryAnalysis.textContent = itemNames.join('、');
       } else {
@@ -953,13 +984,18 @@
 
   document.querySelectorAll('.annual-stage-system-checkbox').forEach(checkbox => {
     checkbox.addEventListener('change', function() {
-      updateAnnualStageState();
+      updateStageModeSelection(!checkbox.disabled);
+      updateStageSummaryOptions();
+      updateTreatmentSelection(!checkbox.disabled);
       updateSummary();
     });
   });
 
-  document.querySelectorAll('.annual-stage-class-checkbox').forEach(checkbox => {
-    checkbox.addEventListener('change', updateSummary);
+  document.querySelectorAll('.stage-summary-option').forEach(checkbox => {
+    checkbox.addEventListener('change', function() {
+      updateTreatmentSelection(!checkbox.disabled);
+      updateSummary();
+    });
   });
 
   document.querySelectorAll('input[name="mainCategoryTab"]').forEach(radio => {
@@ -1174,7 +1210,9 @@ function initDashboardControl() {
               year_end: yearEndVal,
               behavior: behaviorVal,
               analysis_items: Array.from(document.querySelectorAll('.item-checkbox:checked'))
-                  .map(item => item.value)
+                  .map(item => item.value),
+              stage_options: Array.from(document.querySelectorAll('.stage-summary-option:checked'))
+                  .map(item => ({ system: item.dataset.stageSystem, option: item.value }))
           };
           fetch('/api/dashboard/analyze_file', {
               method: 'POST',
@@ -1312,6 +1350,17 @@ function initDashboardControl() {
                       window.DashboardRenderer.renderSurvivalTable(chartData.survivalData, yearTitle, cancerTitle);
                       window.DashboardRenderer.showAnnualDataContent();
                       window.DashboardRenderer.updateChartCaptions(yearTitle, cancerTitle);
+                  }
+
+                  const stageTotalBody = document.getElementById('annualStageTotalTableBody');
+                  if (stageTotalBody) {
+                      stageTotalBody.replaceChildren(...(chartData.stageTotals || []).map(item => {
+                          const row = document.createElement('tr');
+                          row.innerHTML = `<td></td><td></td>`;
+                          row.cells[0].textContent = item.option;
+                          row.cells[1].textContent = item.total_count;
+                          return row;
+                      }));
                   }
 
                   if (window.dashboardChartInstance) {

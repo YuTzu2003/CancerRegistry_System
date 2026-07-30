@@ -154,28 +154,7 @@
 
   function selectedCompareStageOptions() {
     const systems = Array.from(document.querySelectorAll('.compare-stage-system-checkbox:checked')).map(input => input.nextElementSibling?.textContent?.trim() || input.value);
-    const classGroups = Array.from(document.querySelectorAll('.compare-stage-class-card')).flatMap(card => {
-      const classCheckbox = card.querySelector('.compare-stage-class-checkbox');
-      if (!classCheckbox?.checked) return [];
-      return [classCheckbox.value];
-    });
-    return { systems, class_groups: classGroups };
-  }
-
-  function updateCompareStageState() {
-    const ajccCheckbox = document.getElementById('compareItemStageAjcc');
-    const classOptions = document.getElementById('compareAjccClassOptions');
-    if (!ajccCheckbox || !classOptions) return;
-    const enabled = ajccCheckbox.checked && !ajccCheckbox.disabled;
-    classOptions.classList.toggle('d-none', !ajccCheckbox.checked);
-    document.querySelectorAll('.compare-stage-class-card').forEach(card => {
-      const classCheckbox = card.querySelector('.compare-stage-class-checkbox');
-      if (classCheckbox) {
-        classCheckbox.disabled = !enabled;
-        if (!ajccCheckbox.checked) classCheckbox.checked = false;
-      }
-      card.classList.toggle('is-disabled', !enabled);
-    });
+    return { systems };
   }
 
   function markResultsStale() {
@@ -219,7 +198,6 @@
     document.querySelectorAll('input[name="compareType"], .compare-subitem-check').forEach(input => {
       input.disabled = !cancerIsReady;
     });
-    updateCompareStageState();
     document.getElementById('btnSelectAllCompareItems').disabled = !cancerIsReady;
     document.getElementById('btnClearCompareItems').disabled = !cancerIsReady;
     analysisStep?.classList.toggle('opacity-50', !cancerIsReady);
@@ -252,10 +230,9 @@
       : '尚未選擇';
     const items = selectedCompareItems();
     const stageOptions = selectedCompareStageOptions();
-    const summaryItems = items.filter(item => !item.includes('期別分佈'));
+    const summaryItems = items.filter(item => !stageOptions.systems.includes(item));
     if (stageOptions.systems.length) {
-      const classDetail = stageOptions.class_groups.join('、');
-      summaryItems.push(`期別（${stageOptions.systems.join('、')}${classDetail ? `；${classDetail}` : ''}）`);
+      summaryItems.push(`期別（${stageOptions.systems.join('、')}）`);
     }
 
     document.getElementById('summaryCompareMode').textContent = selectedCompareMode() === 'range' ? '年度區間比較' : '單一年度比較';
@@ -1648,11 +1625,6 @@
     document.querySelectorAll('.compare-subitem-check').forEach(input => {
       input.checked = false;
     });
-    document.querySelectorAll('.compare-stage-class-checkbox').forEach(input => {
-      input.checked = false;
-    });
-    updateCompareStageState();
-
     hasRenderedResult = false;
     lastComparisonData = null;
     activeAiNarrativeItem = '';
@@ -1760,28 +1732,16 @@
   document.querySelectorAll('.compare-subitem-check').forEach(input => {
     input.addEventListener('change', () => {
       markResultsStale();
-      updateCompareStageState();
       updateButtonState();
-    });
-  });
-  document.querySelectorAll('.compare-stage-class-checkbox').forEach(input => {
-    input.addEventListener('change', () => {
-      markResultsStale();
-      updateSelectionSummary();
     });
   });
   document.getElementById('btnSelectAllCompareItems').addEventListener('click', () => {
     document.querySelectorAll('.compare-subitem-check:not(:disabled)').forEach(input => { input.checked = true; });
-    updateCompareStageState();
-    document.querySelectorAll('.compare-stage-class-checkbox:not(:disabled)').forEach(input => { input.checked = true; });
-    updateCompareStageState();
     markResultsStale();
     updateButtonState();
   });
   document.getElementById('btnClearCompareItems').addEventListener('click', () => {
     document.querySelectorAll('.compare-subitem-check').forEach(input => { input.checked = false; });
-    document.querySelectorAll('.compare-stage-class-checkbox').forEach(input => { input.checked = false; });
-    updateCompareStageState();
     markResultsStale();
     updateButtonState();
   });
