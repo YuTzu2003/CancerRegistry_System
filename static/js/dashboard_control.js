@@ -8,15 +8,6 @@
     const status = document.getElementById('cancerPickerStatus');
     const leafNodes = document.querySelectorAll('.cancer-cb-leaf:not([value="All_Cancers"])');
     const allCancersNode = document.querySelector('.cancer-cb-leaf[value="All_Cancers"]');
-    const lungHistologyChildChecks = document.querySelectorAll('.lung-histology-child input[type="checkbox"]');
-    const hasCheckedLungHistologyChild = Array.from(lungHistologyChildChecks).some(cb => cb.checked);
-    const lungTopGroup = document.getElementById('chk_group_Lung_and_Bronchus_Trachea');
-    const isDisplayOnlyLungParent = (node) => (
-        node &&
-        node.value === 'Lung_and_Bronchus' &&
-        hasCheckedLungHistologyChild &&
-        !(lungTopGroup && lungTopGroup.checked)
-    );
     
     let specificSelectedCount = 0;
     const selectedValues = [];
@@ -33,11 +24,14 @@
         window.dashboardSelectedCancerTitle = '全癌別';
     } else {
         leafNodes.forEach(node => {
-            if (node.checked && !isDisplayOnlyLungParent(node)) {
+            if (node.checked) {
                 selectedValues.push(node.value);
                 specificSelectedCount++;
             }
         });
+        if (document.getElementById('chk_group_Lung_and_Bronchus')?.checked) {
+            selectedValues.push('Lung_and_Bronchus');
+        }
         
         if (specificSelectedCount === leafNodes.length && leafNodes.length > 0) {
             window.dashboardSelectedCancerTitle = '全癌別';
@@ -54,7 +48,7 @@
             
             const independentLeaves = [];
             leafNodes.forEach(node => {
-               if(node.checked && !isDisplayOnlyLungParent(node)) {
+               if(node.checked) {
                    const parentGrp = document.getElementById('chk_group_' + node.getAttribute('data-parent')) || 
                                      document.getElementById('chk_group_' + node.getAttribute('data-grandparent'));
                    if(!parentGrp || !parentGrp.checked) {
@@ -83,7 +77,7 @@
             }
         });
         leafNodes.forEach(node => {
-            if (!node.checked || isDisplayOnlyLungParent(node)) return;
+            if (!node.checked) return;
             const parentKey = node.dataset.parent;
             const grandparentKey = node.dataset.grandparent;
             if (!selectedGroups.has(parentKey) && !selectedGroups.has(grandparentKey)) {
@@ -113,15 +107,6 @@
     if (typeof updateSummary === 'function') {
       updateSummary();
     }
-  }
-
-  function updateLungHistologyChildrenVisibility() {
-      const childRows = document.querySelectorAll('.lung-histology-child');
-      if (childRows.length === 0) return;
-      childRows.forEach(row => {
-          row.classList.remove('d-none');
-          row.classList.add('d-flex');
-      });
   }
 
   /* ── 癌別選擇事件綁定 ── */
@@ -160,8 +145,6 @@
               allCancersGroup.indeterminate = allCheckedLeaves.length > 0;
           }
       }
-
-      updateLungHistologyChildrenVisibility();
 
       document.querySelectorAll('.cat-nav-btn').forEach(navBtn => {
           const targetHref = navBtn.getAttribute('href');
@@ -209,10 +192,6 @@
                 cb.indeterminate = false;
             });
         }
-    } else if (target.id === 'chk_Lung_and_Bronchus' && !target.checked) {
-        document.querySelectorAll('.lung-histology-child input[type="checkbox"]').forEach(cb => {
-            cb.checked = false;
-        });
     } else if (target.classList.contains('cancer-cb-subgroup')) {
         const groupId = target.getAttribute('data-group');
         const isChecked = target.checked;
@@ -834,6 +813,7 @@
     });
     updateStageModeSelection(isBehaviorValid);
     updateStageSummaryOptions();
+    updateTreatmentSelection(isBehaviorValid);
     updateSummary();
   }
 
@@ -871,11 +851,22 @@
     const options = document.getElementById('stageSummaryOptions');
     if (!stageSummary || !options) return;
     const enabled = stageSummary.checked && !stageSummary.disabled;
-    options.classList.toggle('d-none', !enabled);
+    options.classList.toggle('is-open', enabled);
     options.querySelectorAll('.stage-summary-option').forEach(input => {
       input.disabled = !enabled;
       if (!enabled) input.checked = false;
     });
+  }
+
+  function updateTreatmentSelection(isAvailable) {
+    const hasStageAnalysis = Boolean(document.getElementById('chkStageDetailed')?.checked
+      || document.querySelector('.stage-summary-option:checked'));
+    const enabled = Boolean(isAvailable && hasStageAnalysis);
+    document.querySelectorAll('#subItems-treatment .item-checkbox').forEach(input => {
+      input.disabled = !enabled;
+      if (!enabled) input.checked = false;
+    });
+    document.getElementById('treatmentStageRequired')?.classList.toggle('d-none', enabled);
   }
 
   function selectedAnnualStageOptions() {
@@ -995,12 +986,16 @@
     checkbox.addEventListener('change', function() {
       updateStageModeSelection(!checkbox.disabled);
       updateStageSummaryOptions();
+      updateTreatmentSelection(!checkbox.disabled);
       updateSummary();
     });
   });
 
   document.querySelectorAll('.stage-summary-option').forEach(checkbox => {
-    checkbox.addEventListener('change', updateSummary);
+    checkbox.addEventListener('change', function() {
+      updateTreatmentSelection(!checkbox.disabled);
+      updateSummary();
+    });
   });
 
   document.querySelectorAll('input[name="mainCategoryTab"]').forEach(radio => {
