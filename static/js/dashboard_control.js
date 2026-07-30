@@ -764,9 +764,6 @@
     document.querySelectorAll('.item-checkbox, input[name="mainCategoryTab"]').forEach(cb => {
       cb.checked = false;
     });
-    document.querySelectorAll('.annual-stage-class-checkbox').forEach(cb => {
-      cb.checked = false;
-    });
     document.querySelectorAll('[id^="subItems-"]').forEach(div => {
       div.classList.add('d-none');
     });
@@ -788,7 +785,6 @@
 
     updateParentCheckboxes();
     updateStatus();
-    updateAnnualStageState();
     checkFiltersState();
   }
 
@@ -836,26 +832,25 @@
     itemRadios.forEach(radio => {
       radio.disabled = !isBehaviorValid;
     });
-    updateAnnualStageState();
+    updateStageSummaryOptions();
     updateSummary();
   }
 
-  function updateAnnualStageState() {
-    const ajccCheckbox = document.getElementById('chkStageAjcc');
-    const classOptions = document.getElementById('annualAjccClassOptions');
-    if (!ajccCheckbox || !classOptions) return;
-    const enabled = ajccCheckbox.checked && !ajccCheckbox.disabled;
-    classOptions.classList.toggle('d-none', !ajccCheckbox.checked);
-    classOptions.querySelectorAll('.annual-stage-class-checkbox').forEach(checkbox => {
-      checkbox.disabled = !enabled;
-      if (!ajccCheckbox.checked) checkbox.checked = false;
+  function updateStageSummaryOptions() {
+    const stageSummary = document.getElementById('chkStageSummary');
+    const options = document.getElementById('stageSummaryOptions');
+    if (!stageSummary || !options) return;
+    const enabled = stageSummary.checked && !stageSummary.disabled;
+    options.classList.toggle('d-none', !enabled);
+    options.querySelectorAll('.stage-summary-option').forEach(input => {
+      input.disabled = !enabled;
+      if (!enabled) input.checked = false;
     });
   }
 
   function selectedAnnualStageOptions() {
     return {
-      systems: Array.from(document.querySelectorAll('.annual-stage-system-checkbox:checked')).map(input => input.nextElementSibling?.textContent?.trim() || input.value),
-      class_groups: Array.from(document.querySelectorAll('.annual-stage-class-checkbox:checked')).map(input => input.value)
+      systems: Array.from(document.querySelectorAll('.annual-stage-system-checkbox:checked')).map(input => input.nextElementSibling?.textContent?.trim() || input.value)
     };
   }
 
@@ -896,7 +891,7 @@
           .map(el => el.nextElementSibling.textContent.trim());
         const stageOptions = selectedAnnualStageOptions();
         if (stageOptions.systems.length) {
-          itemNames.push(`期別（${stageOptions.systems.join('、')}${stageOptions.class_groups.length ? `；${stageOptions.class_groups.join('、')}` : ''}）`);
+          itemNames.push(`期別（${stageOptions.systems.join('、')}）`);
         }
         summaryAnalysis.textContent = itemNames.join('、');
       } else {
@@ -953,12 +948,12 @@
 
   document.querySelectorAll('.annual-stage-system-checkbox').forEach(checkbox => {
     checkbox.addEventListener('change', function() {
-      updateAnnualStageState();
+      updateStageSummaryOptions();
       updateSummary();
     });
   });
 
-  document.querySelectorAll('.annual-stage-class-checkbox').forEach(checkbox => {
+  document.querySelectorAll('.stage-summary-option').forEach(checkbox => {
     checkbox.addEventListener('change', updateSummary);
   });
 
