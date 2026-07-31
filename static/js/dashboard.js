@@ -430,6 +430,40 @@ window.DashboardRenderer.renderSexAgeTable = function(genderAgeData, yearTitle, 
         body.innerHTML = `<tr><td>${this.t('male')}</td>${genderAgeData.male.map(value => `<td>${value}</td>`).join('')}<td>${sumMale}</td><td>${percentage(sumMale)}</td></tr><tr><td>${this.t('female')}</td>${genderAgeData.female.map(value => `<td>${value}</td>`).join('')}<td>${sumFemale}</td><td>${percentage(sumFemale)}</td></tr><tr><td>${this.t('total')}</td>${genderAgeData.total.map(value => `<td>${value}</td>`).join('')}<td>${sumTotal}</td><td>${percentage(sumTotal)}</td></tr><tr><td>${this.t('percent')}</td>${genderAgeData.total.map(value => `<td>${percentage(value)}</td>`).join('')}<td>${percentage(sumTotal)}</td><td>-</td></tr>`;
     };
 
+/* ── 期別與首次療程表 ── */
+window.DashboardRenderer.renderStageFirstCourseTables = function(tables, yearTitle, cancerTitle) {
+        const container = document.getElementById('annualStageFirstCourseTables');
+        if (!container) return;
+        const isEnglish = window.DashboardI18n?.getLanguage() === 'en';
+        const selectedCancer = this.getCancerTitleForSentence(cancerTitle);
+        const items = Array.isArray(tables) ? tables : [];
+
+        if (!items.length) {
+            container.innerHTML = `<div class="text-muted text-center py-4">${isEnglish ? 'No stage-treatment data is available.' : '沒有可供統計的期別與首次療程資料。'}</div>`;
+            return;
+        }
+
+        container.innerHTML = items.map(item => {
+            const stages = item.stage_columns || [];
+            const rows = item.rows || [];
+            if (!stages.length) {
+                return `<div class="text-muted text-center py-4">${this.escapeHtml(item.system)}：${isEnglish ? 'No eligible stage-treatment data is available.' : '沒有可供統計的期別與首次療程資料。'}</div>`;
+            }
+            const stageTitle = `${item.system}${isEnglish ? ' stage' : '期別'}`;
+            const title = isEnglish
+                ? `Table . ${stageTitle} and First Course Treatment Distribution of Newly Diagnosed with ${this.getEnglishCancerPatientLabel(selectedCancer)} Patients,\u00a0${yearTitle}`
+                : `表、${yearTitle}年新診斷${selectedCancer}病患${item.system}期別與首次療程分佈`;
+            const bodyRows = rows.map(row => `<tr><td>${this.escapeHtml(row.treatment)}</td>${(row.values || []).map(value => `<td>${Number(value || 0)}</td>`).join('')}<td>${Number(row.subtotal || 0)}</td></tr>`).join('');
+            const totals = (item.totals || []).map(value => `<td>${Number(value || 0)}</td>`).join('');
+            const percentages = (item.percentages || []).map(value => `<td>${Number(value || 0).toFixed(1)}%</td>`).join('');
+            const exclusions = [];
+            if (item.excluded_unknown) exclusions.push(isEnglish ? `Stage Unknown: ${item.excluded_unknown}` : `分期不明：${item.excluded_unknown} 件`);
+            if (item.excluded_not_applicable) exclusions.push(isEnglish ? `Stage Not Applicable: ${item.excluded_not_applicable}` : `分期不適用：${item.excluded_not_applicable} 件`);
+            if (item.excluded_unmapped) exclusions.push(isEnglish ? `No mapped stage: ${item.excluded_unmapped}` : `無法對應分期：${item.excluded_unmapped} 件`);
+            return `<div class="mb-4"><table class="annual-report-table"><caption>${title}</caption><thead><tr><th rowspan="2">${isEnglish ? 'First Course Treatment' : '首次療程'}</th><th colspan="${Math.max(stages.length, 1)}">${this.escapeHtml(stageTitle)}</th><th rowspan="2">${isEnglish ? 'Total' : '小計'}</th></tr><tr>${stages.map(stage => `<th>${this.escapeHtml(stage)}</th>`).join('')}</tr></thead><tbody>${bodyRows}<tr class="fw-bold"><td>${this.t('total')}</td>${totals}<td>${Number(item.total_count || 0)}</td></tr><tr><td>${isEnglish ? '%' : '百分比%'}</td>${percentages}<td>${item.total_count ? '100.0%' : '0.0%'}</td></tr></tbody></table>${exclusions.length ? `<div class="small text-secondary mt-2">${exclusions.join('；')}</div>` : ''}</div>`;
+        }).join('');
+    };
+
 /* ── 組織型態不適用個案說明按鈕 ── */
 window.DashboardRenderer.currentHistologyWarnings = [];
 
@@ -1245,6 +1279,7 @@ window.DashboardRenderer.rerenderDashboardLanguage = function(options = {}) {
         this.renderHistologyWarningButton(this.currentHistologyWarnings);
         this.renderDiagnosisClassificationTable(window.lastChartData.diagnosisClassificationData, yearTitle, cancerTitle);
         this.renderDiagnosisClassificationChart(window.lastChartData.diagnosisClassificationData, yearTitle, cancerTitle);
+        this.renderStageFirstCourseTables(window.lastChartData.stageFirstCourseData, yearTitle, cancerTitle);
         this.renderSurvivalTable(window.lastChartData.survivalData, yearTitle, cancerTitle);
         this.updateChartCaptions(yearTitle, cancerTitle);
         if (window.dashboardChartInstance) window.dashboardChartInstance.setOption(this.getGenderAgeChartOption(window.lastChartData.genderAgeData), true);
@@ -1313,6 +1348,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 'chartPane-DiagnosisAnalyzable': '癌症登記可分析個案與確診個案',
                 'chartPane-DiagnosisHistology': '組織型態分佈',
                 'chartPane-DiagnosisClassification': '個案分類',
+                'chartPane-TreatmentFirstCourse': '期別與首次療程',
                 'chartPane-CrossYearSurvival': '存活率'
             };
             
@@ -1390,6 +1426,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     else if (paneId === 'chartPane-DiagnosisAnalyzable') title = window.DashboardRenderer.t('chartAnalyzable');
                     else if (paneId === 'chartPane-DiagnosisHistology') title = window.DashboardRenderer.t('chartHistology');
                     else if (paneId === 'chartPane-DiagnosisClassification') title = window.DashboardRenderer.t('chartClassification');
+                    else if (paneId === 'chartPane-TreatmentFirstCourse') title = window.DashboardI18n?.getLanguage() === 'en' ? 'Stage and First Course Treatment' : '期別與首次療程';
                     else if (paneId === 'chartPane-CrossYearSurvival') title = window.DashboardI18n?.getLanguage() === 'en' ? 'Survival' : '存活率';
 
                     exportData.push({
