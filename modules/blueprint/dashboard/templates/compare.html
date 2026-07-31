@@ -5,7 +5,7 @@
   <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/i18next@25.3.2/dist/umd/i18next.min.js"></script>
   <link rel="stylesheet" href="/static/css/dashboard.css?v=20260726-table-title-size">
-  <link rel="stylesheet" href="/static/css/dashboard_compare.css?v=20260729-unconfigured-plain">
+  <link rel="stylesheet" href="/static/css/dashboard_compare.css?v=20260731-summary-spacing">
 {% endblock %}
 
 {% block content %}
@@ -115,7 +115,7 @@
   </div>
 
   <div class="section-body p-4">
-  <div class="row g-4">
+  <div class="row">
     <div class="compare-settings-controls col-lg-9">
   <div class="filter-bar p-0">
     <div id="compareBehaviorStep" class="filter-group opacity-50 pe-none">
@@ -203,6 +203,10 @@
           <label class="form-check-label compare-stage-system-label" for="compareItemStageSummary">分期不呈現最細碼</label>
         </div>
       </div>
+      <div id="compareStageOptions" class="compare-stage-options mt-3 pt-3 border-top border-secondary-subtle">
+        <p class="small text-secondary mb-3">選擇各分期系統的期別呈現方式。</p>
+        {% include "_stage_system_cards.html" %}
+      </div>
     </div>
     <div class="compare-subitem-row d-none d-flex flex-wrap gap-3" data-compare-subitems="treatment">
       <div class="form-check">
@@ -250,9 +254,9 @@
       </div>
 
     </div>
-      <div class="compare-selection-summary-pane col-lg-3 border-start border-secondary-subtle ps-4 d-flex flex-column justify-content-center align-items-start mt-4 mt-lg-0">
+      <div class="compare-selection-summary-pane col-lg-3 border-start border-secondary-subtle ps-4 d-flex flex-column mt-4 mt-lg-0">
         <h6 class="fw-bold text-dark mb-3 w-100 text-center">已選取分析條件</h6>
-        <div class="compare-selection-summary-list" style="font-size: 14px; line-height: 2;">
+        <div class="compare-selection-summary-list flex-grow-1" style="font-size: 14px; line-height: 2;">
           <div class="d-flex mb-2">
             <span class="text-secondary d-flex" style="width: 80px; flex-shrink: 0;"><span style="flex-grow: 1; text-align-last: justify;">比較模式</span>：</span>
             <span id="summaryCompareMode" class="text-dark fw-medium ms-1">單一年度比較</span>
@@ -335,5 +339,5 @@
 </script>
 <script src="{{ url_for('static', filename='js/dashboard_i18n.js') }}?v=20260729-age-group-label"></script>
 <script src="{{ url_for('static', filename='js/annual_report_renderer.js') }}?v=20260729-treatment-labels"></script>
-<script src="{{ url_for('static', filename='js/dashboard_compare.js') }}?v=20260729-treatment-labels"></script>
+<script src="{{ url_for('static', filename='js/dashboard_compare.js') }}?v=20260731-stage-panel"></script>
 {% endblock %}

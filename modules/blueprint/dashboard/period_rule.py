@@ -9,6 +9,16 @@ def normalize_code(value, width=0):
     except (TypeError, ValueError):
         return str(value).strip()
 
+
+def normalize_registry_date(value):
+    """將癌登日期統一為 CCYYMMDD，包含 0000/00/00 等特殊日期格式。"""
+    if pd.isna(value):
+        return ""
+    digits = re.sub(r"\D", "", str(value).strip())
+    if not digits:
+        return ""
+    return digits[:8].zfill(8)
+
 # 個案篩選
 def filter_class(df, target_classes=("1", "2")):
     return df[df["個案分類"].map(normalize_code).isin(target_classes)]
@@ -19,7 +29,7 @@ def ajcc_stages(cases, period_codes):
     rows = []
     for index, case in cases.iterrows():
         pdescr = normalize_code(case["病理分期字根/字首"])
-        dop_mds = normalize_code(case["原發部位最確切的手術切除日期"], 8)
+        dop_mds = normalize_registry_date(case["原發部位最確切的手術切除日期"])
         selected_stage = case["臨床期別組合"] if pdescr in {"4", "6"} or dop_mds == "00000000" else case["病理期別組合"]
         selected_stage = normalize_code(selected_stage)
         site = str(case["原發部位"]).strip().upper()
@@ -111,10 +121,13 @@ def bclc_stages(cases, period_codes):
 
 # SCLC分期
 def sclc_stages(cases, period_codes):
-    codes = period_codes[(period_codes["site"].astype(str).str.strip() == "C33-C34") & (period_codes["label"] == "SCLC(ostagec)")]
+    codes = period_codes[
+        (period_codes["site"].astype(str).str.strip() == "C33-C34")
+        & (period_codes["label"] == "SCLC(ostagec)")
+    ]
     return create_stage_results(cases, codes, "sclc",
         lambda case: str(case["原發部位"]).strip().upper()[:3] in {"C33", "C34"} and normalize_code(case["其他分期系統"], 2) == "07",
-        lambda case: normalize_code(case["其他分期系統期別(臨床分期)"]))
+        lambda case: normalize_code(case["其他分期系統期別(臨床分期)"]).upper())
 
 # DSS分期
 def dss_stages(cases, period_codes):
@@ -153,6 +166,172 @@ STAGE_FUNCTIONS = {
     "Breast Cancer Prognostic Stage": breast_stages, "Binet": binet_stages,
 }
 
+AGE_GROUPS = [
+    ("≦19", None, 19), ("20-24", 20, 24), ("25-29", 25, 29),
+    ("30-34", 30, 34), ("35-39", 35, 39), ("40-44", 40, 44),
+    ("45-49", 45, 49), ("50-54", 50, 54), ("55-59", 55, 59),
+    ("60-64", 60, 64), ("65-69", 65, 69), ("70-74", 70, 74),
+    ("75-79", 75, 79), ("80-84", 80, 84), ("≧85", 85, None),
+]
+
+
+def _case_value(case, *field_names):
+    """從已轉為中文欄名的個案資料中取得第一個存在的欄位值。"""
+    for field_name in field_names:
+        if field_name in case:
+            return case.get(field_name)
+    return None
+
+
+def _sex_label(case):
+    value = normalize_code(_case_value(case, "性別", "sex")).upper()
+    if value in {"1", "M", "MALE", "男性", "男"}:
+        return "男性"
+    if value in {"2", "F", "FEMALE", "女性", "女"}:
+        return "女性"
+    return ""
+
+
+def _age_group_label(case):
+    value = _case_value(case, "診斷年齡", "年齡", "age")
+    try:
+        age = int(float(value))
+    except (TypeError, ValueError):
+        return ""
+    for label, lower, upper in AGE_GROUPS:
+        if (lower is None or age >= lower) and (upper is None or age <= upper):
+            return label
+    return ""
+
+
+def _stage_report_label(row, detailed=False):
+    """依模式使用 Period_Code 的最細碼或整併期別名稱。"""
+    value = row.get("stage_detail" if detailed else "stage_detail_hide")
+    if pd.isna(value):
+        return ""
+    label = str(value).strip()
+    return "" if label.lower() in {"", "nan", "none"} else re.sub(r"^Stage\s+", "", label, flags=re.I)
+
+
+def _raw_stage_code(row):
+    for key, value in row.items():
+        if key.endswith("_stage") and key not in {"stage_value", "stage_detail", "stage_detail_hide"}:
+            return normalize_code(value).replace(",", "")
+    return ""
+
+
+def _stage_sort_key(label):
+    order = {
+        "0": 0, "I": 10, "II": 20, "III": 30, "IV": 40,
+        "A": 50, "B": 60, "C": 70, "D": 80,
+        "LIMITED": 90, "EXTENSIVE": 100,
+    }
+    text = str(label).strip()
+    upper = text.upper()
+    stage_match = re.match(r"^(0|IV|III|II|I|4|3|2|1)(.*)$", upper)
+    if stage_match:
+        stage_order = {
+            "0": 0, "I": 10, "1": 10, "II": 20, "2": 20,
+            "III": 30, "3": 30, "IV": 40, "4": 40,
+        }
+        return (stage_order[stage_match.group(1)], stage_match.group(2), text)
+    dre_match = re.match(r"^T(X|0|1|2|3|4)(.*)$", upper)
+    if dre_match:
+        dre_order = {"X": 0, "0": 1, "1": 2, "2": 3, "3": 4, "4": 5}
+        return (110 + dre_order[dre_match.group(1)], dre_match.group(2), text)
+    if upper.startswith("LIMITED"):
+        return (90, upper, text)
+    if upper.startswith("EXTENSIVE"):
+        return (100, upper, text)
+    return (order.get(upper, 999), "", text)
+
+
+def build_stage_report(stage_result, option):
+    """把 2.4 分期結果整理成前端三種表圖共用的資料契約。"""
+    rows = stage_result.get("rows", [])
+    option_name = option.get("option") or option["system"]
+    if "年齡層期別" in option_name:
+        view = "age"
+    elif "性別期別" in option_name:
+        view = "sex"
+    else:
+        view = "stage"
+    detailed = bool(option.get("detailed"))
+    included_rows = []
+    unknown_count = 0
+    not_applicable_count = 0
+
+    for row in rows:
+        raw_code = _raw_stage_code(row)
+        category = row.get("ajcc_stage_category")
+        label = _stage_report_label(row, detailed)
+        if category == "Stage Not Applicable" or raw_code in {"888", "8888"}:
+            not_applicable_count += 1
+        elif category == "Stage Unknown" or raw_code in {"999", "9999"} or not label:
+            unknown_count += 1
+        else:
+            included_rows.append((row, label))
+
+    stage_labels = sorted({label for _, label in included_rows}, key=_stage_sort_key)
+    stage_index = {label: index for index, label in enumerate(stage_labels)}
+    stage_totals = [0] * len(stage_labels)
+    sex_values = {"男性": [0] * len(stage_labels), "女性": [0] * len(stage_labels)}
+    age_values = {label: [0] * len(stage_labels) for label, _, _ in AGE_GROUPS}
+
+    for row, label in included_rows:
+        index = stage_index[label]
+        stage_totals[index] += 1
+        case = row.get("case") or {}
+        sex = _sex_label(case)
+        age_group = _age_group_label(case)
+        if sex in sex_values:
+            sex_values[sex][index] += 1
+        if age_group in age_values:
+            age_values[age_group][index] += 1
+
+    chart_stage_labels = stage_labels
+    chart_age_values = age_values
+    if view == "age" and detailed:
+        # 2.4 規定年齡層「圖」固定使用整併期別；表格仍依最細碼模式呈現。
+        chart_rows = []
+        for row in rows:
+            raw_code = _raw_stage_code(row)
+            category = row.get("ajcc_stage_category")
+            label = _stage_report_label(row, detailed=False)
+            if category in {"Stage Unknown", "Stage Not Applicable"}:
+                continue
+            if raw_code in {"888", "8888", "999", "9999"} or not label:
+                continue
+            chart_rows.append((row, label))
+        chart_stage_labels = sorted({label for _, label in chart_rows}, key=_stage_sort_key)
+        chart_stage_index = {label: index for index, label in enumerate(chart_stage_labels)}
+        chart_age_values = {label: [0] * len(chart_stage_labels) for label, _, _ in AGE_GROUPS}
+        for row, label in chart_rows:
+            age_group = _age_group_label(row.get("case") or {})
+            if age_group in chart_age_values:
+                chart_age_values[age_group][chart_stage_index[label]] += 1
+
+    return {
+        "option": option_name,
+        "view": view,
+        "staging_system": option["system"],
+        "detailed": detailed,
+        "stage_labels": stage_labels,
+        "stage_totals": stage_totals,
+        "sex_rows": [{"sex": label, "values": values} for label, values in sex_values.items()],
+        "age_rows": [{"age": label, "values": age_values[label]} for label, _, _ in AGE_GROUPS],
+        "chart_stage_labels": chart_stage_labels,
+        "chart_age_rows": [
+            {"age": label, "values": chart_age_values[label]}
+            for label, _, _ in AGE_GROUPS
+        ],
+        "analyzable_count": int(stage_result.get("total_count", len(rows))),
+        "unknown_count": unknown_count,
+        "not_applicable_count": not_applicable_count,
+        "included_count": len(included_rows),
+        "is_preview": False,
+    }
+
 
 def load_period_codes():
     conn = get_conn()
@@ -164,17 +343,28 @@ def load_period_codes():
         conn.close()
 
 
-# test
-def calculate_stage_totals(cases, options):
+def calculate_stage_reports(cases, options, period_codes=None):
+    """依勾選選項計算期別、性別期別及年齡層期別報表資料。"""
     cases = filter_class(cases)
-    period_codes = load_period_codes()
-    return [
-        {"option": option.get("option") or option["system"], "total_count": STAGE_FUNCTIONS[option["system"]](cases, period_codes)["total_count"]}
-        for option in options if option.get("system") in STAGE_FUNCTIONS]
+    period_codes = load_period_codes() if period_codes is None else period_codes
+    results_by_system = {}
+    reports = []
+    for option in options:
+        system = option.get("system")
+        if system not in STAGE_FUNCTIONS:
+            continue
+        if system not in results_by_system:
+            results_by_system[system] = STAGE_FUNCTIONS[system](cases, period_codes)
+        reports.append(build_stage_report(results_by_system[system], option))
+    return reports
+
+
+def calculate_stage_totals(cases, options, period_codes=None):
+    reports = calculate_stage_reports(cases, options, period_codes)
+    return [{"option": report["option"], "total_count": report["analyzable_count"]} for report in reports]
 
 
 def _treatment_record(case):
-    """Convert the dashboard's Chinese canonical fields to treatment-rule keys."""
     def value(*keys):
         for key in keys:
             if key in case:
@@ -202,48 +392,27 @@ def _treatment_record(case):
     }
 
 
-def _stage_sort_key(label):
-    """Keep common numeric/Roman stages in their clinical display order."""
-    text = str(label or "").strip()
-    roman = {"0": 0, "I": 1, "II": 2, "III": 3, "IV": 4, "V": 5}
-    match = re.search(r"(?:Stage\s*)?(0|IV|III|II|I|V)", text, flags=re.I)
-    if match:
-        return (0, roman.get(match.group(1).upper(), 99), text)
-    return (1, text)
-
-
-def calculate_stage_first_course_distribution(cases, options):
-    """Create the dynamic stage × first-course-treatment crosstab(s).
-
-    ``options`` accepts the selected stage systems and a ``stage_mode`` of
-    ``detailed`` or ``summary``.  Unknown / not-applicable stages and records
-    without a Period_Code match are not included in the crosstab; their counts
-    are returned for the note under the table.
-    """
+def calculate_stage_first_course_distribution(cases, options, period_codes=None):
+    """Create first-course-treatment crosstabs for the selected stage systems."""
     from modules.blueprint.dashboard.definition.treatment_rules import (
         classify_first_course_treatments,
     )
 
     cases = filter_class(cases)
-    period_codes = load_period_codes()
+    period_codes = load_period_codes() if period_codes is None else period_codes
     tables = []
     seen_systems = set()
-
     for option in options or []:
         system = option.get("system")
         if system not in STAGE_FUNCTIONS or system in seen_systems:
             continue
         seen_systems.add(system)
-        stage_mode = option.get("stage_mode", "summary")
-        stage_column = "stage_detail" if stage_mode == "detailed" else "stage_detail_hide"
+        detailed = option.get("detailed", False)
+        stage_column = "stage_detail" if detailed else "stage_detail_hide"
         stage_result = STAGE_FUNCTIONS[system](cases, period_codes)
-
         counts = {}
         stage_columns = set()
-        excluded_unknown = 0
-        excluded_not_applicable = 0
-        excluded_unmapped = 0
-
+        excluded_unknown = excluded_not_applicable = excluded_unmapped = 0
         for row in stage_result.get("rows", []):
             category = row.get("ajcc_stage_category")
             if category == "Stage Unknown":
@@ -256,27 +425,25 @@ def calculate_stage_first_course_distribution(cases, options):
             if not stage:
                 excluded_unmapped += 1
                 continue
-
-            treatment = classify_first_course_treatments(_treatment_record(row["case"]))
-            treatment = treatment or "未記錄治療"
+            treatment = classify_first_course_treatments(_treatment_record(row["case"])) or "未記錄治療"
             stage_columns.add(stage)
             counts.setdefault(treatment, {})[stage] = counts.setdefault(treatment, {}).get(stage, 0) + 1
 
         stage_columns = sorted(stage_columns, key=_stage_sort_key)
-        treatment_rows = []
-        for treatment, values in counts.items():
-            treatment_rows.append({
+        treatment_rows = [
+            {
                 "treatment": treatment,
                 "values": [int(values.get(stage, 0)) for stage in stage_columns],
                 "subtotal": int(sum(values.values())),
-            })
+            }
+            for treatment, values in counts.items()
+        ]
         treatment_rows.sort(key=lambda item: (-item["subtotal"], item["treatment"]))
-
         totals = [sum(row["values"][index] for row in treatment_rows) for index in range(len(stage_columns))]
         total_count = int(sum(totals))
         tables.append({
             "system": system,
-            "stage_mode": stage_mode,
+            "stage_mode": "detailed" if detailed else "summary",
             "stage_columns": stage_columns,
             "rows": treatment_rows,
             "totals": totals,
