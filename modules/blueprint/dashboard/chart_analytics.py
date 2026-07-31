@@ -83,6 +83,7 @@ def _empty_dashboard_response(message="查無符合條件資料！", histology_r
         "histologyWarnings": [],
         "histologyNoDataReason": histology_reason or message,
         "diagnosisClassificationData": [],
+        "stageFirstCourseData": [],
         "survivalData": {
             "rows": [],
             "no_data_reason": message,
@@ -672,6 +673,7 @@ def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", beh
         stage_selected = calculate_all or bool(
             selected.intersection({"分期呈現最細碼", "分期不呈現最細碼"})
         )
+        treatment_selected = calculate_all or "期別與首次療程" in selected
         result = _empty_dashboard_response()
         result.pop("noDataWarning", None)
         result["histologyNoDataReason"] = ""
@@ -700,14 +702,31 @@ def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", beh
             }
             if stage_options:
                 from modules.blueprint.clean.field_mapping import field_mapping
-                from modules.blueprint.dashboard.period_rule import calculate_stage_totals
+                from modules.blueprint.dashboard.period_rule import (
+                    calculate_stage_first_course_distribution,
+                    calculate_stage_reports,
+                )
 
                 aliases, _ = field_mapping("中文欄位名稱")
                 chinese_df = df.rename(columns={
                     column: aliases.get(str(column).strip(), str(column).strip())
                     for column in df.columns
                 })
-                result["stageTotals"] = calculate_stage_totals(chinese_df, stage_options)
+                treatment_aliases, _ = field_mapping("雲醫癌AI模組")
+                for column in list(chinese_df.columns):
+                    treatment_key = treatment_aliases.get(str(column).strip())
+                    if treatment_key and treatment_key not in chinese_df.columns:
+                        chinese_df[treatment_key] = chinese_df[column]
+                stage_reports = calculate_stage_reports(chinese_df, stage_options)
+                result["stageReports"] = stage_reports
+                result["stageTotals"] = [
+                    {"option": report["option"], "total_count": report["analyzable_count"]}
+                    for report in stage_reports
+                ]
+                if treatment_selected:
+                    result["stageFirstCourseData"] = calculate_stage_first_course_distribution(
+                        chinese_df, stage_options
+                    )
         if calculate_all or "存活率" in selected:
             result["survivalData"] = calculate_survival_table(df, cols)
 

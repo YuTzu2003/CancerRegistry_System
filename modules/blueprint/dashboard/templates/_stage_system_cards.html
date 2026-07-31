@@ -1,0 +1,29 @@
+{% set stage_system_cards = [
+  ("AJCC", "適用癌別：依 Period_Code 原發部位對照", ["期別", "性別期別", "年齡層期別"]),
+  ("FIGO", "適用癌別：子宮頸癌、子宮體癌、卵巢癌", ["期別", "年齡層期別"]),
+  ("BCLC", "適用癌別：肝癌", ["期別", "性別期別", "年齡層期別"]),
+  ("MAC", "適用癌別：結腸癌、直腸癌", ["期別", "性別期別", "年齡層期別"]),
+  ("SCLC", "適用癌別：氣管癌、肺癌", ["期別", "性別期別", "年齡層期別"]),
+  ("DSS", "適用癌別：漿細胞骨髓瘤（組織型態 9731–9734）", ["期別", "性別期別", "年齡層期別"]),
+  ("DRE", "適用癌別：攝護腺癌", ["期別", "年齡層期別"]),
+  ("Breast Cancer Prognostic Stage", "適用癌別：乳癌", ["期別", "性別期別", "年齡層期別"]),
+  ("Binet", "適用癌別：慢性淋巴球性白血病／小淋巴球性淋巴癌（組織型態 9823）", ["期別", "性別期別", "年齡層期別"])
+] %}
+<div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3">
+  {% for system, description, options in stage_system_cards %}
+  <div class="col">
+    <section class="compare-stage-option-card border rounded-3 h-100 p-3" data-stage-system="{{ system }}">
+      <div class="mb-3"><strong>{{ system }}</strong></div>
+      <div class="small text-secondary mb-2">{{ description }}</div>
+      <div class="d-flex flex-wrap gap-3">
+        {% for option in options %}
+        <label class="form-check mb-0">
+          <input class="form-check-input compare-stage-option" type="checkbox" value="{{ system }}{{ option }}" disabled>
+          {{ option }}
+        </label>
+        {% endfor %}
+      </div>
+    </section>
+  </div>
+  {% endfor %}
+</div>

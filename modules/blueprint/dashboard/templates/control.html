@@ -190,7 +190,7 @@
               <div id="subItems-stage" class="d-none w-100 annual-stage-panel">
                 <div class="annual-stage-system-row">
                   <div class="form-check">
-                    <input class="form-check-input item-checkbox annual-stage-system-checkbox" type="checkbox" name="subTab_stage" id="chkStageDetailed" data-parent="stage" value="分期呈現最細碼" disabled>
+                    <input class="form-check-input item-checkbox annual-stage-system-checkbox" type="checkbox" name="subTab_stage" id="chkStageDetailed" data-parent="stage" value="分期呈現最細碼" data-target="#chartPane-StageSummary" disabled>
                     <label class="form-check-label text-dark" for="chkStageDetailed" style="cursor: pointer;">分期呈現最細碼</label>
                   </div>
                   <div class="form-check">
@@ -199,59 +199,68 @@
                   </div>
                 </div>
                 <div id="stageSummaryOptions" class="mt-3 pt-3 border-top border-secondary-subtle">
-                  <p class="small text-secondary mb-3">選擇各分期系統的期別呈現方式。</p>
+                  <p class="small text-secondary mb-3">選擇要套用於分期分析及治療方式表格的分期系統。</p>
                   <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3">
                     <div class="col">
                       <section class="border rounded-3 h-100 p-3">
                         <div class="mb-3"><strong>AJCC</strong></div>
+                        <div class="small text-secondary mb-2">適用癌別：依 Period_Code 原發部位對照</div>
                         <div class="d-flex flex-wrap gap-3"><label class="form-check mb-0"><input class="form-check-input stage-summary-option" type="checkbox" data-stage-system="AJCC" value="AJCC期別" disabled> 期別</label><label class="form-check mb-0"><input class="form-check-input stage-summary-option" type="checkbox" data-stage-system="AJCC" value="AJCC性別期別" disabled> 性別期別</label><label class="form-check mb-0"><input class="form-check-input stage-summary-option" type="checkbox" data-stage-system="AJCC" value="AJCC年齡層期別" disabled> 年齡層期別</label></div>
                       </section>
                     </div>
                     <div class="col">
                       <section class="border rounded-3 h-100 p-3">
                         <div class="mb-3"><strong>FIGO</strong></div>
+                        <div class="small text-secondary mb-2">適用癌別：子宮頸癌、子宮體癌、卵巢癌</div>
                         <div class="d-flex flex-wrap gap-3"><label class="form-check mb-0"><input class="form-check-input stage-summary-option" type="checkbox" data-stage-system="FIGO" value="FIGO期別" disabled> 期別</label><label class="form-check mb-0"><input class="form-check-input stage-summary-option" type="checkbox" data-stage-system="FIGO" value="FIGO年齡層期別" disabled> 年齡層期別</label></div>
                       </section>
                     </div>
                     <div class="col">
                       <section class="border rounded-3 h-100 p-3">
                         <div class="mb-3"><strong>BCLC</strong></div>
+                        <div class="small text-secondary mb-2">適用癌別：肝癌</div>
                         <div class="d-flex flex-wrap gap-3"><label class="form-check mb-0"><input class="form-check-input stage-summary-option" type="checkbox" data-stage-system="BCLC" value="BCLC期別" disabled> 期別</label><label class="form-check mb-0"><input class="form-check-input stage-summary-option" type="checkbox" data-stage-system="BCLC" value="BCLC性別期別" disabled> 性別期別</label><label class="form-check mb-0"><input class="form-check-input stage-summary-option" type="checkbox" data-stage-system="BCLC" value="BCLC年齡層期別" disabled> 年齡層期別</label></div>
                       </section>
                     </div>
                     <div class="col">
                       <section class="border rounded-3 h-100 p-3">
                         <div class="mb-3"><strong>MAC</strong></div>
+                        <div class="small text-secondary mb-2">適用癌別：結腸癌、直腸癌</div>
                         <div class="d-flex flex-wrap gap-3"><label class="form-check mb-0"><input class="form-check-input stage-summary-option" type="checkbox" data-stage-system="MAC" value="MAC期別" disabled> 期別</label><label class="form-check mb-0"><input class="form-check-input stage-summary-option" type="checkbox" data-stage-system="MAC" value="MAC性別期別" disabled> 性別期別</label><label class="form-check mb-0"><input class="form-check-input stage-summary-option" type="checkbox" data-stage-system="MAC" value="MAC年齡層期別" disabled> 年齡層期別</label></div>
                       </section>
                     </div>
                     <div class="col">
                       <section class="border rounded-3 h-100 p-3">
                         <div class="mb-3"><strong>SCLC</strong></div>
+                        <div class="small text-secondary mb-2">適用癌別：氣管癌、肺癌</div>
                         <div class="d-flex flex-wrap gap-3"><label class="form-check mb-0"><input class="form-check-input stage-summary-option" type="checkbox" data-stage-system="SCLC" value="SCLC期別" disabled> 期別</label><label class="form-check mb-0"><input class="form-check-input stage-summary-option" type="checkbox" data-stage-system="SCLC" value="SCLC性別期別" disabled> 性別期別</label><label class="form-check mb-0"><input class="form-check-input stage-summary-option" type="checkbox" data-stage-system="SCLC" value="SCLC年齡層期別" disabled> 年齡層期別</label></div>
                       </section>
                     </div>
                     <div class="col">
                       <section class="border rounded-3 h-100 p-3">
                         <div class="mb-3"><strong>DSS</strong></div>
+                        <div class="small text-secondary mb-2">適用癌別：漿細胞骨髓瘤（組織型態 9731–9734）</div>
                         <div class="d-flex flex-wrap gap-3"><label class="form-check mb-0"><input class="form-check-input stage-summary-option" type="checkbox" data-stage-system="DSS" value="DSS期別" disabled> 期別</label><label class="form-check mb-0"><input class="form-check-input stage-summary-option" type="checkbox" data-stage-system="DSS" value="DSS性別期別" disabled> 性別期別</label><label class="form-check mb-0"><input class="form-check-input stage-summary-option" type="checkbox" data-stage-system="DSS" value="DSS年齡層期別" disabled> 年齡層期別</label></div>
                       </section>
                     </div>
                     <div class="col">
                       <section class="border rounded-3 h-100 p-3">
                         <div class="mb-3"><strong>DRE</strong></div>
+                        <div class="small text-secondary mb-2">適用癌別：攝護腺癌</div>
                         <div class="d-flex flex-wrap gap-3"><label class="form-check mb-0"><input class="form-check-input stage-summary-option" type="checkbox" data-stage-system="DRE" value="DRE期別" disabled> 期別</label><label class="form-check mb-0"><input class="form-check-input stage-summary-option" type="checkbox" data-stage-system="DRE" value="DRE年齡層期別" disabled> 年齡層期別</label></div>
                       </section>
                     </div>
                     <div class="col">
                       <section class="border rounded-3 h-100 p-3">
                         <div class="mb-3"><strong>Breast Cancer Prognostic Stage</strong></div>
+                        <div class="small text-secondary mb-2">適用癌別：乳癌</div>
                         <div class="d-flex flex-wrap gap-3"><label class="form-check mb-0"><input class="form-check-input stage-summary-option" type="checkbox" data-stage-system="Breast Cancer Prognostic Stage" value="Breast Cancer Prognostic Stage期別" disabled> 期別</label><label class="form-check mb-0"><input class="form-check-input stage-summary-option" type="checkbox" data-stage-system="Breast Cancer Prognostic Stage" value="Breast Cancer Prognostic Stage性別期別" disabled> 性別期別</label><label class="form-check mb-0"><input class="form-check-input stage-summary-option" type="checkbox" data-stage-system="Breast Cancer Prognostic Stage" value="Breast Cancer Prognostic Stage年齡層期別" disabled> 年齡層期別</label></div>
                       </section>
                     </div>
                     <div class="col">
                       <section class="border rounded-3 h-100 p-3">
                         <div class="mb-3"><strong>Binet</strong></div>
+                        <div class="small text-secondary mb-2">適用癌別：慢性淋巴球性白血病／小淋巴球性淋巴瘤（組織型態 9823）</div>
                         <div class="d-flex flex-wrap gap-3"><label class="form-check mb-0"><input class="form-check-input stage-summary-option" type="checkbox" data-stage-system="Binet" value="Binet期別" disabled> 期別</label><label class="form-check mb-0"><input class="form-check-input stage-summary-option" type="checkbox" data-stage-system="Binet" value="Binet性別期別" disabled> 性別期別</label><label class="form-check mb-0"><input class="form-check-input stage-summary-option" type="checkbox" data-stage-system="Binet" value="Binet年齡層期別" disabled> 年齡層期別</label></div>
                       </section>
                     </div>
@@ -263,7 +272,7 @@
               <div id="subItems-treatment" class="d-none d-flex flex-wrap gap-3">
                 <p id="treatmentStageRequired" class="small text-secondary w-100 mb-0">請先選擇至少一項期別分析。</p>
                 <div class="form-check">
-                  <input class="form-check-input item-checkbox" type="checkbox" name="subTab_treatment" id="chkTreatmentFirstCourse" data-parent="treatment" value="期別與首次療程" disabled>
+                  <input class="form-check-input item-checkbox" type="checkbox" name="subTab_treatment" id="chkTreatmentFirstCourse" data-parent="treatment" value="期別與首次療程" data-target="#chartPane-TreatmentFirstCourse" disabled>
                   <label class="form-check-label text-dark" for="chkTreatmentFirstCourse" style="cursor: pointer;">期別與首次療程</label>
                 </div>
                 <div class="form-check">
@@ -770,4 +779,4 @@
 </style>
 
 <script src="{{ url_for('static', filename='js/annual_report_renderer.js') }}?v=20260729-common-cancers"></script>
-<script src="{{ url_for('static', filename='js/dashboard_control.js') }}?v=20260731-stage-treatment"></script>
+<script src="{{ url_for('static', filename='js/dashboard_control.js') }}?v=20260731-stage-first-course"></script>

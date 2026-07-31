@@ -86,6 +86,10 @@
         });
     }
     window.dashboardSelectedCancerDisplayKeys = [...new Set(displayCancerKeys)];
+
+    if (typeof updateStageSummaryOptions === 'function') {
+      updateStageSummaryOptions();
+    }
     
     const totalSpecificCount = leafNodes.length;
     
@@ -847,20 +851,45 @@
   }
 
   function updateStageSummaryOptions() {
+    const stageDetailed = document.getElementById('chkStageDetailed');
     const stageSummary = document.getElementById('chkStageSummary');
     const options = document.getElementById('stageSummaryOptions');
-    if (!stageSummary || !options) return;
-    const enabled = stageSummary.checked && !stageSummary.disabled;
+    if (!stageDetailed || !stageSummary || !options) return;
+    const enabled = (stageDetailed.checked && !stageDetailed.disabled)
+      || (stageSummary.checked && !stageSummary.disabled);
+    const selectedCancers = new Set(window.selectedCancers || []);
+    const appliesToSelectedCancer = {
+      AJCC: () => selectedCancers.size > 0,
+      FIGO: () => ['Cervix_Uteri', 'Corpus_Uteri', 'Ovary'].some(value => selectedCancers.has(value)),
+      BCLC: () => selectedCancers.has('Liver'),
+      MAC: () => ['Colon', 'Rectum'].some(value => selectedCancers.has(value)),
+      SCLC: () => [
+        'Lung_and_Bronchus',
+        'Small_cell_carcinoma',
+        'Adenocarcinoma',
+        'Squamous_cell_carcinoma'
+      ].some(value => selectedCancers.has(value)),
+      DSS: () => selectedCancers.has('Plasma_cell_neoplasms'),
+      DRE: () => selectedCancers.has('Prostate'),
+      'Breast Cancer Prognostic Stage': () => [
+        'Breast_Female',
+        'Breast_Male'
+      ].some(value => selectedCancers.has(value)),
+      Binet: () => selectedCancers.has('CLL')
+    };
+    const allCancersSelected = selectedCancers.has('All_Cancers');
+
     options.classList.toggle('is-open', enabled);
     options.querySelectorAll('.stage-summary-option').forEach(input => {
-      input.disabled = !enabled;
-      if (!enabled) input.checked = false;
+      const system = input.dataset.stageSystem;
+      const isApplicable = allCancersSelected || appliesToSelectedCancer[system]?.() === true;
+      input.disabled = !enabled || !isApplicable;
+      if (input.disabled) input.checked = false;
     });
   }
 
   function updateTreatmentSelection(isAvailable) {
-    const hasStageAnalysis = Boolean(document.getElementById('chkStageDetailed')?.checked
-      || document.querySelector('.stage-summary-option:checked'));
+    const hasStageAnalysis = Boolean(document.querySelector('.stage-summary-option:checked'));
     const enabled = Boolean(isAvailable && hasStageAnalysis);
     document.querySelectorAll('#subItems-treatment .item-checkbox').forEach(input => {
       input.disabled = !enabled;
@@ -1212,7 +1241,11 @@ function initDashboardControl() {
               analysis_items: Array.from(document.querySelectorAll('.item-checkbox:checked'))
                   .map(item => item.value),
               stage_options: Array.from(document.querySelectorAll('.stage-summary-option:checked'))
-                  .map(item => ({ system: item.dataset.stageSystem, option: item.value }))
+                  .map(item => ({
+                      system: item.dataset.stageSystem,
+                      option: item.value,
+                      detailed: document.getElementById('chkStageDetailed')?.checked === true
+                  }))
           };
           fetch('/api/dashboard/analyze_file', {
               method: 'POST',
@@ -1243,11 +1276,14 @@ function initDashboardControl() {
                   
                   let anyChecked = false;
                   let firstBtn = null;
-                  
+                  const addedChartTargets = new Set();
+
                   document.querySelectorAll('.item-checkbox').forEach(itemChk => {
                       const targetSelector = itemChk.getAttribute('data-target');
                       if (targetSelector && itemChk.checked) {
                           anyChecked = true;
+                          if (addedChartTargets.has(targetSelector)) return;
+                          addedChartTargets.add(targetSelector);
                           if (chartTabsContainer) {
                               const btn = document.createElement('button');
                               btn.className = 'btn btn-outline-primary chart-tab-btn';
@@ -1347,6 +1383,24 @@ function initDashboardControl() {
                       window.DashboardRenderer.renderHistologyWarningButton(histologyChecked ? histologyWarnings : []);
                       window.DashboardRenderer.renderDiagnosisClassificationTable(chartData.diagnosisClassificationData, yearTitle, cancerTitle);
                       window.DashboardRenderer.renderDiagnosisClassificationChart(chartData.diagnosisClassificationData, yearTitle, cancerTitle);
+                      const stageChecked = Boolean(
+                          document.getElementById('chkStageDetailed')?.checked
+                          || document.getElementById('chkStageSummary')?.checked
+                      );
+                      if (stageChecked) {
+                          let stageReports = Array.isArray(chartData.stageReports) ? chartData.stageReports : [];
+                          if (!stageReports.length) {
+                              stageReports = Array.from(document.querySelectorAll('.stage-summary-option:checked')).map(input => ({
+                                  ...window.DashboardRenderer.getStageDistributionPreviewData(),
+                                  option: input.value,
+                                  staging_system: input.dataset.stageSystem || 'AJCC',
+                                  view: input.value.includes('年齡層期別') ? 'age' : input.value.includes('性別期別') ? 'sex' : 'stage'
+                              }));
+                          }
+                          chartData.stageReports = stageReports;
+                          window.DashboardRenderer.renderStageReportTabs(stageReports, yearTitle, cancerTitle);
+                      }
+                      window.DashboardRenderer.renderStageFirstCourseTables(chartData.stageFirstCourseData, yearTitle, cancerTitle);
                       window.DashboardRenderer.renderSurvivalTable(chartData.survivalData, yearTitle, cancerTitle);
                       window.DashboardRenderer.showAnnualDataContent();
                       window.DashboardRenderer.updateChartCaptions(yearTitle, cancerTitle);
