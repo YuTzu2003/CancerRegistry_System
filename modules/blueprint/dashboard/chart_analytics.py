@@ -700,14 +700,19 @@ def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", beh
             }
             if stage_options:
                 from modules.blueprint.clean.field_mapping import field_mapping
-                from modules.blueprint.dashboard.period_rule import calculate_stage_totals
+                from modules.blueprint.dashboard.period_rule import calculate_stage_reports
 
                 aliases, _ = field_mapping("中文欄位名稱")
                 chinese_df = df.rename(columns={
                     column: aliases.get(str(column).strip(), str(column).strip())
                     for column in df.columns
                 })
-                result["stageTotals"] = calculate_stage_totals(chinese_df, stage_options)
+                stage_reports = calculate_stage_reports(chinese_df, stage_options)
+                result["stageReports"] = stage_reports
+                result["stageTotals"] = [
+                    {"option": report["option"], "total_count": report["analyzable_count"]}
+                    for report in stage_reports
+                ]
         if calculate_all or "存活率" in selected:
             result["survivalData"] = calculate_survival_table(df, cols)
 
