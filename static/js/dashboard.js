@@ -858,6 +858,33 @@ window.DashboardRenderer.renderStageAgeReport = function(stageData, yearTitle, c
         }
     };
 
+/* ── 期別與首次療程表 ── */
+window.DashboardRenderer.renderStageFirstCourseTables = function(tables, yearTitle, cancerTitle) {
+        const container = document.getElementById('annualStageFirstCourseTables');
+        if (!container) return;
+        if (!Array.isArray(tables) || !tables.length) {
+            container.innerHTML = '<div class="text-secondary">目前沒有符合所選分期系統的首次療程資料。</div>';
+            return;
+        }
+        const isEnglish = window.DashboardI18n?.getLanguage() === 'en';
+        const selectedCancer = this.getCancerTitleForSentence(cancerTitle);
+        container.innerHTML = tables.map(item => {
+            const stages = item.stage_columns || [];
+            const rows = item.rows || [];
+            const title = isEnglish
+                ? `Table . First Course Treatment by ${this.escapeHtml(item.system)} Stage of ${this.getEnglishCancerPatientLabel(selectedCancer)}, ${yearTitle}${this.sourceLine()}`
+                : this.reportCaption('table', yearTitle, selectedCancer, `${item.system}期別與首次療程`);
+            const bodyRows = rows.map(row => `<tr><td>${this.escapeHtml(row.treatment)}</td>${row.values.map(value => `<td>${value}</td>`).join('')}<td>${row.subtotal}</td></tr>`).join('');
+            const totals = (item.totals || []).map(value => `<td>${value}</td>`).join('');
+            const percentages = (item.percentages || []).map(value => `<td>${value}%</td>`).join('');
+            const exclusions = [];
+            if (item.excluded_unknown) exclusions.push(isEnglish ? `Unknown stage: ${item.excluded_unknown}` : `不明期別：${item.excluded_unknown} 件`);
+            if (item.excluded_not_applicable) exclusions.push(isEnglish ? `Stage not applicable: ${item.excluded_not_applicable}` : `不適用分期：${item.excluded_not_applicable} 件`);
+            if (item.excluded_unmapped) exclusions.push(isEnglish ? `No mapped stage: ${item.excluded_unmapped}` : `無法對應分期：${item.excluded_unmapped} 件`);
+            return `<div class="mb-4"><table class="annual-report-table"><caption>${title}</caption><thead><tr><th rowspan="2">${isEnglish ? 'First Course Treatment' : '首次療程'}</th><th colspan="${Math.max(stages.length, 1)}">${this.escapeHtml(item.system)}${isEnglish ? ' Stage' : '期別'}</th><th rowspan="2">${isEnglish ? 'Total' : '小計'}</th></tr><tr>${stages.map(stage => `<th>${this.escapeHtml(stage)}</th>`).join('')}</tr></thead><tbody>${bodyRows}<tr class="fw-bold"><td>${this.t('total')}</td>${totals}<td>${Number(item.total_count || 0)}</td></tr><tr><td>${isEnglish ? '%' : '百分比%'}</td>${percentages}<td>${item.total_count ? '100.0%' : '0.0%'}</td></tr></tbody></table>${exclusions.length ? `<div class="small text-secondary mt-2">${exclusions.join('；')}</div>` : ''}</div>`;
+        }).join('');
+    };
+
 /* ── 組織型態不適用個案說明按鈕 ── */
 window.DashboardRenderer.currentHistologyWarnings = [];
 
@@ -1676,6 +1703,7 @@ window.DashboardRenderer.rerenderDashboardLanguage = function(options = {}) {
         if (window.lastChartData.stageReports) {
             this.renderStageReportTabs(window.lastChartData.stageReports, yearTitle, cancerTitle);
         }
+        this.renderStageFirstCourseTables(window.lastChartData.stageFirstCourseData, yearTitle, cancerTitle);
         this.renderSurvivalTable(window.lastChartData.survivalData, yearTitle, cancerTitle);
         this.updateChartCaptions(yearTitle, cancerTitle);
         if (window.dashboardChartInstance) window.dashboardChartInstance.setOption(this.getGenderAgeChartOption(window.lastChartData.genderAgeData), true);

@@ -1401,6 +1401,7 @@ function initDashboardControl() {
                           chartData.stageReports = stageReports;
                           window.DashboardRenderer.renderStageReportTabs(stageReports, yearTitle, cancerTitle);
                       }
+                      window.DashboardRenderer.renderStageFirstCourseTables(chartData.stageFirstCourseData, yearTitle, cancerTitle);
                       window.DashboardRenderer.renderSurvivalTable(chartData.survivalData, yearTitle, cancerTitle);
                       window.DashboardRenderer.showAnnualDataContent();
                       window.DashboardRenderer.updateChartCaptions(yearTitle, cancerTitle);

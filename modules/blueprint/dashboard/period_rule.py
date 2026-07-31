@@ -362,3 +362,95 @@ def calculate_stage_reports(cases, options, period_codes=None):
 def calculate_stage_totals(cases, options, period_codes=None):
     reports = calculate_stage_reports(cases, options, period_codes)
     return [{"option": report["option"], "total_count": report["analyzable_count"]} for report in reports]
+
+
+def _treatment_record(case):
+    def value(*keys):
+        for key in keys:
+            if key in case:
+                return case.get(key)
+        return None
+
+    return {
+        "site": value("site", "原發部位"),
+        "hist": value("hist", "組織型態"),
+        "optype_o": value("optype_o", "外院原發部位手術方式"),
+        "optype_h": value("optype_h", "申報醫院原發部位手術方式"),
+        "drt_1st": value("drt_1st", "DRET"),
+        "rtstatus": value("rtstatus", "放射治療執行狀態"),
+        "chem_o": value("chem_o", "外院化學治療"),
+        "chem_h": value("chem_h", "申報醫院化學治療"),
+        "horm_o": value("horm_o", "外院荷爾蒙/類固醇治療"),
+        "horm_h": value("horm_h", "申報醫院荷爾蒙/類固醇治療"),
+        "immu_o": value("immu_o", "外院免疫治療"),
+        "immu_h": value("immu_h", "申報醫院免疫治療"),
+        "htep_h": value("htep_h", "申報醫院骨髓/幹細胞移植或內分泌處置"),
+        "target_o": value("target_o", "外院標靶治療"),
+        "target_h": value("target_h", "申報醫院標靶治療"),
+        "other": value("other", "其他治療"),
+        "dtrt_1st": value("dtrt_1st", "DTRT_1ST"),
+    }
+
+
+def calculate_stage_first_course_distribution(cases, options, period_codes=None):
+    """Create first-course-treatment crosstabs for the selected stage systems."""
+    from modules.blueprint.dashboard.definition.treatment_rules import (
+        classify_first_course_treatments,
+    )
+
+    cases = filter_class(cases)
+    period_codes = load_period_codes() if period_codes is None else period_codes
+    tables = []
+    seen_systems = set()
+    for option in options or []:
+        system = option.get("system")
+        if system not in STAGE_FUNCTIONS or system in seen_systems:
+            continue
+        seen_systems.add(system)
+        detailed = option.get("detailed", False)
+        stage_column = "stage_detail" if detailed else "stage_detail_hide"
+        stage_result = STAGE_FUNCTIONS[system](cases, period_codes)
+        counts = {}
+        stage_columns = set()
+        excluded_unknown = excluded_not_applicable = excluded_unmapped = 0
+        for row in stage_result.get("rows", []):
+            category = row.get("ajcc_stage_category")
+            if category == "Stage Unknown":
+                excluded_unknown += 1
+                continue
+            if category == "Stage Not Applicable":
+                excluded_not_applicable += 1
+                continue
+            stage = str(row.get(stage_column) or "").strip()
+            if not stage:
+                excluded_unmapped += 1
+                continue
+            treatment = classify_first_course_treatments(_treatment_record(row["case"])) or "未記錄治療"
+            stage_columns.add(stage)
+            counts.setdefault(treatment, {})[stage] = counts.setdefault(treatment, {}).get(stage, 0) + 1
+
+        stage_columns = sorted(stage_columns, key=_stage_sort_key)
+        treatment_rows = [
+            {
+                "treatment": treatment,
+                "values": [int(values.get(stage, 0)) for stage in stage_columns],
+                "subtotal": int(sum(values.values())),
+            }
+            for treatment, values in counts.items()
+        ]
+        treatment_rows.sort(key=lambda item: (-item["subtotal"], item["treatment"]))
+        totals = [sum(row["values"][index] for row in treatment_rows) for index in range(len(stage_columns))]
+        total_count = int(sum(totals))
+        tables.append({
+            "system": system,
+            "stage_mode": "detailed" if detailed else "summary",
+            "stage_columns": stage_columns,
+            "rows": treatment_rows,
+            "totals": totals,
+            "total_count": total_count,
+            "percentages": [round(value / total_count * 100, 1) if total_count else 0 for value in totals],
+            "excluded_unknown": excluded_unknown,
+            "excluded_not_applicable": excluded_not_applicable,
+            "excluded_unmapped": excluded_unmapped,
+        })
+    return tables
