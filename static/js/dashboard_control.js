@@ -859,8 +859,7 @@
   }
 
   function updateTreatmentSelection(isAvailable) {
-    const hasStageAnalysis = Boolean(document.getElementById('chkStageDetailed')?.checked
-      || document.querySelector('.stage-summary-option:checked'));
+    const hasStageAnalysis = Boolean(document.querySelector('.stage-summary-option:checked'));
     const enabled = Boolean(isAvailable && hasStageAnalysis);
     document.querySelectorAll('#subItems-treatment .item-checkbox').forEach(input => {
       input.disabled = !enabled;
@@ -1212,7 +1211,11 @@ function initDashboardControl() {
               analysis_items: Array.from(document.querySelectorAll('.item-checkbox:checked'))
                   .map(item => item.value),
               stage_options: Array.from(document.querySelectorAll('.stage-summary-option:checked'))
-                  .map(item => ({ system: item.dataset.stageSystem, option: item.value }))
+                  .map(item => ({
+                      system: item.dataset.stageSystem,
+                      option: item.value,
+                      stage_mode: document.getElementById('chkStageDetailed')?.checked ? 'detailed' : 'summary'
+                  }))
           };
           fetch('/api/dashboard/analyze_file', {
               method: 'POST',
@@ -1347,6 +1350,7 @@ function initDashboardControl() {
                       window.DashboardRenderer.renderHistologyWarningButton(histologyChecked ? histologyWarnings : []);
                       window.DashboardRenderer.renderDiagnosisClassificationTable(chartData.diagnosisClassificationData, yearTitle, cancerTitle);
                       window.DashboardRenderer.renderDiagnosisClassificationChart(chartData.diagnosisClassificationData, yearTitle, cancerTitle);
+                      window.DashboardRenderer.renderStageFirstCourseTables(chartData.stageFirstCourseData, yearTitle, cancerTitle);
                       window.DashboardRenderer.renderSurvivalTable(chartData.survivalData, yearTitle, cancerTitle);
                       window.DashboardRenderer.showAnnualDataContent();
                       window.DashboardRenderer.updateChartCaptions(yearTitle, cancerTitle);
