@@ -165,6 +165,55 @@
     return Array.from(window.selectedCancers || []);
   }
 
+  function updateCompareStageOptions() {
+    const detailed = document.getElementById('compareItemStageDetailed');
+    const summary = document.getElementById('compareItemStageSummary');
+    const panel = document.getElementById('compareStageOptions');
+    if (!detailed || !summary || !panel) return;
+
+    const cancerReady = selectedCancerValues().length > 0;
+    if (detailed.checked) {
+      summary.checked = false;
+      summary.disabled = true;
+      detailed.disabled = !cancerReady;
+    } else if (summary.checked) {
+      detailed.checked = false;
+      detailed.disabled = true;
+      summary.disabled = !cancerReady;
+    } else {
+      detailed.disabled = !cancerReady;
+      summary.disabled = !cancerReady;
+    }
+
+    const enabled = cancerReady && (detailed.checked || summary.checked);
+    const selectedCancers = new Set(selectedCancerValues());
+    const applicable = {
+      AJCC: () => selectedCancers.size > 0,
+      FIGO: () => ['Cervix_Uteri', 'Corpus_Uteri', 'Ovary'].some(value => selectedCancers.has(value)),
+      BCLC: () => selectedCancers.has('Liver'),
+      MAC: () => ['Colon', 'Rectum'].some(value => selectedCancers.has(value)),
+      SCLC: () => ['Lung_and_Bronchus', 'Small_cell_carcinoma', 'Adenocarcinoma', 'Squamous_cell_carcinoma']
+        .some(value => selectedCancers.has(value)),
+      DSS: () => selectedCancers.has('Plasma_cell_neoplasms'),
+      DRE: () => selectedCancers.has('Prostate'),
+      'Breast Cancer Prognostic Stage': () => ['Breast_Female', 'Breast_Male']
+        .some(value => selectedCancers.has(value)),
+      Binet: () => selectedCancers.has('CLL')
+    };
+    const allSelected = selectedCancers.has('All_Cancers');
+
+    panel.classList.toggle('is-open', enabled);
+    panel.querySelectorAll('.compare-stage-option-card').forEach(card => {
+      const isApplicable = allSelected || applicable[card.dataset.stageSystem]?.() === true;
+      const disabled = !enabled || !isApplicable;
+      card.classList.toggle('is-disabled', disabled);
+      card.querySelectorAll('.compare-stage-option').forEach(input => {
+        input.disabled = disabled;
+        if (disabled) input.checked = false;
+      });
+    });
+  }
+
   function filesReady() {
     const hasBothFilesAndYears = fileSelectionsComplete();
     const mainEnd = selectedCompareMode() === 'range' ? mainYearEnd.value : mainYear.value;
@@ -208,6 +257,7 @@
 
   function updateButtonState() {
     const state = setSettingsEnabled();
+    updateCompareStageOptions();
     runButton.disabled = !(state.cancerIsReady && selectedCompareItems().length > 0);
     updateTopicCounts();
     updateSelectionSummary();
@@ -1733,6 +1783,12 @@
     input.addEventListener('change', () => {
       markResultsStale();
       updateButtonState();
+    });
+  });
+  document.querySelectorAll('.compare-stage-option').forEach(input => {
+    input.addEventListener('change', () => {
+      markResultsStale();
+      updateSelectionSummary();
     });
   });
   document.getElementById('btnSelectAllCompareItems').addEventListener('click', () => {
