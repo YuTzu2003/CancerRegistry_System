@@ -1772,6 +1772,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 'chartPane-DiagnosisAnalyzable': '癌症登記可分析個案與確診個案',
                 'chartPane-DiagnosisHistology': '組織型態分佈',
                 'chartPane-DiagnosisClassification': '個案分類',
+                'chartPane-TreatmentFirstCourse': '期別與首次療程',
                 'chartPane-CrossYearSurvival': '存活率'
             };
             
@@ -1849,6 +1850,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     else if (paneId === 'chartPane-DiagnosisAnalyzable') title = window.DashboardRenderer.t('chartAnalyzable');
                     else if (paneId === 'chartPane-DiagnosisHistology') title = window.DashboardRenderer.t('chartHistology');
                     else if (paneId === 'chartPane-DiagnosisClassification') title = window.DashboardRenderer.t('chartClassification');
+                    else if (paneId === 'chartPane-TreatmentFirstCourse') title = window.DashboardI18n?.getLanguage() === 'en' ? 'Stage and First Course Treatment' : '期別與首次療程';
                     else if (paneId === 'chartPane-CrossYearSurvival') title = window.DashboardI18n?.getLanguage() === 'en' ? 'Survival' : '存活率';
 
                     exportData.push({

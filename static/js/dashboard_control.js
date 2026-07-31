@@ -889,8 +889,7 @@
   }
 
   function updateTreatmentSelection(isAvailable) {
-    const hasStageAnalysis = Boolean(document.getElementById('chkStageDetailed')?.checked
-      || document.querySelector('.stage-summary-option:checked'));
+    const hasStageAnalysis = Boolean(document.querySelector('.stage-summary-option:checked'));
     const enabled = Boolean(isAvailable && hasStageAnalysis);
     document.querySelectorAll('#subItems-treatment .item-checkbox').forEach(input => {
       input.disabled = !enabled;

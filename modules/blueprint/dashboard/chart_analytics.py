@@ -83,6 +83,7 @@ def _empty_dashboard_response(message="查無符合條件資料！", histology_r
         "histologyWarnings": [],
         "histologyNoDataReason": histology_reason or message,
         "diagnosisClassificationData": [],
+        "stageFirstCourseData": [],
         "survivalData": {
             "rows": [],
             "no_data_reason": message,
