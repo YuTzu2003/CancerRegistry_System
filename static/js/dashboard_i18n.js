@@ -2,9 +2,15 @@ window.DashboardI18n = (function() {
     const resources = {
         'zh-TW': {
             translation: {
-                language: '語言', source: '資料來源：癌症登記資料庫', table: '表', chart: '圖', chartSexAge: '性別與年齡分佈', chartAgeMedian: '年齡中位數', chartAnalyzable: '可分析個案與確診個案', chartHistology: '組織型態', chartClassification: '個案分類',
+                language: '語言', source: '資料來源：癌症登記資料庫', table: '表', chart: '圖', chartSexAge: '性別與年齡分佈', chartAgeMedian: '年齡中位數', chartAnalyzable: '可分析個案與確診個案', chartHistology: '組織型態', chartClassification: '個案分類', chartStage: '期別',
                 newDiagnosis: '新診斷', cancer: '癌', patient: '病患', distribution: '分佈',
                 sexAge: '性別及年齡', age: '年齡', ageGroup: '年齡層', sex: '性別', male: '男性', female: '女性', total: '總計', subtotal: '小計', percent: '%', cases: '個案數',
+                stage: '期別', stageTab: '{{system}}期別', stageSexTab: '{{system}}性別期別', stageAgeTab: '{{system}}年齡層期別',
+                stageTableTitle: '表、{{year}}年新診斷{{cancer}}病患{{system}}期別分布表', stageFigureTitle: '圖、{{year}}年新診斷{{cancer}}病患{{system}}期別分布圖', stageChartTitle: '{{year}}年新診斷{{cancer}}病患{{system}}期別分布圖',
+                stageSexTableTitle: '表、{{year}}年新診斷{{cancer}}病患性別及{{system}}期別分布表', stageSexFigureTitle: '圖、{{year}}年新診斷{{cancer}}病患性別及{{system}}期別分布圖', stageSexChartTitle: '{{year}}年新診斷{{cancer}}病患性別及{{system}}期別分布圖',
+                stageAgeTableTitle: '表、{{year}}年新診斷{{cancer}}病患年齡層及{{system}}期別分布表', stageAgeFigureTitle: '圖、{{year}}年新診斷{{cancer}}病患年齡層及{{system}}期別分布圖', stageAgeChartTitle: '{{year}}年新診斷{{cancer}}病患年齡層及{{system}}期別分布圖',
+                stageStatisticsNote: '註：可分析個案數共計 {{analyzable}} 例，其中分期不明 {{unknown}} 例、不適用 {{notApplicable}} 例；共 {{included}} 例納入分期分布百分比計算（百分比分母＝{{included}}）',
+                stagePreview: '介面預覽資料（尚未串接正式分期規則）', stageTooltipCount: '{{percent}}%（{{count}} 人）', stageAgeTooltipTotal: '{{age}}（小計 {{total}} 人）',
                 ageMedian: '年齡中位數', item: '項目', incidentCases: '發生個案', sexRatio: '性別比',
                 medianCharacteristic: '項目', medianN: '個案數(人)', medianAgeYears: '年齡中位數', medianMaleToFemaleRatio: '性別比', medianSex: '發生個案',
                 analyzableConfirmed: '癌症登記可分析個案與確診個案', cancerTotal: '癌症總數', analyzableCases: '可分析個案數',
@@ -29,9 +35,15 @@ window.DashboardI18n = (function() {
         },
         en: {
             translation: {
-                language: 'Language', source: 'Source: Cancer Registry Database', table: 'Table', chart: 'Figure', chartSexAge: 'Sex and age distribution', chartAgeMedian: 'Median age', chartAnalyzable: 'Analyzable and confirmed cases', chartHistology: 'Histology', chartClassification: 'Class',
+                language: 'Language', source: 'Source: Cancer Registry Database', table: 'Table', chart: 'Figure', chartSexAge: 'Sex and age distribution', chartAgeMedian: 'Median age', chartAnalyzable: 'Analyzable and confirmed cases', chartHistology: 'Histology', chartClassification: 'Class', chartStage: 'Stage',
                 newDiagnosis: 'Newly diagnosed ', cancer: ' cancer', patient: ' patients', distribution: ' distribution',
                 sexAge: 'Sex and age', age: 'Age', ageGroup: 'Age', sex: 'Sex', male: 'Male', female: 'Female', total: 'Total', subtotal: 'Total', percent: '%', cases: 'Cases',
+                stage: 'Stage', stageTab: '{{system}} Stage', stageSexTab: '{{system}} Stage by Sex', stageAgeTab: '{{system}} Stage by Age',
+                stageTableTitle: 'Table . {{system}} Stage Distribution of Newly Diagnosed {{cancer}} Cases, {{year}}', stageFigureTitle: 'Figure. {{system}} Stage Distribution of Newly Diagnosed {{cancer}} Patients, {{year}}', stageChartTitle: '{{system}} Stage Distribution of Newly Diagnosed {{cancer}} Patients, {{year}}',
+                stageSexTableTitle: 'Table . Sex and {{system}} Stage Distribution of Newly Diagnosed {{cancer}} Cases, {{year}}', stageSexFigureTitle: 'Figure. {{system}} Stage Distribution by Sex of Newly Diagnosed {{cancer}} Patients, {{year}}', stageSexChartTitle: '{{system}} Stage Distribution by Sex of Newly Diagnosed {{cancer}} Patients, {{year}}',
+                stageAgeTableTitle: 'Table . Age Group and {{system}} Stage Distribution of Newly Diagnosed {{cancer}} Cases, {{year}}', stageAgeFigureTitle: 'Figure. {{system}} Stage Distribution by Age Group of Newly Diagnosed {{cancer}} Patients, {{year}}', stageAgeChartTitle: '{{system}} Stage Distribution by Age Group of Newly Diagnosed {{cancer}} Patients, {{year}}',
+                stageStatisticsNote: 'Note: Stage distribution was calculated using {{included}} analyzable cases (Class 1 - 2). Cases with unknown stage (n={{unknown}}) and non-applicable stage (n={{notApplicable}}) were excluded.',
+                stagePreview: 'Interface preview data (official staging rules not yet connected)', stageTooltipCount: '{{percent}}% (N = {{count}})', stageAgeTooltipTotal: '{{age}} (Total N = {{total}})',
                 ageMedian: 'Median age', item: 'Item', incidentCases: 'Incident cases', sexRatio: 'Sex ratio',
                 medianCharacteristic: 'Characteristic', medianN: 'N', medianAgeYears: 'Median Age (years)', medianMaleToFemaleRatio: 'Male-to-Female Ratio', medianSex: 'Sex',
                 analyzableConfirmed: 'Analyzable and microscopically confirmed cancer cases', cancerTotal: 'Total Cancer Cases', analyzableCases: 'Analyzable cases',

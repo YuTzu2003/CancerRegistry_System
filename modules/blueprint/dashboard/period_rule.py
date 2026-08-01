@@ -19,6 +19,7 @@ def normalize_registry_date(value):
         return ""
     return digits[:8].zfill(8)
 
+
 # 個案篩選
 def filter_class(df, target_classes=("1", "2")):
     return df[df["個案分類"].map(normalize_code).isin(target_classes)]
@@ -30,7 +31,12 @@ def ajcc_stages(cases, period_codes):
     for index, case in cases.iterrows():
         pdescr = normalize_code(case["病理分期字根/字首"])
         dop_mds = normalize_registry_date(case["原發部位最確切的手術切除日期"])
-        selected_stage = case["臨床期別組合"] if pdescr in {"4", "6"} or dop_mds == "00000000" else case["病理期別組合"]
+        pstage = normalize_code(case["病理期別組合"]).upper()
+        selected_stage = (
+            case["臨床期別組合"]
+            if pdescr in {"4", "6"} or dop_mds == "00000000" or pstage == "BBB"
+            else case["病理期別組合"]
+        )
         selected_stage = normalize_code(selected_stage)
         site = str(case["原發部位"]).strip().upper()
         row = {"row_index": index, "case": case.to_dict(), "ajcc_stage": selected_stage,
@@ -59,13 +65,23 @@ def figo_stages(cases, period_codes):
     rows = []
     for index, case in cases.iterrows():
         site = str(case["原發部位"]).strip().upper()[:3]
-        if site not in {"C53", "C54", "C56"} or normalize_code(case["其他分期系統"], 2) != "01":
+        # 2.4 FIGO 僅呈現女性個案：C53、C54、C56 且其他分期系統為 01。
+        is_female = normalize_code(case["性別"]) == "2"
+        if not is_female or site not in {"C53", "C54", "C56"} or normalize_code(case["其他分期系統"], 2) != "01":
             continue
         ostagec = normalize_code(case["其他分期系統期別(臨床分期)"])
-        if site == "C53" or normalize_code(case["其他分期系統期別(臨床分期)"], 4) != "0000":
+        if site == "C53":
             stage_value, label = ostagec, "FIGO(ostagec)"
         else:
-            stage_value, label = normalize_code(case["其他分期系統期別(病理分期)"]), "FIGO(ostagep)"
+            # C54、C56 原則上採病理分期；臨床分期有值且不為 0000 時改採臨床值。
+            # 無論選到哪個值，皆使用該癌別的 FIGO(ostagep) 碼表進行對照。
+            ostagec_padded = normalize_code(case["其他分期系統期別(臨床分期)"], 4)
+            stage_value = (
+                ostagec
+                if ostagec_padded not in {"", "0000"}
+                else normalize_code(case["其他分期系統期別(病理分期)"])
+            )
+            label = "FIGO(ostagep)"
         matched_stage = period_codes[(period_codes["site"].astype(str).str.strip().str.upper().eq(site))
             & period_codes["ostage"].map(lambda value: normalize_code(value, 2)).eq("01")
             & period_codes["label"].astype(str).str.strip().eq(label)
@@ -140,12 +156,21 @@ def dss_stages(cases, period_codes):
 def dre_stages(cases, period_codes):
     codes = period_codes[(period_codes["site"].astype(str).str.strip() == "C619") & (period_codes["label"] == "DRE(ostagec)")]
     return create_stage_results(cases, codes, "dre",
-        lambda case: str(case["原發部位"]).strip().upper() == "C619" and normalize_code(case["其他分期系統"], 2) == "11",
+        # 2.4 DRE 僅呈現男性攝護腺個案。
+        lambda case: normalize_code(case["性別"]) == "1"
+            and str(case["原發部位"]).strip().upper() == "C619"
+            and normalize_code(case["其他分期系統"], 2) == "11",
         lambda case: normalize_code(case["其他分期系統期別(臨床分期)"]))
 
 # Breast Cancer Prognostic Stage分期
 def breast_stages(cases, period_codes):
-    codes = period_codes[(period_codes["site"].astype(str).str.strip() == "C50") & (period_codes["label"] == "Breast Cancer Prognostic Stage(ostagec/ostagec)")]
+    codes = period_codes[
+        (period_codes["site"].astype(str).str.strip() == "C50")
+        & (
+            period_codes["label"].astype(str).str.strip()
+            == "Breast Cancer Prognostic Stage(ostagep/ostagec)"
+        )
+    ]
     def select_stage(case):
         stage_value = normalize_code(case["其他分期系統期別(病理分期)"])
         return normalize_code(case["其他分期系統期別(臨床分期)"]) if normalize_code(stage_value, 4) == "8888" else stage_value
@@ -318,7 +343,12 @@ def build_stage_report(stage_result, option):
         "detailed": detailed,
         "stage_labels": stage_labels,
         "stage_totals": stage_totals,
-        "sex_rows": [{"sex": label, "values": values} for label, values in sex_values.items()],
+        # 2.4 性別期別規則：只呈現實際有個案的性別，總數為 0 的性別不列入表圖。
+        "sex_rows": [
+            {"sex": label, "values": values}
+            for label, values in sex_values.items()
+            if sum(values) > 0
+        ],
         "age_rows": [{"age": label, "values": age_values[label]} for label, _, _ in AGE_GROUPS],
         "chart_stage_labels": chart_stage_labels,
         "chart_age_rows": [
