@@ -346,6 +346,7 @@ def add_favorite():
     cancers = data.get("cancers", [])
     main_category = data.get("main_category", "")
     sub_category = data.get("sub_category", "")
+    stage_options = data.get("stage_options", [])
     user_favs = load_user_favorites(db_id)
     
     if any(f.get("name") == name for f in user_favs):
@@ -353,7 +354,7 @@ def add_favorite():
         
     max_id = max([f.get("id", 0) for f in user_favs], default=0)
     new_id = max_id + 1
-    new_fav = {"id": new_id,"name": name,"behavior": behavior,"cancers": cancers, "main_category": main_category, "sub_category": sub_category}
+    new_fav = {"id": new_id,"name": name,"behavior": behavior,"cancers": cancers, "main_category": main_category, "sub_category": sub_category, "stage_options": stage_options}
     user_favs.append(new_fav)
     save_user_favorites(db_id, user_favs)
     return jsonify({"ok": True, "favorite": new_fav}), 200
@@ -519,7 +520,6 @@ def compare_dashboard_files_route():
     cancers = data.get("cancers", [])
     compare_items = data.get("compare_items", [])
     stage_options = data.get("stage_options", [])
-
     if not isinstance(compare_items, list):
         return jsonify({"ok": False, "error": "分析項目格式錯誤"}), 400
     if not isinstance(stage_options, list):
