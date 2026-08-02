@@ -28,6 +28,7 @@
   const viewPreferences = { main: 'chart', target: 'chart' };
   const customYearControls = new Map();
   const yearSelects = [mainYear, mainYearEnd, targetYear, targetYearEnd];
+  let activeTreatmentStageSystem = '';
 
   function t(key, options) {
     return window.DashboardI18n?.t(key, options) || key;
@@ -155,6 +156,25 @@
   function selectedCompareStageOptions() {
     const systems = Array.from(document.querySelectorAll('.compare-stage-system-checkbox:checked')).map(input => input.nextElementSibling?.textContent?.trim() || input.value);
     return { systems };
+  }
+
+  function treatmentStageOptions() {
+    const selected = new Set(selectedCancerValues());
+    const allSelected = selected.has('All_Cancers');
+    const applicable = {
+      AJCC: () => selected.size > 0,
+      FIGO: () => ['Cervix_Uteri', 'Corpus_Uteri', 'Ovary'].some(value => selected.has(value)),
+      BCLC: () => selected.has('Liver'),
+      MAC: () => ['Colon', 'Rectum'].some(value => selected.has(value)),
+      SCLC: () => ['Lung_and_Bronchus', 'Small_cell_carcinoma', 'Adenocarcinoma', 'Squamous_cell_carcinoma'].some(value => selected.has(value)),
+      DSS: () => selected.has('Plasma_cell_neoplasms'),
+      DRE: () => selected.has('Prostate'),
+      'Breast Cancer Prognostic Stage': () => ['Breast_Female', 'Breast_Male'].some(value => selected.has(value)),
+      Binet: () => selected.has('CLL')
+    };
+    return Object.keys(applicable)
+      .filter(system => allSelected || applicable[system]())
+      .map(system => ({ system, option: `${system}期別`, detailed: false }));
   }
 
   function markResultsStale() {
@@ -1079,13 +1099,56 @@
     setTimeout(() => chart.resize(), 50);
   }
 
-  function reportBlock(item, chartData, meta, chartPrefix) {
+  function treatmentLabel(treatment) {
+    if (!isEnglish()) return treatment;
+    const labels = {
+      '手術': 'Surgery', '放療': 'Radiotherapy', '化療': 'Chemotherapy',
+      '標靶': 'Targeted Therapy', '荷爾蒙': 'Hormone Therapy',
+      '類固醇治療': 'Steroid Therapy', '免疫': 'Immunotherapy',
+      '骨髓/幹細胞移植': 'Hematopoietic Stem Cell Transplantation (HSCT)',
+      '內分泌處置': 'Endocrine Procedure', '其他治療': 'Other Treatment',
+      '密切觀察或不予治療': 'No Treatment', '待確認': 'Pending Confirmation',
+      'RFA/TAE/PEI混合治療': 'RFA/TAE/PEI Combined Treatment'
+    };
+    return String(treatment || '').split('、').map(value => labels[value] || value).join('、');
+  }
+
+  function treatmentFirstCourseBlock(chartData, yearTitle, cancerTitle, activeSystem) {
+    const tables = Array.isArray(chartData?.stageFirstCourseData) ? chartData.stageFirstCourseData : [];
+    const item = tables.find(table => table.system === activeSystem) || tables[0];
+    if (!item) return '<div class="alert alert-light border mb-0">目前沒有可呈現的期別與首次療程資料。</div>';
+    const stages = item.stage_columns || [];
+    const rows = item.rows || [];
+    const totalCount = Number(item.total_count || 0);
+    const displayStage = stage => String(stage || '').replace(/^Stage\s+/i, '').trim();
+    const rowPercentage = row => totalCount ? `${(Number(row.subtotal || 0) / totalCount * 100).toFixed(1)}%` : '0.0%';
+    const unknown = Number(item.excluded_unknown || 0);
+    const notApplicable = Number(item.excluded_not_applicable || 0);
+    const unclassified = Number(item.excluded_unclassified_treatment || 0);
+    const excluded = unknown + notApplicable + unclassified;
+    const definitionNote = isEnglish()
+      ? 'Note: First course treatment refers to all treatments administered before disease progression or recurrence.'
+      : '註：首次療程的定義係指在癌病惡化或復發之前所執行的治療方法。';
+    const stageNote = isEnglish()
+      ? `Note: Of ${Number(item.analyzable_count || 0)} analyzable cases (Class 1–2), ${unknown} had unknown stage and ${notApplicable} had non-applicable stage${unclassified ? `; ${unclassified} case(s) could not be classified using the defined treatment codes` : ''}. A total of ${excluded} case(s) were excluded (percentage denominator = ${Number(item.included_count ?? totalCount)}).`
+      : `註：可分析個案數（Class 1–2）共計 ${Number(item.analyzable_count || 0)} 例，其中分期不明 ${unknown} 例、分期不適用 ${notApplicable} 例${unclassified ? `；另有 ${unclassified} 例治療方式無法依既定治療代碼判定` : ''}。上述共 ${excluded} 例未納入期別與首次療程分佈百分比計算（百分比分母＝${Number(item.included_count ?? totalCount)}）。`;
+    const caption = isEnglish()
+      ? `Table . ${escapeHtml(item.system)} Stage and First Course Treatment Distribution of Newly Diagnosed ${escapeHtml(reportCancerTitle(cancerTitle))} Cases, ${yearTitle}${sourceLine()}`
+      : `表、${yearTitle}年新診斷${escapeHtml(reportCancerTitle(cancerTitle))}${escapeHtml(item.system)}期別與首次療程表${sourceLine()}`;
+    const bodyRows = rows.map(row => `<tr><td class="text-start ps-3">${escapeHtml(treatmentLabel(row.treatment))}</td>${(row.values || []).map(value => `<td>${value}</td>`).join('')}<td>${row.subtotal}</td><td>${rowPercentage(row)}</td></tr>`).join('');
+    const totals = (item.totals || []).map(value => `<td>${value}</td>`).join('');
+    const percentages = (item.percentages || []).map(value => `<td>${value}%</td>`).join('');
+    return `<div class="annual-report-table-wrap"><table class="annual-report-table"><caption>${caption}</caption><thead><tr><th rowspan="2">${isEnglish() ? 'First Course of Treatment' : '首次療程'}</th><th colspan="${Math.max(stages.length, 1)}">${escapeHtml(item.system)} ${isEnglish() ? 'Stage' : '期別'}</th><th rowspan="2">${isEnglish() ? 'Total' : '小計'}</th><th rowspan="2">%</th></tr><tr>${stages.map(stage => `<th>${escapeHtml(displayStage(stage))}</th>`).join('')}</tr></thead><tbody>${bodyRows}<tr class="fw-bold"><td>${isEnglish() ? 'Total' : '總計'}</td>${totals}<td>${totalCount}</td><td>${totalCount ? '100.0%' : '0.0%'}</td></tr><tr><td>%</td>${percentages}<td>${totalCount ? '100.0%' : '0.0%'}</td><td>-</td></tr></tbody></table></div><div class="compare-note"><div>${definitionNote}</div><div>${stageNote}</div></div>`;
+  }
+
+  function reportBlock(item, chartData, meta, chartPrefix, activeStageSystem = '') {
     const cancerTitle = selectedCancerTitle();
     if (item === '性別年齡分佈') return sexAgeBlockV2(chartData, meta.year_label, cancerTitle, `${chartPrefix}SexAgeChart`);
     if (item === '年齡中位數') return ageMedianBlock(chartData, meta.year_label, cancerTitle);
     if (item === '可分析個案與確診個案') return analyzableBlock(chartData, meta.year_label, cancerTitle);
     if (item === '組織型態') return histologyBlock(chartData, meta.year_label, cancerTitle, `${chartPrefix}HistologyChart`);
     if (item === '個案分類') return classificationBlock(chartData, meta.year_label, cancerTitle, `${chartPrefix}ClassificationChart`);
+    if (item === '期別與首次療程') return treatmentFirstCourseBlock(chartData, meta.year_label, cancerTitle, activeStageSystem);
     return `<div class="alert alert-light border mb-0">目前尚未接上：${item}</div>`;
   }
 
@@ -1381,9 +1444,9 @@
     `;
   }
 
-  function renderAnnualReport(containerId, chartData, meta, chartPrefix, item, side, sharedScale) {
+  function renderAnnualReport(containerId, chartData, meta, chartPrefix, item, side, sharedScale, activeStageSystem = '') {
     const container = document.getElementById(containerId);
-    container.innerHTML = reportBlock(item, chartData, meta, chartPrefix);
+    container.innerHTML = reportBlock(item, chartData, meta, chartPrefix, activeStageSystem);
     bindViewSwitch(container, side);
     const viewSwitch = container.querySelector('.compare-view-switch');
     const resultHeading = container.closest('.compare-result-item')?.querySelector('.compare-result-heading');
@@ -1403,7 +1466,19 @@
     });
 
     const sharedScale = calculateSharedScale(data);
+    const isTreatmentFirstCourse = item === '期別與首次療程';
+    const treatmentSystems = Array.from(new Set([
+      ...(data.analysis_data?.main?.stageFirstCourseData || []).map(table => table.system),
+      ...(data.analysis_data?.target?.stageFirstCourseData || []).map(table => table.system)
+    ]));
+    if (isTreatmentFirstCourse && !treatmentSystems.includes(activeTreatmentStageSystem)) {
+      activeTreatmentStageSystem = treatmentSystems[0] || '';
+    }
+    const treatmentTabs = isTreatmentFirstCourse && treatmentSystems.length > 1
+      ? `<div class="d-flex flex-wrap gap-2 mb-3" role="tablist">${treatmentSystems.map(system => `<button type="button" class="btn btn-outline-dark btn-sm compare-treatment-stage-tab${system === activeTreatmentStageSystem ? ' active' : ''}" data-stage-system="${escapeHtml(system)}">${escapeHtml(system)}${isEnglish() ? '' : '期別'}</button>`).join('')}</div>`
+      : '';
     document.getElementById('compareResultPanel').innerHTML = `
+      ${treatmentTabs}
       <div class="compare-result-grid">
         <section class="compare-result-item is-main">
           <div class="compare-result-heading"><div><h3>${isEnglish() ? 'Baseline period' : '基準期資料'}｜${escapeHtml(data.main?.year_label || '—')}</h3></div></div>
@@ -1416,8 +1491,15 @@
       </div>
     `;
 
-    renderAnnualReport('mainAnnualReport', data.analysis_data?.main || {}, data.main, `main${index}`, item, 'main', sharedScale);
-    renderAnnualReport('targetAnnualReport', data.analysis_data?.target || {}, data.target, `target${index}`, item, 'target', sharedScale);
+    renderAnnualReport('mainAnnualReport', data.analysis_data?.main || {}, data.main, `main${index}`, item, 'main', sharedScale, activeTreatmentStageSystem);
+    renderAnnualReport('targetAnnualReport', data.analysis_data?.target || {}, data.target, `target${index}`, item, 'target', sharedScale, activeTreatmentStageSystem);
+    document.querySelectorAll('.compare-treatment-stage-tab').forEach(button => {
+      button.addEventListener('click', () => {
+        activeTreatmentStageSystem = button.dataset.stageSystem || '';
+        renderResultItem(data, item, index);
+        renderAiNarrative(data, item);
+      });
+    });
   }
 
   function buildAiComparisonPayload(data, analysisItem) {
@@ -1431,6 +1513,10 @@
         selectedAnalysis.no_data_reason = analysis?.histologyNoDataReason || '';
       }
       if (analysisItem === '個案分類') selectedAnalysis.diagnosis_classification = analysis?.diagnosisClassificationData || {};
+      if (analysisItem === '期別與首次療程') {
+        const tables = analysis?.stageFirstCourseData || [];
+        selectedAnalysis.stage_first_course = tables.find(table => table.system === activeTreatmentStageSystem) || tables[0] || {};
+      }
       return selectedAnalysis;
     };
     return {
@@ -1459,8 +1545,15 @@
     };
   }
 
+  function aiNarrativeCacheKey(analysisItem) {
+    const stageSystem = analysisItem === '期別與首次療程' ? `|${activeTreatmentStageSystem}` : '';
+    return `${window.DashboardI18n?.getLanguage() || 'zh-TW'}|${analysisItem}${stageSystem}`;
+  }
+
   function fetchAiNarrative(data, analysisItem, force = false) {
-    const cacheKey = `${window.DashboardI18n?.getLanguage() || 'zh-TW'}|${analysisItem}`;
+    const stageSystemAtRequest = analysisItem === '期別與首次療程' ? activeTreatmentStageSystem : '';
+    const language = window.DashboardI18n?.getLanguage() || 'zh-TW';
+    const cacheKey = `${language}|${analysisItem}${stageSystemAtRequest ? `|${stageSystemAtRequest}` : ''}`;
     if (!force && aiNarrativeCache.has(cacheKey)) {
       return Promise.resolve(aiNarrativeCache.get(cacheKey));
     }
@@ -1485,7 +1578,7 @@
         if (!result.success) throw new Error(result.error || '語言模型分析產生失敗');
         const insight = result.insight || '語言模型未回傳分析內容。';
         const insights = result.insights || {};
-        Object.entries(insights).forEach(([language, value]) => aiNarrativeCache.set(`${language}|${analysisItem}`, value));
+        Object.entries(insights).forEach(([insightLanguage, value]) => aiNarrativeCache.set(`${insightLanguage}|${analysisItem}${stageSystemAtRequest ? `|${stageSystemAtRequest}` : ''}`, value));
         aiNarrativeCache.set(cacheKey, insight);
         return insight;
       })
@@ -1503,7 +1596,7 @@
     activeAiNarrativeItem = analysisItem;
     section.classList.remove('d-none');
     retryButton.disabled = true;
-    const cacheKey = `${window.DashboardI18n?.getLanguage() || 'zh-TW'}|${analysisItem}`;
+    const cacheKey = aiNarrativeCacheKey(analysisItem);
     if (!force && aiNarrativeCache.has(cacheKey)) {
       text.textContent = aiNarrativeCache.get(cacheKey);
       retryButton.disabled = false;
@@ -1854,6 +1947,10 @@
     if (window.utils && window.utils.showLoading) {
       window.utils.showLoading('分析中，請稍候...');
     }
+    const compareItems = selectedCompareItems();
+    const stageOptions = compareItems.includes('期別與首次療程')
+      ? treatmentStageOptions()
+      : [];
     fetch('/api/dashboard/compare', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1868,7 +1965,8 @@
         behavior: behavior.value,
         cancers: selectedCancerValues(),
         compare_type: selectedCompareType(),
-        compare_items: selectedCompareItems()
+        compare_items: compareItems,
+        stage_options: stageOptions
       })
     })
       .then(r => r.json())

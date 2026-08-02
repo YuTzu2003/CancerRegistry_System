@@ -1334,7 +1334,36 @@ function initDashboardControl() {
                       { btnId: 'btnAiMedian', title: '年齡中位數', dataKey: 'ageMedianData', fields: ['年齡', '性別'], respId: 'llmResponseMedian' },
                       { btnId: 'btnAiAnalyzable', title: '癌症登記可分析個案與確診個案', dataKey: 'analyzableConfirmedData', fields: ['可分析個案', '確診個案'], respId: 'llmResponseAnalyzable' },
                       { btnId: 'btnAiHistology', title: '組織型態分佈', dataKey: 'histologyData', fields: ['組織型態', '個案數'], respId: 'llmResponseHistology' },
-                      { btnId: 'btnAiDiagnosisClassification', title: '個案分類', dataKey: 'diagnosisClassificationData', fields: ['個案分類'], respId: 'llmResponseDiagnosisClassification' }
+                      { btnId: 'btnAiDiagnosisClassification', title: '個案分類', dataKey: 'diagnosisClassificationData', fields: ['個案分類'], respId: 'llmResponseDiagnosisClassification' },
+                      {
+                          btnId: 'btnAiTreatmentFirstCourse',
+                          title: '期別與首次療程',
+                          dataKey: 'stageFirstCourseData',
+                          fields: [],
+                          respId: 'llmResponseTreatmentFirstCourse',
+                          getData: (data) => {
+                              const tables = Array.isArray(data.stageFirstCourseData) ? data.stageFirstCourseData : [];
+                              const activeSystem = window.stageFirstCourseActiveSystem;
+                              const item = tables.find(table => table.system === activeSystem) || tables[0] || {};
+                              return {
+                                  stage_system: item.system || '',
+                                  stage_mode: item.stage_mode || '',
+                                  stage_columns: item.stage_columns || [],
+                                  treatment_rows: item.rows || [],
+                                  totals: item.totals || [],
+                                  total_count: item.total_count || 0,
+                                  analyzable_count: item.analyzable_count || 0,
+                                  excluded_unknown: item.excluded_unknown || 0,
+                                  excluded_not_applicable: item.excluded_not_applicable || 0,
+                                  excluded_unclassified_treatment: item.excluded_unclassified_treatment || 0
+                              };
+                          },
+                          getFieldKey: (data) => {
+                              const tables = Array.isArray(data.stageFirstCourseData) ? data.stageFirstCourseData : [];
+                              const item = tables.find(table => table.system === window.stageFirstCourseActiveSystem) || tables[0];
+                              return item?.system ? `期別與首次療程（${item.system}期別）` : '期別與首次療程';
+                          }
+                      }
                   ];
 
                   llmConfigs.forEach(cfg => {
@@ -1342,9 +1371,14 @@ function initDashboardControl() {
                       if (btn) {
                           btn.style.display = 'block';
                           btn.innerHTML = window.DashboardRenderer.t('regenerateInsight');
-                          btn.dataset.insightFieldKey = cfg.title;
+                          const getFieldKey = () => cfg.getFieldKey ? cfg.getFieldKey(window.lastChartData || {}) : cfg.title;
+                          btn.dataset.insightFieldKey = getFieldKey();
                           btn.onclick = (event) => {
-                              let dataToSend = window.lastChartData[cfg.dataKey];
+                              const fieldKey = getFieldKey();
+                              btn.dataset.insightFieldKey = fieldKey;
+                              let dataToSend = cfg.getData
+                                  ? cfg.getData(window.lastChartData || {})
+                                  : window.lastChartData[cfg.dataKey];
                               if (cfg.btnId === 'btnAiHistology' && dataToSend) {
                                   // 過濾掉 Unknown / 未對應組織型態，並重新計算百分比以與表格配平
                                   const validHist = dataToSend.filter(item => item.name !== 'Unknown / 未對應組織型態');
@@ -1360,7 +1394,7 @@ function initDashboardControl() {
                                   });
                               }
                               const currentRequest = window.DashboardRenderer.fetchLlmInsight(
-                                  cfg.title, dataToSend, cfg.fields, cfg.respId, cfg.btnId,
+                                  fieldKey, dataToSend, cfg.fields, cfg.respId, cfg.btnId,
                                   { forceRefresh: event?.isTrusted === true }
                               );
                               return currentRequest;

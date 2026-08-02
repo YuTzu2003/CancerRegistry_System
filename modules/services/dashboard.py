@@ -518,6 +518,7 @@ def compare_dashboard_files_route():
     behavior = data.get("behavior", "")
     cancers = data.get("cancers", [])
     compare_items = data.get("compare_items", [])
+    stage_options = data.get("stage_options", [])
 
     main_file = _get_owned_dashboard_file(main_file_id, session.get("id"))
     target_file = _get_owned_dashboard_file(target_file_id, session.get("id"))
@@ -553,7 +554,7 @@ def compare_dashboard_files_route():
 
         result = compare_dashboard_files(
             main_file["storage_path"], target_file["storage_path"], behavior, cancers, compare_items,
-            main_year, target_year, main_year_end, target_year_end, compare_mode
+            main_year, target_year, main_year_end, target_year_end, compare_mode, stage_options
         )
         return jsonify({"ok": True, "data": result}), 200
     except Exception as e:

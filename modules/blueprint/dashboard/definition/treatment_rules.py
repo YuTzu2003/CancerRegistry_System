@@ -52,7 +52,8 @@ OTHER_TREATMENT_RANGES = [(1, 3)]
 LYMPHOID_HISTOLOGY_RANGES = [(9590, 9993)]
 
 RADIOTHERAPY_DRT_EXCLUDED = {"", "0", "00000000", "88888888", "99999999"}
-RADIOTHERAPY_STATUS_CODES = {"0", "00", "6", "09", "10"}
+# Excel may read registry codes such as 00 and 09 as numbers 0 and 9.
+RADIOTHERAPY_STATUS_CODES = {0, 6, 9, 10}
 OBSERVATION_OR_NO_TREATMENT_CODE = "00000000"
 TREATMENT_CONFLICT_LABEL = "待確認"
 
@@ -65,6 +66,12 @@ def normalize_text(value):
     if text.lower() in {"", "nan", "none", "nat"}:
         return ""
     return text[:-2] if text.endswith(".0") else text
+
+
+def normalize_date_code(value):
+    """Normalize registry date sentinels such as ``0000/00/00`` to ``00000000``."""
+    text = normalize_text(value)
+    return "".join(character for character in text if character.isdigit())
 
 
 def normalize_number(value):
@@ -114,21 +121,23 @@ def classify_chemotherapy_items(site, chem_o, chem_h):
 def has_radiotherapy(drt_1st, rtstatus):
     """符合 drt_1st 或 rtstatus 任一條件即列為放療。"""
     return (
-        normalize_text(drt_1st) not in RADIOTHERAPY_DRT_EXCLUDED
-        or normalize_text(rtstatus) in RADIOTHERAPY_STATUS_CODES
+        normalize_date_code(drt_1st) not in RADIOTHERAPY_DRT_EXCLUDED
+        or normalize_number(rtstatus) in RADIOTHERAPY_STATUS_CODES
     )
 
 
 def is_observation_or_no_treatment(dtrt_1st):
-    return normalize_text(dtrt_1st) == OBSERVATION_OR_NO_TREATMENT_CODE
+    return normalize_date_code(dtrt_1st) == OBSERVATION_OR_NO_TREATMENT_CODE
 
 
 def is_prostate_turp_and_surgery_combination(site, optype_o, optype_h):
     """首次療程表專用：外院 TURP（22）且本院一般手術（30）同時存在。"""
     return (
         site_starts_with(site, "C619")
-        and normalize_number(optype_o) == 22
-        and normalize_number(optype_h) == 30
+        and (
+            normalize_number(optype_o) == 22
+            or normalize_number(optype_h) == 30
+        )
     )
 
 

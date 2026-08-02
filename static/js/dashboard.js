@@ -868,21 +868,79 @@ window.DashboardRenderer.renderStageFirstCourseTables = function(tables, yearTit
         }
         const isEnglish = window.DashboardI18n?.getLanguage() === 'en';
         const selectedCancer = this.getCancerTitleForSentence(cancerTitle);
-        container.innerHTML = tables.map(item => {
+        const systems = tables.map(item => item.system);
+        const activeSystem = systems.includes(window.stageFirstCourseActiveSystem)
+            ? window.stageFirstCourseActiveSystem
+            : systems[0];
+        const tabs = tables.length > 1
+            ? `<div class="d-flex flex-wrap gap-2 mb-3" role="tablist">${tables.map(item => `<button type="button" class="btn btn-outline-dark btn-sm stage-first-course-tab${item.system === activeSystem ? ' active' : ''}" data-stage-system="${this.escapeHtml(item.system)}">${this.escapeHtml(item.system)}${isEnglish ? '' : '期別'}</button>`).join('')}</div>`
+            : '';
+        const panels = tables.map(item => {
             const stages = item.stage_columns || [];
             const rows = item.rows || [];
+            const displayStage = (stage) => String(stage || '')
+                .replace(/^Stage\s+/i, '')
+                .trim();
+            const treatmentEnglish = {
+                '手術': 'Surgery',
+                '放療': 'Radiotherapy',
+                '化療': 'Chemotherapy',
+                '標靶': 'Targeted Therapy',
+                '荷爾蒙': 'Hormone Therapy',
+                '類固醇治療': 'Steroid Therapy',
+                '免疫': 'Immunotherapy',
+                '骨髓/幹細胞移植': 'Hematopoietic Stem Cell Transplantation (HSCT)',
+                '血液幹細胞移植': 'Hematopoietic Stem Cell Transplantation (HSCT)',
+                '內分泌處置': 'Endocrine Procedure',
+                '其他治療': 'Other Treatment',
+                '密切觀察或不予治療': 'No Treatment',
+                '待確認': 'Pending Confirmation',
+                'RFA/TAE/PEI混合治療': 'RFA/TAE/PEI Combined Treatment',
+            };
+            const displayTreatment = (treatment) => isEnglish
+                ? String(treatment || '').split('、').map(item => treatmentEnglish[item] || item).join('、')
+                : treatment;
             const title = isEnglish
-                ? `Table . First Course Treatment by ${this.escapeHtml(item.system)} Stage of ${this.getEnglishCancerPatientLabel(selectedCancer)}, ${yearTitle}${this.sourceLine()}`
+                ? `Table . ${this.escapeHtml(item.system)} Stage and First Course Treatment Distribution of Newly Diagnosed ${this.getEnglishCancerPatientLabel(selectedCancer)} Cases,\u00a0${yearTitle}${this.sourceLine()}`
                 : this.reportCaption('table', yearTitle, selectedCancer, `${item.system}期別與首次療程`);
-            const bodyRows = rows.map(row => `<tr><td>${this.escapeHtml(row.treatment)}</td>${row.values.map(value => `<td>${value}</td>`).join('')}<td>${row.subtotal}</td></tr>`).join('');
+            const rowPercentage = row => item.total_count
+                ? `${(Number(row.subtotal || 0) / Number(item.total_count) * 100).toFixed(1)}%`
+                : '0.0%';
+            const bodyRows = rows.map(row => `<tr><td class="text-start ps-3">${this.escapeHtml(displayTreatment(row.treatment))}</td>${row.values.map(value => `<td>${value}</td>`).join('')}<td>${row.subtotal}</td><td>${rowPercentage(row)}</td></tr>`).join('');
             const totals = (item.totals || []).map(value => `<td>${value}</td>`).join('');
             const percentages = (item.percentages || []).map(value => `<td>${value}%</td>`).join('');
-            const exclusions = [];
-            if (item.excluded_unknown) exclusions.push(isEnglish ? `Unknown stage: ${item.excluded_unknown}` : `不明期別：${item.excluded_unknown} 件`);
-            if (item.excluded_not_applicable) exclusions.push(isEnglish ? `Stage not applicable: ${item.excluded_not_applicable}` : `不適用分期：${item.excluded_not_applicable} 件`);
-            if (item.excluded_unmapped) exclusions.push(isEnglish ? `No mapped stage: ${item.excluded_unmapped}` : `無法對應分期：${item.excluded_unmapped} 件`);
-            return `<div class="mb-4"><table class="annual-report-table"><caption>${title}</caption><thead><tr><th rowspan="2">${isEnglish ? 'First Course Treatment' : '首次療程'}</th><th colspan="${Math.max(stages.length, 1)}">${this.escapeHtml(item.system)}${isEnglish ? ' Stage' : '期別'}</th><th rowspan="2">${isEnglish ? 'Total' : '小計'}</th></tr><tr>${stages.map(stage => `<th>${this.escapeHtml(stage)}</th>`).join('')}</tr></thead><tbody>${bodyRows}<tr class="fw-bold"><td>${this.t('total')}</td>${totals}<td>${Number(item.total_count || 0)}</td></tr><tr><td>${isEnglish ? '%' : '百分比%'}</td>${percentages}<td>${item.total_count ? '100.0%' : '0.0%'}</td></tr></tbody></table>${exclusions.length ? `<div class="small text-secondary mt-2">${exclusions.join('；')}</div>` : ''}</div>`;
+            const analyzableCount = Number(item.analyzable_count || 0);
+            const includedCount = Number(item.included_count ?? item.total_count ?? 0);
+            const excludedUnclassifiedTreatment = Number(item.excluded_unclassified_treatment || 0);
+            const excludedCount = Number(item.excluded_unknown || 0)
+                + Number(item.excluded_not_applicable || 0)
+                + excludedUnclassifiedTreatment;
+            const unclassifiedTreatmentClause = excludedUnclassifiedTreatment
+                ? `; ${excludedUnclassifiedTreatment} case(s) had treatment data that could not be classified using the defined treatment codes`
+                : '';
+            const stageNote = isEnglish
+                ? `Note: Of ${analyzableCount} analyzable cases (Class 1-2), ${Number(item.excluded_unknown || 0)} had unknown stage and ${Number(item.excluded_not_applicable || 0)} had non-applicable stage${unclassifiedTreatmentClause}. A total of ${excludedCount} case(s) were excluded from the stage and first-course treatment distribution (percentage denominator = ${includedCount}).`
+                : `\u8a3b\uff1a\u53ef\u5206\u6790\u500b\u6848\u6578\uff08Class 1\u20132\uff09\u5171\u8a08 ${analyzableCount} \u4f8b\uff0c\u5176\u4e2d\u5206\u671f\u4e0d\u660e ${Number(item.excluded_unknown || 0)} \u4f8b\u3001\u5206\u671f\u4e0d\u9069\u7528 ${Number(item.excluded_not_applicable || 0)} \u4f8b${excludedUnclassifiedTreatment ? `\uff1b\u53e6\u6709 ${excludedUnclassifiedTreatment} \u4f8b\u6cbb\u7642\u65b9\u5f0f\u7121\u6cd5\u4f9d\u65e2\u5b9a\u6cbb\u7642\u4ee3\u78bc\u5224\u5b9a` : ''}\u3002\u4e0a\u8ff0\u5171 ${excludedCount} \u4f8b\u672a\u7d0d\u5165\u671f\u5225\u8207\u9996\u6b21\u7642\u7a0b\u5206\u4f48\u767e\u5206\u6bd4\u8a08\u7b97\uff08\u767e\u5206\u6bd4\u5206\u6bcd\uff1d${includedCount}\uff09\u3002`;
+            const definitionNote = isEnglish
+                ? 'Note: First course treatment refers to all treatments administered before disease progression or recurrence.'
+                : '註：首次療程的定義係指在癌病惡化或復發之前所執行的治療方法。';
+            return `<div class="stage-first-course-panel${item.system === activeSystem ? '' : ' d-none'}" data-stage-system="${this.escapeHtml(item.system)}"><table class="annual-report-table"><caption>${title}</caption><thead><tr><th rowspan="2">${isEnglish ? 'First Course of Treatment' : '首次療程'}</th><th colspan="${Math.max(stages.length, 1)}">${this.escapeHtml(item.system)}${isEnglish ? ' Stage' : '期別'}</th><th rowspan="2">${isEnglish ? 'Total' : '小計'}</th><th rowspan="2">%</th></tr><tr>${stages.map(stage => `<th>${this.escapeHtml(displayStage(stage))}</th>`).join('')}</tr></thead><tbody>${bodyRows}<tr class="fw-bold"><td>${this.t('total')}</td>${totals}<td>${Number(item.total_count || 0)}</td><td>${item.total_count ? '100.0%' : '0.0%'}</td></tr><tr><td>%</td>${percentages}<td>${item.total_count ? '100.0%' : '0.0%'}</td><td>-</td></tr></tbody></table><div class="small text-secondary mt-2 mb-0">${definitionNote}</div><div class="small text-secondary mt-0 mb-0">${stageNote}</div></div>`;
         }).join('');
+        container.innerHTML = `${tabs}${panels}`;
+        container.querySelectorAll('.stage-first-course-tab').forEach(button => {
+            button.addEventListener('click', () => {
+                const system = button.dataset.stageSystem;
+                window.stageFirstCourseActiveSystem = system;
+                container.querySelectorAll('.stage-first-course-tab').forEach(tab => tab.classList.toggle('active', tab === button));
+                container.querySelectorAll('.stage-first-course-panel').forEach(panel => {
+                    panel.classList.toggle('d-none', panel.dataset.stageSystem !== system);
+                });
+                const insightButton = document.getElementById('btnAiTreatmentFirstCourse');
+                if (insightButton && window.lastChartData && typeof insightButton.onclick === 'function') {
+                    insightButton.onclick();
+                }
+            });
+        });
     };
 
 /* ── 組織型態不適用個案說明按鈕 ── */

@@ -89,6 +89,14 @@ def get_chart_insight_logic(data):
     else:
         def_section = ""
     style_instruction = STYLE_PROMPTS.get(mode_ai, STYLE_PROMPTS["balanced"])
+    treatment_instruction = ""
+    if "期別與首次療程" in field_key or "Stage and First Course Treatment" in field_key:
+        treatment_instruction = """
+            This is a stage-by-treatment cross-tabulation. State the denominator and any
+            excluded cases when supplied. Describe only the largest treatment combinations
+            and meaningful stage patterns. Do not interpret an excluded case as having no
+            treatment, and do not infer treatment effectiveness.
+        """
     prompt = f"""
                 You are a professional medical and oncology data analysis expert.
                 Produce matching Traditional Chinese and English narratives from the same
@@ -99,6 +107,7 @@ def get_chart_insight_logic(data):
                 [Selected Year Range]{selected_year_range}
                 [Data Content]{json.dumps(chart_data, ensure_ascii=False)}
                 [Writing Style]{style_instruction}
+                [Topic Specific Requirements]{treatment_instruction}
 
                 [Analysis Requirements]
                 The content should include:
