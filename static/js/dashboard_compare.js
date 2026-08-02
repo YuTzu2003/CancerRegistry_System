@@ -25,7 +25,7 @@
   let aiNarrativeRequestId = 0;
   let activeResultIndex = 0;
   const aiNarrativeCache = new Map();
-  const aiNarrativeTimeoutMs = 120000;
+  const aiNarrativeTimeoutMs = 180000;
   const viewPreferences = { main: 'chart', target: 'chart' };
   const customYearControls = new Map();
   const yearSelects = [mainYear, mainYearEnd, targetYear, targetYearEnd];
@@ -300,6 +300,16 @@
     return Boolean(mainFile.value && targetFile.value && mainYear.value && targetYear.value && rangeComplete);
   }
 
+  function updateCompareTreatmentSelection(isAvailable) {
+    const hasStageAnalysis = Boolean(document.querySelector('.compare-stage-option:checked:not(:disabled)'));
+    const enabled = Boolean(isAvailable && hasStageAnalysis);
+    document.querySelectorAll('[data-compare-subitems="treatment"] .compare-subitem-check').forEach(input => {
+      input.disabled = !enabled;
+      if (!enabled) input.checked = false;
+    });
+    document.getElementById('compareTreatmentStageRequired')?.classList.toggle('d-none', enabled);
+  }
+
   function setSettingsEnabled() {
     const filesAreReady = filesReady();
     const behaviorIsReady = filesAreReady && Boolean(behavior.value);
@@ -329,6 +339,7 @@
   function updateButtonState() {
     const state = setSettingsEnabled();
     updateCompareStageOptions();
+    updateCompareTreatmentSelection(state.cancerIsReady);
     runButton.disabled = !(state.cancerIsReady && selectedCompareItems().length > 0);
     updateTopicCounts();
     updateSelectionSummary();
@@ -1862,7 +1873,7 @@
       activeTreatmentStageSystem = treatmentSystems[0] || '';
     }
     const treatmentTabs = isTreatmentFirstCourse && treatmentSystems.length > 1
-      ? `<div class="d-flex flex-wrap gap-2 mb-3" role="tablist">${treatmentSystems.map(system => `<button type="button" class="btn btn-outline-dark btn-sm compare-treatment-stage-tab${system === activeTreatmentStageSystem ? ' active' : ''}" data-stage-system="${escapeHtml(system)}">${escapeHtml(system)}${isEnglish() ? '' : '期別'}</button>`).join('')}</div>`
+      ? `<div class="d-flex flex-wrap gap-2 mb-3" role="tablist">${treatmentSystems.map(system => `<button type="button" class="btn btn-outline-dark btn-sm compare-treatment-stage-tab${system === activeTreatmentStageSystem ? ' active' : ''}" data-stage-system="${escapeHtml(system)}">${escapeHtml(system)}${isEnglish() ? ' Stage' : '期別'}</button>`).join('')}</div>`
       : '';
     const stageTabs = isStageGroup && stageOptions.length > 1
       ? `<div class="d-flex flex-wrap gap-2 mb-3" role="tablist">${stageOptions.map(option => `<button type="button" class="btn btn-outline-dark btn-sm compare-stage-report-tab${option === activeStageReportOption ? ' active' : ''}" data-stage-option="${escapeHtml(option)}">${escapeHtml(option)}</button>`).join('')}</div>`
@@ -2009,7 +2020,7 @@
       return Promise.resolve(aiNarrativeCache.get(cacheKey));
     }
     const requestId = ++aiNarrativeRequestId;
-    text.innerHTML = '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>語言模型正在整理兩年度的比較差異，請稍候…';
+    text.innerHTML = '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>正在產生 LLM 敘述，請稍候…';
 
     return fetchAiNarrative(data, analysisItem, force)
       .then(insight => {
@@ -2370,9 +2381,9 @@
     document.querySelectorAll('.compare-preview-toggle').forEach(button => { button.textContent = '查看資料預覽'; });
     resultBox.classList.add('d-none');
     runButton.disabled = true;
-    runButton.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> 比較中...';
+    runButton.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> 資料分析中，請稍候…';
     if (window.utils && window.utils.showLoading) {
-      window.utils.showLoading('分析中，請稍候...');
+      window.utils.showLoading('資料分析中，請稍候…');
     }
     const compareItems = selectedCompareItems();
     const stageOptions = [...selectedCompareStageOptions().options];
@@ -2406,15 +2417,33 @@
         if (!data.ok) throw new Error(data.error || '比較失敗');
         const items = selectedCompareItems();
         aiNarrativeCache.clear();
+        const treatmentSystems = Array.from(new Set([
+          ...(data.data.analysis_data?.main?.stageFirstCourseData || []).map(table => table.system),
+          ...(data.data.analysis_data?.target?.stageFirstCourseData || []).map(table => table.system)
+        ]));
+        const originalTreatmentSystem = activeTreatmentStageSystem;
+        const narrativeRequests = items.flatMap(item => {
+          if (item !== '期別與首次療程') return [{ item, stageSystem: '' }];
+          return treatmentSystems.length
+            ? treatmentSystems.map(stageSystem => ({ item, stageSystem }))
+            : [{ item, stageSystem: '' }];
+        });
         let completedNarratives = 0;
-        return Promise.all(items.map(item => fetchAiNarrative(data.data, item).then(insight => {
-          completedNarratives += 1;
+        const updateNarrativeProgress = () => {
           if (window.utils && window.utils.showLoading) {
-            window.utils.showLoading(`正在產生比較敘述（${completedNarratives}/${items.length}）...`);
+            window.utils.showLoading(`正在產生 LLM 敘述（${completedNarratives}/${narrativeRequests.length}）…`);
           }
-          return insight;
-        })))
+        };
+        updateNarrativeProgress();
+        return narrativeRequests.reduce((chain, { item, stageSystem }) => chain.then(() => {
+          activeTreatmentStageSystem = stageSystem;
+          return fetchAiNarrative(data.data, item).finally(() => {
+            completedNarratives += 1;
+            updateNarrativeProgress();
+          });
+        }), Promise.resolve())
           .then(() => {
+            activeTreatmentStageSystem = originalTreatmentSystem;
             renderResult(data.data);
             setTimeout(() => resultBox.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
           });

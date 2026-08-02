@@ -100,7 +100,7 @@
     const btnText = document.getElementById('btnCancerPickerText');
     if (btnText) {
       if (isAllSelected || (specificSelectedCount === totalSpecificCount && totalSpecificCount > 0)) {
-        btnText.textContent = '不分癌別 全癌別(C00-C80)';
+        btnText.textContent = '不分癌別 全癌別';
       } else if (specificSelectedCount === 0) {
         btnText.textContent = '— 尚未選擇癌別 —';
       } else {
@@ -1262,9 +1262,9 @@ function initDashboardControl() {
            document.getElementById('chartTabsArea')?.classList.add('d-none');
 
           if (window.utils && window.utils.showLoading) {
-              window.utils.showLoading('分析中，請稍候...');
+              window.utils.showLoading('資料分析中，請稍候…');
           } else if (window.dashboardChartInstance) {
-              window.dashboardChartInstance.showLoading({ text: '資料載入中...', color: '#2563eb', textColor: '#212529', maskColor: 'rgba(255, 255, 255, 0.8)', zlevel: 0 });
+              window.dashboardChartInstance.showLoading({ text: '資料分析中，請稍候…', color: '#2563eb', textColor: '#212529', maskColor: 'rgba(255, 255, 255, 0.8)', zlevel: 0 });
           }
 
           const dashboardAnalyzePayload = {
@@ -1495,7 +1495,6 @@ function initDashboardControl() {
                        window.stageFirstCourseActiveSystem = initialTreatmentSystem;
                        window.DashboardRenderer.renderStageFirstCourseTables(chartData.stageFirstCourseData, yearTitle, cancerTitle);
                       window.DashboardRenderer.renderSurvivalTable(chartData.survivalData, yearTitle, cancerTitle);
-                      window.DashboardRenderer.showAnnualDataContent();
                       window.DashboardRenderer.updateChartCaptions(yearTitle, cancerTitle);
                   }
 
@@ -1520,7 +1519,7 @@ function initDashboardControl() {
                   document.querySelectorAll('.item-checkbox').forEach(itemChk => {
                       if (itemChk.checked) {
                           const targetSelector = itemChk.getAttribute('data-target');
-                          if (targetSelector) {
+                          if (targetSelector && targetSelector !== '#chartPane-StageSummary' && targetSelector !== '#chartPane-TreatmentFirstCourse') {
                               const targetPane = document.querySelector(targetSelector);
                               if (targetPane) {
                                   const aiBtn = targetPane.querySelector('button[id^="btnAi"]');
@@ -1536,12 +1535,24 @@ function initDashboardControl() {
                       }
                   });
 
-                   Promise.all(aiPromises).then(() => {
+                  let completedInsights = 0;
+                  const totalInsights = aiPromises.length;
+                  const updateInsightProgress = () => {
+                      if (window.utils?.showLoading) {
+                          window.utils.showLoading(`正在產生 LLM 敘述（${completedInsights}/${totalInsights}）…`);
+                      }
+                  };
+                  updateInsightProgress();
+                  Promise.allSettled(aiPromises.map(request => Promise.resolve(request).finally(() => {
+                      completedInsights += 1;
+                      updateInsightProgress();
+                  }))).then(() => {
                        if (initialStageReport) window.DashboardRenderer.configureStageInsight(initialStageReport);
                        if (initialTreatmentSystem) {
                            window.stageFirstCourseActiveSystem = initialTreatmentSystem;
                            document.getElementById('btnAiTreatmentFirstCourse')?.onclick?.();
                        }
+                       window.DashboardRenderer.showAnnualDataContent();
                        if (window.utils && window.utils.hideLoading) {
                           window.utils.hideLoading();
                       } else if (window.dashboardChartInstance) {

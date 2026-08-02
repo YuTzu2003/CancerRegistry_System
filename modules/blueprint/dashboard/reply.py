@@ -218,7 +218,7 @@ def get_compare_insight_logic(data):
                 {"role": "user", "content": prompt}
             ],
             temperature=0.3,
-            timeout=110.0
+            timeout=180.0
         )
         content = response.choices[0].message.content
         insights = _parse_bilingual_insights(content)

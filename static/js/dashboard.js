@@ -989,7 +989,7 @@ window.DashboardRenderer.renderStageFirstCourseTables = function(tables, yearTit
             ? window.stageFirstCourseActiveSystem
             : systems[0];
         const tabs = tables.length > 1
-            ? `<div class="d-flex flex-wrap gap-2 mb-3" role="tablist">${tables.map(item => `<button type="button" class="btn btn-outline-dark btn-sm stage-first-course-tab${item.system === activeSystem ? ' active' : ''}" data-stage-system="${this.escapeHtml(item.system)}">${this.escapeHtml(item.system)}${isEnglish ? '' : '期別'}</button>`).join('')}</div>`
+            ? `<div class="d-flex flex-wrap gap-2 mb-3" role="tablist">${tables.map(item => `<button type="button" class="btn btn-outline-dark btn-sm stage-first-course-tab${item.system === activeSystem ? ' active' : ''}" data-stage-system="${this.escapeHtml(item.system)}">${this.escapeHtml(item.system)}${isEnglish ? ' Stage' : '期別'}</button>`).join('')}</div>`
             : '';
         const panels = tables.map(item => {
             const stages = item.stage_columns || [];
