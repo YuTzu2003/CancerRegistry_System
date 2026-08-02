@@ -947,17 +947,20 @@
     if (summaryAnalysis) {
       const checkedItems = document.querySelectorAll('.item-checkbox:checked');
       if (checkedItems.length > 0) {
-        const itemNames = Array.from(checkedItems)
-          .filter(el => !el.classList.contains('annual-stage-system-checkbox'))
+        const selectedItemNames = groups => Array.from(checkedItems)
+          .filter(el => groups.includes(el.dataset.parent) && !el.classList.contains('annual-stage-system-checkbox'))
           .map(el => el.nextElementSibling.textContent.trim());
+        const itemNames = selectedItemNames(['incidence', 'diagnosis']);
         const stageOptions = selectedAnnualStageOptions();
         if (stageOptions.systems.length) {
           const summaryOptions = selectedStageSummaryOptions();
-          const stageSummary = stageOptions.systems.includes('分期不呈現最細碼') && summaryOptions.length
-            ? `分期不呈現最細碼（${summaryOptions.join('；')}）`
-            : stageOptions.systems.join('、');
+          const stageMode = stageOptions.systems.join('、');
+          const stageSummary = summaryOptions.length
+            ? `${stageMode}（${summaryOptions.join('；')}）`
+            : stageMode;
           itemNames.push(`期別（${stageSummary}）`);
         }
+        itemNames.push(...selectedItemNames(['treatment', 'cross_year']));
         summaryAnalysis.textContent = itemNames.join('、');
       } else {
         summaryAnalysis.innerHTML = '<span class="text-muted">尚未選擇</span>';
@@ -1426,6 +1429,10 @@ function initDashboardControl() {
                       el.innerText = window.DashboardRenderer.t('autoInsight');
                   });
 
+                  const variantInsightPromises = [];
+                  let initialStageReport = null;
+                  let initialTreatmentSystem = '';
+
                   if (window.DashboardRenderer) {
                       const yearTitle = window.DashboardRenderer.getSelectedYearTitle();
                       const cancerTitle = window.DashboardRenderer.getSelectedCancerTitle();
@@ -1450,11 +1457,31 @@ function initDashboardControl() {
                                   staging_system: input.dataset.stageSystem || 'AJCC',
                                   view: input.value.includes('年齡層期別') ? 'age' : input.value.includes('性別期別') ? 'sex' : 'stage'
                               }));
-                          }
-                          chartData.stageReports = stageReports;
-                          window.DashboardRenderer.renderStageReportTabs(stageReports, yearTitle, cancerTitle);
-                      }
-                      window.DashboardRenderer.renderStageFirstCourseTables(chartData.stageFirstCourseData, yearTitle, cancerTitle);
+                           }
+                           chartData.stageReports = stageReports;
+                           window.DashboardRenderer.renderStageReportTabs(stageReports, yearTitle, cancerTitle);
+                           initialStageReport = stageReports[0] || null;
+                           stageReports.forEach(report => {
+                               const request = window.DashboardRenderer.configureStageInsight(report);
+                               if (request instanceof Promise) variantInsightPromises.push(request);
+                           });
+                       }
+                       window.DashboardRenderer.renderStageFirstCourseTables(chartData.stageFirstCourseData, yearTitle, cancerTitle);
+                       const treatmentTables = Array.isArray(chartData.stageFirstCourseData)
+                           ? chartData.stageFirstCourseData
+                           : [];
+                       const treatmentSystems = treatmentTables.map(table => table.system);
+                       initialTreatmentSystem = treatmentSystems.includes(window.stageFirstCourseActiveSystem)
+                           ? window.stageFirstCourseActiveSystem
+                           : treatmentSystems[0] || '';
+                       const treatmentInsightButton = document.getElementById('btnAiTreatmentFirstCourse');
+                       treatmentTables.forEach(table => {
+                           window.stageFirstCourseActiveSystem = table.system;
+                           const request = treatmentInsightButton?.onclick?.();
+                           if (request instanceof Promise) variantInsightPromises.push(request);
+                       });
+                       window.stageFirstCourseActiveSystem = initialTreatmentSystem;
+                       window.DashboardRenderer.renderStageFirstCourseTables(chartData.stageFirstCourseData, yearTitle, cancerTitle);
                       window.DashboardRenderer.renderSurvivalTable(chartData.survivalData, yearTitle, cancerTitle);
                       window.DashboardRenderer.showAnnualDataContent();
                       window.DashboardRenderer.updateChartCaptions(yearTitle, cancerTitle);
@@ -1477,7 +1504,7 @@ function initDashboardControl() {
                   if (window.DashboardRenderer) window.DashboardRenderer.updateHistologyChart(chartData.histologyData, chartData.histologyNoDataReason);
                   
                   // Collect all AI promises before showing the charts
-                  let aiPromises = [];
+                   let aiPromises = [...variantInsightPromises];
                   document.querySelectorAll('.item-checkbox').forEach(itemChk => {
                       if (itemChk.checked) {
                           const targetSelector = itemChk.getAttribute('data-target');
@@ -1497,8 +1524,13 @@ function initDashboardControl() {
                       }
                   });
 
-                  Promise.all(aiPromises).then(() => {
-                      if (window.utils && window.utils.hideLoading) {
+                   Promise.all(aiPromises).then(() => {
+                       if (initialStageReport) window.DashboardRenderer.configureStageInsight(initialStageReport);
+                       if (initialTreatmentSystem) {
+                           window.stageFirstCourseActiveSystem = initialTreatmentSystem;
+                           document.getElementById('btnAiTreatmentFirstCourse')?.onclick?.();
+                       }
+                       if (window.utils && window.utils.hideLoading) {
                           window.utils.hideLoading();
                       } else if (window.dashboardChartInstance) {
                           window.dashboardChartInstance.hideLoading();

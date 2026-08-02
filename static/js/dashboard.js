@@ -700,10 +700,7 @@ window.DashboardRenderer.renderStageDistributionReport = function(stageData, yea
                     barMaxWidth: 68,
                     data: data.stage_totals.map(value => Number(percentage(value).toFixed(1))),
                     itemStyle: {
-                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                            { offset: 0, color: '#F4F1FB' },
-                            { offset: 1, color: '#B8AEE3' }
-                        ]),
+                        color: '#9A8CD8',
                         borderColor: '#9A8CD8',
                         borderWidth: 1
                     },
@@ -777,9 +774,7 @@ window.DashboardRenderer.renderStageSexReport = function(stageData, yearTitle, c
                     barMaxWidth: 68,
                     data: row.values.map(value => Number(percentage(value).toFixed(1))),
                     itemStyle: {
-                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, isMale
-                            ? [{ offset: 0, color: '#eef1fb' }, { offset: 1, color: '#5470C6' }]
-                            : [{ offset: 0, color: '#fceeee' }, { offset: 1, color: '#EE6666' }]),
+                        color: isMale ? '#5470C6' : '#EE6666',
                         borderColor: isMale ? '#5470C6' : '#EE6666',
                         borderWidth: 1
                     },
@@ -2119,6 +2114,69 @@ document.addEventListener('DOMContentLoaded', function() {
                                 chartImageKey: '',
                                 llmText: stageLlmText
                             });
+                        }
+
+                        if (wasHidden) {
+                            pane.classList.add('d-none');
+                            pane.style.visibility = '';
+                            pane.style.display = '';
+                        }
+                        continue;
+                    }
+
+                    if (paneId === 'chartPane-TreatmentFirstCourse') {
+                        const treatmentTables = Array.isArray(window.lastChartData?.stageFirstCourseData)
+                            ? window.lastChartData.stageFirstCourseData
+                            : [];
+                        const treatmentContainer = document.getElementById('annualStageFirstCourseTables');
+                        const treatmentInsightButton = document.getElementById('btnAiTreatmentFirstCourse');
+                        const systems = treatmentTables.map(table => table.system);
+                        const activeSystem = systems.includes(window.stageFirstCourseActiveSystem)
+                            ? window.stageFirstCourseActiveSystem
+                            : systems[0];
+
+                        for (let treatmentIndex = 0; treatmentIndex < treatmentTables.length; treatmentIndex += 1) {
+                            const table = treatmentTables[treatmentIndex];
+                            window.stageFirstCourseActiveSystem = table.system;
+                            window.DashboardRenderer.renderStageFirstCourseTables(
+                                treatmentTables,
+                                window.DashboardRenderer.getSelectedYearTitle(),
+                                window.DashboardRenderer.getSelectedCancerTitle()
+                            );
+                            if (typeof treatmentInsightButton?.onclick === 'function') {
+                                await treatmentInsightButton.onclick();
+                            }
+
+                            const tablePanel = Array.from(
+                                treatmentContainer?.querySelectorAll('.stage-first-course-panel') || []
+                            ).find(panel => panel.dataset.stageSystem === table.system);
+                            const fieldKey = treatmentInsightButton?.dataset.insightFieldKey || '';
+                            const llmText = fieldKey
+                                ? (window.DashboardRenderer?.insightCache?.get(`${exportLanguage}|${modeAi}|${fieldKey}`) || '')
+                                : '';
+                            const title = exportLanguage === 'en'
+                                ? `${table.system} Stage and First Course Treatment`
+                                : `${table.system}期別與首次療程`;
+
+                            exportData.push({
+                                id: `chartPane-TreatmentFirstCourse-${treatmentIndex}`,
+                                order: orderIndex++,
+                                title,
+                                tableHtml: tablePanel ? tablePanel.innerHTML : '',
+                                chartImage: '',
+                                chartImageKey: '',
+                                llmText
+                            });
+                        }
+
+                        window.stageFirstCourseActiveSystem = activeSystem;
+                        window.DashboardRenderer.renderStageFirstCourseTables(
+                            treatmentTables,
+                            window.DashboardRenderer.getSelectedYearTitle(),
+                            window.DashboardRenderer.getSelectedCancerTitle()
+                        );
+                        if (typeof treatmentInsightButton?.onclick === 'function') {
+                            await treatmentInsightButton.onclick();
                         }
 
                         if (wasHidden) {
