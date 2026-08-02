@@ -335,11 +335,21 @@
         }
       });
     }
-
     updateParentCheckboxes();
     updateStatus();
     togglePresetActionButtons(true);
     checkFiltersState();
+    if (Array.isArray(preset.stage_options)) {
+      preset.stage_options.forEach(value => {
+        const stageOption = Array.from(document.querySelectorAll('.stage-summary-option'))
+          .find(input => input.value === value && !input.disabled);
+        if (stageOption) {
+          stageOption.checked = true;
+          stageOption.dispatchEvent(new Event('change'));
+        }
+      });
+      updateSummary();
+    }
   });
 
   document.getElementById('btnSavePreset')?.addEventListener('click', function() {
@@ -374,6 +384,8 @@
     if (subCatEls.length > 0) {
       sub_category = Array.from(subCatEls).map(el => el.id).join(',');
     }
+    const stage_options = Array.from(document.querySelectorAll('.stage-summary-option:checked'))
+      .map(input => input.value);
 
     if (cancers.length === 0) {
       Swal.fire({ icon: 'warning', title: '請先選擇癌別', text: '最愛範本必須包含至少一項癌別設定。', confirmButtonColor: '#2563eb' });
@@ -402,7 +414,7 @@
         fetch('/api/favorites', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, behavior, cancers, main_category, sub_category })
+          body: JSON.stringify({ name, behavior, cancers, main_category, sub_category, stage_options })
         })
         .then(r => r.json())
         .then(data => {

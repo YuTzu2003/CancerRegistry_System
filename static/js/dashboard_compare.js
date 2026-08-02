@@ -30,6 +30,8 @@
   const customYearControls = new Map();
   const yearSelects = [mainYear, mainYearEnd, targetYear, targetYearEnd];
   let activeTreatmentStageSystem = '';
+  const stageResultGroupItem = '__stage_reports__';
+  let activeStageReportOption = '';
 
   function t(key, options) {
     return window.DashboardI18n?.t(key, options) || key;
@@ -150,14 +152,44 @@
     return document.querySelector('input[name="compareType"]:checked')?.value || '';
   }
 
+  function selectedCompareItemsForGroups(groups) {
+    return groups.flatMap(group => Array.from(document.querySelectorAll(
+      `[data-compare-subitems="${group}"] .compare-subitem-check:checked:not(:disabled):not(.compare-stage-system-checkbox)`
+    )).map(input => input.value));
+  }
+
   function selectedCompareItems() {
-    const selectedItems = Array.from(
-      document.querySelectorAll('.compare-subitem-check:checked:not(.compare-stage-system-checkbox)')
-    ).map(input => input.value);
     const selectedStageItems = Array.from(
       document.querySelectorAll('.compare-stage-option:checked:not(:disabled)')
     ).map(input => input.value);
-    return [...new Set([...selectedItems, ...selectedStageItems])];
+    return [...new Set([
+      ...selectedCompareItemsForGroups(['incidence', 'diagnosis']),
+      ...selectedStageItems,
+      ...selectedCompareItemsForGroups(['treatment', 'cross_year'])
+    ])];
+  }
+
+  function selectedStageReportOptions() {
+    return selectedCompareStageOptions().options.map(item => item.option);
+  }
+
+  function comparisonResultItems() {
+    const stageOptions = new Set(selectedStageReportOptions());
+    let stageGroupAdded = false;
+    return selectedCompareItems().reduce((items, item) => {
+      if (!stageOptions.has(item)) return [...items, item];
+      if (stageGroupAdded) return items;
+      stageGroupAdded = true;
+      return [...items, stageResultGroupItem];
+    }, []);
+  }
+
+  function activeComparisonItem(item) {
+    return item === stageResultGroupItem ? activeStageReportOption : item;
+  }
+
+  function comparisonItemTitle(item) {
+    return item === stageResultGroupItem ? (isEnglish() ? 'Stage' : '期別') : item;
   }
 
   function selectedCompareStageOptions() {
@@ -317,12 +349,16 @@
     const cancerText = selectedCancerValues().length
       ? (selectedCancerTitle && selectedCancerTitle !== 'XX' ? selectedCancerTitle : `${selectedCancerValues().length} 個癌別`)
       : '尚未選擇';
-    const items = selectedCompareItems();
     const stageOptions = selectedCompareStageOptions();
-    const summaryItems = [...items];
-    if (selectedCompareType() === 'stage' && stageOptions.options.length) {
-      summaryItems.splice(0, summaryItems.length, `期別（${stageOptions.options.map(item => item.option).join('、')}）`);
-    }
+    const stageMode = stageOptions.detailed ? '分期呈現最細碼' : '分期不呈現最細碼';
+    const stageSummary = stageOptions.options.length
+      ? `期別（${stageMode}（${stageOptions.options.map(item => item.option).join('、')}））`
+      : '';
+    const summaryItems = [
+      ...selectedCompareItemsForGroups(['incidence', 'diagnosis']),
+      ...(stageSummary ? [stageSummary] : []),
+      ...selectedCompareItemsForGroups(['treatment', 'cross_year'])
+    ];
 
     document.getElementById('summaryCompareMode').textContent = selectedCompareMode() === 'range' ? '年度區間比較' : '單一年度比較';
     document.getElementById('summaryMainData').textContent = formatDataSelection(mainFile, mainYear, mainYearEnd, !sameFile);
@@ -1804,14 +1840,20 @@
 
   function renderResultItem(data, item, index) {
     activeResultIndex = index;
-    alignStageComparisonReports(data, item);
-    renderDifferenceSummary(data, item);
+    const stageOptions = selectedStageReportOptions();
+    const isStageGroup = item === stageResultGroupItem;
+    if (isStageGroup && !stageOptions.includes(activeStageReportOption)) {
+      activeStageReportOption = stageOptions[0] || '';
+    }
+    const activeItem = activeComparisonItem(item);
+    alignStageComparisonReports(data, activeItem);
+    renderDifferenceSummary(data, activeItem);
     document.querySelectorAll('.compare-result-tab').forEach((button, buttonIndex) => {
       button.classList.toggle('active', buttonIndex === index);
     });
 
     const sharedScale = calculateSharedScale(data);
-    const isTreatmentFirstCourse = item === '期別與首次療程';
+    const isTreatmentFirstCourse = activeItem === '期別與首次療程';
     const treatmentSystems = Array.from(new Set([
       ...(data.analysis_data?.main?.stageFirstCourseData || []).map(table => table.system),
       ...(data.analysis_data?.target?.stageFirstCourseData || []).map(table => table.system)
@@ -1822,7 +1864,11 @@
     const treatmentTabs = isTreatmentFirstCourse && treatmentSystems.length > 1
       ? `<div class="d-flex flex-wrap gap-2 mb-3" role="tablist">${treatmentSystems.map(system => `<button type="button" class="btn btn-outline-dark btn-sm compare-treatment-stage-tab${system === activeTreatmentStageSystem ? ' active' : ''}" data-stage-system="${escapeHtml(system)}">${escapeHtml(system)}${isEnglish() ? '' : '期別'}</button>`).join('')}</div>`
       : '';
+    const stageTabs = isStageGroup && stageOptions.length > 1
+      ? `<div class="d-flex flex-wrap gap-2 mb-3" role="tablist">${stageOptions.map(option => `<button type="button" class="btn btn-outline-dark btn-sm compare-stage-report-tab${option === activeStageReportOption ? ' active' : ''}" data-stage-option="${escapeHtml(option)}">${escapeHtml(option)}</button>`).join('')}</div>`
+      : '';
     document.getElementById('compareResultPanel').innerHTML = `
+      ${stageTabs}
       ${treatmentTabs}
       <div class="compare-result-grid">
         <section class="compare-result-item is-main">
@@ -1836,13 +1882,20 @@
       </div>
     `;
 
-    renderAnnualReport('mainAnnualReport', data.analysis_data?.main || {}, data.main, `main${index}`, item, 'main', sharedScale, activeTreatmentStageSystem);
-    renderAnnualReport('targetAnnualReport', data.analysis_data?.target || {}, data.target, `target${index}`, item, 'target', sharedScale, activeTreatmentStageSystem);
+    renderAnnualReport('mainAnnualReport', data.analysis_data?.main || {}, data.main, `main${index}`, activeItem, 'main', sharedScale, activeTreatmentStageSystem);
+    renderAnnualReport('targetAnnualReport', data.analysis_data?.target || {}, data.target, `target${index}`, activeItem, 'target', sharedScale, activeTreatmentStageSystem);
     document.querySelectorAll('.compare-treatment-stage-tab').forEach(button => {
       button.addEventListener('click', () => {
         activeTreatmentStageSystem = button.dataset.stageSystem || '';
         renderResultItem(data, item, index);
-        renderAiNarrative(data, item);
+        renderAiNarrative(data, activeComparisonItem(item));
+      });
+    });
+    document.querySelectorAll('.compare-stage-report-tab').forEach(button => {
+      button.addEventListener('click', () => {
+        activeStageReportOption = button.dataset.stageOption || '';
+        renderResultItem(data, item, index);
+        renderAiNarrative(data, activeStageReportOption);
       });
     });
   }
@@ -2057,26 +2110,26 @@
   }
 
   function renderResult(data) {
-    const items = selectedCompareItems();
+    const items = comparisonResultItems();
     lastComparisonData = data;
     hasRenderedResult = true;
     resultStale.classList.add('d-none');
     renderRangeTrend(data);
     const tabs = document.getElementById('compareResultTabs');
     tabs.innerHTML = items.map((item, index) => `
-      <button type="button" class="compare-result-tab ${index === 0 ? 'active' : ''}" data-index="${index}">${item}</button>
+      <button type="button" class="compare-result-tab ${index === 0 ? 'active' : ''}" data-index="${index}">${comparisonItemTitle(item)}</button>
     `).join('');
     tabs.querySelectorAll('.compare-result-tab').forEach(button => {
       button.addEventListener('click', () => {
         const index = Number(button.dataset.index);
         renderResultItem(data, items[index], index);
-        renderAiNarrative(data, items[index]);
+        renderAiNarrative(data, activeComparisonItem(items[index]));
       });
     });
 
     if (items.length > 0) renderResultItem(data, items[0], 0);
     resultBox.classList.remove('d-none');
-    if (items.length > 0) renderAiNarrative(data, items[0]);
+    if (items.length > 0) renderAiNarrative(data, activeComparisonItem(items[0]));
   }
 
   window.DashboardCompare = {
@@ -2088,12 +2141,12 @@
       const retryButton = document.getElementById('btnRetryAiNarrative');
       if (retryButton) retryButton.innerHTML = `<i class="bi bi-arrow-clockwise me-1"></i>${t('regenerateInsight')}`;
       if (!lastComparisonData || !hasRenderedResult) return;
-      const items = selectedCompareItems();
+      const items = comparisonResultItems();
       const item = items[activeResultIndex] || items[0];
       if (!item) return;
       renderRangeTrend(lastComparisonData);
       renderResultItem(lastComparisonData, item, activeResultIndex);
-      renderAiNarrative(lastComparisonData, item);
+      renderAiNarrative(lastComparisonData, activeComparisonItem(item));
     }
   };
 
