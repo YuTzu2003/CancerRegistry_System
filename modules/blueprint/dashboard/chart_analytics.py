@@ -670,7 +670,7 @@ def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", beh
         diagnosis_selected = calculate_all or bool(
             selected.intersection({"可分析個案與確診個案", "組織型態", "個案分類"})
         )
-        stage_selected = calculate_all or bool(
+        stage_selected = calculate_all or bool(stage_options) or bool(
             selected.intersection({"分期呈現最細碼", "分期不呈現最細碼"})
         )
         treatment_selected = calculate_all or "期別與首次療程" in selected

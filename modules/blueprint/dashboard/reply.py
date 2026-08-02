@@ -136,7 +136,9 @@ def get_chart_insight_logic(data):
             messages=[
                 {"role": "system", "content": "You are a professional cancer-registry data analyst. Return valid bilingual JSON only."},
                 {"role": "user", "content": prompt}
-            ],temperature=0.5
+            ],
+            temperature=0.5,
+            timeout=110.0
         )
         content = response.choices[0].message.content
         insights = _parse_bilingual_insights(content)
@@ -215,7 +217,8 @@ def get_compare_insight_logic(data):
                 {"role": "system", "content": "You are a professional cancer registry data comparison expert. Return professional Traditional Chinese and English narratives as valid JSON."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.3
+            temperature=0.3,
+            timeout=110.0
         )
         content = response.choices[0].message.content
         insights = _parse_bilingual_insights(content)

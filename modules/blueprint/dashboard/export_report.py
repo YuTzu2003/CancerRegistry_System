@@ -50,7 +50,7 @@ def _split_tall_chart_at_blank_rows(image_bytes, max_height_ratio=0.62):
 
 def generate_export_files(format_pdf, format_word, charts_data, output_dir, export_language="zh-TW"):
     os.makedirs(output_dir, exist_ok=True)
-    insight_heading = "AI-generated narrative:" if export_language == "en" else "語言模型敘述："
+    insight_heading = "AI-generated narrative:" if export_language == "en" else "AI 分析敘述："
     html_content = """
     <!DOCTYPE html>
     <html>
@@ -66,9 +66,13 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir, expo
                 border: 1px solid #ccc; padding: 4px; text-align: center; vertical-align: middle;
             }
             .annual-report-table caption { font-weight: bold; font-size: 14px; margin-bottom: 10px; }
+            .annual-report-table:has(+ .annual-stage-report-note) { margin-bottom: 4px; }
             #annualHistologyTableNote { color: #dc3545 !important; font-size: 10px !important; margin-top: -14px !important; margin-bottom: 8px !important; }
             #annualAnalyzableConfirmedNote { margin-top: 6px !important; font-size: 10px !important; line-height: 1.45 !important; text-align: left !important; }
             #annualAnalyzableConfirmedNote .annual-analyzable-note-item { margin-left: 12px !important; }
+            .annual-stage-report-note { margin-top: 0 !important; margin-bottom: 14px !important; padding-left: 8px !important; box-sizing: border-box; font-size: 10px !important; line-height: 1.45 !important; text-align: left !important; }
+            .stage-export-chart-caption { margin-top: 4px; font-size: 12px; font-weight: bold; text-align: center; }
+            .stage-export-chart-note { margin-top: 5px; margin-bottom: 12px; font-size: 10px; line-height: 1.45; text-align: left; }
             .chart-img { max-width: 100%; height: auto; margin-bottom: 15px; display: block; }
             .chart-img-wrapper.tall-chart { break-before: page; }
             .tall-chart .chart-img-page {
@@ -88,7 +92,16 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir, expo
                 object-fit: contain;
                 margin: 0;
             }
-            .llm-text { background: #f8f9fa; padding: 15px; border-radius: 5px; font-size: 12px; white-space: pre-wrap; margin-top: 15px; }
+            .llm-text {
+                background: #f8f9fa;
+                padding: 15px;
+                border-radius: 5px;
+                font-size: 12px;
+                white-space: pre-wrap;
+                margin-top: 15px;
+                break-inside: avoid;
+                page-break-inside: avoid;
+            }
             .text-center { text-align: center !important; }
             .text-start { text-align: left !important; }
             .text-end { text-align: right !important; }
@@ -135,6 +148,12 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir, expo
                     html_content += (f'<div class="chart-img-page">{image_html}</div>'
                                      if len(image_parts) > 1 else image_html)
                 html_content += '</div>'
+                chart_caption = chart.get('chartCaption', '')
+                chart_note = chart.get('chartNote', '')
+                if chart_caption:
+                    html_content += f'<div class="stage-export-chart-caption">{chart_caption}</div>'
+                if chart_note:
+                    html_content += f'<div class="stage-export-chart-note">{chart_note}</div>'
                 
         # LLM text
         if chart.get('includeAi', True):
@@ -307,6 +326,17 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir, expo
                             for run in note_paragraph.runs:
                                 run.font.size = Pt(8)
                                 run.font.color.rgb = RGBColor(220, 53, 69)
+
+                    stage_note = table_node.find_next_sibling('div', class_='annual-stage-report-note')
+                    if stage_note:
+                        note_text = stage_note.get_text(separator='\n').strip()
+                        if note_text:
+                            note_paragraph = doc.add_paragraph(note_text)
+                            note_paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                            note_paragraph.paragraph_format.space_before = Pt(0)
+                            note_paragraph.paragraph_format.space_after = Pt(0)
+                            for run in note_paragraph.runs:
+                                run.font.size = Pt(8)
                                             
                 img_nodes = sec.find_all('img', class_='chart-img')
                 if img_nodes:
@@ -317,6 +347,25 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir, expo
                             doc.add_page_break()
                         doc.add_paragraph()
                         doc.add_picture(io.BytesIO(image_part), width=Inches(9.0))
+
+                chart_caption_node = sec.find('div', class_='stage-export-chart-caption')
+                if chart_caption_node:
+                    caption_paragraph = doc.add_paragraph(chart_caption_node.get_text(separator=' ').strip())
+                    caption_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    caption_paragraph.paragraph_format.space_before = Pt(2)
+                    caption_paragraph.paragraph_format.space_after = Pt(2)
+                    for run in caption_paragraph.runs:
+                        run.font.size = Pt(9)
+                        run.font.bold = True
+
+                chart_note_node = sec.find('div', class_='stage-export-chart-note')
+                if chart_note_node:
+                    note_paragraph = doc.add_paragraph(chart_note_node.get_text(separator=' ').strip())
+                    note_paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                    note_paragraph.paragraph_format.space_before = Pt(0)
+                    note_paragraph.paragraph_format.space_after = Pt(4)
+                    for run in note_paragraph.runs:
+                        run.font.size = Pt(8)
                         
                 llm_node = sec.find('div', class_='llm-text')
                 if llm_node:

@@ -1190,8 +1190,6 @@ function initDashboardControl() {
   if (btnRunQuery) {
       btnRunQuery.addEventListener('click', async function() {
           await window.DashboardI18n?.setLanguage('zh-TW');
-          window.DashboardRenderer?.clearInsightCache?.();
-          document.querySelectorAll('.chart-pane').forEach(pane => {pane.classList.add('d-none');});
 
           let selectedFileId = '';
           const activeRow = document.querySelector('#dashFileListBody tr.table-active');
@@ -1225,6 +1223,28 @@ function initDashboardControl() {
               return;
           }
           window.dashboardAnalysisFileId = selectedFileId;
+
+          const isStageAnalysis = document.getElementById('chkGroupStage')?.checked === true;
+          if (isStageAnalysis) {
+              const stageModes = [
+                  document.getElementById('chkStageDetailed'),
+                  document.getElementById('chkStageSummary')
+              ].filter(input => input?.checked);
+              if (stageModes.length !== 1) {
+                  utils.alert('期別分析請先選擇「分期呈現最細碼」或「分期不呈現最細碼」！', 'warning');
+                  return;
+              }
+
+              const selectedStageOptions = document.querySelectorAll('.stage-summary-option:checked:not(:disabled)');
+              if (selectedStageOptions.length === 0) {
+                  utils.alert('期別分析請至少選擇一個分期系統的表圖項目！', 'warning');
+                  return;
+              }
+          }
+
+           window.DashboardRenderer?.clearInsightCache?.();
+           document.querySelectorAll('.chart-pane').forEach(pane => {pane.classList.add('d-none');});
+           document.getElementById('chartTabsArea')?.classList.add('d-none');
 
           if (window.utils && window.utils.showLoading) {
               window.utils.showLoading('分析中，請稍候...');
@@ -1438,17 +1458,6 @@ function initDashboardControl() {
                       window.DashboardRenderer.renderSurvivalTable(chartData.survivalData, yearTitle, cancerTitle);
                       window.DashboardRenderer.showAnnualDataContent();
                       window.DashboardRenderer.updateChartCaptions(yearTitle, cancerTitle);
-                  }
-
-                  const stageTotalBody = document.getElementById('annualStageTotalTableBody');
-                  if (stageTotalBody) {
-                      stageTotalBody.replaceChildren(...(chartData.stageTotals || []).map(item => {
-                          const row = document.createElement('tr');
-                          row.innerHTML = `<td></td><td></td>`;
-                          row.cells[0].textContent = item.option;
-                          row.cells[1].textContent = item.total_count;
-                          return row;
-                      }));
                   }
 
                   if (window.dashboardChartInstance) {

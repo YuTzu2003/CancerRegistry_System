@@ -519,6 +519,18 @@ def compare_dashboard_files_route():
     cancers = data.get("cancers", [])
     compare_items = data.get("compare_items", [])
     stage_options = data.get("stage_options", [])
+    if not isinstance(compare_items, list):
+        return jsonify({"ok": False, "error": "分析項目格式錯誤"}), 400
+    if not isinstance(stage_options, list):
+        return jsonify({"ok": False, "error": "期別選項格式錯誤"}), 400
+    stage_options = [
+        option for option in stage_options
+        if isinstance(option, dict)
+        and str(option.get("system", "")).strip()
+        and str(option.get("option", "")).strip()
+    ]
+    if compare_items and any(str(item).endswith("期別") for item in compare_items) and not stage_options:
+        return jsonify({"ok": False, "error": "請至少選擇一個分期系統及表圖類型"}), 400
 
     main_file = _get_owned_dashboard_file(main_file_id, session.get("id"))
     target_file = _get_owned_dashboard_file(target_file_id, session.get("id"))

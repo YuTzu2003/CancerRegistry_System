@@ -480,10 +480,13 @@ window.DashboardRenderer.normalizeStageDistributionData = function(stageData) {
         const normalizeValues = values => stageLabels.map((_, index) => Number(values?.[index] || 0));
         const stageTotals = normalizeValues(source.stage_totals);
         const includedCount = Number(source.included_count ?? stageTotals.reduce((sum, value) => sum + value, 0));
-        const sexRows = (Array.isArray(source.sex_rows) ? source.sex_rows : []).map(row => ({
-            sex: String(row.sex || ''),
-            values: normalizeValues(row.values)
-        }));
+        const sexRows = (Array.isArray(source.sex_rows) ? source.sex_rows : [])
+            .map(row => ({
+                sex: String(row.sex || ''),
+                values: normalizeValues(row.values)
+            }))
+            // 2.4：性別期別表圖不顯示總數為 0 的性別。
+            .filter(row => row.values.some(value => value > 0));
         const ageRows = (Array.isArray(source.age_rows) ? source.age_rows : []).map(row => ({
             age: String(row.age || ''),
             values: normalizeValues(row.values)
@@ -514,6 +517,14 @@ window.DashboardRenderer.normalizeStageDistributionData = function(stageData) {
         };
     };
 
+/* 英文模板本身會補上 Stage，避免 Breast Cancer Prognostic Stage 變成 Stage Stage。 */
+window.DashboardRenderer.getStageSystemTitle = function(systemName) {
+        const name = String(systemName || '').trim();
+        return window.DashboardI18n?.getLanguage() === 'en'
+            ? name.replace(/\s+Stage$/i, '')
+            : name;
+    };
+
 /* ── 分期不呈現最細碼：依勾選項目切換昨天建立的三種表圖 ── */
 window.DashboardRenderer.renderStageReportTabs = function(stageReports, yearTitle, cancerTitle) {
         const tabs = document.getElementById('annualStageReportTabs');
@@ -532,11 +543,14 @@ window.DashboardRenderer.renderStageReportTabs = function(stageReports, yearTitl
             button?.classList.add('active');
             const view = report.view || 'stage';
             sections[view]?.classList.remove('d-none');
-            document.getElementById('annualStagePreviewNotice')?.classList.toggle('d-none', report.is_preview !== true);
+            const previewNotice = document.getElementById('annualStagePreviewNotice');
+            previewNotice?.classList.toggle('d-none', report.is_preview !== true);
+            if (previewNotice) previewNotice.textContent = this.t('stagePreview');
 
             if (view === 'sex') this.renderStageSexReport(report, yearTitle, cancerTitle);
             else if (view === 'age') this.renderStageAgeReport(report, yearTitle, cancerTitle);
             else this.renderStageDistributionReport(report, yearTitle, cancerTitle);
+            this.configureStageInsight(report);
 
             requestAnimationFrame(() => {
                 if (view === 'sex') window.dashboardStageSexChartInstance?.resize();
@@ -549,17 +563,67 @@ window.DashboardRenderer.renderStageReportTabs = function(stageReports, yearTitl
             const button = document.createElement('button');
             button.type = 'button';
             button.className = 'btn btn-outline-dark btn-sm';
-            button.textContent = report.option || `${report.staging_system}期別`;
+            const tabKey = report.view === 'sex' ? 'stageSexTab' : report.view === 'age' ? 'stageAgeTab' : 'stageTab';
+            button.textContent = window.DashboardI18n?.getLanguage() === 'en'
+                ? this.t(tabKey, { system: this.getStageSystemTitle(report.staging_system) })
+                : (report.option || this.t(tabKey, { system: report.staging_system }));
             button.addEventListener('click', () => showReport(report, button));
             tabs.appendChild(button);
             if (index === 0) showReport(report, button);
         });
     };
 
+/* 目前顯示的期別分頁共用同一個敘述區塊；切換分頁時改用該報表資料產生敘述。 */
+window.DashboardRenderer.configureStageInsight = function(stageReport) {
+        const button = document.getElementById('btnAiStageSummary');
+        const response = document.getElementById('llmResponseStageSummary');
+        if (!button || !response || !stageReport) return;
+
+        const data = this.normalizeStageDistributionData(stageReport);
+        const view = stageReport.view || 'stage';
+        const viewLabel = view === 'sex' ? 'Stage Distribution by Sex'
+            : view === 'age' ? 'Stage Distribution by Age Group'
+            : 'Stage Distribution';
+        const fieldKey = `${data.staging_system} ${viewLabel}`;
+        const fields = view === 'sex'
+            ? ['期別', '性別', '個案數', '百分比']
+            : view === 'age'
+                ? ['期別', '年齡層', '個案數', '百分比']
+                : ['期別', '個案數', '百分比'];
+        const insightData = {
+            staging_system: data.staging_system,
+            stage_labels: data.stage_labels,
+            stage_totals: data.stage_totals,
+            sex_rows: view === 'sex' ? data.sex_rows : undefined,
+            age_rows: view === 'age' ? data.age_rows : undefined,
+            analyzable_count: data.analyzable_count,
+            unknown_count: data.unknown_count,
+            not_applicable_count: data.not_applicable_count,
+            included_count: data.included_count
+        };
+
+        const reportChanged = button.dataset.insightFieldKey !== fieldKey;
+        button.style.display = 'block';
+        button.textContent = this.t('regenerateInsight');
+        button.dataset.insightFieldKey = fieldKey;
+        button.onclick = event => this.fetchLlmInsight(
+            fieldKey,
+            insightData,
+            fields,
+            'llmResponseStageSummary',
+            'btnAiStageSummary',
+            { forceRefresh: event?.isTrusted === true }
+        );
+        if (reportChanged) response.textContent = this.t('autoInsight');
+        return button.onclick();
+    };
+
 /* ── 表一、圖一：期別分布 ── */
 window.DashboardRenderer.renderStageDistributionReport = function(stageData, yearTitle, cancerTitle) {
         const data = this.normalizeStageDistributionData(stageData);
         const selectedCancer = this.getCancerTitleForSentence(cancerTitle);
+        const isEnglish = window.DashboardI18n?.getLanguage() === 'en';
+        const titleCancer = isEnglish ? this.getEnglishCancerPatientLabel(cancerTitle) : selectedCancer;
         const systemName = data.staging_system;
         const percentage = value => data.included_count > 0 ? Number(value) / data.included_count * 100 : 0;
         const tableCaption = document.getElementById('annualStageDistributionCaption');
@@ -571,19 +635,22 @@ window.DashboardRenderer.renderStageDistributionReport = function(stageData, yea
         const previewNotice = document.getElementById('annualStagePreviewNotice');
 
         if (previewNotice) previewNotice.classList.toggle('d-none', !data.is_preview);
-        if (tableCaption) tableCaption.textContent = `表、${yearTitle}年新診斷${selectedCancer}病患${systemName}期別分布表`;
-        if (chartCaption) chartCaption.textContent = `圖、${yearTitle}年新診斷${selectedCancer}病患${systemName}期別分布圖`;
+        const titleOptions = { year: yearTitle, cancer: titleCancer, system: this.getStageSystemTitle(systemName) };
+        const noteText = this.t('stageStatisticsNote', {
+            analyzable: data.analyzable_count, unknown: data.unknown_count,
+            notApplicable: data.not_applicable_count, included: data.included_count
+        });
+        if (tableCaption) tableCaption.innerHTML = `${this.t('stageTableTitle', titleOptions)}${this.sourceLine()}`;
+        if (chartCaption) chartCaption.textContent = this.t('stageFigureTitle', titleOptions);
         if (tableHead) {
-            tableHead.innerHTML = `<tr><th>期別</th>${data.stage_labels.map(label => `<th>${this.escapeHtml(label)}</th>`).join('')}<th>小計</th></tr>`;
+            tableHead.innerHTML = `<tr><th>${this.t('stage')}</th>${data.stage_labels.map(label => `<th>${this.escapeHtml(label)}</th>`).join('')}<th>${this.t('subtotal')}</th></tr>`;
         }
         if (tableBody) {
             tableBody.innerHTML = `
-                <tr><th>總計</th>${data.stage_totals.map(value => `<td>${value}</td>`).join('')}<td>${data.included_count}</td></tr>
+                <tr><th>${this.t('total')}</th>${data.stage_totals.map(value => `<td>${value}</td>`).join('')}<td>${data.included_count}</td></tr>
                 <tr><th>%</th>${data.stage_totals.map(value => `<td>${percentage(value).toFixed(1)}%</td>`).join('')}<td>${data.included_count > 0 ? '100.0%' : '0.0%'}</td></tr>`;
         }
-        if (note) {
-            note.textContent = `註：可分析個案數共計 ${data.analyzable_count} 例，其中分期不明 ${data.unknown_count} 例、不適用 ${data.not_applicable_count} 例；共 ${data.included_count} 例納入分期分布百分比計算（百分比分母＝${data.included_count}）`;
-        }
+        if (note) note.textContent = noteText;
         if (chartNote) chartNote.textContent = note?.textContent || '';
 
         /* 圖一：期別分布圖 */
@@ -594,8 +661,8 @@ window.DashboardRenderer.renderStageDistributionReport = function(stageData, yea
             window.dashboardStageDistributionChartInstance.setOption({
                 animation: false,
                 title: {
-                    text: `${yearTitle}年新診斷${selectedCancer}病患${systemName}期別分布圖`,
-                    subtext: data.is_preview ? '介面預覽資料（尚未串接正式分期規則）' : this.t('source'),
+                    text: this.t('stageChartTitle', titleOptions),
+                    subtext: data.is_preview ? this.t('stagePreview') : this.t('source'),
                     left: 'center',
                     textStyle: { fontSize: 18, fontWeight: 'bold' }
                 },
@@ -605,7 +672,7 @@ window.DashboardRenderer.renderStageDistributionReport = function(stageData, yea
                     formatter: params => {
                         const item = params[0];
                         const count = data.stage_totals[item.dataIndex] || 0;
-                        return `${systemName} ${item.name}<br/>${item.marker}${percentage(count).toFixed(1)}%（${count} 人）`;
+                        return `${systemName} ${item.name}<br/>${item.marker}${this.t('stageTooltipCount', { percent: percentage(count).toFixed(1), count })}`;
                     }
                 },
                 toolbox: {
@@ -642,11 +709,14 @@ window.DashboardRenderer.renderStageDistributionReport = function(stageData, yea
                     },
                     label: {
                         show: true,
-                        position: 'inside',
+                        position: 'top',
+                        distance: 4,
                         color: '#4b5563',
                         fontSize: 14,
                         fontWeight: 'bold',
-                        formatter: params => `${Number(params.value).toFixed(1)}%`
+                        formatter: params => Number(params.value) > 0
+                            ? `${Number(params.value).toFixed(1)}%`
+                            : ''
                     }
                 }]
             });
@@ -658,6 +728,8 @@ window.DashboardRenderer.renderStageDistributionReport = function(stageData, yea
 /* ── 表二、圖二：性別及期別分布 ── */
 window.DashboardRenderer.renderStageSexReport = function(stageData, yearTitle, cancerTitle) {
         const data = this.normalizeStageDistributionData(stageData);
+        const isEnglish = window.DashboardI18n?.getLanguage() === 'en';
+        const titleCancer = isEnglish ? this.getEnglishCancerPatientLabel(cancerTitle) : cancerTitle;
         const systemName = data.staging_system;
         const tableCaption = document.getElementById('annualStageSexCaption');
         const chartCaption = document.getElementById('annualStageSexChartCaption');
@@ -668,23 +740,27 @@ window.DashboardRenderer.renderStageSexReport = function(stageData, yearTitle, c
         const rowTotal = row => row.values.reduce((sum, value) => sum + value, 0);
         const percentage = value => data.included_count > 0 ? Number(value) / data.included_count * 100 : 0;
 
-        if (tableCaption) tableCaption.textContent = `表、${yearTitle}年新診斷${cancerTitle}病患性別及${systemName}期別分布表`;
-        if (chartCaption) chartCaption.textContent = `圖、${yearTitle}年新診斷${cancerTitle}病患性別及${systemName}期別分布圖`;
+        const titleOptions = { year: yearTitle, cancer: titleCancer, system: this.getStageSystemTitle(systemName) };
+        const sexLabel = sex => sex === '男性' ? this.t('male') : sex === '女性' ? this.t('female') : sex;
+        const noteText = this.t('stageStatisticsNote', {
+            analyzable: data.analyzable_count, unknown: data.unknown_count,
+            notApplicable: data.not_applicable_count, included: data.included_count
+        });
+        if (tableCaption) tableCaption.innerHTML = `${this.t('stageSexTableTitle', titleOptions)}${this.sourceLine()}`;
+        if (chartCaption) chartCaption.textContent = this.t('stageSexFigureTitle', titleOptions);
         if (tableHead) {
-            tableHead.innerHTML = `<tr><th>性別</th>${data.stage_labels.map(label => `<th>${this.escapeHtml(label)}</th>`).join('')}<th>小計</th><th>%</th></tr>`;
+            tableHead.innerHTML = `<tr><th>${this.t('sex')}</th>${data.stage_labels.map(label => `<th>${this.escapeHtml(label)}</th>`).join('')}<th>${this.t('subtotal')}</th><th>%</th></tr>`;
         }
         if (tableBody) {
             const sexRowsHtml = data.sex_rows.map(row => {
                 const total = rowTotal(row);
-                return `<tr><th>${this.escapeHtml(row.sex)}</th>${row.values.map(value => `<td>${value}</td>`).join('')}<td>${total}</td><td>${percentage(total).toFixed(1)}%</td></tr>`;
+                return `<tr><th>${this.escapeHtml(sexLabel(row.sex))}</th>${row.values.map(value => `<td>${value}</td>`).join('')}<td>${total}</td><td>${percentage(total).toFixed(1)}%</td></tr>`;
             }).join('');
             tableBody.innerHTML = `${sexRowsHtml}
-                <tr><th>總計</th>${data.stage_totals.map(value => `<td>${value}</td>`).join('')}<td>${data.included_count}</td><td>${data.included_count > 0 ? '100.0%' : '0.0%'}</td></tr>
+                <tr><th>${this.t('total')}</th>${data.stage_totals.map(value => `<td>${value}</td>`).join('')}<td>${data.included_count}</td><td>${data.included_count > 0 ? '100.0%' : '0.0%'}</td></tr>
                 <tr><th>%</th>${data.stage_totals.map(value => `<td>${percentage(value).toFixed(1)}%</td>`).join('')}<td>${data.included_count > 0 ? '100.0%' : '0.0%'}</td><td>-</td></tr>`;
         }
-        if (note) {
-            note.textContent = `註：可分析個案數共計 ${data.analyzable_count} 例，其中分期不明 ${data.unknown_count} 例、不適用 ${data.not_applicable_count} 例；共 ${data.included_count} 例納入分期分布百分比計算（百分比分母＝${data.included_count}）`;
-        }
+        if (note) note.textContent = noteText;
         if (chartNote) chartNote.textContent = note?.textContent || '';
 
         /* 圖二：性別及期別分布圖 */
@@ -692,11 +768,68 @@ window.DashboardRenderer.renderStageSexReport = function(stageData, yearTitle, c
         if (chartDom && typeof echarts !== 'undefined') {
             window.dashboardStageSexChartInstance?.dispose();
             window.dashboardStageSexChartInstance = echarts.init(chartDom);
+            const sexSeries = data.sex_rows.map(row => {
+                const isMale = row.sex === '男性';
+                return {
+                    name: sexLabel(row.sex),
+                    type: 'bar',
+                    stack: 'stage-total',
+                    barMaxWidth: 68,
+                    data: row.values.map(value => Number(percentage(value).toFixed(1))),
+                    itemStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, isMale
+                            ? [{ offset: 0, color: '#eef1fb' }, { offset: 1, color: '#5470C6' }]
+                            : [{ offset: 0, color: '#fceeee' }, { offset: 1, color: '#EE6666' }]),
+                        borderColor: isMale ? '#5470C6' : '#EE6666',
+                        borderWidth: 1
+                    },
+                    label: { show: false }
+                };
+            });
+            const maleRow = data.sex_rows.find(row => row.sex === '男性');
+            const femaleRow = data.sex_rows.find(row => row.sex === '女性');
+            const topLabelData = data.stage_labels.map((_, index) => {
+                const malePercent = percentage(maleRow?.values[index] || 0);
+                const femalePercent = percentage(femaleRow?.values[index] || 0);
+                return {
+                    value: Number((malePercent + femalePercent).toFixed(1)),
+                    malePercent,
+                    femalePercent
+                };
+            });
+            const topLabelSeries = {
+                name: '__stageSexLabels',
+                type: 'bar',
+                barMaxWidth: 68,
+                barGap: '-100%',
+                silent: true,
+                z: 10,
+                tooltip: { show: false },
+                data: topLabelData,
+                itemStyle: { color: 'transparent', borderColor: 'transparent' },
+                label: {
+                    show: true,
+                    position: 'top',
+                    distance: 4,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    formatter: params => {
+                        return [
+                            `{female|${Number(params.data.femalePercent || 0).toFixed(1)}%}`,
+                            `{male|${Number(params.data.malePercent || 0).toFixed(1)}%}`
+                        ].join('\n');
+                    },
+                    rich: {
+                        male: { color: '#36558f', fontWeight: 600, lineHeight: 16 },
+                        female: { color: '#b54848', fontWeight: 600, lineHeight: 16 }
+                    }
+                }
+            };
             window.dashboardStageSexChartInstance.setOption({
                 animation: false,
                 title: {
-                    text: `${yearTitle}年新診斷${cancerTitle}病患性別及${systemName}期別分布圖`,
-                    subtext: data.is_preview ? '介面預覽資料（尚未串接正式分期規則）' : this.t('source'),
+                    text: this.t('stageSexChartTitle', titleOptions),
+                    subtext: data.is_preview ? this.t('stagePreview') : this.t('source'),
                     left: 'center',
                     textStyle: { fontSize: 18, fontWeight: 'bold' }
                 },
@@ -704,9 +837,12 @@ window.DashboardRenderer.renderStageSexReport = function(stageData, yearTitle, c
                     trigger: 'axis',
                     axisPointer: { type: 'shadow' },
                     formatter: params => {
-                        const lines = params.map(item => {
-                            const count = data.sex_rows[item.seriesIndex]?.values[item.dataIndex] || 0;
-                            return `${item.marker}${item.seriesName}：${Number(item.value).toFixed(1)}%（${count} 人）`;
+                        const lines = params
+                            .filter(item => item.seriesName !== '__stageSexLabels')
+                            .map(item => {
+                            const sexRow = data.sex_rows.find(row => sexLabel(row.sex) === item.seriesName);
+                            const count = sexRow?.values[item.dataIndex] || 0;
+                            return `${item.marker}${item.seriesName}: ${this.t('stageTooltipCount', { percent: Number(item.value).toFixed(1), count })}`;
                         });
                         return `${systemName} ${params[0]?.name || ''}<br/>${lines.join('<br/>')}`;
                     }
@@ -731,28 +867,7 @@ window.DashboardRenderer.renderStageSexReport = function(stageData, yearTitle, c
                     interval: 10,
                     axisLabel: { formatter: '{value}%' }
                 },
-                series: data.sex_rows.map((row, rowIndex) => ({
-                    name: row.sex,
-                    type: 'bar',
-                    stack: 'stage-total',
-                    barMaxWidth: 68,
-                    data: row.values.map(value => Number(percentage(value).toFixed(1))),
-                    itemStyle: {
-                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, rowIndex === 0
-                            ? [{ offset: 0, color: '#eef1fb' }, { offset: 1, color: '#5470C6' }]
-                            : [{ offset: 0, color: '#fceeee' }, { offset: 1, color: '#EE6666' }]),
-                        borderColor: rowIndex === 0 ? '#5470C6' : '#EE6666',
-                        borderWidth: 1
-                    },
-                    label: {
-                        show: true,
-                        position: 'inside',
-                        color: '#212529',
-                        fontSize: 13,
-                        fontWeight: 600,
-                        formatter: params => `${Number(params.value).toFixed(1)}%`
-                    }
-                }))
+                series: [...sexSeries, topLabelSeries]
             });
         }
     };
@@ -760,6 +875,8 @@ window.DashboardRenderer.renderStageSexReport = function(stageData, yearTitle, c
 /* ── 表三、圖三：年齡層及期別分布 ── */
 window.DashboardRenderer.renderStageAgeReport = function(stageData, yearTitle, cancerTitle) {
         const data = this.normalizeStageDistributionData(stageData);
+        const isEnglish = window.DashboardI18n?.getLanguage() === 'en';
+        const titleCancer = isEnglish ? this.getEnglishCancerPatientLabel(cancerTitle) : cancerTitle;
         const chartStageLabels = data.chart_stage_labels;
         const chartAgeRows = data.chart_age_rows;
         const systemName = data.staging_system;
@@ -771,12 +888,16 @@ window.DashboardRenderer.renderStageAgeReport = function(stageData, yearTitle, c
         const chartNote = document.getElementById('annualStageAgeChartNote');
         const rowTotal = row => row.values.reduce((sum, value) => sum + value, 0);
         const percentage = value => data.included_count > 0 ? Number(value) / data.included_count * 100 : 0;
-        const noteText = `註：可分析個案數共計 ${data.analyzable_count} 例，其中分期不明 ${data.unknown_count} 例、不適用 ${data.not_applicable_count} 例；共 ${data.included_count} 例納入分期分布百分比計算（百分比分母＝${data.included_count}）`;
+        const titleOptions = { year: yearTitle, cancer: titleCancer, system: this.getStageSystemTitle(systemName) };
+        const noteText = this.t('stageStatisticsNote', {
+            analyzable: data.analyzable_count, unknown: data.unknown_count,
+            notApplicable: data.not_applicable_count, included: data.included_count
+        });
 
-        if (tableCaption) tableCaption.textContent = `表、${yearTitle}年新診斷${cancerTitle}病患年齡層及${systemName}期別分布表`;
-        if (chartCaption) chartCaption.textContent = `圖、${yearTitle}年新診斷${cancerTitle}病患年齡層及${systemName}期別分布圖`;
+        if (tableCaption) tableCaption.innerHTML = `${this.t('stageAgeTableTitle', titleOptions)}${this.sourceLine()}`;
+        if (chartCaption) chartCaption.textContent = this.t('stageAgeFigureTitle', titleOptions);
         if (tableHead) {
-            tableHead.innerHTML = `<tr><th>年齡層</th>${data.stage_labels.map(label => `<th>${this.escapeHtml(label)}</th>`).join('')}<th>小計</th><th>%</th></tr>`;
+            tableHead.innerHTML = `<tr><th>${this.t('ageGroup')}</th>${data.stage_labels.map(label => `<th>${this.escapeHtml(label)}</th>`).join('')}<th>${this.t('subtotal')}</th><th>%</th></tr>`;
         }
         if (tableBody) {
             const ageRowsHtml = data.age_rows.map(row => {
@@ -784,7 +905,7 @@ window.DashboardRenderer.renderStageAgeReport = function(stageData, yearTitle, c
                 return `<tr><th>${this.escapeHtml(row.age)}</th>${row.values.map(value => `<td>${value}</td>`).join('')}<td>${total}</td><td>${percentage(total).toFixed(1)}%</td></tr>`;
             }).join('');
             tableBody.innerHTML = `${ageRowsHtml}
-                <tr><th>總計</th>${data.stage_totals.map(value => `<td>${value}</td>`).join('')}<td>${data.included_count}</td><td>${data.included_count > 0 ? '100.0%' : '0.0%'}</td></tr>
+                <tr><th>${this.t('total')}</th>${data.stage_totals.map(value => `<td>${value}</td>`).join('')}<td>${data.included_count}</td><td>${data.included_count > 0 ? '100.0%' : '0.0%'}</td></tr>
                 <tr><th>%</th>${data.stage_totals.map(value => `<td>${percentage(value).toFixed(1)}%</td>`).join('')}<td>${data.included_count > 0 ? '100.0%' : '0.0%'}</td><td>-</td></tr>`;
         }
         if (note) note.textContent = noteText;
@@ -793,14 +914,14 @@ window.DashboardRenderer.renderStageAgeReport = function(stageData, yearTitle, c
         /* 圖三：年齡層及期別分布圖 */
         const chartDom = document.getElementById('annualStageAgeChart');
         if (chartDom && typeof echarts !== 'undefined') {
-            const stageColors = ['#5470C6', '#EE6666', '#91CC75', '#9A8CD8'];
+            const stageColors = ['#5470C6', '#EE6666', '#91CC75', '#9A8CD8', '#F28C45'];
             window.dashboardStageAgeChartInstance?.dispose();
             window.dashboardStageAgeChartInstance = echarts.init(chartDom);
             window.dashboardStageAgeChartInstance.setOption({
                 animation: false,
                 title: {
-                    text: `${yearTitle}年新診斷${cancerTitle}病患年齡層及${systemName}期別分布圖`,
-                    subtext: data.is_preview ? '介面預覽資料（尚未串接正式分期規則）' : this.t('source'),
+                    text: this.t('stageAgeChartTitle', titleOptions),
+                    subtext: data.is_preview ? this.t('stagePreview') : this.t('source'),
                     left: 'center',
                     textStyle: { fontSize: 18, fontWeight: 'bold' }
                 },
@@ -813,9 +934,9 @@ window.DashboardRenderer.renderStageAgeReport = function(stageData, yearTitle, c
                         const total = row ? rowTotal(row) : 0;
                         const lines = params.map(item => {
                             const count = row?.values[item.seriesIndex] || 0;
-                            return `${item.marker}${item.seriesName}：${Number(item.value).toFixed(1)}%（${count} 人）`;
+                            return `${item.marker}${item.seriesName}: ${this.t('stageTooltipCount', { percent: Number(item.value).toFixed(1), count })}`;
                         });
-                        return `${row?.age || ''}（小計 ${total} 人）<br/>${lines.join('<br/>')}`;
+                        return `${this.t('stageAgeTooltipTotal', { age: row?.age || '', total })}<br/>${lines.join('<br/>')}`;
                     }
                 },
                 legend: {
@@ -1469,7 +1590,9 @@ window.DashboardRenderer.fetchLlmInsight = function(fieldKey, chartData, fields,
         if (shouldManageButton && button) button.disabled = true;
 
         const cacheGeneration = this.insightCacheGeneration;
-        const request = fetch('/api/chart_insight', {method: 'POST',headers: { 'Content-Type': 'application/json' },body: JSON.stringify({ field_key: fieldKey, data: chartData, fields: fields, mode_ai: modeAi, year_start: yearStart, year_end: yearEnd, language })})
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => controller.abort(), 120000);
+        const request = fetch('/api/chart_insight', {method: 'POST',headers: { 'Content-Type': 'application/json' },signal: controller.signal,body: JSON.stringify({ field_key: fieldKey, data: chartData, fields: fields, mode_ai: modeAi, year_start: yearStart, year_end: yearEnd, language })})
         .then(res => res.json())
         .then(data => {
             if (data.success) {
@@ -1482,8 +1605,12 @@ window.DashboardRenderer.fetchLlmInsight = function(fieldKey, chartData, fields,
             }
             return data;
         })
-        .catch(() => ({ success: false, error: 'error' }))
+        .catch(error => ({
+            success: false,
+            error: error.name === 'AbortError' ? '語言模型敘述產生逾時，請稍後重試。' : 'error'
+        }))
         .finally(() => {
+            window.clearTimeout(timeoutId);
             if (this.insightRequests.get(requestKey) === request) this.insightRequests.delete(requestKey);
         });
         this.insightRequests.set(requestKey, request);
@@ -1819,6 +1946,76 @@ document.addEventListener('DOMContentLoaded', function() {
             return image;
     };
 
+    /* 將期別圖名與統計註解合成進匯出圖片，避免 PDF／Word 只擷取 ECharts 畫布。 */
+    const appendStageChartAnnotations = async (imageDataUrl, captionText, noteText) => {
+            if (!imageDataUrl || (!captionText && !noteText)) return imageDataUrl;
+            const image = new Image();
+            await new Promise((resolve, reject) => {
+                image.onload = resolve;
+                image.onerror = reject;
+                image.src = imageDataUrl;
+            });
+
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            const horizontalPadding = 64;
+            const topPadding = 36;
+            const maxTextWidth = image.width - horizontalPadding * 2;
+            const wrapText = (text, font, maxWidth) => {
+                context.font = font;
+                const characters = Array.from(String(text || ''));
+                const lines = [];
+                let line = '';
+                characters.forEach(character => {
+                    const candidate = line + character;
+                    if (line && context.measureText(candidate).width > maxWidth) {
+                        lines.push(line);
+                        line = character;
+                    } else {
+                        line = candidate;
+                    }
+                });
+                if (line) lines.push(line);
+                return lines;
+            };
+            // ECharts 以 pixelRatio 2 匯出，因此外加文字也使用兩倍字級，縮入報表後才會與既有主題一致。
+            const captionFont = 'bold 28px sans-serif';
+            const noteFont = '32px sans-serif';
+            const captionLines = wrapText(captionText, captionFont, maxTextWidth);
+            const noteLines = wrapText(noteText, noteFont, maxTextWidth);
+            const captionLineHeight = 40;
+            const noteLineHeight = 46;
+            const annotationHeight = 22
+                + captionLines.length * captionLineHeight
+                + (captionLines.length && noteLines.length ? 12 : 0)
+                + noteLines.length * noteLineHeight
+                + 28;
+
+            canvas.width = image.width;
+            canvas.height = image.height + topPadding + annotationHeight;
+            context.fillStyle = '#ffffff';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            context.drawImage(image, 0, topPadding);
+
+            let y = topPadding + image.height + 22;
+            context.fillStyle = '#111827';
+            context.textBaseline = 'top';
+            context.textAlign = 'center';
+            context.font = captionFont;
+            captionLines.forEach(line => {
+                context.fillText(line, canvas.width / 2, y);
+                y += captionLineHeight;
+            });
+            if (captionLines.length && noteLines.length) y += 12;
+            context.textAlign = 'center';
+            context.font = noteFont;
+            noteLines.forEach(line => {
+                context.fillText(line, canvas.width / 2, y);
+                y += noteLineHeight;
+            });
+            return canvas.toDataURL('image/png');
+    };
+
     const collectExportData = async (sharedChartImages = {}) => {
             const exportData = [];
             let orderIndex = 0;
@@ -1830,6 +2027,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 'chartPane-DiagnosisAnalyzable': '癌症登記可分析個案與確診個案',
                 'chartPane-DiagnosisHistology': '組織型態分佈',
                 'chartPane-DiagnosisClassification': '個案分類',
+                'chartPane-StageSummary': '期別',
                 'chartPane-TreatmentFirstCourse': '期別與首次療程',
                 'chartPane-CrossYearSurvival': '存活率'
             };
@@ -1861,6 +2059,75 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
 
                     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+                    /* 期別可能同時選擇多個分期系統與呈現方式，逐一匯出成獨立項目。 */
+                    if (paneId === 'chartPane-StageSummary') {
+                        const stageReports = Array.isArray(window.lastChartData?.stageReports)
+                            ? window.lastChartData.stageReports
+                            : [];
+                        for (let stageIndex = 0; stageIndex < stageReports.length; stageIndex += 1) {
+                            const report = stageReports[stageIndex];
+                            const view = report.view || 'stage';
+                            const section = view === 'sex'
+                                ? document.getElementById('annualStageSexSection')
+                                : view === 'age'
+                                    ? document.getElementById('annualStageAgeSection')
+                                    : document.getElementById('annualStageDistributionSection');
+                            ['annualStageDistributionSection', 'annualStageSexSection', 'annualStageAgeSection']
+                                .forEach(id => document.getElementById(id)?.classList.add('d-none'));
+                            section?.classList.remove('d-none');
+                            if (view === 'sex') window.DashboardRenderer.renderStageSexReport(report, window.DashboardRenderer.getSelectedYearTitle(), window.DashboardRenderer.getSelectedCancerTitle());
+                            else if (view === 'age') window.DashboardRenderer.renderStageAgeReport(report, window.DashboardRenderer.getSelectedYearTitle(), window.DashboardRenderer.getSelectedCancerTitle());
+                            else window.DashboardRenderer.renderStageDistributionReport(report, window.DashboardRenderer.getSelectedYearTitle(), window.DashboardRenderer.getSelectedCancerTitle());
+
+                            await window.DashboardRenderer.configureStageInsight(report);
+                            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+                            const chart = view === 'sex'
+                                ? window.dashboardStageSexChartInstance
+                                : view === 'age'
+                                    ? window.dashboardStageAgeChartInstance
+                                    : window.dashboardStageDistributionChartInstance;
+                            const stageTableWrap = section?.querySelector('.annual-report-table-wrap');
+                            const stageChartCaption = section?.querySelector('.annual-chart-caption');
+                            const stageChartNote = section?.querySelector('.annual-stage-chart-note');
+                            const stageButton = document.getElementById('btnAiStageSummary');
+                            const stageFieldKey = stageButton?.dataset.insightFieldKey || '';
+                            const stageResponse = document.getElementById('llmResponseStageSummary');
+                            const stageLlmText = stageFieldKey
+                                ? (window.DashboardRenderer?.insightCache?.get(`${exportLanguage}|${modeAi}|${stageFieldKey}`)
+                                    || stageResponse?.textContent
+                                    || '')
+                                : '';
+                            const tabKey = view === 'sex' ? 'stageSexTab' : view === 'age' ? 'stageAgeTab' : 'stageTab';
+                            const stageTitle = exportLanguage === 'en'
+                                ? window.DashboardRenderer.t(tabKey, { system: window.DashboardRenderer.getStageSystemTitle(report.staging_system) })
+                                : (report.option || window.DashboardRenderer.t(tabKey, { system: report.staging_system }));
+                            const rawStageChartImage = chart ? await captureChartImage(chart) : '';
+                            const annotatedStageChartImage = await appendStageChartAnnotations(
+                                rawStageChartImage,
+                                stageChartCaption?.textContent?.trim() || '',
+                                stageChartNote?.textContent?.trim() || ''
+                            );
+
+                            exportData.push({
+                                id: `chartPane-StageSummary-${stageIndex}`,
+                                order: orderIndex++,
+                                title: stageTitle,
+                                tableHtml: stageTableWrap ? stageTableWrap.innerHTML : '',
+                                chartImage: annotatedStageChartImage,
+                                chartImageKey: '',
+                                llmText: stageLlmText
+                            });
+                        }
+
+                        if (wasHidden) {
+                            pane.classList.add('d-none');
+                            pane.style.visibility = '';
+                            pane.style.display = '';
+                        }
+                        continue;
+                    }
 
                     let chartImage = '';
                     let chartImageKey = '';
@@ -1908,6 +2175,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     else if (paneId === 'chartPane-DiagnosisAnalyzable') title = window.DashboardRenderer.t('chartAnalyzable');
                     else if (paneId === 'chartPane-DiagnosisHistology') title = window.DashboardRenderer.t('chartHistology');
                     else if (paneId === 'chartPane-DiagnosisClassification') title = window.DashboardRenderer.t('chartClassification');
+                    else if (paneId === 'chartPane-StageSummary') title = window.DashboardRenderer.t('chartStage');
                     else if (paneId === 'chartPane-TreatmentFirstCourse') title = window.DashboardI18n?.getLanguage() === 'en' ? 'Stage and First Course Treatment' : '期別與首次療程';
                     else if (paneId === 'chartPane-CrossYearSurvival') title = window.DashboardI18n?.getLanguage() === 'en' ? 'Survival' : '存活率';
 

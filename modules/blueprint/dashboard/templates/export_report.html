@@ -311,7 +311,10 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const hasTable = item.tableHtml && item.tableHtml.trim().length > 0;
         const hasChart = item.chartImage && item.chartImage.trim().length > 0;
-        const hasAi = item.llmText && item.llmText.trim().length > 0 && !item.llmText.includes('自動產生');
+        const hasAi = item.llmText
+            && item.llmText.trim().length > 0
+            && !item.llmText.includes('自動產生')
+            && !item.llmText.includes('generate an analysis automatically');
 
         div.innerHTML = `
             <div class="d-flex align-items-center flex-grow-1">

@@ -25,6 +25,7 @@
   let aiNarrativeRequestId = 0;
   let activeResultIndex = 0;
   const aiNarrativeCache = new Map();
+  const aiNarrativeTimeoutMs = 120000;
   const viewPreferences = { main: 'chart', target: 'chart' };
   const customYearControls = new Map();
   const yearSelects = [mainYear, mainYearEnd, targetYear, targetYearEnd];
@@ -150,12 +151,30 @@
   }
 
   function selectedCompareItems() {
-    return Array.from(document.querySelectorAll('.compare-subitem-check:checked')).map(input => input.value);
+    const selectedItems = Array.from(
+      document.querySelectorAll('.compare-subitem-check:checked:not(.compare-stage-system-checkbox)')
+    ).map(input => input.value);
+    const selectedStageItems = Array.from(
+      document.querySelectorAll('.compare-stage-option:checked:not(:disabled)')
+    ).map(input => input.value);
+    return [...new Set([...selectedItems, ...selectedStageItems])];
   }
 
   function selectedCompareStageOptions() {
-    const systems = Array.from(document.querySelectorAll('.compare-stage-system-checkbox:checked')).map(input => input.nextElementSibling?.textContent?.trim() || input.value);
-    return { systems };
+    const detailed = document.getElementById('compareItemStageDetailed')?.checked === true;
+    const summary = document.getElementById('compareItemStageSummary')?.checked === true;
+    const options = Array.from(document.querySelectorAll('.compare-stage-option:checked:not(:disabled)'))
+      .map(input => ({
+        system: input.closest('[data-stage-system]')?.dataset.stageSystem || '',
+        option: input.value,
+        detailed
+      }))
+      .filter(item => item.system && item.option);
+    return {
+      mode: detailed ? 'detailed' : summary ? 'summary' : '',
+      detailed,
+      options
+    };
   }
 
   function treatmentStageOptions() {
@@ -300,9 +319,9 @@
       : '尚未選擇';
     const items = selectedCompareItems();
     const stageOptions = selectedCompareStageOptions();
-    const summaryItems = items.filter(item => !stageOptions.systems.includes(item));
-    if (stageOptions.systems.length) {
-      summaryItems.push(`期別（${stageOptions.systems.join('、')}）`);
+    const summaryItems = [...items];
+    if (selectedCompareType() === 'stage' && stageOptions.options.length) {
+      summaryItems.splice(0, summaryItems.length, `期別（${stageOptions.options.map(item => item.option).join('、')}）`);
     }
 
     document.getElementById('summaryCompareMode').textContent = selectedCompareMode() === 'range' ? '年度區間比較' : '單一年度比較';
@@ -317,7 +336,9 @@
   function updateTopicCounts() {
     document.querySelectorAll('.cat-count-badge[data-parent-group]').forEach(badge => {
       const group = document.querySelector(`[data-compare-subitems="${badge.dataset.parentGroup}"]`);
-      const count = group?.querySelectorAll('.compare-subitem-check:checked').length || 0;
+      const count = badge.dataset.parentGroup === 'stage'
+        ? selectedCompareStageOptions().options.length
+        : (group?.querySelectorAll('.compare-subitem-check:checked').length || 0);
       badge.textContent = String(count);
       badge.classList.toggle('d-none', count === 0);
     });
@@ -1141,6 +1162,275 @@
     return `<div class="annual-report-table-wrap"><table class="annual-report-table"><caption>${caption}</caption><thead><tr><th rowspan="2">${isEnglish() ? 'First Course of Treatment' : '首次療程'}</th><th colspan="${Math.max(stages.length, 1)}">${escapeHtml(item.system)} ${isEnglish() ? 'Stage' : '期別'}</th><th rowspan="2">${isEnglish() ? 'Total' : '小計'}</th><th rowspan="2">%</th></tr><tr>${stages.map(stage => `<th>${escapeHtml(displayStage(stage))}</th>`).join('')}</tr></thead><tbody>${bodyRows}<tr class="fw-bold"><td>${isEnglish() ? 'Total' : '總計'}</td>${totals}<td>${totalCount}</td><td>${totalCount ? '100.0%' : '0.0%'}</td></tr><tr><td>%</td>${percentages}<td>${totalCount ? '100.0%' : '0.0%'}</td><td>-</td></tr></tbody></table></div><div class="compare-note"><div>${definitionNote}</div><div>${stageNote}</div></div>`;
   }
 
+  function normalizeStageReport(report) {
+    const stageLabels = Array.isArray(report?.stage_labels) ? report.stage_labels.map(String) : [];
+    const values = source => stageLabels.map((_, index) => Number(source?.[index] || 0));
+    return {
+      ...report,
+      stage_labels: stageLabels,
+      stage_totals: values(report?.stage_totals),
+      sex_rows: (report?.sex_rows || []).map(row => ({ ...row, values: values(row.values) }))
+        .filter(row => row.values.some(value => value > 0)),
+      age_rows: (report?.age_rows || []).map(row => ({ ...row, values: values(row.values) })),
+      chart_stage_labels: Array.isArray(report?.chart_stage_labels) ? report.chart_stage_labels.map(String) : stageLabels,
+      chart_age_rows: Array.isArray(report?.chart_age_rows) ? report.chart_age_rows : (report?.age_rows || []),
+      analyzable_count: Number(report?.analyzable_count || 0),
+      unknown_count: Number(report?.unknown_count || 0),
+      not_applicable_count: Number(report?.not_applicable_count || 0),
+      included_count: Number(report?.included_count || 0)
+    };
+  }
+
+  function stageLabelSortKey(label) {
+    const text = String(label || '').trim().toUpperCase();
+    const match = text.match(/^(0|IV|III|II|I|4|3|2|1)(.*)$/);
+    const order = { '0': 0, I: 10, '1': 10, II: 20, '2': 20, III: 30, '3': 30, IV: 40, '4': 40 };
+    if (match) return [order[match[1]], match[2], text];
+    return [999, '', text];
+  }
+
+  function compareStageLabels(left, right) {
+    const leftKey = stageLabelSortKey(left);
+    const rightKey = stageLabelSortKey(right);
+    return leftKey[0] - rightKey[0]
+      || leftKey[1].localeCompare(rightKey[1], undefined, { numeric: true })
+      || leftKey[2].localeCompare(rightKey[2], undefined, { numeric: true });
+  }
+
+  function alignStageReportLabels(report, labels, chartLabels) {
+    const source = normalizeStageReport(report);
+    const valueMap = (sourceLabels, values) => Object.fromEntries(
+      sourceLabels.map((label, index) => [label, Number(values?.[index] || 0)])
+    );
+    const alignValues = (sourceLabels, values, targetLabels) => {
+      const mapped = valueMap(sourceLabels, values);
+      return targetLabels.map(label => Number(mapped[label] || 0));
+    };
+    return {
+      ...source,
+      stage_labels: labels,
+      stage_totals: alignValues(source.stage_labels, source.stage_totals, labels),
+      sex_rows: source.sex_rows.map(row => ({
+        ...row,
+        values: alignValues(source.stage_labels, row.values, labels)
+      })),
+      age_rows: source.age_rows.map(row => ({
+        ...row,
+        values: alignValues(source.stage_labels, row.values, labels)
+      })),
+      chart_stage_labels: chartLabels,
+      chart_age_rows: source.chart_age_rows.map(row => ({
+        ...row,
+        values: alignValues(source.chart_stage_labels, row.values, chartLabels)
+      }))
+    };
+  }
+
+  function alignStageComparisonReports(data, item) {
+    const mainReports = data.analysis_data?.main?.stageReports || [];
+    const targetReports = data.analysis_data?.target?.stageReports || [];
+    const mainIndex = mainReports.findIndex(report => report.option === item);
+    const targetIndex = targetReports.findIndex(report => report.option === item);
+    if (mainIndex < 0 || targetIndex < 0) return;
+
+    const main = normalizeStageReport(mainReports[mainIndex]);
+    const target = normalizeStageReport(targetReports[targetIndex]);
+    const labels = [...new Set([...main.stage_labels, ...target.stage_labels])].sort(compareStageLabels);
+    const chartLabels = [...new Set([...main.chart_stage_labels, ...target.chart_stage_labels])]
+      .sort(compareStageLabels);
+    mainReports[mainIndex] = alignStageReportLabels(main, labels, chartLabels);
+    targetReports[targetIndex] = alignStageReportLabels(target, labels, chartLabels);
+  }
+
+  function stageSystemTitle(system) {
+    const name = String(system || '').trim();
+    return isEnglish() ? name.replace(/\s+Stage$/i, '') : name;
+  }
+
+  function stageReportTitleOptions(report, yearTitle, cancerTitle) {
+    return {
+      year: yearTitle,
+      cancer: reportCancerTitle(cancerTitle),
+      system: stageSystemTitle(report.staging_system)
+    };
+  }
+
+  function stageNote(report) {
+    return t('stageStatisticsNote', {
+      analyzable: report.analyzable_count,
+      unknown: report.unknown_count,
+      notApplicable: report.not_applicable_count,
+      included: report.included_count
+    });
+  }
+
+  function stageTableHtml(report, yearTitle, cancerTitle) {
+    const titleOptions = stageReportTitleOptions(report, yearTitle, cancerTitle);
+    const pct = value => report.included_count ? `${(Number(value || 0) / report.included_count * 100).toFixed(1)}%` : '0.0%';
+    const total = values => values.reduce((sumValue, value) => sumValue + Number(value || 0), 0);
+    let captionKey = 'stageTableTitle';
+    let head = `<tr><th>${t('stage')}</th>${report.stage_labels.map(label => `<th>${escapeHtml(label)}</th>`).join('')}<th>${t('subtotal')}</th></tr>`;
+    let rows = `<tr><th>${t('total')}</th>${report.stage_totals.map(value => `<td>${value}</td>`).join('')}<td>${report.included_count}</td></tr>
+      <tr><th>%</th>${report.stage_totals.map(value => `<td>${pct(value)}</td>`).join('')}<td>${report.included_count ? '100.0%' : '0.0%'}</td></tr>`;
+
+    if (report.view === 'sex') {
+      captionKey = 'stageSexTableTitle';
+      head = `<tr><th>${t('sex')}</th>${report.stage_labels.map(label => `<th>${escapeHtml(label)}</th>`).join('')}<th>${t('subtotal')}</th><th>%</th></tr>`;
+      const sexLabel = sex => sex === '男性' ? t('male') : sex === '女性' ? t('female') : sex;
+      rows = report.sex_rows.map(row => {
+        const rowTotal = total(row.values);
+        return `<tr><th>${escapeHtml(sexLabel(row.sex))}</th>${row.values.map(value => `<td>${value}</td>`).join('')}<td>${rowTotal}</td><td>${pct(rowTotal)}</td></tr>`;
+      }).join('');
+      rows += `<tr><th>${t('total')}</th>${report.stage_totals.map(value => `<td>${value}</td>`).join('')}<td>${report.included_count}</td><td>${report.included_count ? '100.0%' : '0.0%'}</td></tr>
+        <tr><th>%</th>${report.stage_totals.map(value => `<td>${pct(value)}</td>`).join('')}<td>${report.included_count ? '100.0%' : '0.0%'}</td><td>-</td></tr>`;
+    } else if (report.view === 'age') {
+      captionKey = 'stageAgeTableTitle';
+      head = `<tr><th>${t('ageGroup')}</th>${report.stage_labels.map(label => `<th>${escapeHtml(label)}</th>`).join('')}<th>${t('subtotal')}</th><th>%</th></tr>`;
+      rows = report.age_rows.map(row => {
+        const rowTotal = total(row.values);
+        return `<tr><th>${escapeHtml(row.age)}</th>${row.values.map(value => `<td>${value}</td>`).join('')}<td>${rowTotal}</td><td>${pct(rowTotal)}</td></tr>`;
+      }).join('');
+      rows += `<tr><th>${t('total')}</th>${report.stage_totals.map(value => `<td>${value}</td>`).join('')}<td>${report.included_count}</td><td>${report.included_count ? '100.0%' : '0.0%'}</td></tr>
+        <tr><th>%</th>${report.stage_totals.map(value => `<td>${pct(value)}</td>`).join('')}<td>${report.included_count ? '100.0%' : '0.0%'}</td><td>-</td></tr>`;
+    }
+
+    return `<div class="annual-report-table-wrap compare-stage-table-wrap">
+      <table class="annual-report-table">
+        <caption>${t(captionKey, titleOptions)}${sourceLine()}</caption>
+        <thead>${head}</thead><tbody>${rows}</tbody>
+      </table>
+      <div class="annual-stage-report-note text-start">${escapeHtml(stageNote(report))}</div>
+    </div>`;
+  }
+
+  function stageBlock(chartData, yearTitle, cancerTitle, chartId, item) {
+    const source = (chartData?.stageReports || []).find(report => report.option === item);
+    if (!source) return `<div class="alert alert-light border mb-0">${t('noData')}</div>`;
+    const report = normalizeStageReport(source);
+    const titleOptions = stageReportTitleOptions(report, yearTitle, cancerTitle);
+    const figureKey = report.view === 'sex' ? 'stageSexFigureTitle' : report.view === 'age' ? 'stageAgeFigureTitle' : 'stageFigureTitle';
+    return `${viewSwitchBlock()}
+      <div data-compare-view-panel="chart">
+        <div id="${chartId}" class="compare-chart compare-stage-chart"></div>
+        <div class="compare-chart-caption">${t(figureKey, titleOptions)}</div>
+        <div class="annual-stage-chart-note">${escapeHtml(stageNote(report))}</div>
+      </div>
+      <div data-compare-view-panel="table" class="d-none">${stageTableHtml(report, yearTitle, cancerTitle)}</div>`;
+  }
+
+  function renderStageChart(chartId, chartData, yearTitle, cancerTitle, item) {
+    if (!window.echarts) return;
+    const chartEl = document.getElementById(chartId);
+    const source = (chartData?.stageReports || []).find(report => report.option === item);
+    if (!chartEl || !source) return;
+    const report = normalizeStageReport(source);
+    const oldChart = echarts.getInstanceByDom(chartEl);
+    if (oldChart) oldChart.dispose();
+    const chart = echarts.init(chartEl);
+    const titleOptions = stageReportTitleOptions(report, yearTitle, cancerTitle);
+    const chartTitleKey = report.view === 'sex' ? 'stageSexChartTitle' : report.view === 'age' ? 'stageAgeChartTitle' : 'stageChartTitle';
+    const percentage = value => report.included_count ? Number(value || 0) / report.included_count * 100 : 0;
+    const common = {
+      animation: false,
+      title: { text: t(chartTitleKey, titleOptions), subtext: t('source'), left: 'center', textStyle: { fontSize: 18, fontWeight: 'bold' } },
+      toolbox: { right: 12, top: 0, feature: { dataView: { show: true, readOnly: false, title: t('dataView'), lang: [t('dataView'), t('close'), t('refresh')] }, saveAsImage: { show: true, title: t('downloadImage') } } }
+    };
+
+    if (report.view === 'sex') {
+      const sexLabel = sex => sex === '男性' ? t('male') : sex === '女性' ? t('female') : sex;
+      const rows = report.sex_rows;
+      const sexSeries = rows.map(row => {
+        const male = row.sex === '男性';
+        return {
+          name: sexLabel(row.sex),
+          type: 'bar',
+          stack: 'stage',
+          barMaxWidth: 58,
+          data: row.values.map(value => Number(percentage(value).toFixed(1))),
+          itemStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, male
+              ? [{ offset: 0, color: '#eef1fb' }, { offset: 1, color: '#5470C6' }]
+              : [{ offset: 0, color: '#fceeee' }, { offset: 1, color: '#EE6666' }]),
+            borderColor: male ? '#5470C6' : '#EE6666',
+            borderWidth: 1
+          },
+          label: { show: false }
+        };
+      });
+      const maleRow = rows.find(row => row.sex === '男性');
+      const femaleRow = rows.find(row => row.sex === '女性');
+      const topLabelSeries = {
+        name: '__stageSexLabels',
+        type: 'bar',
+        barMaxWidth: 58,
+        barGap: '-100%',
+        silent: true,
+        z: 10,
+        tooltip: { show: false },
+        data: report.stage_labels.map((_, index) => {
+          const malePercent = percentage(maleRow?.values[index] || 0);
+          const femalePercent = percentage(femaleRow?.values[index] || 0);
+          return { value: Number((malePercent + femalePercent).toFixed(1)), malePercent, femalePercent };
+        }),
+        itemStyle: { color: 'transparent', borderColor: 'transparent' },
+        label: {
+          show: true,
+          position: 'top',
+          distance: 4,
+          fontSize: 13,
+          fontWeight: 600,
+          formatter: params => {
+            return [
+              `{female|${Number(params.data.femalePercent || 0).toFixed(1)}%}`,
+              `{male|${Number(params.data.malePercent || 0).toFixed(1)}%}`
+            ].join('\n');
+          },
+          rich: {
+            male: { color: '#36558f', fontWeight: 600, lineHeight: 16 },
+            female: { color: '#b54848', fontWeight: 600, lineHeight: 16 }
+          }
+        }
+      };
+      chart.setOption({
+        ...common,
+        tooltip: {
+          trigger: 'axis',
+          axisPointer: { type: 'shadow' },
+          formatter: params => {
+            const lines = params.filter(entry => entry.seriesName !== '__stageSexLabels').map(entry => {
+              const row = rows.find(itemRow => sexLabel(itemRow.sex) === entry.seriesName);
+              const count = Number(row?.values[entry.dataIndex] || 0);
+              return `${entry.marker}${entry.seriesName}: ${Number(entry.value).toFixed(1)}% (${count})`;
+            });
+            return `${report.staging_system} ${params[0]?.name || ''}<br/>${lines.join('<br/>')}`;
+          }
+        },
+        legend: { top: 55, data: rows.map(row => sexLabel(row.sex)) },
+        grid: { left: 60, right: 30, top: 95, bottom: 55 },
+        xAxis: { type: 'category', data: report.stage_labels },
+        yAxis: { type: 'value', min: 0, max: 100, interval: 10, axisLabel: { formatter: '{value}%' } },
+        series: [...sexSeries, topLabelSeries]
+      });
+    } else if (report.view === 'age') {
+      const colors = ['#5470C6', '#EE6666', '#91CC75', '#9A8CD8', '#F28C45'];
+      const labels = report.chart_stage_labels;
+      chartEl.style.height = '560px';
+      chart.setOption({ ...common, tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } }, legend: { top: 55 }, grid: { left: 62, right: 28, top: 95, bottom: 45 },
+        xAxis: { type: 'value', min: 0, max: 100, axisLabel: { formatter: '{value}%' } }, yAxis: { type: 'category', data: report.chart_age_rows.map(row => row.age) },
+        series: labels.map((label, index) => ({ name: label, type: 'bar', stack: 'age-stage', data: report.chart_age_rows.map(row => {
+          const total = (row.values || []).reduce((sumValue, value) => sumValue + Number(value || 0), 0);
+          return total ? Number((Number(row.values?.[index] || 0) / total * 100).toFixed(1)) : 0;
+        }), itemStyle: { color: colors[index % colors.length] } })) });
+    } else {
+      chart.setOption({ ...common, tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } }, grid: { left: 58, right: 28, top: 82, bottom: 55 },
+        xAxis: { type: 'category', data: report.stage_labels }, yAxis: { type: 'value', min: 0, max: 100, interval: 10, axisLabel: { formatter: '{value}%' } },
+        series: [{ type: 'bar', barMaxWidth: 58, data: report.stage_totals.map(value => Number(percentage(value).toFixed(1))),
+          itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#f2effc' }, { offset: 1, color: '#9A8CD8' }]), borderColor: '#9A8CD8', borderWidth: 1 },
+          label: { show: true, position: 'top', fontSize: 13, fontWeight: 'bold', formatter: params => `${Number(params.value || 0).toFixed(1)}%` } }] });
+    }
+    setTimeout(() => chart.resize(), 50);
+  }
+
   function reportBlock(item, chartData, meta, chartPrefix, activeStageSystem = '') {
     const cancerTitle = selectedCancerTitle();
     if (item === '性別年齡分佈') return sexAgeBlockV2(chartData, meta.year_label, cancerTitle, `${chartPrefix}SexAgeChart`);
@@ -1149,6 +1439,9 @@
     if (item === '組織型態') return histologyBlock(chartData, meta.year_label, cancerTitle, `${chartPrefix}HistologyChart`);
     if (item === '個案分類') return classificationBlock(chartData, meta.year_label, cancerTitle, `${chartPrefix}ClassificationChart`);
     if (item === '期別與首次療程') return treatmentFirstCourseBlock(chartData, meta.year_label, cancerTitle, activeStageSystem);
+    if ((chartData?.stageReports || []).some(report => report.option === item)) {
+      return stageBlock(chartData, meta.year_label, cancerTitle, `${chartPrefix}StageChart`, item);
+    }
     return `<div class="alert alert-light border mb-0">目前尚未接上：${item}</div>`;
   }
 
@@ -1222,7 +1515,7 @@
   function summaryCategoryForItem(item) {
     if (['性別年齡分佈', '年齡中位數'].includes(item)) return 'incidence';
     if (['可分析個案與確診個案', '組織型態', '個案分類'].includes(item)) return 'diagnosis';
-    if (['AJCC期別分佈', 'FIGO/MAC/BCLC/SCLC期別分佈'].includes(item)) return 'stage';
+    if (/期別$/.test(String(item || '')) || ['AJCC期別分佈', 'FIGO/MAC/BCLC/SCLC期別分佈'].includes(item)) return 'stage';
     if (['期別與首次療程', '期別與手術術式'].includes(item)) return 'treatment';
     if (['存活率', '歷年年齡中位數', '歷年期別分佈', '歷年新診斷件數', '本院常見癌症'].includes(item)) return 'cross_year';
     return 'incidence';
@@ -1330,10 +1623,60 @@
     `;
   }
 
+  function renderStageDifferenceSummary(data, item) {
+    const findReport = side => normalizeStageReport(
+      (data.analysis_data?.[side]?.stageReports || []).find(report => report.option === item) || {}
+    );
+    const main = findReport('main');
+    const target = findReport('target');
+    const signed = value => Number(value) > 0 ? `+${Number(value)}` : String(Number(value));
+    const valueClass = value => Number(value) > 0 ? 'is-up' : Number(value) < 0 ? 'is-down' : 'is-flat';
+    const shareMap = report => Object.fromEntries(report.stage_labels.map((label, index) => [
+      label,
+      report.included_count ? Number(report.stage_totals[index] || 0) / report.included_count * 100 : 0
+    ]));
+    const mainShares = shareMap(main);
+    const targetShares = shareMap(target);
+    const labels = [...new Set([...main.stage_labels, ...target.stage_labels])];
+    const largest = labels.map(label => ({
+      label,
+      difference: Number(targetShares[label] || 0) - Number(mainShares[label] || 0)
+    })).sort((a, b) => Math.abs(b.difference) - Math.abs(a.difference))[0]
+      || { label: '—', difference: 0 };
+    const includedDiff = target.included_count - main.included_count;
+    const unknownDiff = target.unknown_count - main.unknown_count;
+    const notApplicableDiff = target.not_applicable_count - main.not_applicable_count;
+    document.getElementById('compareResultSummary').innerHTML = `
+      <div class="compare-summary-card">
+        <div class="compare-summary-label">有效期別個案數差異</div>
+        <div class="compare-summary-value ${valueClass(includedDiff)}">${signed(includedDiff)}人</div>
+        <div class="compare-summary-period-detail">${main.included_count}人 → ${target.included_count}人</div>
+      </div>
+      <div class="compare-summary-card">
+        <div class="compare-summary-label">期別比例差異最大</div>
+        <div class="compare-summary-value ${valueClass(largest.difference)}">${escapeHtml(largest.label)} ${largest.difference > 0 ? '+' : largest.difference < 0 ? '−' : ''}${Math.abs(largest.difference).toFixed(1)}%</div>
+        <div class="compare-summary-period-detail">${Number(mainShares[largest.label] || 0).toFixed(1)}% → ${Number(targetShares[largest.label] || 0).toFixed(1)}%</div>
+      </div>
+      <div class="compare-summary-card">
+        <div class="compare-summary-label">分期不明個案差異</div>
+        <div class="compare-summary-value ${valueClass(unknownDiff)}">${signed(unknownDiff)}人</div>
+        <div class="compare-summary-period-detail">${main.unknown_count}人 → ${target.unknown_count}人</div>
+      </div>
+      <div class="compare-summary-card">
+        <div class="compare-summary-label">分期不適用個案差異</div>
+        <div class="compare-summary-value ${valueClass(notApplicableDiff)}">${signed(notApplicableDiff)}人</div>
+        <div class="compare-summary-period-detail">${main.not_applicable_count}人 → ${target.not_applicable_count}人</div>
+      </div>`;
+  }
+
   function renderDifferenceSummary(data, analysisItem = '性別年齡分佈') {
     const category = summaryCategoryForItem(analysisItem);
     if (category === 'diagnosis') {
       renderDiagnosisDifferenceSummary(data);
+      return;
+    }
+    if (category === 'stage') {
+      renderStageDifferenceSummary(data, analysisItem);
       return;
     }
     if (category !== 'incidence') {
@@ -1456,10 +1799,14 @@
       renderHistologyChart(`${chartPrefix}HistologyChart`, chartData, meta.year_label, selectedCancerTitle(), sharedScale);
     }
     if (item === '個案分類') renderClassificationChart(`${chartPrefix}ClassificationChart`, chartData, sharedScale, meta.year_label, selectedCancerTitle());
+    if ((chartData?.stageReports || []).some(report => report.option === item)) {
+      renderStageChart(`${chartPrefix}StageChart`, chartData, meta.year_label, selectedCancerTitle(), item);
+    }
   }
 
   function renderResultItem(data, item, index) {
     activeResultIndex = index;
+    alignStageComparisonReports(data, item);
     renderDifferenceSummary(data, item);
     document.querySelectorAll('.compare-result-tab').forEach((button, buttonIndex) => {
       button.classList.toggle('active', buttonIndex === index);
@@ -1517,6 +1864,8 @@
         const tables = analysis?.stageFirstCourseData || [];
         selectedAnalysis.stage_first_course = tables.find(table => table.system === activeTreatmentStageSystem) || tables[0] || {};
       }
+      const stageReport = (analysis?.stageReports || []).find(report => report.option === analysisItem);
+      if (stageReport) selectedAnalysis.stage_report = stageReport;
       return selectedAnalysis;
     };
     return {
@@ -1559,9 +1908,12 @@
     }
 
     const comparisonPayload = buildAiComparisonPayload(data, analysisItem);
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), aiNarrativeTimeoutMs);
     return fetch('/api/dashboard/compare_insight', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
       body: JSON.stringify({
         analysis_item: analysisItem,
         comparison_direction: comparisonPayload.comparison_direction,
@@ -1582,11 +1934,14 @@
         aiNarrativeCache.set(cacheKey, insight);
         return insight;
       })
-      .catch(() => {
-        const errorText = '語言模型比較敘述暫時無法產生，請確認模型服務設定或稍後再試。';
+      .catch(error => {
+        const errorText = error.name === 'AbortError'
+          ? '語言模型比較敘述產生逾時，請稍後重試。'
+          : '語言模型比較敘述暫時無法產生，請確認模型服務設定或稍後再試。';
         aiNarrativeCache.set(cacheKey, errorText);
         return errorText;
-      });
+      })
+      .finally(() => window.clearTimeout(timeoutId));
   }
 
   function renderAiNarrative(data, analysisItem, force = false) {
@@ -1881,16 +2236,26 @@
   document.querySelectorAll('.compare-stage-option').forEach(input => {
     input.addEventListener('change', () => {
       markResultsStale();
-      updateSelectionSummary();
+      updateButtonState();
     });
   });
   document.getElementById('btnSelectAllCompareItems').addEventListener('click', () => {
-    document.querySelectorAll('.compare-subitem-check:not(:disabled)').forEach(input => { input.checked = true; });
+    if (selectedCompareType() === 'stage') {
+      const summary = document.getElementById('compareItemStageSummary');
+      const detailed = document.getElementById('compareItemStageDetailed');
+      if (!summary?.checked && !detailed?.checked && summary && !summary.disabled) summary.checked = true;
+      updateCompareStageOptions();
+      document.querySelectorAll('.compare-stage-option:not(:disabled)').forEach(input => { input.checked = true; });
+    } else {
+      document.querySelectorAll('.compare-subitem-check:not(:disabled):not(.compare-stage-system-checkbox)')
+        .forEach(input => { input.checked = true; });
+    }
     markResultsStale();
     updateButtonState();
   });
   document.getElementById('btnClearCompareItems').addEventListener('click', () => {
     document.querySelectorAll('.compare-subitem-check').forEach(input => { input.checked = false; });
+    document.querySelectorAll('.compare-stage-option').forEach(input => { input.checked = false; });
     markResultsStale();
     updateButtonState();
   });
@@ -1939,6 +2304,17 @@
       showAlert('尚未選擇分析項目', '請至少選擇一個分析項目後再開始比較。');
       return;
     }
+    if (selectedCompareType() === 'stage') {
+      const stageOptions = selectedCompareStageOptions();
+      if (!stageOptions.mode) {
+        showAlert('尚未選擇期別模式', '請先選擇「分期呈現最細碼」或「分期不呈現最細碼」。');
+        return;
+      }
+      if (stageOptions.options.length === 0) {
+        showAlert('尚未選擇期別報表', '請至少選擇一個分期系統的期別表圖。');
+        return;
+      }
+    }
     [mainPreview, targetPreview].forEach(preview => preview.classList.add('d-none'));
     document.querySelectorAll('.compare-preview-toggle').forEach(button => { button.textContent = '查看資料預覽'; });
     resultBox.classList.add('d-none');
@@ -1948,9 +2324,14 @@
       window.utils.showLoading('分析中，請稍候...');
     }
     const compareItems = selectedCompareItems();
-    const stageOptions = compareItems.includes('期別與首次療程')
-      ? treatmentStageOptions()
-      : [];
+    const stageOptions = [...selectedCompareStageOptions().options];
+    if (compareItems.includes('期別與首次療程')) {
+      treatmentStageOptions().forEach(option => {
+        if (!stageOptions.some(selected => selected.system === option.system && selected.option === option.option)) {
+          stageOptions.push(option);
+        }
+      });
+    }
     fetch('/api/dashboard/compare', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1974,7 +2355,14 @@
         if (!data.ok) throw new Error(data.error || '比較失敗');
         const items = selectedCompareItems();
         aiNarrativeCache.clear();
-        return Promise.all(items.map(item => fetchAiNarrative(data.data, item)))
+        let completedNarratives = 0;
+        return Promise.all(items.map(item => fetchAiNarrative(data.data, item).then(insight => {
+          completedNarratives += 1;
+          if (window.utils && window.utils.showLoading) {
+            window.utils.showLoading(`正在產生比較敘述（${completedNarratives}/${items.length}）...`);
+          }
+          return insight;
+        })))
           .then(() => {
             renderResult(data.data);
             setTimeout(() => resultBox.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
