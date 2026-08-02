@@ -19,6 +19,7 @@ def normalize_registry_date(value):
         return ""
     return digits[:8].zfill(8)
 
+
 # 個案篩選
 def filter_class(df, target_classes=("1", "2")):
     return df[df["個案分類"].map(normalize_code).isin(target_classes)]
@@ -30,7 +31,12 @@ def ajcc_stages(cases, period_codes):
     for index, case in cases.iterrows():
         pdescr = normalize_code(case["病理分期字根/字首"])
         dop_mds = normalize_registry_date(case["原發部位最確切的手術切除日期"])
-        selected_stage = case["臨床期別組合"] if pdescr in {"4", "6"} or dop_mds == "00000000" else case["病理期別組合"]
+        pstage = normalize_code(case["病理期別組合"]).upper()
+        selected_stage = (
+            case["臨床期別組合"]
+            if pdescr in {"4", "6"} or dop_mds == "00000000" or pstage == "BBB"
+            else case["病理期別組合"]
+        )
         selected_stage = normalize_code(selected_stage)
         site = str(case["原發部位"]).strip().upper()
         row = {"row_index": index, "case": case.to_dict(), "ajcc_stage": selected_stage,
@@ -59,13 +65,23 @@ def figo_stages(cases, period_codes):
     rows = []
     for index, case in cases.iterrows():
         site = str(case["原發部位"]).strip().upper()[:3]
-        if site not in {"C53", "C54", "C56"} or normalize_code(case["其他分期系統"], 2) != "01":
+        # 2.4 FIGO 僅呈現女性個案：C53、C54、C56 且其他分期系統為 01。
+        is_female = normalize_code(case["性別"]) == "2"
+        if not is_female or site not in {"C53", "C54", "C56"} or normalize_code(case["其他分期系統"], 2) != "01":
             continue
         ostagec = normalize_code(case["其他分期系統期別(臨床分期)"])
-        if site == "C53" or normalize_code(case["其他分期系統期別(臨床分期)"], 4) != "0000":
+        if site == "C53":
             stage_value, label = ostagec, "FIGO(ostagec)"
         else:
-            stage_value, label = normalize_code(case["其他分期系統期別(病理分期)"]), "FIGO(ostagep)"
+            # C54、C56 原則上採病理分期；臨床分期有值且不為 0000 時改採臨床值。
+            # 無論選到哪個值，皆使用該癌別的 FIGO(ostagep) 碼表進行對照。
+            ostagec_padded = normalize_code(case["其他分期系統期別(臨床分期)"], 4)
+            stage_value = (
+                ostagec
+                if ostagec_padded not in {"", "0000"}
+                else normalize_code(case["其他分期系統期別(病理分期)"])
+            )
+            label = "FIGO(ostagep)"
         matched_stage = period_codes[(period_codes["site"].astype(str).str.strip().str.upper().eq(site))
             & period_codes["ostage"].map(lambda value: normalize_code(value, 2)).eq("01")
             & period_codes["label"].astype(str).str.strip().eq(label)
@@ -140,12 +156,21 @@ def dss_stages(cases, period_codes):
 def dre_stages(cases, period_codes):
     codes = period_codes[(period_codes["site"].astype(str).str.strip() == "C619") & (period_codes["label"] == "DRE(ostagec)")]
     return create_stage_results(cases, codes, "dre",
-        lambda case: str(case["原發部位"]).strip().upper() == "C619" and normalize_code(case["其他分期系統"], 2) == "11",
+        # 2.4 DRE 僅呈現男性攝護腺個案。
+        lambda case: normalize_code(case["性別"]) == "1"
+            and str(case["原發部位"]).strip().upper() == "C619"
+            and normalize_code(case["其他分期系統"], 2) == "11",
         lambda case: normalize_code(case["其他分期系統期別(臨床分期)"]))
 
 # Breast Cancer Prognostic Stage分期
 def breast_stages(cases, period_codes):
-    codes = period_codes[(period_codes["site"].astype(str).str.strip() == "C50") & (period_codes["label"] == "Breast Cancer Prognostic Stage(ostagec/ostagec)")]
+    codes = period_codes[
+        (period_codes["site"].astype(str).str.strip() == "C50")
+        & (
+            period_codes["label"].astype(str).str.strip()
+            == "Breast Cancer Prognostic Stage(ostagep/ostagec)"
+        )
+    ]
     def select_stage(case):
         stage_value = normalize_code(case["其他分期系統期別(病理分期)"])
         return normalize_code(case["其他分期系統期別(臨床分期)"]) if normalize_code(stage_value, 4) == "8888" else stage_value
@@ -318,7 +343,12 @@ def build_stage_report(stage_result, option):
         "detailed": detailed,
         "stage_labels": stage_labels,
         "stage_totals": stage_totals,
-        "sex_rows": [{"sex": label, "values": values} for label, values in sex_values.items()],
+        # 2.4 性別期別規則：只呈現實際有個案的性別，總數為 0 的性別不列入表圖。
+        "sex_rows": [
+            {"sex": label, "values": values}
+            for label, values in sex_values.items()
+            if sum(values) > 0
+        ],
         "age_rows": [{"age": label, "values": age_values[label]} for label, _, _ in AGE_GROUPS],
         "chart_stage_labels": chart_stage_labels,
         "chart_age_rows": [
@@ -365,18 +395,24 @@ def calculate_stage_totals(cases, options, period_codes=None):
 
 
 def _treatment_record(case):
-    def value(*keys):
-        for key in keys:
-            if key in case:
-                return case.get(key)
-        return None
+    """Return treatment fields after CancerRegistry_FieldMap standardization.
+
+    The dashboard prepares these canonical keys from the ``雲醫癌AI模組``
+    mapping before stage/treatment analysis.  The Chinese registry headers
+    remain a compatibility fallback for a directly uploaded registry file.
+    In particular, ``DRET`` is never a fallback for ``drt_1st``.
+    """
+    def value(canonical_key, registry_header):
+        if canonical_key in case:
+            return case.get(canonical_key)
+        return case.get(registry_header)
 
     return {
         "site": value("site", "原發部位"),
         "hist": value("hist", "組織型態"),
         "optype_o": value("optype_o", "外院原發部位手術方式"),
         "optype_h": value("optype_h", "申報醫院原發部位手術方式"),
-        "drt_1st": value("drt_1st", "DRET"),
+        "drt_1st": value("drt_1st", "放射治療開始日期"),
         "rtstatus": value("rtstatus", "放射治療執行狀態"),
         "chem_o": value("chem_o", "外院化學治療"),
         "chem_h": value("chem_h", "申報醫院化學治療"),
@@ -384,12 +420,38 @@ def _treatment_record(case):
         "horm_h": value("horm_h", "申報醫院荷爾蒙/類固醇治療"),
         "immu_o": value("immu_o", "外院免疫治療"),
         "immu_h": value("immu_h", "申報醫院免疫治療"),
-        "htep_h": value("htep_h", "申報醫院骨髓/幹細胞移植或內分泌處置"),
+        "htep_h": value("htep_h", "骨髓/幹細胞移植或內分泌處置"),
         "target_o": value("target_o", "外院標靶治療"),
         "target_h": value("target_h", "申報醫院標靶治療"),
         "other": value("other", "其他治療"),
-        "dtrt_1st": value("dtrt_1st", "DTRT_1ST"),
+        "dtrt_1st": value("dtrt_1st", "首次療程開始日期"),
     }
+
+
+def _available_stage_labels(system, detailed, period_codes):
+    """Return reportable Period_Code labels for an empty stage-treatment table."""
+    label = period_codes["label"].astype(str).str.strip()
+    label_matches = {
+        "AJCC": label.eq("AJCC(pstage/cstage)"),
+        "FIGO": label.str.startswith("FIGO("),
+        "MAC": label.eq("MAC(ostagep)"),
+        "BCLC": label.eq("BCLC(ostagec)"),
+        "SCLC": label.eq("SCLC(ostagec)"),
+        "DSS": label.eq("DSS(ostagec)"),
+        "DRE": label.eq("DRE(ostagec)"),
+        "Breast Cancer Prognostic Stage": label.str.startswith("Breast Cancer Prognostic Stage("),
+        "Binet": label.eq("Binet(ostagec)"),
+    }
+    codes = period_codes.loc[label_matches.get(system, pd.Series(False, index=period_codes.index))]
+    stage_column = "stage_detail" if detailed else "stage_detail_hide"
+    labels = []
+    for _, code in codes.iterrows():
+        if normalize_code(code.get("stage_value")).replace(",", "") in {"888", "8888", "999", "9999"}:
+            continue
+        value = str(code.get(stage_column) or "").strip()
+        if value:
+            labels.append(value)
+    return sorted(set(labels), key=_stage_sort_key)
 
 
 def calculate_stage_first_course_distribution(cases, options, period_codes=None):
@@ -413,23 +475,31 @@ def calculate_stage_first_course_distribution(cases, options, period_codes=None)
         counts = {}
         stage_columns = set()
         excluded_unknown = excluded_not_applicable = excluded_unmapped = 0
+        excluded_unclassified_treatment = 0
         for row in stage_result.get("rows", []):
+            raw_code = _raw_stage_code(row)
             category = row.get("ajcc_stage_category")
-            if category == "Stage Unknown":
-                excluded_unknown += 1
-                continue
-            if category == "Stage Not Applicable":
+            if category == "Stage Not Applicable" or raw_code in {"888", "8888"}:
                 excluded_not_applicable += 1
                 continue
             stage = str(row.get(stage_column) or "").strip()
-            if not stage:
-                excluded_unmapped += 1
+            if category == "Stage Unknown" or raw_code in {"999", "9999"} or not stage:
+                # Keep the same convention as the stage distribution tables:
+                # a blank Period_Code mapping is counted as an unknown stage.
+                excluded_unknown += 1
                 continue
-            treatment = classify_first_course_treatments(_treatment_record(row["case"])) or "未記錄治療"
+            treatment = classify_first_course_treatments(_treatment_record(row["case"]))
+            if not treatment:
+                # A real first-course date without a recognized treatment code
+                # is a data-quality exception, not a treatment category.
+                excluded_unclassified_treatment += 1
+                continue
             stage_columns.add(stage)
             counts.setdefault(treatment, {})[stage] = counts.setdefault(treatment, {}).get(stage, 0) + 1
 
         stage_columns = sorted(stage_columns, key=_stage_sort_key)
+        if not stage_columns:
+            stage_columns = _available_stage_labels(system, detailed, period_codes)
         treatment_rows = [
             {
                 "treatment": treatment,
@@ -449,8 +519,11 @@ def calculate_stage_first_course_distribution(cases, options, period_codes=None)
             "totals": totals,
             "total_count": total_count,
             "percentages": [round(value / total_count * 100, 1) if total_count else 0 for value in totals],
+            "analyzable_count": int(stage_result.get("total_count", len(stage_result.get("rows", [])))),
+            "included_count": total_count,
             "excluded_unknown": excluded_unknown,
             "excluded_not_applicable": excluded_not_applicable,
             "excluded_unmapped": excluded_unmapped,
+            "excluded_unclassified_treatment": excluded_unclassified_treatment,
         })
     return tables

@@ -670,7 +670,7 @@ def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", beh
         diagnosis_selected = calculate_all or bool(
             selected.intersection({"可分析個案與確診個案", "組織型態", "個案分類"})
         )
-        stage_selected = calculate_all or bool(
+        stage_selected = calculate_all or bool(stage_options) or bool(
             selected.intersection({"分期呈現最細碼", "分期不呈現最細碼"})
         )
         treatment_selected = calculate_all or "期別與首次療程" in selected
@@ -805,7 +805,7 @@ def summarize_dashboard_file(filename, behavior="", cancers=None, year_start="",
 
 def compare_dashboard_files(main_filename, target_filename, behavior="", cancers=None, compare_items=None,
                             main_year="", target_year="", main_year_end="", target_year_end="",
-                            compare_mode="single"):
+                            compare_mode="single", stage_options=None):
     main_end = main_year if compare_mode == "single" else (main_year_end or main_year)
     target_end = target_year if compare_mode == "single" else (target_year_end or target_year)
     main_source = _read_dashboard_excel(main_filename)
@@ -839,11 +839,11 @@ def compare_dashboard_files(main_filename, target_filename, behavior="", cancers
         "analysis_data": {
             "main": analyze_dashboard_file(
                 main_filename, cancers or [], main_year, main_end, behavior,
-                compare_items, main_source, main_cols, main_filtered
+                compare_items, main_source, main_cols, main_filtered, stage_options
             ),
             "target": analyze_dashboard_file(
                 target_filename, cancers or [], target_year, target_end, behavior,
-                compare_items, target_source, target_cols, target_filtered
+                compare_items, target_source, target_cols, target_filtered, stage_options
             ),
             "items": compare_items or [],
         },
