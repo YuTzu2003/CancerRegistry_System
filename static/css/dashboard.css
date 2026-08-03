@@ -582,18 +582,11 @@
 
 .annual-stage-report-note {
   margin-top: 6px;
-  padding-left: 12px;
-  color: #111827;
-  font-size: 14px;
-  line-height: 1.55;
 }
 
 /* 期別圖表下方顯示的統計口徑註解 */
 .annual-stage-chart-note {
   margin-top: 6px;
-  color: #111827;
-  font-size: 14px;
-  line-height: 1.55;
   text-align: center;
 }
 

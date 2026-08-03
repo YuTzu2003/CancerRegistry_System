@@ -700,7 +700,10 @@ window.DashboardRenderer.renderStageDistributionReport = function(stageData, yea
                     barMaxWidth: 68,
                     data: data.stage_totals.map(value => Number(percentage(value).toFixed(1))),
                     itemStyle: {
-                        color: '#9A8CD8',
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: '#F4F1FB' },
+                            { offset: 1, color: '#B8AEE3' }
+                        ]),
                         borderColor: '#9A8CD8',
                         borderWidth: 1
                     },
@@ -711,9 +714,7 @@ window.DashboardRenderer.renderStageDistributionReport = function(stageData, yea
                         color: '#4b5563',
                         fontSize: 14,
                         fontWeight: 'bold',
-                        formatter: params => Number(params.value) > 0
-                            ? `${Number(params.value).toFixed(1)}%`
-                            : ''
+                        formatter: params => `${Number(params.value || 0).toFixed(1)}%`
                     }
                 }]
             });
@@ -774,7 +775,9 @@ window.DashboardRenderer.renderStageSexReport = function(stageData, yearTitle, c
                     barMaxWidth: 68,
                     data: row.values.map(value => Number(percentage(value).toFixed(1))),
                     itemStyle: {
-                        color: isMale ? '#5470C6' : '#EE6666',
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, isMale
+                            ? [{ offset: 0, color: '#eef1fb' }, { offset: 1, color: '#5470C6' }]
+                            : [{ offset: 0, color: '#fceeee' }, { offset: 1, color: '#EE6666' }]),
                         borderColor: isMale ? '#5470C6' : '#EE6666',
                         borderWidth: 1
                     },
@@ -909,7 +912,7 @@ window.DashboardRenderer.renderStageAgeReport = function(stageData, yearTitle, c
         /* 圖三：年齡層及期別分布圖 */
         const chartDom = document.getElementById('annualStageAgeChart');
         if (chartDom && typeof echarts !== 'undefined') {
-            const stageColors = ['#5470C6', '#EE6666', '#91CC75', '#9A8CD8', '#F28C45'];
+            const stageColors = ['#5470C6', '#EE6666', '#91CC75', '#9A8CD8', '#F28C45', '#4DB6AC'];
             window.dashboardStageAgeChartInstance?.dispose();
             window.dashboardStageAgeChartInstance = echarts.init(chartDom);
             window.dashboardStageAgeChartInstance.setOption({

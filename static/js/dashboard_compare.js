@@ -1346,7 +1346,7 @@
         <caption>${t(captionKey, titleOptions)}${sourceLine()}</caption>
         <thead>${head}</thead><tbody>${rows}</tbody>
       </table>
-      <div class="annual-stage-report-note text-start">${escapeHtml(stageNote(report))}</div>
+      <div class="annual-stage-report-note small text-secondary mt-2 mb-0 text-start">${escapeHtml(stageNote(report))}</div>
     </div>`;
   }
 
@@ -1360,7 +1360,7 @@
       <div data-compare-view-panel="chart">
         <div id="${chartId}" class="compare-chart compare-stage-chart"></div>
         <div class="compare-chart-caption">${t(figureKey, titleOptions)}</div>
-        <div class="annual-stage-chart-note">${escapeHtml(stageNote(report))}</div>
+        <div class="annual-stage-chart-note small text-secondary mt-2 mb-0">${escapeHtml(stageNote(report))}</div>
       </div>
       <div data-compare-view-panel="table" class="d-none">${stageTableHtml(report, yearTitle, cancerTitle)}</div>`;
   }
@@ -1395,7 +1395,9 @@
           barMaxWidth: 58,
           data: row.values.map(value => Number(percentage(value).toFixed(1))),
           itemStyle: {
-            color: male ? '#5470C6' : '#EE6666',
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, male
+              ? [{ offset: 0, color: '#eef1fb' }, { offset: 1, color: '#5470C6' }]
+              : [{ offset: 0, color: '#fceeee' }, { offset: 1, color: '#EE6666' }]),
             borderColor: male ? '#5470C6' : '#EE6666',
             borderWidth: 1
           },
@@ -1457,7 +1459,7 @@
         series: [...sexSeries, topLabelSeries]
       });
     } else if (report.view === 'age') {
-      const colors = ['#5470C6', '#EE6666', '#91CC75', '#9A8CD8', '#F28C45'];
+      const colors = ['#5470C6', '#EE6666', '#91CC75', '#9A8CD8', '#F28C45', '#4DB6AC'];
       const labels = report.chart_stage_labels;
       chartEl.style.height = '560px';
       chart.setOption({ ...common, tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } }, legend: { top: 55 }, grid: { left: 62, right: 28, top: 95, bottom: 45 },
@@ -1470,7 +1472,14 @@
       chart.setOption({ ...common, tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } }, grid: { left: 58, right: 28, top: 82, bottom: 55 },
         xAxis: { type: 'category', data: report.stage_labels }, yAxis: { type: 'value', min: 0, max: 100, interval: 10, axisLabel: { formatter: '{value}%' } },
         series: [{ type: 'bar', barMaxWidth: 58, data: report.stage_totals.map(value => Number(percentage(value).toFixed(1))),
-          itemStyle: { color: '#9A8CD8', borderColor: '#9A8CD8', borderWidth: 1 },
+          itemStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: '#F4F1FB' },
+              { offset: 1, color: '#B8AEE3' }
+            ]),
+            borderColor: '#9A8CD8',
+            borderWidth: 1
+          },
           label: { show: true, position: 'top', fontSize: 13, fontWeight: 'bold', formatter: params => `${Number(params.value || 0).toFixed(1)}%` } }] });
     }
     setTimeout(() => chart.resize(), 50);
