@@ -573,7 +573,7 @@
 
 /* 年齡層共 15 列，增加高度以避免水平堆疊長條過度擁擠 */
 .annual-stage-age-chart {
-  height: 560px;
+  height: 680px;
 }
 
 .annual-stage-section {
