@@ -697,11 +697,11 @@ window.DashboardRenderer.renderStageDistributionReport = function(stageData, yea
                 series: [{
                     name: this.t('caseRatio'),
                     type: 'bar',
-                    barMaxWidth: 68,
+                    barWidth: 45,
                     data: data.stage_totals.map(value => Number(percentage(value).toFixed(1))),
                     itemStyle: {
-                        color: '#9A8CD8',
-                        borderColor: '#9A8CD8',
+                        color: '#D4B2F6',
+                        borderColor: '#D4B2F6',
                         borderWidth: 1
                     },
                     label: {
@@ -711,9 +711,7 @@ window.DashboardRenderer.renderStageDistributionReport = function(stageData, yea
                         color: '#4b5563',
                         fontSize: 14,
                         fontWeight: 'bold',
-                        formatter: params => Number(params.value) > 0
-                            ? `${Number(params.value).toFixed(1)}%`
-                            : ''
+                        formatter: params => `${Number(params.value || 0).toFixed(1)}%`
                     }
                 }]
             });
@@ -771,7 +769,7 @@ window.DashboardRenderer.renderStageSexReport = function(stageData, yearTitle, c
                     name: sexLabel(row.sex),
                     type: 'bar',
                     stack: 'stage-total',
-                    barMaxWidth: 68,
+                    barWidth: 45,
                     data: row.values.map(value => Number(percentage(value).toFixed(1))),
                     itemStyle: {
                         color: isMale ? '#5470C6' : '#EE6666',
@@ -795,7 +793,7 @@ window.DashboardRenderer.renderStageSexReport = function(stageData, yearTitle, c
             const topLabelSeries = {
                 name: '__stageSexLabels',
                 type: 'bar',
-                barMaxWidth: 68,
+                barWidth: 45,
                 barGap: '-100%',
                 silent: true,
                 z: 10,
@@ -806,8 +804,9 @@ window.DashboardRenderer.renderStageSexReport = function(stageData, yearTitle, c
                     show: true,
                     position: 'top',
                     distance: 4,
-                    fontSize: 13,
-                    fontWeight: 600,
+                    align: 'center',
+                    fontSize: 14,
+                    fontWeight: 'bold',
                     formatter: params => {
                         return [
                             `{female|${Number(params.data.femalePercent || 0).toFixed(1)}%}`,
@@ -815,8 +814,8 @@ window.DashboardRenderer.renderStageSexReport = function(stageData, yearTitle, c
                         ].join('\n');
                     },
                     rich: {
-                        male: { color: '#36558f', fontWeight: 600, lineHeight: 16 },
-                        female: { color: '#b54848', fontWeight: 600, lineHeight: 16 }
+                        male: { color: '#36558f', fontSize: 14, fontWeight: 'bold', lineHeight: 17, width: 45, align: 'center' },
+                        female: { color: '#b54848', fontSize: 14, fontWeight: 'bold', lineHeight: 17, width: 45, align: 'center' }
                     }
                 }
             };
@@ -842,7 +841,13 @@ window.DashboardRenderer.renderStageSexReport = function(stageData, yearTitle, c
                         return `${systemName} ${params[0]?.name || ''}<br/>${lines.join('<br/>')}`;
                     }
                 },
-                legend: { show: false },
+                legend: {
+                    show: true,
+                    data: data.sex_rows.map(row => sexLabel(row.sex)),
+                    top: 52,
+                    left: 'center',
+                    itemGap: 12
+                },
                 toolbox: {
                     right: 16,
                     feature: {
@@ -850,7 +855,7 @@ window.DashboardRenderer.renderStageSexReport = function(stageData, yearTitle, c
                         saveAsImage: { show: true, title: this.t('downloadImage') }
                     }
                 },
-                grid: { left: 70, right: 50, top: 60, bottom: 40, containLabel: true },
+                grid: { left: 70, right: 50, top: 95, bottom: 40, containLabel: true },
                 xAxis: {
                     type: 'category',
                     data: data.stage_labels
@@ -909,7 +914,65 @@ window.DashboardRenderer.renderStageAgeReport = function(stageData, yearTitle, c
         /* 圖三：年齡層及期別分布圖 */
         const chartDom = document.getElementById('annualStageAgeChart');
         if (chartDom && typeof echarts !== 'undefined') {
-            const stageColors = ['#5470C6', '#EE6666', '#91CC75', '#9A8CD8', '#F28C45'];
+            const stageColors = ['#F3AE9F', '#E9CB92', '#C3E4C3', '#A7B9DF', '#C8B0DC'];
+            const ageStagePercentages = chartAgeRows.map(row => {
+                const total = rowTotal(row);
+                return chartStageLabels.map((_, stageIndex) => total > 0
+                    ? Number((row.values[stageIndex] / total * 100).toFixed(1))
+                    : 0);
+            });
+            const smallStageLabelData = [];
+            ageStagePercentages.forEach((values, rowIndex) => {
+                let cumulative = 0;
+                values.forEach((value, stageIndex) => {
+                    if (value > 0 && value <= 3) {
+                        smallStageLabelData.push([
+                            cumulative + value / 2,
+                            chartAgeRows[rowIndex].age,
+                            value,
+                            stageIndex
+                        ]);
+                    }
+                    cumulative += value;
+                });
+            });
+            const smallStageLabelSeries = {
+                name: '__smallStageLabels',
+                type: 'custom',
+                silent: true,
+                tooltip: { show: false },
+                z: 20,
+                data: smallStageLabelData,
+                renderItem: (params, api) => {
+                    const point = api.coord([api.value(0), api.value(1)]);
+                    const stageIndex = Number(api.value(3) || 0);
+                    const horizontalShift = 8;
+                    const lineStartY = point[1] - 10;
+                    const lineEnd = [point[0] + horizontalShift, point[1] - 18];
+                    return {
+                        type: 'group',
+                        children: [
+                            {
+                                type: 'line',
+                                shape: { x1: point[0], y1: lineStartY, x2: lineEnd[0], y2: lineEnd[1] },
+                                style: { stroke: stageColors[stageIndex % stageColors.length], lineWidth: 1.5 }
+                            },
+                            {
+                                type: 'text',
+                                style: {
+                                    text: `${Number(api.value(2)).toFixed(1)}%`,
+                                    x: lineEnd[0],
+                                    y: lineEnd[1] - 2,
+                                    fill: '#4b5563',
+                                    font: '700 11px Arial, sans-serif',
+                                    align: 'center',
+                                    verticalAlign: 'bottom'
+                                }
+                            }
+                        ]
+                    };
+                }
+            };
             window.dashboardStageAgeChartInstance?.dispose();
             window.dashboardStageAgeChartInstance = echarts.init(chartDom);
             window.dashboardStageAgeChartInstance.setOption({
@@ -924,10 +987,11 @@ window.DashboardRenderer.renderStageAgeReport = function(stageData, yearTitle, c
                     trigger: 'axis',
                     axisPointer: { type: 'shadow' },
                     formatter: params => {
-                        const rowIndex = params[0]?.dataIndex ?? 0;
+                        const stageParams = params.filter(item => item.seriesName !== '__smallStageLabels');
+                        const rowIndex = stageParams[0]?.dataIndex ?? 0;
                         const row = chartAgeRows[rowIndex];
                         const total = row ? rowTotal(row) : 0;
-                        const lines = params.map(item => {
+                        const lines = stageParams.map(item => {
                             const count = row?.values[item.seriesIndex] || 0;
                             return `${item.marker}${item.seriesName}: ${this.t('stageTooltipCount', { percent: Number(item.value).toFixed(1), count })}`;
                         });
@@ -959,17 +1023,32 @@ window.DashboardRenderer.renderStageAgeReport = function(stageData, yearTitle, c
                     data: chartAgeRows.map(row => row.age),
                     axisTick: { show: false }
                 },
-                series: chartStageLabels.map((label, stageIndex) => ({
+                series: [...chartStageLabels.map((label, stageIndex) => ({
                     name: label,
                     type: 'bar',
                     stack: 'age-stage-total',
                     barMaxWidth: 22,
-                    itemStyle: { color: stageColors[stageIndex % stageColors.length], opacity: 0.75 },
-                    data: chartAgeRows.map(row => {
-                        const total = rowTotal(row);
-                        return total > 0 ? Number((row.values[stageIndex] / total * 100).toFixed(1)) : 0;
-                    })
-                }))
+                    itemStyle: { color: stageColors[stageIndex % stageColors.length] },
+                    label: {
+                        show: true,
+                        position: 'inside',
+                        align: 'center',
+                        verticalAlign: 'middle',
+                        offset: [0, 1],
+                        color: '#4b5563',
+                        fontSize: 11,
+                        fontFamily: 'Arial, sans-serif',
+                        fontStyle: 'normal',
+                        fontWeight: 700,
+                        lineHeight: 22,
+                        textBorderWidth: 0,
+                        textShadowBlur: 0,
+                        formatter: params => Number(params.value || 0) > 3
+                            ? `${Number(params.value).toFixed(1)}%`
+                            : ''
+                    },
+                    data: ageStagePercentages.map(values => values[stageIndex])
+                })), smallStageLabelSeries]
             });
         }
     };

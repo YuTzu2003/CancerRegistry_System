@@ -271,7 +271,7 @@ def _stage_sort_key(label):
     return (order.get(upper, 999), "", text)
 
 
-def build_stage_report(stage_result, option):
+def build_stage_report(stage_result, option, period_codes=None):
     """把 2.4 分期結果整理成前端三種表圖共用的資料契約。"""
     rows = stage_result.get("rows", [])
     option_name = option.get("option") or option["system"]
@@ -297,7 +297,9 @@ def build_stage_report(stage_result, option):
         else:
             included_rows.append((row, label))
 
-    stage_labels = sorted({label for _, label in included_rows}, key=_stage_sort_key)
+    observed_stage_labels = {label for _, label in included_rows}
+    # 只呈現查詢資料中實際出現的期別，避免空資料欄位使表圖過度展開。
+    stage_labels = sorted(observed_stage_labels, key=_stage_sort_key)
     stage_index = {label: index for index, label in enumerate(stage_labels)}
     stage_totals = [0] * len(stage_labels)
     sex_values = {"男性": [0] * len(stage_labels), "女性": [0] * len(stage_labels)}
@@ -328,7 +330,10 @@ def build_stage_report(stage_result, option):
             if raw_code in {"888", "8888", "999", "9999"} or not label:
                 continue
             chart_rows.append((row, label))
-        chart_stage_labels = sorted({label for _, label in chart_rows}, key=_stage_sort_key)
+        chart_stage_labels = sorted(
+            {label for _, label in chart_rows},
+            key=_stage_sort_key,
+        )
         chart_stage_index = {label: index for index, label in enumerate(chart_stage_labels)}
         chart_age_values = {label: [0] * len(chart_stage_labels) for label, _, _ in AGE_GROUPS}
         for row, label in chart_rows:
@@ -385,7 +390,7 @@ def calculate_stage_reports(cases, options, period_codes=None):
             continue
         if system not in results_by_system:
             results_by_system[system] = STAGE_FUNCTIONS[system](cases, period_codes)
-        reports.append(build_stage_report(results_by_system[system], option))
+        reports.append(build_stage_report(results_by_system[system], option, period_codes))
     return reports
 
 
@@ -449,7 +454,8 @@ def _available_stage_labels(system, detailed, period_codes):
         if normalize_code(code.get("stage_value")).replace(",", "") in {"888", "8888", "999", "9999"}:
             continue
         value = str(code.get(stage_column) or "").strip()
-        if value:
+        if value.lower() not in {"", "nan", "none"}:
+            value = re.sub(r"^Stage\s+", "", value, flags=re.I)
             labels.append(value)
     return sorted(set(labels), key=_stage_sort_key)
 

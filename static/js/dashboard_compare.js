@@ -1346,7 +1346,7 @@
         <caption>${t(captionKey, titleOptions)}${sourceLine()}</caption>
         <thead>${head}</thead><tbody>${rows}</tbody>
       </table>
-      <div class="annual-stage-report-note text-start">${escapeHtml(stageNote(report))}</div>
+      <div class="annual-stage-report-note small text-secondary mt-2 mb-0 text-start">${escapeHtml(stageNote(report))}</div>
     </div>`;
   }
 
@@ -1360,7 +1360,7 @@
       <div data-compare-view-panel="chart">
         <div id="${chartId}" class="compare-chart compare-stage-chart"></div>
         <div class="compare-chart-caption">${t(figureKey, titleOptions)}</div>
-        <div class="annual-stage-chart-note">${escapeHtml(stageNote(report))}</div>
+        <div class="annual-stage-chart-note small text-secondary mt-2 mb-0">${escapeHtml(stageNote(report))}</div>
       </div>
       <div data-compare-view-panel="table" class="d-none">${stageTableHtml(report, yearTitle, cancerTitle)}</div>`;
   }
@@ -1392,7 +1392,7 @@
           name: sexLabel(row.sex),
           type: 'bar',
           stack: 'stage',
-          barMaxWidth: 58,
+          barWidth: 45,
           data: row.values.map(value => Number(percentage(value).toFixed(1))),
           itemStyle: {
             color: male ? '#5470C6' : '#EE6666',
@@ -1407,7 +1407,7 @@
       const topLabelSeries = {
         name: '__stageSexLabels',
         type: 'bar',
-        barMaxWidth: 58,
+        barWidth: 45,
         barGap: '-100%',
         silent: true,
         z: 10,
@@ -1422,8 +1422,9 @@
           show: true,
           position: 'top',
           distance: 4,
+          align: 'center',
           fontSize: 13,
-          fontWeight: 600,
+          fontWeight: 'bold',
           formatter: params => {
             return [
               `{female|${Number(params.data.femalePercent || 0).toFixed(1)}%}`,
@@ -1431,8 +1432,8 @@
             ].join('\n');
           },
           rich: {
-            male: { color: '#36558f', fontWeight: 600, lineHeight: 16 },
-            female: { color: '#b54848', fontWeight: 600, lineHeight: 16 }
+            male: { color: '#36558f', fontSize: 13, fontWeight: 'bold', lineHeight: 16, width: 45, align: 'center' },
+            female: { color: '#b54848', fontSize: 13, fontWeight: 'bold', lineHeight: 16, width: 45, align: 'center' }
           }
         }
       };
@@ -1457,20 +1458,76 @@
         series: [...sexSeries, topLabelSeries]
       });
     } else if (report.view === 'age') {
-      const colors = ['#5470C6', '#EE6666', '#91CC75', '#9A8CD8', '#F28C45'];
+      const colors = ['#F3AE9F', '#E9CB92', '#C3E4C3', '#A7B9DF', '#C8B0DC'];
       const labels = report.chart_stage_labels;
-      chartEl.style.height = '560px';
-      chart.setOption({ ...common, tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } }, legend: { top: 55 }, grid: { left: 62, right: 28, top: 95, bottom: 45 },
+      const ageStagePercentages = report.chart_age_rows.map(row => {
+        const total = (row.values || []).reduce((sumValue, value) => sumValue + Number(value || 0), 0);
+        return labels.map((_, index) => total
+          ? Number((Number(row.values?.[index] || 0) / total * 100).toFixed(1))
+          : 0);
+      });
+      const smallStageLabelData = [];
+      ageStagePercentages.forEach((values, rowIndex) => {
+        let cumulative = 0;
+        values.forEach((value, stageIndex) => {
+          if (value > 0 && value <= 3) {
+            smallStageLabelData.push([
+              cumulative + value / 2,
+              report.chart_age_rows[rowIndex].age,
+              value,
+              stageIndex
+            ]);
+          }
+          cumulative += value;
+        });
+      });
+      const smallStageLabelSeries = {
+        name: '__smallStageLabels',
+        type: 'custom',
+        silent: true,
+        tooltip: { show: false },
+        z: 20,
+        data: smallStageLabelData,
+        renderItem: (params, api) => {
+          const point = api.coord([api.value(0), api.value(1)]);
+          const stageIndex = Number(api.value(3) || 0);
+          const horizontalShift = 8;
+          const lineStartY = point[1] - 10;
+          const lineEnd = [point[0] + horizontalShift, point[1] - 18];
+          return { type: 'group', children: [
+            { type: 'line', shape: { x1: point[0], y1: lineStartY, x2: lineEnd[0], y2: lineEnd[1] }, style: { stroke: colors[stageIndex % colors.length], lineWidth: 1.5 } },
+            { type: 'text', style: { text: `${Number(api.value(2)).toFixed(1)}%`, x: lineEnd[0], y: lineEnd[1] - 2, fill: '#4b5563', font: '700 11px Arial, sans-serif', align: 'center', verticalAlign: 'bottom' } }
+          ] };
+        }
+      };
+      chartEl.style.height = '680px';
+      chart.setOption({ ...common, tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } }, legend: { top: 55, data: labels }, grid: { left: 62, right: 28, top: 95, bottom: 45 },
         xAxis: { type: 'value', min: 0, max: 100, axisLabel: { formatter: '{value}%' } }, yAxis: { type: 'category', data: report.chart_age_rows.map(row => row.age) },
-        series: labels.map((label, index) => ({ name: label, type: 'bar', stack: 'age-stage', data: report.chart_age_rows.map(row => {
-          const total = (row.values || []).reduce((sumValue, value) => sumValue + Number(value || 0), 0);
-          return total ? Number((Number(row.values?.[index] || 0) / total * 100).toFixed(1)) : 0;
-        }), itemStyle: { color: colors[index % colors.length] } })) });
+        series: [...labels.map((label, index) => ({ name: label, type: 'bar', stack: 'age-stage', barMaxWidth: 22, data: ageStagePercentages.map(values => values[index]), itemStyle: { color: colors[index % colors.length] }, label: {
+          show: true,
+          position: 'inside',
+          align: 'center',
+          verticalAlign: 'middle',
+          offset: [0, 1],
+          color: '#4b5563',
+          fontSize: 11,
+          fontFamily: 'Arial, sans-serif',
+          fontStyle: 'normal',
+          fontWeight: 700,
+          lineHeight: 22,
+          textBorderWidth: 0,
+          textShadowBlur: 0,
+          formatter: params => Number(params.value || 0) > 3 ? `${Number(params.value).toFixed(1)}%` : ''
+        } })), smallStageLabelSeries] });
     } else {
       chart.setOption({ ...common, tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } }, grid: { left: 58, right: 28, top: 82, bottom: 55 },
         xAxis: { type: 'category', data: report.stage_labels }, yAxis: { type: 'value', min: 0, max: 100, interval: 10, axisLabel: { formatter: '{value}%' } },
-        series: [{ type: 'bar', barMaxWidth: 58, data: report.stage_totals.map(value => Number(percentage(value).toFixed(1))),
-          itemStyle: { color: '#9A8CD8', borderColor: '#9A8CD8', borderWidth: 1 },
+        series: [{ type: 'bar', barWidth: 45, data: report.stage_totals.map(value => Number(percentage(value).toFixed(1))),
+          itemStyle: {
+            color: '#D4B2F6',
+            borderColor: '#D4B2F6',
+            borderWidth: 1
+          },
           label: { show: true, position: 'top', fontSize: 13, fontWeight: 'bold', formatter: params => `${Number(params.value || 0).toFixed(1)}%` } }] });
     }
     setTimeout(() => chart.resize(), 50);
