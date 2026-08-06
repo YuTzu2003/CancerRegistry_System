@@ -557,7 +557,13 @@
 .annual-stage-chart {
   width: 100%;
   height: 380px;
-  margin-top: 16px;
+  margin-top: 8px;
+}
+
+/* 期別表格註解保留在表格區塊內，避免與下一張圖的標題重疊 */
+#chartPane-StageSummary .annual-report-table-wrap {
+  margin-bottom: 0;
+  padding-bottom: 18px;
 }
 
 /* 將期別圖說拉進 ECharts 畫布底部的預留空間，避免圖與圖說之間留白過大 */
@@ -567,7 +573,7 @@
 
 /* 年齡層共 15 列，增加高度以避免水平堆疊長條過度擁擠 */
 .annual-stage-age-chart {
-  height: 560px;
+  height: 680px;
 }
 
 .annual-stage-section {
@@ -576,18 +582,11 @@
 
 .annual-stage-report-note {
   margin-top: 6px;
-  padding-left: 12px;
-  color: #111827;
-  font-size: 14px;
-  line-height: 1.55;
 }
 
 /* 期別圖表下方顯示的統計口徑註解 */
 .annual-stage-chart-note {
   margin-top: 6px;
-  color: #111827;
-  font-size: 14px;
-  line-height: 1.55;
   text-align: center;
 }
 
@@ -800,4 +799,12 @@
 @media (max-width: 640px) {
   .filter-bar { flex-direction: column; align-items: stretch; }
   .filter-group { min-width: 0; }
+}
+#stageSummaryOptions .col > section {
+    display: flex;
+    flex-direction: column;
+}
+
+#stageSummaryOptions .col > section > .d-flex {
+    margin-top: auto;
 }

@@ -490,6 +490,27 @@
     color: inherit;
     cursor: pointer;
 }
+.compare-stage-chart {
+    height: 420px;
+}
+.compare-stage-table-wrap {
+    overflow-x: auto;
+    padding-bottom: 12px;
+}
+.compare-stage-table-wrap .annual-report-table {
+    min-width: 720px;
+    margin-bottom: 4px;
+}
+.compare-stage-table-wrap .annual-stage-report-note,
+.compare-result-item .annual-stage-chart-note {
+    font-size: 13px;
+    line-height: 1.5;
+}
+.compare-result-item .annual-stage-chart-note {
+    margin-top: 4px;
+    margin-bottom: 18px;
+    text-align: center;
+}
 .compare-stage-options {
     display: none;
 }
@@ -502,6 +523,13 @@
     border-color: var(--border) !important;
     color: var(--muted);
     cursor: not-allowed;
+}
+.compare-stage-option-card {
+    display: flex;
+    flex-direction: column;
+}
+.compare-stage-option-card > .d-flex {
+    margin-top: auto;
 }
 .compare-stage-option-card.is-disabled label,
 .compare-stage-option:disabled {

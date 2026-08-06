@@ -89,6 +89,14 @@ def get_chart_insight_logic(data):
     else:
         def_section = ""
     style_instruction = STYLE_PROMPTS.get(mode_ai, STYLE_PROMPTS["balanced"])
+    treatment_instruction = ""
+    if "期別與首次療程" in field_key or "Stage and First Course Treatment" in field_key:
+        treatment_instruction = """
+            This is a stage-by-treatment cross-tabulation. State the denominator and any
+            excluded cases when supplied. Describe only the largest treatment combinations
+            and meaningful stage patterns. Do not interpret an excluded case as having no
+            treatment, and do not infer treatment effectiveness.
+        """
     prompt = f"""
                 You are a professional medical and oncology data analysis expert.
                 Produce matching Traditional Chinese and English narratives from the same
@@ -99,6 +107,7 @@ def get_chart_insight_logic(data):
                 [Selected Year Range]{selected_year_range}
                 [Data Content]{json.dumps(chart_data, ensure_ascii=False)}
                 [Writing Style]{style_instruction}
+                [Topic Specific Requirements]{treatment_instruction}
 
                 [Analysis Requirements]
                 The content should include:
@@ -127,7 +136,9 @@ def get_chart_insight_logic(data):
             messages=[
                 {"role": "system", "content": "You are a professional cancer-registry data analyst. Return valid bilingual JSON only."},
                 {"role": "user", "content": prompt}
-            ],temperature=0.5
+            ],
+            temperature=0.5,
+            timeout=180.0
         )
         content = response.choices[0].message.content
         insights = _parse_bilingual_insights(content)
@@ -206,7 +217,8 @@ def get_compare_insight_logic(data):
                 {"role": "system", "content": "You are a professional cancer registry data comparison expert. Return professional Traditional Chinese and English narratives as valid JSON."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.3
+            temperature=0.3,
+            timeout=180.0
         )
         content = response.choices[0].message.content
         insights = _parse_bilingual_insights(content)
