@@ -292,7 +292,18 @@
     const validRanges = Number(mainYear.value) <= Number(mainEnd) && Number(targetYear.value) <= Number(targetEnd);
     const isSameFileSamePeriod = mainFile.value === targetFile.value
       && mainYear.value === targetYear.value && mainEnd === targetEnd;
-    return hasBothFilesAndYears && validRanges && !isSameFileSamePeriod;
+    const isSameNationalData = mainFile.value === 'national_age' && targetFile.value === 'national_age';
+    return hasBothFilesAndYears && validRanges && (!isSameFileSamePeriod || isSameNationalData);
+  }
+
+  function isNationalAgeComparison() {
+    // 任一側選用全國彙總檔時，只呈現該檔可提供的性別年齡分布。
+    return mainFile.value === 'national_age' || targetFile.value === 'national_age';
+  }
+
+  function isNationalOnlyComparison() {
+    // 兩側都是全國彙總檔時，沒有性態碼可篩選。
+    return mainFile.value === 'national_age' && targetFile.value === 'national_age';
   }
 
   function fileSelectionsComplete() {
@@ -312,22 +323,32 @@
 
   function setSettingsEnabled() {
     const filesAreReady = filesReady();
-    const behaviorIsReady = filesAreReady && Boolean(behavior.value);
+    const nationalAgeComparison = isNationalAgeComparison();
+    const nationalOnlyComparison = isNationalOnlyComparison();
+    const behaviorIsReady = filesAreReady && (nationalOnlyComparison || Boolean(behavior.value));
     const cancerIsReady = behaviorIsReady && selectedCancerValues().length > 0;
     const behaviorStep = document.getElementById('compareBehaviorStep');
     const cancerStep = document.getElementById('compareCancerStep');
     const analysisStep = document.getElementById('compareAnalysisStep');
 
-    behavior.disabled = !filesAreReady;
-    behaviorStep?.classList.toggle('opacity-50', !filesAreReady);
-    behaviorStep?.classList.toggle('pe-none', !filesAreReady);
+    behavior.disabled = !filesAreReady || nationalOnlyComparison;
+    behaviorStep?.classList.toggle('opacity-50', !filesAreReady || nationalOnlyComparison);
+    behaviorStep?.classList.toggle('pe-none', !filesAreReady || nationalOnlyComparison);
     const cancerPicker = document.getElementById('btnCancerPicker');
     if (cancerPicker) cancerPicker.disabled = !behaviorIsReady;
     cancerStep?.classList.toggle('opacity-50', !behaviorIsReady);
     cancerStep?.classList.toggle('pe-none', !behaviorIsReady);
     document.querySelectorAll('input[name="compareType"], .compare-subitem-check').forEach(input => {
-      input.disabled = !cancerIsReady;
+      // 全國檔只有年齡、合計、男、女，其他分析項目沒有來源欄位。
+      const isNationalAgeItem = input.id === 'compareTypeIncidence' || input.id === 'compareItemGenderAge';
+      input.disabled = !cancerIsReady || (nationalAgeComparison && !isNationalAgeItem);
     });
+    if (nationalAgeComparison && cancerIsReady) {
+      // 選到全國檔後自動固定為性別年齡分布，避免送出不支援的分析項目。
+      document.getElementById('compareTypeIncidence').checked = true;
+      document.getElementById('compareItemGenderAge').checked = true;
+      renderCompareSubItems();
+    }
     document.getElementById('btnSelectAllCompareItems').disabled = !cancerIsReady;
     document.getElementById('btnClearCompareItems').disabled = !cancerIsReady;
     analysisStep?.classList.toggle('opacity-50', !cancerIsReady);
@@ -739,7 +760,9 @@
     const totalCount = sum(total);
     const percentage = value => totalCount ? `${(Number(value || 0) / totalCount * 100).toFixed(1)}%` : '0.0%';
     const cancer = reportCancerTitle(cancerTitle);
+    const noDataNotice = totalCount ? '' : `<div class="alert alert-light border mb-3">${t('noData')}</div>`;
     return `
+      ${noDataNotice}
       ${viewSwitchBlock()}
       <div data-compare-view-panel="chart">
         <div id="${chartId}" class="compare-chart"></div>
@@ -2085,7 +2108,7 @@
     const viewSwitch = container.querySelector('.compare-view-switch');
     const resultHeading = container.closest('.compare-result-item')?.querySelector('.compare-result-heading');
     if (viewSwitch && resultHeading) resultHeading.appendChild(viewSwitch);
-    if (item === '性別年齡分佈') renderSexAgeChart(`${chartPrefix}SexAgeChart`, chartData, sharedScale, meta.year_label, selectedCancerTitle());
+    if (item === '性別年齡分佈') renderSexAgeChart(`${chartPrefix}SexAgeChart`, chartData, null, meta.year_label, selectedCancerTitle());
     if (item === '組織型態') {
       renderHistologyChart(`${chartPrefix}HistologyChart`, chartData, meta.year_label, selectedCancerTitle(), sharedScale);
     }
@@ -2600,7 +2623,7 @@
       showAlert('資料不可相同', '基準期資料與比較期資料不可使用相同檔案及相同年度。');
       return;
     }
-    if (!behavior.value) {
+    if (!isNationalOnlyComparison() && !behavior.value) {
       showAlert('尚未選擇性態碼', '請先選擇性態碼後再開始比較。');
       return;
     }
@@ -2631,7 +2654,8 @@
     if (window.utils && window.utils.showLoading) {
       window.utils.showLoading('資料分析中，請稍候…');
     }
-    const compareItems = selectedCompareItems();
+    // 全國資料由後端依年度與癌別直接彙總，前端只請求性別年齡分布。
+    const compareItems = isNationalAgeComparison() ? ['性別年齡分佈'] : selectedCompareItems();
     const stageOptions = [...selectedCompareStageOptions().options];
     if (compareItems.includes('期別與首次療程')) {
       treatmentStageOptions().forEach(option => {
@@ -2661,7 +2685,7 @@
       .then(r => r.json())
       .then(data => {
         if (!data.ok) throw new Error(data.error || '比較失敗');
-        const items = selectedCompareItems();
+        const items = data.data.analysis_data?.items || selectedCompareItems();
         aiNarrativeCache.clear();
         const treatmentSystems = Array.from(new Set([
           ...(data.data.analysis_data?.main?.stageFirstCourseData || []).map(table => table.system),

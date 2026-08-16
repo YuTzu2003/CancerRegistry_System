@@ -6,58 +6,20 @@ from modules.blueprint.dashboard.reply import get_chart_insight_logic, get_compa
 from modules.blueprint.dashboard.definition.cancer_group_rules import CANCER_GROUP_RULES
 from flask import send_file
 from modules.blueprint.dashboard.export_report import generate_export_files
-from modules.blueprint.dashboard.pbi_settings import (
-    get_pbi_publish_path,
-    get_pbi_publish_settings,
-    save_pbi_publish_path,
-)
+from modules.blueprint.dashboard.pbi_settings import (get_pbi_publish_path,get_pbi_publish_settings,save_pbi_publish_path,)
 import os
 import re
 import logging
 import uuid
 import pandas as pd
 from flask import render_template
+from modules.blueprint.dashboard.national_age_compare import (get_national_age_options,get_national_age_preview,get_national_age_side)
 
 dashboard_bp = Blueprint('dashboard', __name__, template_folder='../blueprint/dashboard/templates')
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DASHBOARD_DATA = os.path.join(BASE_DIR, 'tasks', 'data')
 DASHBOARD_UPLOADS = os.path.join(DASHBOARD_DATA, 'dashboard')
 os.makedirs(DASHBOARD_DATA, exist_ok=True)
-
-def _ensure_dashboard_file_table():
-    conn = get_conn()
-    cursor = conn.cursor()
-    cursor.execute("""
-        IF OBJECT_ID(N'dbo.DashboardFile', N'U') IS NULL
-        BEGIN
-            CREATE TABLE dbo.DashboardFile (
-                FileID NVARCHAR(36) NOT NULL PRIMARY KEY,
-                UserID NVARCHAR(50) NOT NULL,
-                DisplayName NVARCHAR(255) NOT NULL,
-                StoragePath NVARCHAR(512) NULL,
-                CreatedAt DATETIME2 NOT NULL DEFAULT SYSDATETIME()
-            );
-            CREATE INDEX IX_DashboardFile_UserID_CreatedAt
-                ON dbo.DashboardFile (UserID, CreatedAt DESC);
-        END
-        IF COL_LENGTH(N'dbo.DashboardFile', N'StoragePath') IS NULL
-            ALTER TABLE dbo.DashboardFile ADD StoragePath NVARCHAR(512) NULL;
-    """)
-    conn.commit()
-    conn.close()
-    if _dashboard_file_has_stored_name():
-        _migrate_legacy_dashboard_files()
-        _remove_dashboard_stored_name_column()
-
-
-def _dashboard_file_has_stored_name():
-    conn = get_conn()
-    cursor = conn.cursor()
-    cursor.execute("SELECT COL_LENGTH(N'dbo.DashboardFile', N'StoredName')")
-    exists = cursor.fetchone()[0] is not None
-    conn.close()
-    return exists
-
 
 def _dashboard_storage_path(file_id, stored_name):
     return os.path.join('dashboard', str(file_id), str(stored_name))
@@ -71,79 +33,10 @@ def _absolute_dashboard_path(storage_path):
     return file_path
 
 
-def _migrate_legacy_dashboard_files():
-    """Move legacy flat dashboard uploads into one folder per FileID."""
-    conn = get_conn()
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT FileID, StoredName
-        FROM dbo.DashboardFile
-        WHERE StoragePath IS NULL OR StoragePath = ''
-    """)
-    legacy_files = cursor.fetchall()
-    for row in legacy_files:
-        file_id, stored_name = str(row[0]), str(row[1])
-        storage_path = _dashboard_storage_path(file_id, stored_name)
-        legacy_path = os.path.join(DASHBOARD_DATA, stored_name)
-        destination = _absolute_dashboard_path(storage_path)
-        if os.path.isfile(legacy_path):
-            os.makedirs(os.path.dirname(destination), exist_ok=True)
-            os.replace(legacy_path, destination)
-        cursor.execute(
-            "UPDATE dbo.DashboardFile SET StoragePath = ? WHERE FileID = ?",
-            (storage_path, file_id),
-        )
-    conn.commit()
-    conn.close()
-
-
-def _remove_dashboard_stored_name_column():
-    """Remove the legacy physical-filename column after StoragePath migration."""
-    conn = get_conn()
-    cursor = conn.cursor()
-    cursor.execute("""
-        DECLARE @constraint_name SYSNAME;
-        SELECT TOP 1 @constraint_name = kc.name
-        FROM sys.key_constraints kc
-        JOIN sys.index_columns ic
-          ON ic.object_id = kc.parent_object_id AND ic.index_id = kc.unique_index_id
-        JOIN sys.columns c
-          ON c.object_id = ic.object_id AND c.column_id = ic.column_id
-        WHERE kc.parent_object_id = OBJECT_ID(N'dbo.DashboardFile')
-          AND c.name = N'StoredName';
-        IF @constraint_name IS NOT NULL
-            EXEC(N'ALTER TABLE dbo.DashboardFile DROP CONSTRAINT [' + @constraint_name + N']');
-
-        DECLARE @index_name SYSNAME;
-        SELECT TOP 1 @index_name = i.name
-        FROM sys.indexes i
-        JOIN sys.index_columns ic
-          ON ic.object_id = i.object_id AND ic.index_id = i.index_id
-        JOIN sys.columns c
-          ON c.object_id = ic.object_id AND c.column_id = ic.column_id
-        WHERE i.object_id = OBJECT_ID(N'dbo.DashboardFile')
-          AND i.is_primary_key = 0 AND i.is_unique_constraint = 0
-          AND c.name = N'StoredName';
-        IF @index_name IS NOT NULL
-            EXEC(N'DROP INDEX [' + @index_name + N'] ON dbo.DashboardFile');
-
-        IF COL_LENGTH(N'dbo.DashboardFile', N'StoredName') IS NOT NULL
-            ALTER TABLE dbo.DashboardFile DROP COLUMN StoredName;
-    """)
-    conn.commit()
-    conn.close()
-
-
 def _get_uploaded_dashboard_files(user_id):
-    _ensure_dashboard_file_table()
     conn = get_conn()
     cursor = conn.cursor()
-    cursor.execute("""
-        SELECT FileID, DisplayName, CreatedAt
-        FROM dbo.DashboardFile
-        WHERE UserID = ?
-        ORDER BY CreatedAt DESC
-    """, (str(user_id),))
+    cursor.execute("""SELECT FileID, DisplayName, CreatedAt FROM dbo.DashboardFile WHERE UserID = ? ORDER BY CreatedAt DESC """, (str(user_id),))
     files = [
         {
             "id": str(row[0]),
@@ -159,14 +52,9 @@ def _get_uploaded_dashboard_files(user_id):
 def _get_owned_dashboard_file(file_id, user_id):
     if not file_id:
         return None
-    _ensure_dashboard_file_table()
     conn = get_conn()
     cursor = conn.cursor()
-    cursor.execute("""
-        SELECT DisplayName, StoragePath
-        FROM dbo.DashboardFile
-        WHERE FileID = ? AND UserID = ?
-    """, (str(file_id), str(user_id)))
+    cursor.execute("""SELECT DisplayName, StoragePath FROM dbo.DashboardFile WHERE FileID = ? AND UserID = ? """, (str(file_id), str(user_id)))
     row = cursor.fetchone()
     conn.close()
     if not row:
@@ -209,6 +97,7 @@ def compare():
         cancer_name_translations=_get_cancer_name_translations(),
     )
 
+
 @dashboard_bp.route("/dashboard/upload", methods=["POST"])
 @login_required
 def dashboard_upload():
@@ -224,7 +113,6 @@ def dashboard_upload():
     if not filename.strip() or filename == f".{ext}":
         filename = f"uploaded_file.{ext}"
     user_id = session.get("id")
-    _ensure_dashboard_file_table()
     file_id = str(uuid.uuid4())
     storage_name = f"{file_id}{os.path.splitext(filename)[1].lower()}"
     storage_path = _dashboard_storage_path(file_id, storage_name)
@@ -234,10 +122,7 @@ def dashboard_upload():
     try:
         conn = get_conn()
         cursor = conn.cursor()
-        cursor.execute("""
-            INSERT INTO dbo.DashboardFile (FileID, UserID, DisplayName, StoragePath)
-            VALUES (?, ?, ?, ?)
-        """, (file_id, str(user_id), filename, storage_path))
+        cursor.execute("""INSERT INTO dbo.DashboardFile (FileID, UserID, DisplayName, StoragePath) VALUES (?, ?, ?, ?)""", (file_id, str(user_id), filename, storage_path))
         conn.commit()
         conn.close()
     except Exception:
@@ -481,6 +366,16 @@ def save_pbi_settings_route():
 def dashboard_file_years_route():
     data = request.json or {}
     file_id = data.get("file_id", "")
+    if file_id == "national_age":
+        # 「全國癌症年齡統計資料」是系統固定檔案，不在使用者上傳檔案表中。
+        try:
+
+            options = get_national_age_options()
+            preview = get_national_age_preview(data.get("year_start", ""), data.get("year_end", ""))
+            return jsonify({"ok": True, "years": options["years"], "preview": preview}), 200
+        except Exception as error:
+            logging.error("Error reading national age data: %s", error)
+            return jsonify({"ok": False, "error": str(error)}), 500
     year_start = str(data.get("year_start", "")).strip()
     year_end = str(data.get("year_end", "")).strip()
     owned_file = _get_owned_dashboard_file(file_id, session.get("id"))
@@ -520,6 +415,7 @@ def compare_dashboard_files_route():
     cancers = data.get("cancers", [])
     compare_items = data.get("compare_items", [])
     stage_options = data.get("stage_options", [])
+    is_national_compare = main_file_id == "national_age" or target_file_id == "national_age"
     if not isinstance(compare_items, list):
         return jsonify({"ok": False, "error": "分析項目格式錯誤"}), 400
     if not isinstance(stage_options, list):
@@ -533,9 +429,10 @@ def compare_dashboard_files_route():
     if compare_items and any(str(item).endswith("期別") for item in compare_items) and not stage_options:
         return jsonify({"ok": False, "error": "請至少選擇一個分期系統及表圖類型"}), 400
 
-    main_file = _get_owned_dashboard_file(main_file_id, session.get("id"))
-    target_file = _get_owned_dashboard_file(target_file_id, session.get("id"))
-    if not main_file or not target_file:
+    # 全國檔不需使用者檔案所有權驗證；另一側仍依原規則取得使用者上傳檔。
+    main_file = None if main_file_id == "national_age" else _get_owned_dashboard_file(main_file_id, session.get("id"))
+    target_file = None if target_file_id == "national_age" else _get_owned_dashboard_file(target_file_id, session.get("id"))
+    if (main_file_id != "national_age" and not main_file) or (target_file_id != "national_age" and not target_file):
         return jsonify({"ok": False, "error": "請選擇基準期資料與比較期資料"}), 400
     if compare_mode not in {"single", "range"}:
         return jsonify({"ok": False, "error": "比較模式不正確"}), 400
@@ -548,9 +445,9 @@ def compare_dashboard_files_route():
         return jsonify({"ok": False, "error": "年度格式不正確"}), 400
     if int(main_year) > int(main_year_end) or int(target_year) > int(target_year_end):
         return jsonify({"ok": False, "error": "起始年度不可晚於結束年度"}), 400
-    if main_file_id == target_file_id and main_year == target_year and main_year_end == target_year_end:
+    if not is_national_compare and main_file_id == target_file_id and main_year == target_year and main_year_end == target_year_end:
         return jsonify({"ok": False, "error": "同一份 Excel 比較時，基準期間與比較期間不可相同"}), 400
-    if not behavior:
+    if (main_file_id != "national_age" or target_file_id != "national_age") and not behavior:
         return jsonify({"ok": False, "error": "請選擇性態碼"}), 400
     if not cancers:
         return jsonify({"ok": False, "error": "請選擇癌別"}), 400
@@ -558,6 +455,67 @@ def compare_dashboard_files_route():
         return jsonify({"ok": False, "error": "請選擇分析項目"}), 400
 
     try:
+        if is_national_compare:
+            # 任一側是全國彙總檔時，兩側都只組裝性別年齡分布，維持原比較頁的資料格式。
+            from modules.blueprint.dashboard.chart_analytics import (
+                _read_dashboard_excel,
+                analyze_dashboard_file,
+                filter_dashboard_data,
+                get_column_names,
+                get_dashboard_file_years,
+                summarize_dashboard_file,
+            )
+
+
+            def build_local_side(file_info, year, year_end):
+                # 院內檔仍使用既有逐案資料篩選與年齡圖計算，避免改變原本統計規則。
+                source = _read_dashboard_excel(file_info["storage_path"])
+                columns = get_column_names(source)
+                filtered = filter_dashboard_data(source, columns, cancers, year, year_end, behavior)
+                summary = summarize_dashboard_file(
+                    file_info["storage_path"], behavior, cancers, year, year_end,
+                    source, columns, filtered,
+                )
+                analysis = analyze_dashboard_file(
+                    file_info["storage_path"], cancers, year, year_end, behavior,
+                    ["性別年齡分佈"], source, columns, filtered,
+                )
+                return summary, {"genderAgeData": analysis["genderAgeData"]}
+
+            main_summary, main_analysis = (
+                (get_national_age_side(main_year, cancers), None)
+                if main_file_id == "national_age"
+                else build_local_side(main_file, main_year, main_year_end)
+            )
+            target_summary, target_analysis = (
+                (get_national_age_side(target_year, cancers), None)
+                if target_file_id == "national_age"
+                else build_local_side(target_file, target_year, target_year_end)
+            )
+            main_analysis = main_analysis or {"genderAgeData": main_summary.pop("genderAgeData")}
+            target_analysis = target_analysis or {"genderAgeData": target_summary.pop("genderAgeData")}
+            for file_info, year, year_end in ((main_file, main_year, main_year_end), (target_file, target_year, target_year_end)):
+                if file_info:
+                    available_years = get_dashboard_file_years(file_info["storage_path"])
+                    if int(year) not in available_years or int(year_end) not in available_years:
+                        return jsonify({"ok": False, "error": "所選年度不存在於院內 Excel"}), 400
+            diff = target_summary["total_count"] - main_summary["total_count"]
+            result = {
+                "main": main_summary,
+                "target": target_summary,
+                "analysis_data": {
+                    "main": main_analysis,
+                    "target": target_analysis,
+                    "items": ["性別年齡分佈"],
+                },
+                "compare_mode": "single",
+                "diff": {
+                    "total_count": diff,
+                    "total_percent": f"{diff / main_summary['total_count'] * 100:.1f}%" if main_summary["total_count"] else "",
+                    "annual_average": diff,
+                },
+            }
+            return jsonify({"ok": True, "data": result}), 200
         from modules.blueprint.dashboard.chart_analytics import compare_dashboard_files, get_dashboard_file_years
         main_years = get_dashboard_file_years(main_file["storage_path"])
         target_years = get_dashboard_file_years(target_file["storage_path"])
@@ -570,6 +528,9 @@ def compare_dashboard_files_route():
             main_year, target_year, main_year_end, target_year_end, compare_mode, stage_options
         )
         return jsonify({"ok": True, "data": result}), 200
+    except ValueError as e:
+        logging.error(f"Error comparing dashboard files: {e}")
+        return jsonify({"ok": False, "error": f"無數據：{e}"}), 400
     except Exception as e:
         logging.error(f"Error comparing dashboard files: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500

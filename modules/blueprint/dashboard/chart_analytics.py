@@ -66,7 +66,6 @@ def get_column_names(df):
     }
 
 # 性別年齡分布圖
-
 def _empty_dashboard_response(message="查無符合條件資料！", histology_reason=""):
     labels = ['≦19', '20-24', '25-29', '30-34', '35-39', '40-44', '45-49', '50-54', '55-59', '60-64', '65-69', '70-74', '75-79', '80-84', '≧85']
     return {
@@ -175,14 +174,15 @@ def calculate_gender_age_distribution(df, cols):
         df_ga = df[[gender_col, age_col]].dropna()
         df_ga[age_col] = pd.to_numeric(df_ga[age_col], errors='coerce')
         df_ga = df_ga.dropna(subset=[age_col])
-        df_ga[gender_col] = df_ga[gender_col].astype(str)
+        # 同時接受數字、中文與英文性別值，避免資料表有個案但年齡圖未計入。
+        df_ga[gender_col] = df_ga[gender_col].astype(str).str.strip().str.upper()
         
         bins = [0, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 150]
         df_ga['AgeGroup'] = pd.cut(df_ga[age_col], bins=bins, labels=labels, right=False)
         
         for idx, label in enumerate(labels):
-            m_count = len(df_ga[(df_ga['AgeGroup'] == label) & (df_ga[gender_col].isin(['1', '1.0', '男']))])
-            f_count = len(df_ga[(df_ga['AgeGroup'] == label) & (df_ga[gender_col].isin(['2', '2.0', '女']))])
+            m_count = len(df_ga[(df_ga['AgeGroup'] == label) & (df_ga[gender_col].isin(['1', '1.0', '男', 'M', 'MALE']))])
+            f_count = len(df_ga[(df_ga['AgeGroup'] == label) & (df_ga[gender_col].isin(['2', '2.0', '女', 'F', 'FEMALE']))])
             gender_age_data["male"][idx] = m_count
             gender_age_data["female"][idx] = f_count
             gender_age_data["total"][idx] = m_count + f_count
