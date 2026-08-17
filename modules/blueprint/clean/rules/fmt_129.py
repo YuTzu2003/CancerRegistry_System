@@ -1774,7 +1774,7 @@ RULES = {
         'field': 'Site-Specific Factor 6',
         'length': 3,
         'patterns': [
-                        {'name': '肺癌', 'regex': r'^[A-Z]\d{2}$'},
+                        {'name': '肺癌', 'regex': r'^[A-Z]{3}$'},
                         {'name': '一般癌別', 'regex': r'^\d{3}$'},
         ],
         'description': '記錄與癌症預後和治療決策有關之癌症部位特定因子',
