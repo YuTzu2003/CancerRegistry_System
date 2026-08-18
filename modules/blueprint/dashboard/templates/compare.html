@@ -39,6 +39,7 @@
         <label class="compare-label" for="mainCompareFile">主要 Excel</label>
         <select id="mainCompareFile" class="form-select">
           <option value="" selected disabled>選擇主要檔案...</option>
+          <option value="national_age">全國癌症年齡統計資料</option>
           {% for f in uploaded_files %}
           <option value="{{ f.id }}">{{ f.name }}</option>
           {% endfor %}
@@ -78,6 +79,7 @@
         <label class="compare-label" for="targetCompareFile">比較 Excel</label>
         <select id="targetCompareFile" class="form-select">
           <option value="" selected disabled>選擇比較檔案...</option>
+          <option value="national_age">全國癌症年齡統計資料</option>
           {% for f in uploaded_files %}
           <option value="{{ f.id }}">{{ f.name }}</option>
           {% endfor %}

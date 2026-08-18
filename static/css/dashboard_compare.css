@@ -391,6 +391,12 @@
     align-items: flex-start;
     row-gap: 0;
 }
+.compare-summary-national-detail {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: flex-start;
+    row-gap: 0;
+}
 .compare-summary-period-arrow {
     margin-right: 4px;
 }
