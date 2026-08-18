@@ -1953,9 +1953,12 @@
     const targetAge = targetAnalysis.ageMedianData || {};
     const mainGender = normalizeGenderAgeData(mainAnalysis.genderAgeData || {});
     const targetGender = normalizeGenderAgeData(targetAnalysis.genderAgeData || {});
-    const changes = targetGender.categories.map((label, index) => {
-      const mainCount = Number(mainGender.total[index] || 0);
-      const targetCount = Number(targetGender.total[index] || 0);
+    const mainCountByAge = new Map(mainGender.categories.map((label, index) => [label, Number(mainGender.total[index] || 0)]));
+    const targetCountByAge = new Map(targetGender.categories.map((label, index) => [label, Number(targetGender.total[index] || 0)]));
+    const ageLabels = [...new Set([...mainGender.categories, ...targetGender.categories])];
+    const changes = ageLabels.map(label => {
+      const mainCount = Number(mainCountByAge.get(label) || 0);
+      const targetCount = Number(targetCountByAge.get(label) || 0);
       return { label, mainCount, targetCount, value: targetCount - mainCount };
     });
     const biggest = changes.sort((a, b) => Math.abs(b.value) - Math.abs(a.value))[0]
@@ -2024,6 +2027,89 @@
     const targetPeriodLabel = escapeHtml(formatPeriod(data.target?.year_label, '比較期', 'Comparison'));
     const rangePeriodComparison = (prefix, mainText, targetText) => `<span class="compare-summary-period-main">${prefix}${mainText}</span><span class="compare-summary-period-target"><span class="compare-summary-period-arrow">→</span>${targetText}</span>`;
     const valueClass = value => Number(value) > 0 ? 'is-up' : Number(value) < 0 ? 'is-down' : 'is-flat';
+    if (data.comparison_scope === 'national') {
+      const sourceTypes = data.source_types || {};
+      const sourceName = side => sourceTypes[side] === 'national'
+        ? summaryText('全國', 'National')
+        : summaryText('院內', 'Hospital');
+      const sourceYear = side => {
+        const period = side === 'main' ? data.main : data.target;
+        const year = summaryPeriod(period?.year_label, side === 'main' ? '基準期' : '比較期', side === 'main' ? 'Baseline' : 'Comparison');
+        return isEnglish() ? `${sourceName(side)} (${year})` : `${sourceName(side)}（${year}）`;
+      };
+      const percentagePointChangeText = difference => {
+        if (Math.abs(difference) < 0.05) return summaryText('無變化 —', 'No change —');
+        return difference > 0
+          ? summaryText(`上升${Math.abs(difference).toFixed(1)}個百分點 ▲`, `Increase by ${Math.abs(difference).toFixed(1)} percentage points ▲`)
+          : summaryText(`下降${Math.abs(difference).toFixed(1)}個百分點 ▼`, `Decrease by ${Math.abs(difference).toFixed(1)} percentage points ▼`);
+      };
+      const ageShareRows = ageLabels.map(label => {
+        const mainCount = Number(mainCountByAge.get(label) || 0);
+        const targetCount = Number(targetCountByAge.get(label) || 0);
+        const mainShare = mainAgeGroupTotal ? mainCount / mainAgeGroupTotal * 100 : 0;
+        const targetShare = targetAgeGroupTotal ? targetCount / targetAgeGroupTotal * 100 : 0;
+        return { label, mainCount, targetCount, mainShare, targetShare, difference: targetShare - mainShare };
+      });
+      const largestAgeShare = ageShareRows.sort(
+        (a, b) => Math.abs(b.difference) - Math.abs(a.difference)
+          || (b.mainCount + b.targetCount) - (a.mainCount + a.targetCount)
+      )[0] || { label: '—', mainCount: 0, targetCount: 0, mainShare: 0, targetShare: 0, difference: 0 };
+      const mainMaleCount = mainGender.male.reduce((sum, value) => sum + Number(value || 0), 0);
+      const targetMaleCount = targetGender.male.reduce((sum, value) => sum + Number(value || 0), 0);
+      const mainFemaleCount = mainGender.female.reduce((sum, value) => sum + Number(value || 0), 0);
+      const targetFemaleCount = targetGender.female.reduce((sum, value) => sum + Number(value || 0), 0);
+      const mainSexTotal = mainMaleCount + mainFemaleCount;
+      const targetSexTotal = targetMaleCount + targetFemaleCount;
+      const nationalSide = sourceTypes.main === 'national' ? 'main' : sourceTypes.target === 'national' ? 'target' : '';
+      const hospitalSide = sourceTypes.main === 'hospital' ? 'main' : sourceTypes.target === 'hospital' ? 'target' : '';
+      const nationalTotal = Number(nationalSide ? data[nationalSide]?.total_count : 0);
+      const hospitalTotal = Number(hospitalSide ? data[hospitalSide]?.total_count : 0);
+      const hospitalNationalShare = nationalTotal ? hospitalTotal / nationalTotal * 100 : 0;
+      const mainMaleDistribution = mainSexTotal ? mainMaleCount / mainSexTotal * 100 : 0;
+      const targetMaleDistribution = targetSexTotal ? targetMaleCount / targetSexTotal * 100 : 0;
+      const mainFemaleDistribution = mainSexTotal ? mainFemaleCount / mainSexTotal * 100 : 0;
+      const targetFemaleDistribution = targetSexTotal ? targetFemaleCount / targetSexTotal * 100 : 0;
+      const maleDistributionDiff = targetMaleDistribution - mainMaleDistribution;
+      const femaleDistributionDiff = targetFemaleDistribution - mainFemaleDistribution;
+      const firstCard = nationalSide && hospitalSide
+        ? `
+          <div class="compare-summary-label">${summaryText('院內個案占全國比例', 'Hospital Share of National Cases')}</div>
+          <div class="compare-summary-value is-flat">${summaryText('占全國 ', 'Accounts for ')}${hospitalNationalShare.toFixed(1)}%</div>
+          <div class="compare-summary-period-detail">${summaryText('院內', 'Hospital')} ${summaryCount(hospitalTotal)}／${summaryText('全國', 'National')} ${summaryCount(nationalTotal)}</div>`
+        : `
+          <div class="compare-summary-label">${summaryText('全國個案數差異', 'National Case Difference')}</div>
+          <div class="compare-summary-value ${valueClass(totalDiff)}">${changeNumberText(totalDiff, '人')}${summaryParentheses(signedPercentText(data.main?.total_count, data.target?.total_count))}</div>
+          <div class="compare-summary-period-detail">${sourceYear('main')} ${summaryCount(data.main?.total_count)} → ${sourceYear('target')} ${summaryCount(data.target?.total_count)}</div>`;
+      document.getElementById('compareResultSummary').innerHTML = `
+        <div class="compare-summary-card">
+          ${firstCard}
+        </div>
+        <div class="compare-summary-card">
+          <div class="compare-summary-label">${summaryText('年齡層占比最大差異', 'Largest Age Distribution Difference')}</div>
+          <div class="compare-summary-age-row">
+            <span class="compare-summary-age-group">${escapeHtml(formatAgeGroup(largestAgeShare.label))}</span>
+            <span class="compare-summary-age-change ${valueClass(largestAgeShare.difference)}">${percentagePointChangeText(largestAgeShare.difference)}</span>
+          </div>
+          <div class="compare-summary-period-values compare-summary-period-comparison compare-summary-national-detail">${rangePeriodComparison('', `${sourceYear('main')} ${summaryCount(largestAgeShare.mainCount)}${summaryParentheses(`${largestAgeShare.mainShare.toFixed(1)}%`)}`, `${sourceYear('target')} ${summaryCount(largestAgeShare.targetCount)}${summaryParentheses(`${largestAgeShare.targetShare.toFixed(1)}%`)}`)}</div>
+        </div>
+        <div class="compare-summary-card">
+          <div class="compare-summary-label">${summaryText('性別分布差異', 'Sex Distribution Difference')}</div>
+          <div class="compare-summary-gender-primary">
+            <span class="${valueClass(maleDistributionDiff)}">${summaryText('男', 'Male')} ${percentagePointChangeText(maleDistributionDiff)}</span>
+            <span class="compare-summary-divider">｜</span>
+            <span class="${valueClass(femaleDistributionDiff)}">${summaryText('女', 'Female')} ${percentagePointChangeText(femaleDistributionDiff)}</span>
+          </div>
+          <div class="compare-summary-period-detail compare-summary-period-comparison compare-summary-national-detail">${rangePeriodComparison(summaryText('男：', 'Male: '), `${sourceYear('main')} ${summaryCount(mainMaleCount)}${summaryParentheses(`${mainMaleDistribution.toFixed(1)}%`)}`, `${sourceYear('target')} ${summaryCount(targetMaleCount)}${summaryParentheses(`${targetMaleDistribution.toFixed(1)}%`)}`)}</div>
+          <div class="compare-summary-period-detail compare-summary-period-detail-next compare-summary-period-comparison compare-summary-national-detail">${rangePeriodComparison(summaryText('女：', 'Female: '), `${sourceYear('main')} ${summaryCount(mainFemaleCount)}${summaryParentheses(`${mainFemaleDistribution.toFixed(1)}%`)}`, `${sourceYear('target')} ${summaryCount(targetFemaleCount)}${summaryParentheses(`${targetFemaleDistribution.toFixed(1)}%`)}`)}</div>
+        </div>
+        <div class="compare-summary-card">
+          <div class="compare-summary-label">${summaryText('中位年齡層差異（依全體個案的年齡層分布判定）', 'Median Age Group Difference (based on the age distribution of all cases)')}</div>
+          <div class="compare-summary-median-change ${valueClass(medianGroupDiff)}">${medianGroupChangeText}</div>
+          <div class="compare-summary-median-period">${sourceYear('main')} ${escapeHtml(mainMedianGroup.label)} → ${sourceYear('target')} ${escapeHtml(targetMedianGroup.label)}</div>
+        </div>
+      `;
+      return;
+    }
     if (data.compare_mode === 'range') {
       const periodYearCount = period => Number(period?.year_count || 0)
         || Object.keys(period?.yearly_counts || {}).length

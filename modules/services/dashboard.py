@@ -503,6 +503,11 @@ def compare_dashboard_files_route():
             result = {
                 "main": main_summary,
                 "target": target_summary,
+                "comparison_scope": "national",
+                "source_types": {
+                    "main": "national" if main_file_id == "national_age" else "hospital",
+                    "target": "national" if target_file_id == "national_age" else "hospital",
+                },
                 "analysis_data": {
                     "main": main_analysis,
                     "target": target_analysis,
