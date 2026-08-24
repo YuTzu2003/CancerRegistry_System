@@ -29,7 +29,9 @@ TREATMENT_ORDER = [
     "待確認",
 ]
 
-SURGERY_RANGES = [(20, 90), (200, 900)]
+# 年報定義的一般手術碼，另有 2M／2E 等非純數字的內視鏡術式。
+SURGERY_RANGES = [(10, 90), (100, 900)]
+SURGERY_EXACT_CODES = {"2M", "2M0", "2E", "2E0"}
 SURGERY_EXCEPTIONS = (
     ("C619", [(21, 23), (25, 25), (210, 230), (250, 250)], "TURP"),
     ("C67", [(27, 27), (270, 270)], "TURBT"),
@@ -54,7 +56,6 @@ LYMPHOID_HISTOLOGY_RANGES = [(9590, 9993)]
 RADIOTHERAPY_DRT_EXCLUDED = {"", "0", "00000000", "88888888", "99999999"}
 # Excel may read registry codes such as 00 and 09 as numbers 0 and 9.
 RADIOTHERAPY_STATUS_CODES = {0, 6, 9, 10}
-OBSERVATION_OR_NO_TREATMENT_CODE = "00000000"
 TREATMENT_CONFLICT_LABEL = "待確認"
 
 
@@ -96,6 +97,16 @@ def has_any_code(value_o, value_h, ranges):
     return in_ranges(value_o, ranges) or in_ranges(value_h, ranges)
 
 
+def is_surgery_code(value):
+    """Return whether a primary-site operation code is a general surgery code."""
+    code = normalize_text(value).upper()
+    return code in SURGERY_EXACT_CODES or in_ranges(value, SURGERY_RANGES)
+
+
+def has_any_surgery_code(value_o, value_h):
+    return is_surgery_code(value_o) or is_surgery_code(value_h)
+
+
 def classify_surgery_items(site, optype_o, optype_h):
     """判定手術及特殊局部治療；特殊項目不會同時被列為一般手術。"""
     exceptions = {
@@ -105,7 +116,7 @@ def classify_surgery_items(site, optype_o, optype_h):
     }
     if exceptions:
         return exceptions
-    return {"手術"} if has_any_code(optype_o, optype_h, SURGERY_RANGES) else set()
+    return {"手術"} if has_any_surgery_code(optype_o, optype_h) else set()
 
 
 def classify_chemotherapy_items(site, chem_o, chem_h):
@@ -126,8 +137,42 @@ def has_radiotherapy(drt_1st, rtstatus):
     )
 
 
-def is_observation_or_no_treatment(dtrt_1st):
-    return normalize_date_code(dtrt_1st) == OBSERVATION_OR_NO_TREATMENT_CODE
+def is_zero_treatment_code(value):
+    """Treat 0, 00 and 000 as the registry's no-treatment code."""
+    return normalize_number(value) == 0
+
+
+def is_prostate_turp(record):
+    """Return whether a prostate case meets the TURP surgical exception."""
+    return (
+        site_starts_with(record.get("site"), "C619")
+        and has_any_code(record.get("optype_o"), record.get("optype_h"), [
+            (21, 23), (25, 25), (210, 230), (250, 250),
+        ])
+    )
+
+
+def is_observation_or_no_treatment(record):
+    """Determine no-treatment status from case, diagnosis and treatment classes.
+
+    Rule 11 applies when either ``class/class_d/class_t`` is ``1/1/4`` or
+    ``2/2/4``.  A prostate TURP code is an explicit surgical exception and
+    remains a treatment rather than observation/no treatment.
+    """
+    get = record.get
+    is_no_treatment_class = (
+        (
+            normalize_number(get("class")) == 1
+            and normalize_number(get("class_d")) == 1
+            and normalize_number(get("class_t")) == 4
+        )
+        or (
+            normalize_number(get("class")) == 2
+            and normalize_number(get("class_d")) == 2
+            and normalize_number(get("class_t")) == 4
+        )
+    )
+    return is_no_treatment_class and not is_prostate_turp(record)
 
 
 def is_prostate_turp_and_surgery_combination(site, optype_o, optype_h):
@@ -144,9 +189,9 @@ def is_prostate_turp_and_surgery_combination(site, optype_o, optype_h):
 def classify_treatment_items(record):
     """依全部規則回傳排序後的治療項目清單。
 
-    record 需提供下列標準鍵：site、hist、optype_o、optype_h、drt_1st、
-    rtstatus、chem_o、chem_h、horm_o、horm_h、immu_o、immu_h、htep_h、
-    target_o、target_h、other、dtrt_1st。
+    record 需提供下列標準鍵：class、class_d、class_t、site、hist、optype_o、
+    optype_h、drt_1st、rtstatus、chem_o、chem_h、horm_o、horm_h、immu_o、
+    immu_h、htep_h、target_o、target_h、other、dtrt_1st。
     """
     treatments = set()
     get = record.get
@@ -180,11 +225,7 @@ def classify_treatment_items(record):
     if in_ranges(get("other"), OTHER_TREATMENT_RANGES):
         treatments.add("其他治療")
 
-    # DTRT_1ST 為 00000000 時，理論上不應存在任何首次癌症治療。
-    # 若治療欄位仍符合其他定義，保留資料矛盾訊號，供年報表格另外列示或追查。
-    if is_observation_or_no_treatment(get("dtrt_1st")):
-        if treatments:
-            return [TREATMENT_CONFLICT_LABEL]
+    if is_observation_or_no_treatment(record):
         return ["密切觀察或不予治療"]
 
     return [item for item in TREATMENT_ORDER if item in treatments]
@@ -194,14 +235,10 @@ def classify_first_course_treatment_items(record):
     """回傳「期別與首次療程」表專用的治療組合。
 
     攝護腺 C619 個案在外院術式為 22、申報醫院術式為 30 時，同時列示
-    TURP 與手術。若 DTRT_1ST 為 00000000 卻仍有治療，則標示為待確認。
+    TURP 與手術。若所有指定治療欄位均為未治療碼，則列為密切觀察或不予治療。
     """
     normalized_record = dict(record)
-    observation_or_no_treatment = is_observation_or_no_treatment(
-        normalized_record.get("dtrt_1st")
-    )
-    # 先排除觀察碼，以辨識是否同時出現其他治療欄位。
-    normalized_record["dtrt_1st"] = ""
+    observation_or_no_treatment = is_observation_or_no_treatment(normalized_record)
     treatments = set(classify_treatment_items(normalized_record))
 
     if is_prostate_turp_and_surgery_combination(
@@ -212,7 +249,7 @@ def classify_first_course_treatment_items(record):
         treatments.update({"TURP", "手術"})
 
     if observation_or_no_treatment:
-        return [TREATMENT_CONFLICT_LABEL] if treatments else ["密切觀察或不予治療"]
+        return ["密切觀察或不予治療"]
 
     return [item for item in TREATMENT_ORDER if item in treatments]
 

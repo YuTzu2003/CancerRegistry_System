@@ -413,6 +413,9 @@ def _treatment_record(case):
         return case.get(registry_header)
 
     return {
+        "class": value("class", "個案分類"),
+        "class_d": value("class_d", "診斷狀態分類"),
+        "class_t": value("class_t", "治療狀態分類"),
         "site": value("site", "原發部位"),
         "hist": value("hist", "組織型態"),
         "optype_o": value("optype_o", "外院原發部位手術方式"),
