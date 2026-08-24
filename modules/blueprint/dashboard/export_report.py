@@ -65,6 +65,25 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir, expo
             .annual-report-table th, .annual-report-table td { 
                 border: 1px solid #ccc; padding: 4px; text-align: center; vertical-align: middle;
             }
+            /* Keep the histology table consistent in Chinese and English exports. */
+            .annual-histology-table { table-layout: fixed; }
+            .annual-histology-table .annual-histology-code-col,
+            .annual-histology-table th:nth-child(1),
+            .annual-histology-table td:nth-child(1) { width: 20%; }
+            .annual-histology-table .annual-histology-name-col,
+            .annual-histology-table th:nth-child(2),
+            .annual-histology-table td:nth-child(2) { width: 50%; }
+            .annual-histology-table .annual-histology-count-col,
+            .annual-histology-table th:nth-child(3),
+            .annual-histology-table td:nth-child(3) { width: 13%; }
+            .annual-histology-table .annual-histology-percent-col,
+            .annual-histology-table th:nth-child(4),
+            .annual-histology-table td:nth-child(4) { width: 17%; }
+            .annual-histology-table td:nth-child(2) {
+                text-align: left;
+                overflow-wrap: anywhere;
+                word-break: break-word;
+            }
             .annual-report-table caption { font-weight: bold; font-size: 14px; margin-bottom: 10px; }
             .annual-report-table:has(+ .annual-stage-report-note) { margin-bottom: 4px; }
             #annualHistologyTableNote { color: #dc3545 !important; font-size: 10px !important; margin-top: -14px !important; margin-bottom: 8px !important; }
@@ -202,6 +221,10 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir, expo
                     
                 table_node = sec.find('table', class_='annual-report-table')
                 if table_node:
+                    table_classes = table_node.get('class', [])
+                    if isinstance(table_classes, str):
+                        table_classes = table_classes.split()
+                    is_histology_table = 'annual-histology-table' in table_classes
                     caption = table_node.find('caption')
                     if caption:
                         doc.add_paragraph(caption.get_text(separator='\n').strip())
@@ -227,9 +250,6 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir, expo
                                 if isinstance(cell_classes, str): cell_classes = cell_classes.split()
                                 row_classes = row.get('class', [])
                                 if isinstance(row_classes, str): row_classes = row_classes.split()
-                                table_classes = table_node.get('class', [])
-                                if isinstance(table_classes, str): table_classes = table_classes.split()
-                                
                                 all_classes = table_classes + row_classes + cell_classes
                                 
                                 style_str = (cell.get('style', '') or '') + ';' + (row.get('style', '') or '')
@@ -269,6 +289,13 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir, expo
                         if max_cols > 0:
                             w_table = doc.add_table(rows=len(rows), cols=max_cols)
                             w_table.style = 'Table Grid'
+                            if is_histology_table and max_cols == 4:
+                                # Match the fixed 20 / 50 / 13 / 17 percent layout used in the PDF.
+                                w_table.autofit = False
+                                histology_widths = [Inches(1.8), Inches(4.5), Inches(1.17), Inches(1.53)]
+                                for row in w_table.rows:
+                                    for col_idx, width in enumerate(histology_widths):
+                                        row.cells[col_idx].width = width
                             
                             # Apply merges
                             merged_cells = set()

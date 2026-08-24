@@ -218,8 +218,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }
           },
           grid: {
-            left: 500,
-            right: 60,
+            left: 410,
+            right: 125,
             bottom: 50,
             top: 60,
             containLabel: false
@@ -249,15 +249,15 @@ document.addEventListener('DOMContentLoaded', function() {
             data: [], 
             inverse: true,
             axisLabel: {
-              width: 420,
+              width: 350,
               align: 'right',
-              margin: 20,
+              margin: 16,
               formatter: function(value) {
-                return window.DashboardRenderer.rightAlignedAxisLabel(value);
+                return window.DashboardRenderer.histologyAxisLabel(value);
               },
               rich: {
-                right: { width: 420, align: 'right', lineHeight: 18, fontSize: 12 },
-                bracket: { width: 420, align: 'right', lineHeight: 18, fontSize: 10.5 }
+                right: { width: 350, align: 'right', lineHeight: 18, fontSize: 12 },
+                bracket: { width: 350, align: 'right', lineHeight: 18, fontSize: 10.5 }
               }
             }
           },
@@ -1256,6 +1256,21 @@ window.DashboardRenderer.renderColonHistologyTableNote = function(histologyWarni
     };
 
 /* ── 組織型態分佈表 ── */
+window.DashboardRenderer.histologyDisplayName = function(item) {
+        const isEnglish = window.DashboardI18n?.getLanguage() === 'en';
+        return isEnglish
+            ? (item?.name_en || item?.name || '')
+            : (item?.name_zh || item?.name || '');
+    };
+
+window.DashboardRenderer.histologyAxisLabel = function(value) {
+        const text = String(value ?? '').replace(/\s*\n\s*/g, ' ').trim();
+        // 原位癌後綴屬於名稱的一部分，中文與英文皆固定同一列。
+        return /[\u3400-\u9fff]/.test(text) || /\(in situ\)$/i.test(text)
+            ? `{right|${text}}`
+            : this.rightAlignedAxisLabel(text);
+    };
+
 window.DashboardRenderer.renderHistologyTable = function(histologyData, yearTitle, cancerTitle, noDataReason = '') {
         const body = document.getElementById('annualHistologyTableBody');
         const caption = document.getElementById('annualHistologyCaption');
@@ -1280,7 +1295,7 @@ window.DashboardRenderer.renderHistologyTable = function(histologyData, yearTitl
             return `
                 <tr>
                     <td>${item.code}</td>
-                    <td class="text-start">${item.name}</td>
+                    <td class="text-start">${this.escapeHtml(this.histologyDisplayName(item))}</td>
                     <td>${item.count}</td>
                     <td>${pct}%</td>
                 </tr>
@@ -1872,7 +1887,7 @@ window.DashboardRenderer.updateHistologyChart = function(histologyData, noDataRe
         const validData = histologyData.filter(item => item.name !== 'Unknown / 未對應組織型態');
         const totalValid = validData.reduce((sum, item) => sum + item.count, 0);
         const topData = [...validData].reverse();
-        const categories = topData.map(item => item.name);
+        const categories = topData.map(item => this.histologyDisplayName(item));
         const chartSeriesData = topData.map(item => ({
             value: totalValid > 0 ? Number(((item.count / totalValid) * 100).toFixed(1)) : 0,
             count: item.count

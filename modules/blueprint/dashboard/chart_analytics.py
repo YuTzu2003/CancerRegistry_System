@@ -4,8 +4,13 @@ import logging
 from functools import lru_cache
 from modules.blueprint.dashboard.definition.cancer_grouping import classify_cancer_group
 from modules.blueprint.dashboard.definition.cancer_group_rules import CANCER_GROUP_RULES
-from modules.blueprint.dashboard.definition.histology_mapping import get_histology_rules
-from modules.blueprint.dashboard.definition.histology_validate import match_histology
+from modules.blueprint.dashboard.definition.histology_code_mapping import (
+    blood_or_lymphoid_name,
+    get_histology_code_rules,
+    is_blood_or_lymphoid,
+    resolve_histology_code,
+    should_append_in_situ,
+)
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 DASHBOARD_DATA = f"{BASE_DIR}/tasks/data"
@@ -328,7 +333,7 @@ def calculate_analyzable_confirmed_cases(df, cols):
     return analyzable_confirmed_data
 
 # 組織型態(表,圖)
-def calculate_histology_distribution(df, cols, return_warnings=False):
+def calculate_histology_distribution(df, cols, cancers=None, year_start="", year_end="", return_warnings=False):
     hist_dist_data = []
     histology_warnings = []
     unknown_name = "Unknown / 未對應組織型態"
@@ -346,7 +351,7 @@ def calculate_histology_distribution(df, cols, return_warnings=False):
 
         total_valid_cases = len(df_filtered)
         if total_valid_cases > 0:
-            rules = get_histology_rules()
+            rules = get_histology_code_rules()
             hist_counts = {}
             for _, row in df_filtered.iterrows():
                 case_row = {
@@ -355,23 +360,47 @@ def calculate_histology_distribution(df, cols, return_warnings=False):
                     "site": row[site_col] if site_col in df.columns else "",
                     "didiag": row[year_col] if year_col in df.columns else "",
                 }
-                res = match_histology(case_row, rules)
+                cancer = classify_cancer_group(
+                    case_row["site"], case_row["hist"], CANCER_GROUP_RULES,
+                    behavior=case_row["behavior"], didiag=case_row["didiag"],
+                )
+                if is_blood_or_lymphoid(cancer):
+                    name_zh, name_en = blood_or_lymphoid_name(cancer)
+                    res = {
+                        "status": "matched", "icdo_code": f"{normalize_case_code(case_row['hist'])}/{normalize_case_code(case_row['behavior'])}",
+                        "name_zh": name_zh, "name_en": name_en,
+                    }
+                else:
+                    res = resolve_histology_code(case_row, cancer, rules, year_start, year_end)
                 icdo_code = res.get("icdo_code", "")
-                report_name = res.get("report_name", unknown_name)
-                key = (icdo_code, report_name)
+                report_name_zh = res.get("name_zh", unknown_name)
+                report_name_en = res.get("name_en", unknown_name)
+                if res.get("status") == "matched" and should_append_in_situ(
+                    case_row, cancer, case_row["hist"], case_row["behavior"]
+                ):
+                    report_name_zh = f"{report_name_zh}(原位癌)"
+                    report_name_en = f"{report_name_en}(in situ)"
+                key = (icdo_code, report_name_zh, report_name_en)
                 hist_counts[key] = hist_counts.get(key, 0) + 1
 
-                if report_name == unknown_name:
+                if res.get("status") != "matched":
                     user_id = display_value(row[patient_id_col]) if patient_id_col in df.columns else ""
                     site_value = display_value(row[site_col]) if site_col in df.columns else ""
                     hist_value = display_value(row[hist_col]) if hist_col in df.columns else ""
                     behavior_value = display_value(row[behavior_col]) if behavior_col in df.columns else ""
                     didiag_value = display_value(row[year_col]) if year_col in df.columns else ""
-                    warning_type = res.get("warning_type", "not_in_mapping")
-                    mismatch_fields = res.get("mismatch_fields", [])
-                    default_message = f"{icdo_code} 未納入 1.3 組織型態規則。"
-                    message = clean_warning_sentence(res.get("message", default_message))
-                    detail_message = clean_warning_sentence(res.get("detail_message", "若此組織型態無特殊適用條件，則此組織代碼組合不屬於目前統計規則範圍。"))
+                    warning_type = "ambiguous_mapping" if res.get("status") == "ambiguous" else "not_in_mapping"
+                    mismatch_fields = []
+                    default_message = f"{icdo_code} 未納入組織代碼表。"
+                    message = clean_warning_sentence(
+                        f"{icdo_code} 在組織代碼表中有重複且名稱不一致的資料，請確認。"
+                        if warning_type == "ambiguous_mapping" else default_message
+                    )
+                    detail_message = clean_warning_sentence(
+                        "請補充原發部位適用條件或確認此代碼的最終組織型態名稱。"
+                        if warning_type == "ambiguous_mapping"
+                        else "請確認常見癌別、組織型態代碼與性態碼是否已匯入組織代碼表。"
+                    )
                     raw_data_message = build_histology_raw_data_message(
                         warning_type,
                         mismatch_fields,
@@ -392,11 +421,13 @@ def calculate_histology_distribution(df, cols, return_warnings=False):
                         "detail_message": detail_message
                     })
 
-            for (icdo_code, report_name), count in hist_counts.items():
+            for (icdo_code, report_name_zh, report_name_en), count in hist_counts.items():
                 pct = (count / total_valid_cases) * 100
                 hist_dist_data.append({
                     "code": icdo_code,
-                    "name": report_name,
+                    "name": report_name_zh,
+                    "name_zh": report_name_zh,
+                    "name_en": report_name_en,
                     "count": count,
                     "percentage": f"{pct:.1f}%",
                     "pct_val": pct})
@@ -685,7 +716,7 @@ def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", beh
             result["analyzableConfirmedData"] = calculate_analyzable_confirmed_cases(df, cols)
         if diagnosis_selected:
             histology_data, histology_warnings = calculate_histology_distribution(
-                df, cols, return_warnings=True
+                df, cols, cancers=cancers, year_start=year_start, year_end=year_end, return_warnings=True
             )
             result["histologyData"] = histology_data
             result["histologyWarnings"] = histology_warnings
