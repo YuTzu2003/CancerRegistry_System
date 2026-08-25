@@ -43,7 +43,7 @@ def inject_nav():
         {"title":"報表分析","icon":"bi-bar-chart", "subitems": [
             {"endpoint":"dashboard.dashboard","title":"年報分析","icon":"bi-bar-chart"},
             {"endpoint":"dashboard.compare","title":"年度比較","icon":"bi-columns-gap"},
-            {"endpoint":"histology_mapping.histology_code_mapping","title":"組織型態管理","icon":"bi-list-ul"}
+            {"endpoint":"histology_mapping.histology_code_mapping","title":"組織型態","icon":"bi-list-ul"}
         ]},
     ]
     if session.get("position") == "Admin":

@@ -1,54 +1,47 @@
+from zipfile import BadZipFile
+
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from openpyxl import load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
-from zipfile import BadZipFile
+
 from modules.services.auth import login_required
 from modules.services.db import get_conn
 
-histology_mapping_bp = Blueprint("histology_mapping",__name__,template_folder="templates",)
 
-_COLUMN_LABELS = {
-    "codeyear": "年度",
-    "code_year": "年度",
-    "cancergroupkey": "癌別群組",
-    "cancer_group_key": "癌別群組",
-    "cancergroup_zh": "癌別(中)",
-    "cancergroup_en": "癌別(英)",
-    "histcode": "性態碼",
-    "hist": "性態碼",
-    "behaviorcode": "行為碼",
-    "behavior": "行為碼",
-    "histologyzh": "組織型態(中)",
-    "hist_zh": "組織型態(中)",
-    "histologyen": "組織型態(英)",
-    "hist_en": "組織型態(英)",
-    "behavior_en": "組織型態(英)",
-    "histology": "組織型態(英)",
-    "siteinclude": "納入部位",
-    "site_include": "納入部位",
-    "siteexclude": "排除部位",
-    "site_exclude": "排除部位",
-}
-
-_DISPLAY_COLUMN_NAMES = (
-    "codeyear",
-    "cancergroup_zh",
-    "cancergroup_en",
-    "hist",
-    "behavior",
-    "hist_zh",
-    "hist_en",
+histology_mapping_bp = Blueprint(
+    "histology_mapping",
+    __name__,
+    template_folder="templates",
 )
 
-_IMPORT_COLUMNS = (
-    "CodeYear",
-    "CancerGroupKey",
-    "CancerGroup_zh",
-    "CancerGroup_en",
-    "hist",
-    "behavior",
-    "hist_zh",
-    "hist_en",
+# (Excel/database column, label, accepted column-name aliases, show in table, allow Excel import)
+_FIELD_CONFIG = (
+    ("CodeYear", "年度", ("codeyear", "code_year"), True, True),
+    ("CancerGroupKey", "癌別群組", ("cancergroupkey", "cancer_group_key"), False, True),
+    ("CancerGroup_zh", "癌別(中)", ("cancergroup_zh",), True, True),
+    ("CancerGroup_en", "癌別(英)", ("cancergroup_en",), True, True),
+    ("hist", "性態碼", ("hist", "histcode"), True, True),
+    ("behavior", "行為碼", ("behavior", "behaviorcode"), True, True),
+    ("hist_zh", "組織型態(中)", ("hist_zh", "histologyzh"), True, True),
+    ("hist_en", "組織型態(英)", ("hist_en", "histologyen", "behavior_en", "histology"), True, True),
+    ("SiteInclude", "納入部位", ("siteinclude", "site_include"), False, False),
+    ("SiteExclude", "排除部位", ("siteexclude", "site_exclude"), False, False),
+)
+
+_COLUMN_LABELS = {
+    alias: label
+    for _, label, aliases, _, _ in _FIELD_CONFIG
+    for alias in aliases
+}
+_DISPLAY_COLUMN_NAMES = tuple(
+    aliases[0]
+    for _, _, aliases, show_in_table, _ in _FIELD_CONFIG
+    if show_in_table
+)
+_IMPORT_COLUMNS = tuple(
+    column
+    for column, _, _, _, allow_excel_import in _FIELD_CONFIG
+    if allow_excel_import
 )
 
 
@@ -56,15 +49,14 @@ def _quote_identifier(identifier):
     return f"[{identifier.replace(']', ']]')}]"
 
 
-def _code_year_column(columns):
-    return next((column for column in columns if column.lower() in {"codeyear", "code_year"}), None)
-
-
-def _year_sort_key(year):
+def _get_mapping_columns():
+    conn = get_conn()
     try:
-        return 0, int(str(year))
-    except (TypeError, ValueError):
-        return 1, str(year)
+        cursor = conn.cursor()
+        cursor.execute("SELECT TOP 0 * FROM dbo.histology_code_mapping")
+        return [column[0] for column in cursor.description]
+    finally:
+        conn.close()
 
 
 def _get_mapping_data(search_column="", search_query="", selected_year=""):
@@ -76,7 +68,10 @@ def _get_mapping_data(search_column="", search_query="", selected_year=""):
         query = "SELECT * FROM dbo.histology_code_mapping"
         conditions = []
         parameters = []
-        code_year_column = _code_year_column(columns)
+        code_year_column = next(
+            (column for column in columns if column.lower() in {"codeyear", "code_year"}),
+            None,
+        )
         if selected_year and code_year_column:
             conditions.append(f"{_quote_identifier(code_year_column)} = ?")
             parameters.append(selected_year)
@@ -97,12 +92,71 @@ def _get_mapping_data(search_column="", search_query="", selected_year=""):
         conn.close()
 
 
+def _get_year_counts():
+    conn = get_conn()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT TOP 0 * FROM dbo.histology_code_mapping")
+        columns = [column[0] for column in cursor.description]
+        code_year_column = next(
+            (column for column in columns if column.lower() in {"codeyear", "code_year"}),
+            None,
+        )
+        if not code_year_column:
+            return columns, []
+
+        quoted_year_column = _quote_identifier(code_year_column)
+        cursor.execute(f"SELECT {quoted_year_column}, COUNT(*) FROM dbo.histology_code_mapping WHERE {quoted_year_column} IS NOT NULL GROUP BY {quoted_year_column}")
+        year_counts = [(str(row[0]), row[1]) for row in cursor.fetchall()]
+        year_counts.sort(
+            key=lambda item: (
+                item[0].isdigit(),
+                int(item[0]) if item[0].isdigit() else item[0],
+            ),
+            reverse=True,
+        )
+        return columns, year_counts
+    finally:
+        conn.close()
+
+
 def _primary_key(columns):
     return next((column for column in columns if column.lower() == "histcode_id"), None)
 
 
 def _return_to_mapping():
-    return redirect(url_for("histology_mapping.histology_code_mapping"))
+    return redirect(
+        url_for(
+            "histology_mapping.histology_code_mapping",
+            year=request.form.get("return_year", ""),
+            column=request.form.get("return_column", ""),
+            q=request.form.get("return_q", ""),
+        )
+    )
+
+
+def _editable_columns(columns):
+    primary_key = _primary_key(columns)
+    return [column for column in columns if column != primary_key]
+
+
+def _insert_mapping_rows(columns, rows):
+    editable_columns = _editable_columns(columns)
+    fields = ", ".join(_quote_identifier(column) for column in editable_columns)
+    placeholders = ", ".join("?" for _ in editable_columns)
+    conn = get_conn()
+    try:
+        cursor = conn.cursor()
+        cursor.executemany(
+            f"INSERT INTO dbo.histology_code_mapping ({fields}) VALUES ({placeholders})",
+            rows,
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def _read_import_rows(uploaded_file):
@@ -133,20 +187,12 @@ def histology_code_mapping():
     search_column = request.args.get("column", "")
     search_query = request.args.get("q", "")
     edit_id = request.args.get("edit_id", "")
-    columns, all_rows = _get_mapping_data()
-    code_year_column = _code_year_column(columns)
-    year_index = columns.index(code_year_column) if code_year_column else None
-    available_years = sorted(
-        {str(row[year_index]) for row in all_rows if row[year_index] is not None},
-        key=_year_sort_key,
-        reverse=True,
-    )
+    columns, year_counts = _get_year_counts()
+    available_years = [year for year, _ in year_counts]
     requested_year = request.args.get("year", "")
-    selected_year = requested_year if requested_year in available_years else (available_years[0] if available_years else "")
+    selected_year = requested_year if requested_year in available_years else next(iter(available_years), "")
     columns, rows = _get_mapping_data(search_column, search_query, selected_year)
-    selected_year_count = sum(
-        1 for row in all_rows if year_index is not None and str(row[year_index]) == selected_year
-    )
+    selected_year_count = dict(year_counts).get(selected_year, 0)
     primary_key = _primary_key(columns)
     editing_row = None
     if edit_id and primary_key:
@@ -165,7 +211,7 @@ def histology_code_mapping():
         selected_year=selected_year,
         selected_year_count=selected_year_count,
         primary_key=primary_key,
-        editable_columns=[column for column in columns if column != primary_key],
+        editable_columns=_editable_columns(columns),
         search_column=search_column if search_column in columns else "",
         search_query=search_query,
         editing_row=editing_row,
@@ -175,18 +221,10 @@ def histology_code_mapping():
 @histology_mapping_bp.route("/dashboard/histology-code-mapping/create", methods=["POST"])
 @login_required
 def create_histology_code_mapping():
-    columns, _ = _get_mapping_data()
-    editable_columns = [column for column in columns if column != _primary_key(columns)]
+    columns = _get_mapping_columns()
+    editable_columns = _editable_columns(columns)
     values = [request.form.get(column, "") for column in editable_columns]
-    conn = get_conn()
-    try:
-        cursor = conn.cursor()
-        fields = ", ".join(_quote_identifier(column) for column in editable_columns)
-        placeholders = ", ".join("?" for _ in editable_columns)
-        cursor.execute(f"INSERT INTO dbo.histology_code_mapping ({fields}) VALUES ({placeholders})", *values)
-        conn.commit()
-    finally:
-        conn.close()
+    _insert_mapping_rows(columns, [values])
     flash("組織型態資料已新增。", "success")
     return _return_to_mapping()
 
@@ -208,27 +246,13 @@ def import_histology_code_mapping():
         flash(str(error), "danger")
         return _return_to_mapping()
 
-    columns, _ = _get_mapping_data()
-    editable_columns = [column for column in columns if column != _primary_key(columns)]
+    columns = _get_mapping_columns()
+    editable_columns = _editable_columns(columns)
     if tuple(editable_columns) != _IMPORT_COLUMNS:
         flash("資料庫欄位與組織型態表範本不一致，無法匯入。", "danger")
         return _return_to_mapping()
 
-    conn = get_conn()
-    try:
-        cursor = conn.cursor()
-        fields = ", ".join(_quote_identifier(column) for column in editable_columns)
-        placeholders = ", ".join("?" for _ in editable_columns)
-        cursor.executemany(
-            f"INSERT INTO dbo.histology_code_mapping ({fields}) VALUES ({placeholders})",
-            rows,
-        )
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+    _insert_mapping_rows(columns, rows)
 
     flash(f"已新增 {len(rows)} 筆組織型態資料。", "success")
     return _return_to_mapping()
@@ -237,11 +261,11 @@ def import_histology_code_mapping():
 @histology_mapping_bp.route("/dashboard/histology-code-mapping/<int:histcode_id>/update", methods=["POST"])
 @login_required
 def update_histology_code_mapping(histcode_id):
-    columns, _ = _get_mapping_data()
+    columns = _get_mapping_columns()
     primary_key = _primary_key(columns)
     if not primary_key:
         return "histology_code_mapping 缺少 HistCode_ID 主鍵", 500
-    editable_columns = [column for column in columns if column != primary_key]
+    editable_columns = _editable_columns(columns)
     values = [request.form.get(column, "") for column in editable_columns]
     assignments = ", ".join(f"{_quote_identifier(column)} = ?" for column in editable_columns)
     conn = get_conn()
@@ -262,7 +286,7 @@ def update_histology_code_mapping(histcode_id):
 @histology_mapping_bp.route("/dashboard/histology-code-mapping/<int:histcode_id>/delete", methods=["POST"])
 @login_required
 def delete_histology_code_mapping(histcode_id):
-    columns, _ = _get_mapping_data()
+    columns = _get_mapping_columns()
     primary_key = _primary_key(columns)
     if not primary_key:
         return "histology_code_mapping 缺少 HistCode_ID 主鍵", 500
@@ -277,4 +301,32 @@ def delete_histology_code_mapping(histcode_id):
     finally:
         conn.close()
     flash("組織型態資料已刪除。", "success")
+    return _return_to_mapping()
+
+
+@histology_mapping_bp.route("/dashboard/histology-code-mapping/delete-selected", methods=["POST"])
+@login_required
+def delete_selected_histology_code_mappings():
+    histcode_ids = [value for value in request.form.getlist("histcode_ids") if value.isdigit()]
+    if not histcode_ids:
+        flash("請先勾選要刪除的組織型態資料。", "danger")
+        return _return_to_mapping()
+
+    columns = _get_mapping_columns()
+    primary_key = _primary_key(columns)
+    if not primary_key:
+        return "histology_code_mapping 缺少 HistCode_ID 主鍵", 500
+
+    placeholders = ", ".join("?" for _ in histcode_ids)
+    conn = get_conn()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            f"DELETE FROM dbo.histology_code_mapping WHERE {_quote_identifier(primary_key)} IN ({placeholders})",
+            *histcode_ids,
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    flash(f"已刪除 {len(histcode_ids)} 筆組織型態資料。", "success")
     return _return_to_mapping()
