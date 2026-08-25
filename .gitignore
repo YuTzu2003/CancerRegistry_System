@@ -22,3 +22,10 @@ Jobs/
 AGENTS.md
 CLAUDE.md
 GEMINI.md
+
+# Node dependencies
+node_modules/
+**/node_modules/
+
+# Codex / AI workspace files
+.codex/

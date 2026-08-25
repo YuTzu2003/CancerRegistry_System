@@ -823,3 +823,14 @@
 #stageSummaryOptions .col > section > .d-flex {
     margin-top: auto;
 }
+
+/* 附錄 B 手術術式表：標題與分類依據分兩列置中呈現。 */
+.stage-surgery-panel .surgery-table-caption {
+  text-align: center;
+}
+.stage-surgery-panel .surgery-table-caption-note {
+  display: inline-block;
+  margin-top: 2px;
+  font-size: 14px;
+  font-weight: 400;
+}

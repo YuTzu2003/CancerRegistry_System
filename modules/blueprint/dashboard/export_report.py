@@ -85,6 +85,7 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir, expo
                 word-break: break-word;
             }
             .annual-report-table caption { font-weight: bold; font-size: 14px; margin-bottom: 10px; }
+            .surgery-table-caption { text-align: center; }
             .annual-report-table:has(+ .annual-stage-report-note) { margin-bottom: 4px; }
             #annualHistologyTableNote { color: #dc3545 !important; font-size: 10px !important; margin-top: -14px !important; margin-bottom: 8px !important; }
             #annualAnalyzableConfirmedNote { margin-top: 6px !important; font-size: 10px !important; line-height: 1.45 !important; text-align: left !important; }

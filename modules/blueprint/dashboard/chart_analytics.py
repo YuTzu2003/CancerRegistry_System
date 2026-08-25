@@ -89,6 +89,7 @@ def _empty_dashboard_response(message="查無符合條件資料！", histology_r
         "histologyNoDataReason": histology_reason or message,
         "diagnosisClassificationData": [],
         "stageFirstCourseData": [],
+        "stageSurgeryData": [],
         "survivalData": {
             "rows": [],
             "no_data_reason": message,
@@ -705,6 +706,7 @@ def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", beh
             selected.intersection({"分期呈現最細碼", "分期不呈現最細碼"})
         )
         treatment_selected = calculate_all or "期別與首次療程" in selected
+        surgery_selected = calculate_all or "期別與手術術式" in selected
         result = _empty_dashboard_response()
         result.pop("noDataWarning", None)
         result["histologyNoDataReason"] = ""
@@ -735,6 +737,7 @@ def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", beh
                 from modules.blueprint.clean.field_mapping import field_mapping
                 from modules.blueprint.dashboard.period_rule import (
                     calculate_stage_first_course_distribution,
+                    calculate_stage_surgery_distribution,
                     calculate_stage_reports,
                 )
 
@@ -757,6 +760,11 @@ def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", beh
                 if treatment_selected:
                     result["stageFirstCourseData"] = calculate_stage_first_course_distribution(
                         chinese_df, stage_options
+                    )
+                if surgery_selected:
+                    result["stageSurgeryData"] = calculate_stage_surgery_distribution(
+                        chinese_df, stage_options,
+                        manual_keys=cancers,
                     )
         if calculate_all or "存活率" in selected:
             result["survivalData"] = calculate_survival_table(df, cols)

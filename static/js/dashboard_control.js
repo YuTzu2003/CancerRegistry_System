@@ -1401,7 +1401,37 @@ function initDashboardControl() {
                               return item?.system ? `期別與首次療程（${item.system}期別）` : '期別與首次療程';
                           }
                       }
-                  ];
+,
+                      {
+                          btnId: 'btnAiTreatmentSurgery',
+                          title: '期別與手術術式',
+                          dataKey: 'stageSurgeryData',
+                          fields: [],
+                          respId: 'llmResponseTreatmentSurgery',
+                          getData: (data) => {
+                              const tables = Array.isArray(data.stageSurgeryData) ? data.stageSurgeryData : [];
+                              const activeKey = window.stageSurgeryActiveTableKey;
+                              const item = tables.find((table, index) => `${table.manual_key || 'unknown'}::${table.system || 'stage'}::${index}` === activeKey) || tables[0] || {};
+                              return {
+                                  stage_system: item.system || '',
+                                  stage_mode: item.stage_mode || '',
+                                  stage_columns: item.stage_columns || [],
+                                  surgery_rows: item.rows || [],
+                                  totals: item.totals || [],
+                                  total_count: item.total_count || 0,
+                                  analyzable_count: item.analyzable_count || 0,
+                                  excluded_unknown: item.excluded_unknown || 0,
+                                  excluded_not_applicable: item.excluded_not_applicable || 0,
+                                  excluded_unmapped_surgery: item.excluded_unmapped_surgery || 0
+                              };
+                          },
+                          getFieldKey: (data) => {
+                              const tables = Array.isArray(data.stageSurgeryData) ? data.stageSurgeryData : [];
+                              const activeKey = window.stageSurgeryActiveTableKey;
+                              const item = tables.find((table, index) => `${table.manual_key || 'unknown'}::${table.system || 'stage'}::${index}` === activeKey) || tables[0];
+                              return item?.system ? `期別與手術術式（${item.system}期別）` : '期別與手術術式';
+                          }
+                      }                  ];
 
                   llmConfigs.forEach(cfg => {
                       const btn = document.getElementById(cfg.btnId);
@@ -1475,12 +1505,15 @@ function initDashboardControl() {
                            chartData.stageReports = stageReports;
                            window.DashboardRenderer.renderStageReportTabs(stageReports, yearTitle, cancerTitle);
                            initialStageReport = stageReports[0] || null;
-                           stageReports.forEach(report => {
-                               const request = window.DashboardRenderer.configureStageInsight(report);
+                           // Generate only the active report; concurrent requests for every
+                           // variant can overwhelm the model service and time out.
+                           if (initialStageReport) {
+                               const request = window.DashboardRenderer.configureStageInsight(initialStageReport);
                                if (request instanceof Promise) variantInsightPromises.push(request);
-                           });
+                           }
                        }
                        window.DashboardRenderer.renderStageFirstCourseTables(chartData.stageFirstCourseData, yearTitle, cancerTitle);
+                       window.DashboardRenderer.renderStageSurgeryTables(chartData.stageSurgeryData, yearTitle, cancerTitle);
                        const treatmentTables = Array.isArray(chartData.stageFirstCourseData)
                            ? chartData.stageFirstCourseData
                            : [];
@@ -1489,13 +1522,27 @@ function initDashboardControl() {
                            ? window.stageFirstCourseActiveSystem
                            : treatmentSystems[0] || '';
                        const treatmentInsightButton = document.getElementById('btnAiTreatmentFirstCourse');
-                       treatmentTables.forEach(table => {
-                           window.stageFirstCourseActiveSystem = table.system;
+                       if (initialTreatmentSystem) {
+                           window.stageFirstCourseActiveSystem = initialTreatmentSystem;
                            const request = treatmentInsightButton?.onclick?.();
                            if (request instanceof Promise) variantInsightPromises.push(request);
-                       });
+                       }
                        window.stageFirstCourseActiveSystem = initialTreatmentSystem;
-                       window.DashboardRenderer.renderStageFirstCourseTables(chartData.stageFirstCourseData, yearTitle, cancerTitle);
+                       window.DashboardRenderer.renderStageFirstCourseTables(chartData.stageFirstCourseData, yearTitle, cancerTitle);                       const surgeryTables = Array.isArray(chartData.stageSurgeryData)
+                           ? chartData.stageSurgeryData
+                           : [];
+                       const surgerySystems = surgeryTables.map(table => table.system);
+                       const initialSurgerySystem = surgerySystems.includes(window.stageSurgeryActiveSystem)
+                           ? window.stageSurgeryActiveSystem
+                           : surgerySystems[0] || '';
+                       const surgeryInsightButton = document.getElementById('btnAiTreatmentSurgery');
+                       if (initialSurgerySystem) {
+                           window.stageSurgeryActiveSystem = initialSurgerySystem;
+                           const request = surgeryInsightButton?.onclick?.();
+                           if (request instanceof Promise) variantInsightPromises.push(request);
+                       }
+                       window.stageSurgeryActiveSystem = initialSurgerySystem;
+                       window.DashboardRenderer.renderStageSurgeryTables(chartData.stageSurgeryData, yearTitle, cancerTitle);
                       window.DashboardRenderer.renderSurvivalTable(chartData.survivalData, yearTitle, cancerTitle);
                       window.DashboardRenderer.updateChartCaptions(yearTitle, cancerTitle);
                   }
