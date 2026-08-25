@@ -13,6 +13,7 @@ Jobs/
 *.lock
 *.python-version
 *.xlsx
+!範本_組織型態表.xlsx
 *.csv
 *.pptx
 *.doc

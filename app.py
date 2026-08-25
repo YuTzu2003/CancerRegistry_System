@@ -3,7 +3,7 @@ import os
 import logging
 import sys
 from dotenv import load_dotenv
-from modules.services import auth_bp, login_required, member_bp, history_bp, clean_bp, data_gen_bp, dashboard_bp
+from modules.services import auth_bp, login_required, member_bp, history_bp, clean_bp, data_gen_bp, dashboard_bp, histology_mapping_bp
 from modules.services.db import get_conn
 import jinja2
 
@@ -23,6 +23,7 @@ app.register_blueprint(history_bp)
 app.register_blueprint(clean_bp)
 app.register_blueprint(data_gen_bp)
 app.register_blueprint(dashboard_bp)
+app.register_blueprint(histology_mapping_bp)
 
 BASE_DIR = os.path.dirname(__file__)
 Jobs_FOLDER = 'tasks/Jobs'
@@ -41,7 +42,8 @@ def inject_nav():
         {"endpoint":"data_gen.dataGen","title":"虛擬資料生成","icon":"bi-database-add"},
         {"title":"報表分析","icon":"bi-bar-chart", "subitems": [
             {"endpoint":"dashboard.dashboard","title":"年報分析","icon":"bi-bar-chart"},
-            {"endpoint":"dashboard.compare","title":"年度比較","icon":"bi-columns-gap"}
+            {"endpoint":"dashboard.compare","title":"年度比較","icon":"bi-columns-gap"},
+            {"endpoint":"histology_mapping.histology_code_mapping","title":"組織型態管理","icon":"bi-list-ul"}
         ]},
     ]
     if session.get("position") == "Admin":

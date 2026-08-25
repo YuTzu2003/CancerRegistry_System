@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% block title %}組織型態管理{% endblock %}
+{% block page_title %}組織型態管理{% endblock %}
+{% block extra_head %}
+<style>
+  .histology-summary { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow-sm); }
+  .histology-summary-icon { width: 42px; height: 42px; border-radius: var(--radius-sm); background: var(--warning-soft); color: var(--warning); }
+  .histology-search-card, .histology-editor-card { border-color: var(--border); border-radius: var(--radius); box-shadow: var(--shadow-sm); }
+  .histology-search-card { background: var(--gray-50); }
+  .histology-editor-title { font-size: 0.9rem; font-weight: 700; }
+  .histology-editor-header { background: var(--gray-50); }
+  .histology-entry-tabs .nav-link { height: auto; color: var(--text); border: 1px solid var(--border); background: var(--surface); }
+  .histology-entry-tabs .nav-link.active { color: var(--white); background: var(--gray-800); border-color: var(--gray-800); box-shadow: none; }
+  .histology-entry-pane { border: 1px solid var(--border); background: var(--gray-50); }
+  .histology-editor-card .form-label { font-size: 0.8rem; margin-bottom: 0.25rem; }
+  .histology-year-tabs { overflow-x: auto; }
+  .histology-year-tabs .nav { flex-wrap: nowrap; min-width: max-content; }
+  .histology-year-tabs .nav-link { height: auto; color: var(--text); border: 1px solid var(--border); background: var(--surface); }
+  .histology-year-tabs .nav-link:hover { background: var(--gray-100); color: var(--text); }
+  .histology-year-tabs .nav-link.active { background: var(--gray-800); border-color: var(--gray-800); color: var(--white); box-shadow: none; }
+  .histology-table-wrap { border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: auto; }
+  .histology-table { margin: 0; min-width: 1080px; table-layout: fixed; }
+  .histology-table th { background: var(--gray-100); color: var(--text); font-size: 13px; font-weight: 700; white-space: nowrap; }
+  .histology-table td { color: var(--text); font-size: 14px; vertical-align: middle; overflow-wrap: anywhere; }
+  .histology-table th:nth-child(1), .histology-table th:nth-child(4), .histology-table th:nth-child(5),
+  .histology-table td:nth-child(1), .histology-table td:nth-child(4), .histology-table td:nth-child(5) { text-align: center; }
+  .histology-table th:last-child, .histology-table td:last-child { text-align: right; }
+  .histology-actions { display: flex; justify-content: flex-end; gap: 6px; }
+  .histology-actions form { margin: 0; }
+  .histology-empty { color: var(--muted); padding: 48px 24px; text-align: center; }
+  [data-theme="dark"] .histology-summary, [data-theme="dark"] .histology-search-card, [data-theme="dark"] .histology-editor-card { background: var(--surface); color: var(--text); border-color: var(--border); }
+  [data-theme="dark"] .histology-year-tabs .nav-link { background: var(--surface); color: var(--text); border-color: var(--border); }
+  [data-theme="dark"] .histology-year-tabs .nav-link.active { background: var(--gray-800); color: var(--white); }
+  [data-theme="dark"] .histology-table { --bs-table-bg: var(--surface); --bs-table-color: var(--text); --bs-table-striped-bg: #151518; --bs-table-hover-bg: #1f1f23; --bs-table-border-color: var(--border); }
+  [data-theme="dark"] .histology-table th { background: var(--gray-100); color: var(--text); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>組織型態管理</h1>
+    <p class="lead">組織型態對照資料，顯示年度、癌別、代碼與組織型態名稱。</p>
+  </div>
+</div>
+
+<section class="card-flat">
+  <div class="section-head">
+    <h2><span class="dot" style="background:var(--warning)"></span> 對照資料</h2>
+    <span class="hint">以欄位或全部資料搜尋</span>
+  </div>
+  <div class="section-body">
+    <form class="card histology-search-card mb-4" method="get">
+      <div class="card-body p-3 p-lg-4">
+        <div class="row g-3 align-items-end">
+          <div class="col-md-4 col-xl-3">
+            <label class="form-label fw-semibold" for="histologyColumn">搜尋欄位</label>
+            <select id="histologyColumn" name="column" class="form-select">
+              <option value="">全部欄位</option>
+              {% for column in display_columns %}
+              <option value="{{ column }}" {% if search_column == column %}selected{% endif %}>{{ column_labels[column] }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-8 col-xl-6">
+            <label class="form-label fw-semibold" for="histologyQuery">關鍵字</label>
+            <div class="input-group">
+              <span class="input-group-text"><i class="bi bi-search"></i></span>
+              <input id="histologyQuery" name="q" value="{{ search_query }}" class="form-control" type="search" placeholder="輸入年度、癌別、代碼或組織型態名稱">
+            </div>
+          </div>
+          <div class="col-xl-3 d-flex gap-2">
+            <button class="btn btn-dark px-4" type="submit"><i class="bi bi-search me-1"></i>搜尋</button>
+            {% if search_query %}<a class="btn btn-outline-secondary" href="{{ url_for('histology_mapping.histology_code_mapping') }}">清除</a>{% endif %}
+          </div>
+        </div>
+      </div>
+    </form>
+
+    {% if primary_key %}
+    <section class="card histology-editor-card mb-4">
+      <div class="card-header histology-editor-header d-flex align-items-center justify-content-between gap-3 py-2 px-3">
+        <div>
+          <h3 class="histology-editor-title mb-0">{% if editing_row %}編輯資料{% else %}資料輸入{% endif %}</h3>
+        </div>
+      </div>
+      <div class="card-body pt-2 pb-3 px-3">
+        {% if not editing_row %}
+        <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2 mb-3">
+          <nav class="histology-entry-tabs" aria-label="新增方式">
+            <div class="nav nav-pills gap-2">
+              <button class="nav-link active px-3 py-2" id="single-entry-tab" data-bs-toggle="tab" data-bs-target="#single-entry-pane" type="button" role="tab" aria-controls="single-entry-pane" aria-selected="true"><i class="bi bi-pencil-square me-1"></i>單筆新增</button>
+              <button class="nav-link px-3 py-2" id="excel-entry-tab" data-bs-toggle="tab" data-bs-target="#excel-entry-pane" type="button" role="tab" aria-controls="excel-entry-pane" aria-selected="false"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Excel 批次新增</button>
+            </div>
+          </nav>
+          <div class="d-flex align-items-center gap-2 flex-shrink-0">
+            <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('static', filename='document/範本_組織型態表.xlsx') }}" download><i class="bi bi-download me-1"></i>下載組織型態範本</a>
+          </div>
+        </div>
+        {% endif %}
+        <div class="tab-content">
+          <div class="tab-pane fade show active" id="single-entry-pane" role="tabpanel" aria-labelledby="single-entry-tab">
+            <div class="histology-entry-pane rounded-2 p-3">
+              <div class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-2 mb-3">
+                <p class="text-secondary small mb-0">逐欄填寫一筆組織型態對照資料。</p>
+                <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                  <button class="btn btn-dark btn-sm px-3" type="submit" form="histologyMappingForm"><i class="bi bi-check-lg me-1"></i>{% if editing_row %}儲存變更{% else %}新增資料{% endif %}</button>
+                  {% if editing_row %}<a class="btn btn-outline-secondary btn-sm" href="{{ url_for('histology_mapping.histology_code_mapping') }}">取消</a>{% endif %}
+                </div>
+              </div>
+              <form id="histologyMappingForm" class="row g-2" method="post" action="{% if editing_row %}{{ url_for('histology_mapping.update_histology_code_mapping', histcode_id=editing_row[columns.index(primary_key)]) }}{% else %}{{ url_for('histology_mapping.create_histology_code_mapping') }}{% endif %}">
+              {% for column in editable_columns %}
+              <div class="col-md-6 col-xl-4">
+                <label class="form-label" for="field-{{ column }}">{{ column_labels[column] }}</label>
+                <input id="field-{{ column }}" name="{{ column }}" class="form-control form-control-sm" value="{% if editing_row %}{{ editing_row[columns.index(column)] }}{% endif %}">
+              </div>
+              {% endfor %}
+              </form>
+            </div>
+          </div>
+          {% if not editing_row %}
+          <div class="tab-pane fade" id="excel-entry-pane" role="tabpanel" aria-labelledby="excel-entry-tab">
+            <div class="histology-entry-pane rounded-2 p-3">
+              <p class="text-secondary small mb-3">下載範本填寫多筆資料後上傳；所有資料檢查通過才會批次新增。</p>
+              <form class="row g-2 align-items-center" method="post" action="{{ url_for('histology_mapping.import_histology_code_mapping') }}" enctype="multipart/form-data">
+                <div class="col-lg">
+                  <input class="form-control form-control-sm" type="file" name="import_file" accept=".xlsx" required>
+                </div>
+                <div class="col-lg-auto d-flex gap-2">
+                  <button class="btn btn-success btn-sm px-3" type="submit"><i class="bi bi-file-earmark-arrow-up me-1"></i>上傳並新增</button>
+                </div>
+              </form>
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </section>
+    {% endif %}
+
+    <section class="card histology-editor-card mb-4">
+      <div class="card-body p-3 p-lg-4">
+        <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2 mb-3">
+          <div>
+            <h3 class="h6 mb-1">年度排序與查看</h3>
+            <p class="text-secondary small mb-0">預設顯示最新年度；點選年份查看該年度資料。</p>
+          </div>
+          {% if selected_year %}<span class="badge badge-soft green px-3 py-2">目前：{{ selected_year }} 年 · 共 {{ selected_year_count }} 筆資料</span>{% endif %}
+        </div>
+        {% if available_years %}
+        <nav class="histology-year-tabs" aria-label="年度選擇">
+          <div class="nav nav-pills gap-2">
+            {% for year in available_years %}
+            <a class="nav-link px-3 py-2 {% if year == selected_year %}active{% endif %}" href="{{ url_for('histology_mapping.histology_code_mapping', year=year, column=search_column, q=search_query) }}">{{ year }} 年</a>
+            {% endfor %}
+          </div>
+        </nav>
+        {% endif %}
+      </div>
+    </section>
+
+    <div class="histology-table-wrap table-responsive">
+      <table class="table table-striped table-hover align-middle histology-table mb-0">
+        <colgroup>
+          <col style="width: 6%">
+          <col style="width: 16%">
+          <col style="width: 19%">
+          <col style="width: 8%">
+          <col style="width: 7%">
+          <col style="width: 19%">
+          <col style="width: 19%">
+          {% if primary_key %}<col style="width: 6%">{% endif %}
+        </colgroup>
+        <thead>
+          <tr>
+            {% for column in display_columns %}<th scope="col">{{ column_labels[column] }}</th>{% endfor %}
+            {% if primary_key %}<th scope="col">操作</th>{% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr>
+            {% for column in display_columns %}<td>{{ row[columns.index(column)] if row[columns.index(column)] is not none else '' }}</td>{% endfor %}
+            {% if primary_key %}
+            <td>
+              <div class="histology-actions">
+                <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('histology_mapping.histology_code_mapping', edit_id=row[columns.index(primary_key)]) }}" title="編輯"><i class="bi bi-pencil-square"></i><span class="visually-hidden">編輯</span></a>
+                <form method="post" action="{{ url_for('histology_mapping.delete_histology_code_mapping', histcode_id=row[columns.index(primary_key)]) }}" onsubmit="return confirm('確定要刪除此筆資料嗎？');">
+                  <button class="btn btn-sm btn-outline-danger" type="submit" title="刪除"><i class="bi bi-trash"></i><span class="visually-hidden">刪除</span></button>
+                </form>
+              </div>
+            </td>
+            {% endif %}
+          </tr>
+          {% else %}
+          <tr><td class="histology-empty" colspan="{{ display_columns|length + (1 if primary_key else 0) }}"><i class="bi bi-search fs-4 d-block mb-2"></i>找不到符合條件的資料。</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+{% endblock %}
