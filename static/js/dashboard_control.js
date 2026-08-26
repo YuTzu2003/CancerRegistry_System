@@ -1294,6 +1294,11 @@ function initDashboardControl() {
               if (data.ok) {
                   const chartData = data.data;
                   if (chartData && chartData.noDataWarning) {
+                      // Do not leave a previous query's report visible when this query has no cases.
+                      window.lastChartData = null;
+                      document.querySelectorAll('.chart-pane').forEach(pane => pane.classList.add('d-none'));
+                      document.getElementById('chartTabsArea')?.classList.add('d-none');
+                      document.getElementById('chartTabsContainer')?.replaceChildren();
                       if (window.utils && window.utils.hideLoading) {
                           window.utils.hideLoading();
                       } else if (window.dashboardChartInstance) {

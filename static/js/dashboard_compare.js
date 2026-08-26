@@ -1237,8 +1237,8 @@
     }).join('');
     const caption = isEnglish()
       ? `Table. Surgical Procedure Distribution of Newly Diagnosed ${escapeHtml(reportCancerTitle(cancerTitle))} Cases by ${escapeHtml(stageSystem)} Stage, ${yearTitle}${sourceLine()}`
-      : `表、${yearTitle}年新診斷${escapeHtml(reportCancerTitle(cancerTitle))}病患（${escapeHtml(stageSystem)}期別）與手術術式分佈${sourceLine()}`;
-    return `<div class="annual-report-table-wrap"><table class="annual-report-table"><caption class="surgery-table-caption">${caption}</caption><thead><tr><th class="text-center">${isEnglish() ? 'Surgical Codes/Surgical Procedure' : '術式編碼／術式名稱'}</th><th colspan="${Math.max(stages.length, 1)}">${escapeHtml(stageSystem)} ${isEnglish() ? 'Stage' : '期別'}</th><th rowspan="2">${isEnglish() ? 'Total' : '小計'}</th><th rowspan="2">%</th></tr><tr><th class="text-center">${isEnglish() ? '(Taiwan Cancer Registry Surgery Codes)' : '（按台灣癌症登記術式編碼分類）'}</th>${stages.map(stage => `<th>${escapeHtml(String(stage || '').replace(/^Stage\s+/i, ''))}</th>`).join('')}</tr></thead><tbody>${body}<tr class="fw-bold"><td>${isEnglish() ? 'Total' : '總計'}</td>${(item.totals || []).map(value => `<td>${value}</td>`).join('')}<td>${total}</td><td>${total ? '100.0%' : '0.0%'}</td></tr><tr><td>%</td>${(item.percentages || []).map(value => `<td>${value}%</td>`).join('')}<td>${total ? '100.0%' : '0.0%'}</td><td>-</td></tr></tbody></table></div>`;
+      : `表、${yearTitle}年新診斷${escapeHtml(reportCancerTitle(cancerTitle))}病患${escapeHtml(stageSystem)}期別與手術術式分佈${sourceLine()}`;
+    return `<div class="annual-report-table-wrap"><table class="annual-report-table"><caption class="surgery-table-caption">${caption}</caption><thead><tr><th class="text-center">${isEnglish() ? 'Surgical Codes/Surgical Procedure' : '術式編碼/術式名稱'}</th><th colspan="${Math.max(stages.length, 1)}">${escapeHtml(stageSystem)} ${isEnglish() ? 'Stage' : '期別'}</th><th rowspan="2">${isEnglish() ? 'Total' : '小計'}</th><th rowspan="2">%</th></tr><tr><th class="text-center">${isEnglish() ? '(Taiwan Cancer Registry Surgery Codes)' : '（按台灣癌症登記術式編碼分類）'}</th>${stages.map(stage => `<th>${escapeHtml(String(stage || '').replace(/^Stage\s+/i, ''))}</th>`).join('')}</tr></thead><tbody>${body}<tr class="fw-bold"><td>${isEnglish() ? 'Total' : '總計'}</td>${(item.totals || []).map(value => `<td>${value}</td>`).join('')}<td>${total}</td><td>${total ? '100.0%' : '0.0%'}</td></tr><tr><td>%</td>${(item.percentages || []).map(value => `<td>${value}%</td>`).join('')}<td>${total ? '100.0%' : '0.0%'}</td><td>-</td></tr></tbody></table></div>`;
   }
   function normalizeStageReport(report) {
     const stageLabels = Array.isArray(report?.stage_labels) ? report.stage_labels.map(String) : [];
@@ -3119,6 +3119,22 @@
       .then(r => r.json())
       .then(data => {
         if (!data.ok) throw new Error(data.error || '比較失敗');
+        if (data.data?.noDataWarning) {
+          lastComparisonData = null;
+          hasRenderedResult = false;
+          activeAiNarrativeItem = '';
+          aiNarrativeRequestId += 1;
+          aiNarrativeCache.clear();
+          resultStale.classList.add('d-none');
+          resultBox.classList.add('d-none');
+          document.getElementById('compareResultSummary').replaceChildren();
+          document.getElementById('compareResultTabs').replaceChildren();
+          document.getElementById('compareResultPanel').replaceChildren();
+          document.getElementById('compareAiNarrative').classList.add('d-none');
+          document.getElementById('compareAiNarrativeText').textContent = '';
+          showAlert('查無符合資料', data.data.noDataWarning);
+          return;
+        }
         const items = selectedCompareItems();
         aiNarrativeCache.clear();
         const treatmentSystems = Array.from(new Set([
