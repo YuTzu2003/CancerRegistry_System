@@ -21,20 +21,37 @@
         <p class="login-subtitle">請輸入您的員工帳號與密碼以登入系統</p>
       </div>
 
+      <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
-          {% for category, msg in messages %}
-            <div class="alert-flat alert-{{ category }} error-alert mb-3">
-              <i class="bi {% if category == 'success' %}bi-check-circle-fill{% else %}bi-exclamation-circle-fill{% endif %}"></i> {{ msg }}
-            </div>
-          {% endfor %}
+          <script>
+            document.addEventListener("DOMContentLoaded", function() {
+              {% for category, msg in messages %}
+                {% set icon = 'success' if category == 'success' else ('error' if category == 'danger' else ('warning' if category == 'warning' else 'info')) %}
+                {% set title = '成功' if category == 'success' else ('錯誤' if category == 'danger' else ('警告' if category == 'warning' else '提示')) %}
+                Swal.fire({
+                  icon: '{{ icon }}',
+                  title: '{{ title }}',
+                  text: {{ msg|tojson|safe }},
+                  confirmButtonColor: '#2563eb'
+                });
+              {% endfor %}
+            });
+          </script>
         {% endif %}
       {% endwith %}
 
       {% if error %}
-        <div class="alert-flat alert-danger error-alert">
-          <i class="bi bi-exclamation-circle-fill"></i> {{ error }}
-        </div>
+        <script>
+          document.addEventListener("DOMContentLoaded", function() {
+            Swal.fire({
+              icon: 'error',
+              title: '錯誤',
+              text: {{ error|tojson|safe }},
+              confirmButtonColor: '#2563eb'
+            });
+          });
+        </script>
       {% endif %}
 
       <form method="POST">

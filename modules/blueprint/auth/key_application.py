@@ -1,6 +1,7 @@
 from flask import Blueprint, flash, jsonify, redirect, render_template, request, session, url_for
 from modules.services.auth import login_required
 from modules.services.db import get_conn
+
 key_application_bp = Blueprint("key_application", __name__, template_folder="templates")
 
 def _return_to_applications():
@@ -41,7 +42,7 @@ def create_application():
     cursor.execute("INSERT INTO dbo.User_applications (UserID, Content, Usage_days, Status) VALUES (?, ?, ?, 'Pending')",session["userid"], content, int(usage_days),)
     conn.commit()
     conn.close()
-    flash("Key 申請已送出，請等待管理員審核。", "success")
+    flash("權限申請已送出，請等待管理員審核。", "success")
     return _return_to_applications()
 
 

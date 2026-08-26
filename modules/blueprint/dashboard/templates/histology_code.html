@@ -41,13 +41,37 @@
 {% endblock %}
 
 {% block content %}
-<div class="page-head">
+{% if preview_mode %}
+<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2 mb-2">
+  <span class="text-secondary fw-medium">正在預覽版本 <code>{{ preview_commit_id }}</code>；此頁為唯讀，不會修改資料。</span>
+</div>
+<style>form[action*="/versions/save"] { display: none; }</style>
+{% endif %}
+<div class="page-head d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
   <div>
     <h1>組織型態管理</h1>
     <p class="lead">組織型態對照資料，顯示年度、癌別、代碼與組織型態名稱。</p>
   </div>
+  <div class="d-flex flex-wrap align-items-center gap-3">
+    {% if pending_change_count %}
+    <div class="text-secondary fw-medium d-flex align-items-center gap-1" style="font-size: 14.5px;">
+      <span>尚有 {{ pending_change_count }} 筆未儲存變更</span>
+    </div>
+    {% endif %}
+    <div class="d-flex flex-wrap gap-2">
+      <a class="btn btn-danger" href="{{ url_for('histology_mapping.histology_code_versions', access_token=access_token) }}">版本紀錄</a>
+      <form method="post" action="{{ url_for('histology_mapping.save_histology_code_version') }}" onsubmit="event.preventDefault(); Swal.fire({ title: '儲存目前版本', text: '將儲存所有年度的組織型態資料。', icon: 'question', showCancelButton: true, confirmButtonColor: '#2563eb', cancelButtonColor: '#6c757d', confirmButtonText: '確認儲存', cancelButtonText: '取消' }).then((result) => { if (result.isConfirmed) { this.submit(); } });">
+        <input type="hidden" name="access_token" value="{{ access_token }}">
+      <input type="hidden" name="return_year" value="{{ selected_year }}">
+      <input type="hidden" name="return_column" value="{{ search_column }}">
+      <input type="hidden" name="return_q" value="{{ search_query }}">
+      <button class="btn btn-success" type="submit">儲存目前版本</button>
+      </form>
+    </div>
+  </div>
 </div>
 
+{% if not preview_mode %}
 <section class="card-flat">
   <div class="section-head">
     <h2><span class="dot" style="background:var(--warning)"></span> 資料輸入與上傳</h2>
@@ -69,7 +93,7 @@
         <div class="histology-entry-pane rounded-2 p-3">
           <div class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-2 mb-3">
             <p class="text-secondary small mb-0">逐欄填寫一筆組織型態對照資料。</p>
-            <button class="btn btn-dark btn-sm px-3" type="submit" form="histologyMappingForm"><i class="bi bi-check-lg me-1"></i>新增資料</button>
+            <button class="btn btn-dark btn-sm px-3" type="submit" form="histologyMappingForm">新增資料</button>
           </div>
           <form id="histologyMappingForm" class="row g-2" method="post" action="{{ url_for('histology_mapping.create_histology_code_mapping') }}" onsubmit="event.preventDefault(); Swal.fire({ title: '確認新增', text: '確定要新增這筆資料嗎？', icon: 'question', showCancelButton: true, confirmButtonColor: '#2563eb', cancelButtonColor: '#6c757d', confirmButtonText: '確定', cancelButtonText: '取消' }).then((result) => { if (result.isConfirmed) { this.submit(); } });">
             <input type="hidden" name="access_token" value="{{ access_token }}">
@@ -106,6 +130,7 @@
     {% endif %}
   </div>
 </section>
+{% endif %}
 
 <section class="card-flat">
   <div class="section-head">
@@ -126,16 +151,22 @@
               {% endfor %}
             </select>
           </div>
-          <div class="col-md-8 col-xl-6">
+          <div class="col-md-8 col-xl">
             <label class="form-label fw-semibold" for="histologyQuery">關鍵字</label>
             <div class="input-group">
               <span class="input-group-text"><i class="bi bi-search"></i></span>
               <input id="histologyQuery" name="q" value="{{ search_query }}" class="form-control" type="search" placeholder="輸入年度、癌別、代碼或組織型態名稱">
             </div>
           </div>
-          <div class="col-xl-3 d-flex gap-2">
+          <div class="col-12 col-xl-auto d-flex gap-2">
             <button class="btn btn-dark px-4" type="submit"><i class="bi bi-search me-1"></i>搜尋</button>
-            {% if search_query %}<a class="btn btn-outline-secondary" href="{{ url_for('histology_mapping.histology_code_mapping', access_token=access_token) }}">清除</a>{% endif %}
+            {% if search_query %}
+              {% if preview_mode %}
+              <a class="btn btn-outline-secondary" href="{{ url_for('histology_mapping.preview_histology_code_version', version_id=preview_commit_id, access_token=access_token) }}">清除</a>
+              {% else %}
+              <a class="btn btn-outline-secondary" href="{{ url_for('histology_mapping.histology_code_mapping', access_token=access_token) }}">清除</a>
+              {% endif %}
+            {% endif %}
           </div>
         </div>
       </div>
@@ -154,7 +185,11 @@
         <nav class="histology-year-tabs" aria-label="年度選擇">
           <div class="nav nav-pills gap-2">
             {% for year in available_years %}
+            {% if preview_mode %}
+            <a class="nav-link px-3 py-2 {% if year == selected_year %}active{% endif %}" href="{{ url_for('histology_mapping.preview_histology_code_version', version_id=preview_commit_id, year=year, column=search_column, q=search_query, access_token=access_token) }}">{{ year }} 年</a>
+            {% else %}
             <a class="nav-link px-3 py-2 {% if year == selected_year %}active{% endif %}" href="{{ url_for('histology_mapping.histology_code_mapping', year=year, column=search_column, q=search_query, access_token=access_token) }}">{{ year }} 年</a>
+            {% endif %}
             {% endfor %}
           </div>
         </nav>
@@ -188,7 +223,14 @@
         <thead>
           <tr>
             {% if primary_key %}<th scope="col" class="text-center"><input id="histologySelectAll" class="form-check-input" type="checkbox" aria-label="全選目前顯示的資料"></th>{% endif %}
-            {% for column in display_columns %}<th scope="col">{{ column_labels[column] }}</th>{% endfor %}
+            {% for column in display_columns %}
+            <th scope="col" class="sortable-header user-select-none" data-sort-idx="{{ loop.index0 + (1 if primary_key else 0) }}" style="cursor: pointer;" title="點擊排序">
+              <div class="d-flex align-items-center gap-1">
+                {{ column_labels[column] }}
+                <i class="bi bi-caret-down text-muted ms-1" style="font-size: 0.8rem; transition: transform 0.2s;"></i>
+              </div>
+            </th>
+            {% endfor %}
             {% if primary_key %}<th scope="col">操作</th>{% endif %}
           </tr>
         </thead>
@@ -281,6 +323,60 @@
     rowSelections.forEach((checkbox) => {
       checkbox.addEventListener("change", () => {
         selectAll.checked = rowSelections.length > 0 && [...rowSelections].every((item) => item.checked);
+      });
+    });
+  }
+
+  // Table Sorting Logic
+  const histologyTable = document.querySelector(".histology-table");
+  if (histologyTable) {
+    const headers = histologyTable.querySelectorAll("th.sortable-header");
+    headers.forEach(header => {
+      header.addEventListener("click", () => {
+        const tbody = histologyTable.querySelector("tbody");
+        const rows = Array.from(tbody.querySelectorAll("tr:not(.histology-empty-row)"));
+        if (rows.length === 0) return;
+        
+        const idx = parseInt(header.getAttribute("data-sort-idx"));
+        const isAsc = header.classList.contains("sort-asc");
+        
+        // Reset all headers
+        headers.forEach(h => {
+          h.classList.remove("sort-asc", "sort-desc");
+          const icon = h.querySelector("i.bi");
+          if (icon) icon.className = "bi bi-caret-down text-muted ms-1";
+        });
+        
+        // Set current header state
+        header.classList.add(isAsc ? "sort-desc" : "sort-asc");
+        const currIcon = header.querySelector("i.bi");
+        if (currIcon) {
+          currIcon.className = isAsc ? "bi bi-caret-down-fill text-dark ms-1" : "bi bi-caret-up-fill text-dark ms-1";
+        }
+        
+        // Sort rows
+        rows.sort((a, b) => {
+          const getVal = (row) => {
+            const cell = row.children[idx];
+            if (!cell) return "";
+            const input = cell.querySelector("input:not([type='hidden']):not([type='checkbox'])");
+            return input ? input.value.trim() : cell.innerText.trim();
+          };
+          
+          const aCol = getVal(a);
+          const bCol = getVal(b);
+          
+          const aNum = parseFloat(aCol);
+          const bNum = parseFloat(bCol);
+          
+          if (!isNaN(aNum) && !isNaN(bNum)) {
+            return isAsc ? bNum - aNum : aNum - bNum;
+          }
+          return isAsc ? bCol.localeCompare(aCol, "zh-TW") : aCol.localeCompare(bCol, "zh-TW");
+        });
+        
+        // Append sorted rows
+        rows.forEach(row => tbody.appendChild(row));
       });
     });
   }

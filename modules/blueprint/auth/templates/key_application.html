@@ -4,8 +4,6 @@
 
 {% block extra_head %}
 <style>
-  /* Hallmark — genre: modern-minimal · macrostructure: Workbench · tone: formal, minimal · anchor hue: project blue
-   * contrast: pass · responsive: pass · no invented metrics or decorative chrome */
   .key-application-page {
     --key-panel: var(--surface);
     --key-ink: var(--text);
@@ -27,7 +25,6 @@
   .key-page-head p { margin: 7px 0 0; color: var(--key-muted); font-size: .9rem; }
   .key-page-mark { display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; color: var(--key-muted); font-size: .78rem; font-weight: 700; }
   .key-page-mark i { color: var(--key-accent); font-size: 1rem; }
-
   .key-workbench { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(270px, .85fr); border: 1px solid var(--key-rule); border-radius: var(--key-radius); background: var(--key-panel); box-shadow: var(--shadow-sm); overflow: hidden; }
   .key-form-zone { padding: 28px; }
   .key-form-zone h2 { margin: 0; color: var(--key-ink); font-size: 1.2rem; font-weight: 750; letter-spacing: -.015em; }
@@ -44,7 +41,6 @@
   .key-submit:hover { background: var(--gray-800); color: var(--white); transform: translateY(-1px); }
   .key-submit:focus-visible, .key-copy:focus-visible, .key-activate:focus-visible, .key-delete:focus-visible, .key-details summary:focus-visible { outline: 3px solid var(--key-accent-soft); outline-offset: 2px; }
   .key-submit:active { transform: translateY(0); }
-
   .key-process-zone { padding: 28px; background: var(--key-dark); color: var(--white); }
   .key-process-zone h3 { margin: 0; color: var(--white); font-size: 1rem; font-weight: 750; }
   .key-process-zone > p { margin: 7px 0 22px; color: var(--key-dark-muted); font-size: .84rem; line-height: 1.7; }
@@ -55,7 +51,6 @@
   .key-process-list strong { display: block; color: var(--white); font-size: .83rem; font-weight: 700; }
   .key-notice { display: flex; gap: 9px; margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--gray-700); color: var(--gray-400); font-size: .76rem; line-height: 1.65; }
   .key-notice i { flex: 0 0 auto; color: var(--blue-500); }
-
   .key-history { margin-top: 30px; }
   .key-history-head { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
   .key-history-head h2 { margin: 0; color: var(--key-ink); font-size: 1.18rem; font-weight: 750; letter-spacing: -.015em; }
@@ -94,7 +89,6 @@
   .key-delete:hover { background: var(--danger); color: var(--white); }
   .key-empty { padding: 38px 20px; border: 1px dashed var(--key-rule); border-radius: var(--key-radius); color: var(--key-muted); text-align: center; }
   .key-empty i { display: block; margin-bottom: 8px; color: var(--gray-400); font-size: 1.3rem; }
-
   @media (max-width: 991.98px) { .key-workbench { grid-template-columns: minmax(0, 1fr); } .key-process-zone { border-top: 1px solid var(--gray-700); } .key-record-data { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
   @media (max-width: 767.98px) { .key-page-head, .key-history-head { align-items: flex-start; flex-direction: column; } .key-form-zone, .key-process-zone { padding: 22px; } .key-record { grid-template-columns: 34px minmax(0, 1fr); } .key-record-action { grid-column: 2; } .key-record-data, .key-detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media (max-width: 479.98px) { .key-form-grid, .key-record-data, .key-detail-grid { grid-template-columns: minmax(0, 1fr); } .key-form-field--full { grid-column: auto; } .key-record-top { align-items: flex-start; flex-direction: column; gap: 7px; } .key-submit { min-height: 44px; } }
@@ -115,7 +109,7 @@
     <div class="key-form-zone">
       <h2 id="key-application-title">申請新的存取金鑰</h2>
       <p class="key-form-intro">請說明使用需求與預計借用時間；申請送出後，須由管理員審核。</p>
-      <form class="key-form-grid" method="post" action="{{ url_for('key_application.create_application') }}">
+      <form class="key-form-grid" method="post" action="{{ url_for('key_application.create_application') }}" onsubmit="event.preventDefault(); Swal.fire({ title: '確認送出', text: '確定要送出此存取金鑰申請嗎？', icon: 'question', showCancelButton: true, confirmButtonColor: '#2563eb', cancelButtonColor: '#6c757d', confirmButtonText: '送出申請', cancelButtonText: '取消' }).then((result) => { if (result.isConfirmed) { this.submit(); } });">
         <div class="key-form-field--full">
           <label class="form-label" for="applicationContent">使用需求 
             <span class="text-danger">*</span>
@@ -215,7 +209,7 @@
           </form>
           {% endif %}
           {% if item.Status == 'Pending' %}
-          <form method="post" action="{{ url_for('key_application.delete_application', application_id=item.Application_id) }}" onsubmit="return confirm('確定要刪除此筆申請嗎？');">
+          <form method="post" action="{{ url_for('key_application.delete_application', application_id=item.Application_id) }}" onsubmit="event.preventDefault(); Swal.fire({ title: '確認刪除', text: '確定要刪除此筆申請嗎？', icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545', cancelButtonColor: '#6c757d', confirmButtonText: '確定刪除', cancelButtonText: '取消' }).then((result) => { if (result.isConfirmed) { this.submit(); } });">
             <button class="key-delete" type="submit">刪除申請</button>
           </form>
           {% endif %}
@@ -235,7 +229,7 @@
       const response = await fetch(button.dataset.copyUrl);
       const data = await response.json();
       if (!response.ok) {
-        alert(data.error);
+        Swal.fire({ icon: 'error', title: '複製失敗', text: data.error, confirmButtonColor: '#2563eb' });
         return;
       }
       await navigator.clipboard.writeText(data.key);

@@ -27,18 +27,8 @@
       <label class="form-label fw-semibold" for="histology-api-key">授權金鑰</label>
       <input id="histology-api-key" name="api_key" class="form-control" type="password" autocomplete="off" required autofocus>
       <p class="form-text mt-2">Key 必須屬於目前登入帳號，且仍在啟用期間內。</p>
-      <button class="btn btn-dark w-100 mt-3" type="submit"><i class="bi bi-shield-check me-1"></i>驗證並進入</button>
+      <button class="btn btn-dark w-100 mt-3 d-flex justify-content-center align-items-center" type="submit"><i class="bi bi-shield-check me-1"></i>驗證並進入</button>
     </form>
   </div>
 </section>
-<script>
-  document.addEventListener("DOMContentLoaded", function() {
-    const keyErrorAlert = document.querySelector(".alert-danger");
-    if (keyErrorAlert && window.Swal) {
-      const message = keyErrorAlert.textContent.trim();
-      keyErrorAlert.remove();
-      Swal.fire({ icon: "error", title: "Key 驗證失敗", text: message, confirmButtonColor: "#2563eb" });
-    }
-  });
-</script>
 {% endblock %}
