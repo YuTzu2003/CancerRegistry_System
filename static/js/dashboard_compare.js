@@ -30,6 +30,7 @@
   const customYearControls = new Map();
   const yearSelects = [mainYear, mainYearEnd, targetYear, targetYearEnd];
   let activeTreatmentStageSystem = '';
+  let activeSurgeryTableKey = '';
   const stageResultGroupItem = '__stage_reports__';
   let activeStageReportOption = '';
 
@@ -1209,6 +1210,36 @@
     return `<div class="annual-report-table-wrap"><table class="annual-report-table"><caption>${caption}</caption><thead><tr><th rowspan="2">${isEnglish() ? 'First Course of Treatment' : '首次療程'}</th><th colspan="${Math.max(stages.length, 1)}">${escapeHtml(item.system)} ${isEnglish() ? 'Stage' : '期別'}</th><th rowspan="2">${isEnglish() ? 'Total' : '小計'}</th><th rowspan="2">%</th></tr><tr>${stages.map(stage => `<th>${escapeHtml(displayStage(stage))}</th>`).join('')}</tr></thead><tbody>${bodyRows}<tr class="fw-bold"><td>${isEnglish() ? 'Total' : '總計'}</td>${totals}<td>${totalCount}</td><td>${totalCount ? '100.0%' : '0.0%'}</td></tr><tr><td>%</td>${percentages}<td>${totalCount ? '100.0%' : '0.0%'}</td><td>-</td></tr></tbody></table></div><div class="compare-note"><div>${definitionNote}</div><div>${stageNote}</div></div>`;
   }
 
+  function surgeryProcedureBlock(chartData, yearTitle, cancerTitle, activeKey) {
+    const tables = Array.isArray(chartData?.stageSurgeryData) ? chartData.stageSurgeryData : [];
+    const tableKeyOf = table => `${table.manual_key || 'unknown'}::${table.system || 'stage'}`;
+    const item = tables.find(table => tableKeyOf(table) === activeKey) || tables[0];
+    if (!item) return `<div class="alert alert-light border mb-0">${isEnglish() ? 'No stage and surgical procedure data are available.' : '目前沒有可呈現的期別與手術術式資料。'}</div>`;
+    const stages = item.stage_columns || [];
+    const rows = item.rows || [];
+    const rowByKey = new Map(rows.map(row => [row.row_key, row]));
+    const levelOf = row => {
+      if (row.display_level !== null && row.display_level !== undefined && row.display_level !== '' && Number.isFinite(Number(row.display_level))) return Math.max(0, Number(row.display_level));
+      let level = 0, parent = rowByKey.get(row.parent_row_key), seen = new Set();
+      while (parent && !seen.has(parent.row_key)) { seen.add(parent.row_key); level += 1; parent = rowByKey.get(parent.parent_row_key); }
+      return level;
+    };
+    const total = Number(item.total_count || 0);
+    const stageSystem = item.system || (isEnglish() ? 'Unspecified' : '未指定');
+    const procedure = row => {
+      const code = row.code_short && row.code_long ? `${row.code_short}/${row.code_long}` : (row.code_short || row.code_long || '');
+      return row.row_type === 'heading' ? (row.procedure || '') : `${code}${code && row.procedure ? ' ' : ''}${row.procedure || ''}`;
+    };
+    const body = rows.map(row => {
+      const indent = Math.min(levelOf(row), 3) * 1.5;
+      const values = (row.values || []).map(value => `<td>${value}</td>`).join('');
+      return `<tr class="${row.row_type === 'heading' ? 'table-light fw-semibold' : ''}"><td class="text-start" style="padding-left: calc(0.75rem + ${indent}rem) !important">${escapeHtml(procedure(row))}</td>${values}<td>${Number(row.subtotal || 0)}</td><td>${total ? (Number(row.subtotal || 0) / total * 100).toFixed(1) : '0.0'}%</td></tr>`;
+    }).join('');
+    const caption = isEnglish()
+      ? `Table. Surgical Procedure Distribution of Newly Diagnosed ${escapeHtml(reportCancerTitle(cancerTitle))} Cases by ${escapeHtml(stageSystem)} Stage, ${yearTitle}${sourceLine()}`
+      : `表、${yearTitle}年新診斷${escapeHtml(reportCancerTitle(cancerTitle))}病患${escapeHtml(stageSystem)}期別與手術術式分佈${sourceLine()}`;
+    return `<div class="annual-report-table-wrap"><table class="annual-report-table"><caption class="surgery-table-caption">${caption}</caption><thead><tr><th class="text-center">${isEnglish() ? 'Surgical Codes/Surgical Procedure' : '術式編碼/術式名稱'}</th><th colspan="${Math.max(stages.length, 1)}">${escapeHtml(stageSystem)} ${isEnglish() ? 'Stage' : '期別'}</th><th rowspan="2">${isEnglish() ? 'Total' : '小計'}</th><th rowspan="2">%</th></tr><tr><th class="text-center">${isEnglish() ? '(Taiwan Cancer Registry Surgery Codes)' : '（按台灣癌症登記術式編碼分類）'}</th>${stages.map(stage => `<th>${escapeHtml(String(stage || '').replace(/^Stage\s+/i, ''))}</th>`).join('')}</tr></thead><tbody>${body}<tr class="fw-bold"><td>${isEnglish() ? 'Total' : '總計'}</td>${(item.totals || []).map(value => `<td>${value}</td>`).join('')}<td>${total}</td><td>${total ? '100.0%' : '0.0%'}</td></tr><tr><td>%</td>${(item.percentages || []).map(value => `<td>${value}%</td>`).join('')}<td>${total ? '100.0%' : '0.0%'}</td><td>-</td></tr></tbody></table></div>`;
+  }
   function normalizeStageReport(report) {
     const stageLabels = Array.isArray(report?.stage_labels) ? report.stage_labels.map(String) : [];
     const values = source => stageLabels.map((_, index) => Number(source?.[index] || 0));
@@ -1541,6 +1572,7 @@
     if (item === '組織型態') return histologyBlock(chartData, meta.year_label, cancerTitle, `${chartPrefix}HistologyChart`);
     if (item === '個案分類') return classificationBlock(chartData, meta.year_label, cancerTitle, `${chartPrefix}ClassificationChart`);
     if (item === '期別與首次療程') return treatmentFirstCourseBlock(chartData, meta.year_label, cancerTitle, activeStageSystem);
+    if (item === '期別與手術術式') return surgeryProcedureBlock(chartData, meta.year_label, cancerTitle, activeStageSystem);
     if ((chartData?.stageReports || []).some(report => report.option === item)) {
       return stageBlock(chartData, meta.year_label, cancerTitle, `${chartPrefix}StageChart`, item);
     }
@@ -2118,6 +2150,24 @@
     if (isTreatmentFirstCourse && !treatmentSystems.includes(activeTreatmentStageSystem)) {
       activeTreatmentStageSystem = treatmentSystems[0] || '';
     }
+    const isTreatmentSurgery = activeItem === '期別與手術術式';
+    const surgeryTables = [
+      ...(data.analysis_data?.main?.stageSurgeryData || []),
+      ...(data.analysis_data?.target?.stageSurgeryData || [])
+    ];
+    const surgeryKeyOf = table => `${table.manual_key || 'unknown'}::${table.system || 'stage'}`;
+    const surgeryKeys = Array.from(new Set(surgeryTables.map(surgeryKeyOf)));
+    if (isTreatmentSurgery && !surgeryKeys.includes(activeSurgeryTableKey)) {
+      activeSurgeryTableKey = surgeryKeys[0] || '';
+    }
+    const surgeryTabs = isTreatmentSurgery && surgeryKeys.length > 1
+      ? `<div class="d-flex flex-wrap gap-2 mb-3" role="tablist">${surgeryKeys.map(key => {
+          const table = surgeryTables.find(candidate => surgeryKeyOf(candidate) === key) || {};
+          const label = isEnglish() ? `${table.cancer_name_en || table.manual_key || ''} ${table.system || ''} Stage` : `${table.cancer_name || table.manual_key || ''}${table.system || ''}期別`;
+          return `<button type="button" class="btn btn-outline-dark btn-sm compare-surgery-tab${key === activeSurgeryTableKey ? ' active' : ''}" data-surgery-key="${escapeHtml(key)}">${escapeHtml(label)}</button>`;
+        }).join('')}</div>`
+      : '';
+    const activeTableSelection = isTreatmentSurgery ? activeSurgeryTableKey : activeTreatmentStageSystem;
     const treatmentTabs = isTreatmentFirstCourse && treatmentSystems.length > 1
       ? `<div class="d-flex flex-wrap gap-2 mb-3" role="tablist">${treatmentSystems.map(system => `<button type="button" class="btn btn-outline-dark btn-sm compare-treatment-stage-tab${system === activeTreatmentStageSystem ? ' active' : ''}" data-stage-system="${escapeHtml(system)}">${escapeHtml(system)}${isEnglish() ? ' Stage' : '期別'}</button>`).join('')}</div>`
       : '';
@@ -2127,6 +2177,7 @@
     document.getElementById('compareResultPanel').innerHTML = `
       ${stageTabs}
       ${treatmentTabs}
+      ${surgeryTabs}
       <div class="compare-result-grid">
         <section class="compare-result-item is-main">
           <div class="compare-result-heading"><div><h3>${isEnglish() ? 'Baseline period' : '基準期資料'}｜${escapeHtml(data.main?.year_label || '—')}</h3></div></div>
@@ -2139,11 +2190,18 @@
       </div>
     `;
 
-    renderAnnualReport('mainAnnualReport', data.analysis_data?.main || {}, data.main, `main${index}`, activeItem, 'main', sharedScale, activeTreatmentStageSystem);
-    renderAnnualReport('targetAnnualReport', data.analysis_data?.target || {}, data.target, `target${index}`, activeItem, 'target', sharedScale, activeTreatmentStageSystem);
+    renderAnnualReport('mainAnnualReport', data.analysis_data?.main || {}, data.main, `main${index}`, activeItem, 'main', sharedScale, activeTableSelection);
+    renderAnnualReport('targetAnnualReport', data.analysis_data?.target || {}, data.target, `target${index}`, activeItem, 'target', sharedScale, activeTableSelection);
     document.querySelectorAll('.compare-treatment-stage-tab').forEach(button => {
       button.addEventListener('click', () => {
         activeTreatmentStageSystem = button.dataset.stageSystem || '';
+        renderResultItem(data, item, index);
+        renderAiNarrative(data, activeComparisonItem(item));
+      });
+    });
+    document.querySelectorAll('.compare-surgery-tab').forEach(button => {
+      button.addEventListener('click', () => {
+        activeSurgeryTableKey = button.dataset.surgeryKey || '';
         renderResultItem(data, item, index);
         renderAiNarrative(data, activeComparisonItem(item));
       });
@@ -2171,6 +2229,11 @@
       if (analysisItem === '期別與首次療程') {
         const tables = analysis?.stageFirstCourseData || [];
         selectedAnalysis.stage_first_course = tables.find(table => table.system === activeTreatmentStageSystem) || tables[0] || {};
+      }
+      if (analysisItem === '期別與手術術式') {
+        const tables = analysis?.stageSurgeryData || [];
+        const surgeryKeyOf = table => `${table.manual_key || 'unknown'}::${table.system || 'stage'}`;
+        selectedAnalysis.stage_surgery = tables.find(table => surgeryKeyOf(table) === activeSurgeryTableKey) || tables[0] || {};
       }
       const stageReport = (analysis?.stageReports || []).find(report => report.option === analysisItem);
       if (stageReport) selectedAnalysis.stage_report = stageReport;
@@ -2203,12 +2266,14 @@
   }
 
   function aiNarrativeCacheKey(analysisItem) {
-    const stageSystem = analysisItem === '期別與首次療程' ? `|${activeTreatmentStageSystem}` : '';
+    const stageSystem = analysisItem === '期別與首次療程'
+      ? `|${activeTreatmentStageSystem}`
+      : analysisItem === '期別與手術術式' ? `|${activeSurgeryTableKey}` : '';
     return `${window.DashboardI18n?.getLanguage() || 'zh-TW'}|${analysisItem}${stageSystem}`;
   }
 
   function fetchAiNarrative(data, analysisItem, force = false) {
-    const stageSystemAtRequest = analysisItem === '期別與首次療程' ? activeTreatmentStageSystem : '';
+    const stageSystemAtRequest = analysisItem === '期別與首次療程' ? activeTreatmentStageSystem : analysisItem === '期別與手術術式' ? activeSurgeryTableKey : '';
     const language = window.DashboardI18n?.getLanguage() || 'zh-TW';
     const cacheKey = `${language}|${analysisItem}${stageSystemAtRequest ? `|${stageSystemAtRequest}` : ''}`;
     if (!force && aiNarrativeCache.has(cacheKey)) {
@@ -2633,7 +2698,7 @@
     }
     const compareItems = selectedCompareItems();
     const stageOptions = [...selectedCompareStageOptions().options];
-    if (compareItems.includes('期別與首次療程')) {
+    if (compareItems.includes('期別與首次療程') || compareItems.includes('期別與手術術式')) {
       treatmentStageOptions().forEach(option => {
         if (!stageOptions.some(selected => selected.system === option.system && selected.option === option.option)) {
           stageOptions.push(option);
@@ -2661,13 +2726,37 @@
       .then(r => r.json())
       .then(data => {
         if (!data.ok) throw new Error(data.error || '比較失敗');
+        if (data.data?.noDataWarning) {
+          lastComparisonData = null;
+          hasRenderedResult = false;
+          activeAiNarrativeItem = '';
+          aiNarrativeRequestId += 1;
+          aiNarrativeCache.clear();
+          resultStale.classList.add('d-none');
+          resultBox.classList.add('d-none');
+          document.getElementById('compareResultSummary').replaceChildren();
+          document.getElementById('compareResultTabs').replaceChildren();
+          document.getElementById('compareResultPanel').replaceChildren();
+          document.getElementById('compareAiNarrative').classList.add('d-none');
+          document.getElementById('compareAiNarrativeText').textContent = '';
+          showAlert('查無符合資料', data.data.noDataWarning);
+          return;
+        }
         const items = selectedCompareItems();
         aiNarrativeCache.clear();
         const treatmentSystems = Array.from(new Set([
           ...(data.data.analysis_data?.main?.stageFirstCourseData || []).map(table => table.system),
           ...(data.data.analysis_data?.target?.stageFirstCourseData || []).map(table => table.system)
         ]));
-        const originalTreatmentSystem = activeTreatmentStageSystem;
+const originalTreatmentSystem = activeTreatmentStageSystem;
+        const surgeryTables = [
+          ...(data.data.analysis_data?.main?.stageSurgeryData || []),
+          ...(data.data.analysis_data?.target?.stageSurgeryData || [])
+        ];
+        const surgeryKeyOf = table => `${table.manual_key || 'unknown'}::${table.system || 'stage'}`;
+        if (!surgeryTables.some(table => surgeryKeyOf(table) === activeSurgeryTableKey)) {
+          activeSurgeryTableKey = surgeryKeyOf(surgeryTables[0] || {});
+        }
         const narrativeRequests = items.flatMap(item => {
           if (item !== '期別與首次療程') return [{ item, stageSystem: '' }];
           return treatmentSystems.length

@@ -14,7 +14,6 @@ from modules.blueprint.dashboard.definition.histology_code_mapping import (
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 DASHBOARD_DATA = f"{BASE_DIR}/tasks/data"
-
 def _safe_dashboard_path(filename):
     relative_path = str(filename or "")
     fpath = os.path.abspath(os.path.join(DASHBOARD_DATA, relative_path))
@@ -56,7 +55,7 @@ def get_column_names(df):
         "hist_col": _find_column(df, ["hist", "組織型態"]),
         "year_col": _find_column(df, ["didiag", "最初診斷日", "診斷日期"]),
         "behavior_col": _find_column(df, ["behavior", "性態碼"]),
-        "ajcc_ed_col": _find_column(df, ["ajcc_ed", "ajcc edition", "ajcc版本"]),
+        "ajcc_ed_col": _find_column(df, ["ajcc_ed", "ajcc edition", "ajcc版本", "ajcc 癌症分期版本與章節", "癌症分期版本與章節"]),
         "class_col": _find_column(df, ["class", "診斷等級", "診斷方式", "個案分類"]) or _column_by_index(df, 9),
         "confirm_col": _find_column(df, ["confirm", "確診方式", "確診"]) or _column_by_index(df, 20),
         "diag_status_col": _find_column(df, ["診斷狀態分類", "診斷狀態"]),
@@ -89,6 +88,7 @@ def _empty_dashboard_response(message="查無符合條件資料！", histology_r
         "histologyNoDataReason": histology_reason or message,
         "diagnosisClassificationData": [],
         "stageFirstCourseData": [],
+        "stageSurgeryData": [],
         "survivalData": {
             "rows": [],
             "no_data_reason": message,
@@ -676,22 +676,24 @@ def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", beh
         source_df = source_df if source_df is not None else _read_dashboard_excel(filename)
         cols = cols or get_column_names(source_df)
 
+        no_data_message = "依目前選擇的年度、癌別與性態碼查無符合個案，無法產生分析結果。"
         if _query_year_range_outside_data(source_df, cols, year_start, year_end):
-            return _empty_dashboard_response(
-                histology_reason="所選年度區間不在檔案的診斷年度範圍內。"
-            )
+            return _empty_dashboard_response(message=no_data_message, histology_reason="所選年度區間不在檔案的診斷年度範圍內。")
 
         year_filtered_df = filter_dashboard_data(source_df, cols, [], year_start, year_end, "")
         if year_filtered_df.empty:
-            return _empty_dashboard_response(histology_reason="所選年度內沒有可分析個案。")
+            return _empty_dashboard_response(message=no_data_message, histology_reason="所選年度內沒有可分析個案。")
         behavior_filtered_df = filter_dashboard_data(source_df, cols, [], year_start, year_end, behavior)
         if behavior_filtered_df.empty:
-            return _empty_dashboard_response(histology_reason="所選年度內沒有符合性態碼條件的個案。")
+            return _empty_dashboard_response(message=no_data_message, histology_reason="所選年度內沒有符合性態碼條件的個案。")
         df = filtered_df if filtered_df is not None else filter_dashboard_data(
             source_df, cols, cancers, year_start, year_end, behavior
         )
         if df.empty:
-            return _empty_dashboard_response(histology_reason="沒有同時符合所選年度、性態碼與癌別條件的個案。")
+            return _empty_dashboard_response(
+                message=no_data_message,
+                histology_reason="沒有同時符合所選年度、性態碼與癌別條件的個案。",
+            )
         
         selected = set(analysis_items or [])
         calculate_all = not selected
@@ -705,6 +707,7 @@ def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", beh
             selected.intersection({"分期呈現最細碼", "分期不呈現最細碼"})
         )
         treatment_selected = calculate_all or "期別與首次療程" in selected
+        surgery_selected = calculate_all or "期別與手術術式" in selected
         result = _empty_dashboard_response()
         result.pop("noDataWarning", None)
         result["histologyNoDataReason"] = ""
@@ -735,6 +738,7 @@ def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", beh
                 from modules.blueprint.clean.field_mapping import field_mapping
                 from modules.blueprint.dashboard.period_rule import (
                     calculate_stage_first_course_distribution,
+                    calculate_stage_surgery_distribution,
                     calculate_stage_reports,
                 )
 
@@ -757,6 +761,11 @@ def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", beh
                 if treatment_selected:
                     result["stageFirstCourseData"] = calculate_stage_first_course_distribution(
                         chinese_df, stage_options
+                    )
+                if surgery_selected:
+                    result["stageSurgeryData"] = calculate_stage_surgery_distribution(
+                        chinese_df, stage_options,
+                        manual_keys=cancers,
                     )
         if calculate_all or "存活率" in selected:
             result["survivalData"] = calculate_survival_table(df, cols)
@@ -849,6 +858,19 @@ def compare_dashboard_files(main_filename, target_filename, behavior="", cancers
     target_filtered = filter_dashboard_data(
         target_source, target_cols, cancers or [], target_year, target_end, behavior
     )
+    no_data_message = "依目前選擇的年度、癌別與性態碼查無符合個案，無法進行年度比較。"
+    if main_filtered.empty or target_filtered.empty:
+        main_period = f"{main_year}年" if str(main_year) == str(main_end) else f"{main_year}-{main_end}年"
+        target_period = f"{target_year}年" if str(target_year) == str(target_end) else f"{target_year}-{target_end}年"
+        missing_periods = []
+        if main_filtered.empty:
+            missing_periods.append(f"基準期({main_period})")
+        if target_filtered.empty:
+            missing_periods.append(f"比較期({target_period})")
+        return {
+            "noDataWarning": f"{'、'.join(missing_periods)}{no_data_message}",
+            "missingPeriods": ["main" if main_filtered.empty else None, "target" if target_filtered.empty else None],
+        }
     main_data = summarize_dashboard_file(
         main_filename, behavior, cancers, main_year, main_end,
         main_source, main_cols, main_filtered
