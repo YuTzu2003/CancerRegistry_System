@@ -1,6 +1,8 @@
 from zipfile import BadZipFile
+from functools import wraps
+import secrets
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, flash, redirect, render_template, request, session, url_for
 from openpyxl import load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
 
@@ -43,6 +45,29 @@ _IMPORT_COLUMNS = tuple(
     for column, _, _, _, allow_excel_import in _FIELD_CONFIG
     if allow_excel_import
 )
+_NUMERIC_COLUMNS = frozenset({"codeyear", "code_year", "hist", "histcode", "behavior", "behaviorcode"})
+
+_HISTOLOGY_ACCESS_TOKEN = "histology_mapping_access_token"
+_HISTOLOGY_ACCESS_USER = "histology_mapping_access_user"
+
+
+def _has_histology_access(access_token):
+    return session.get("position") == "Admin" or (
+        bool(access_token)
+        and session.get(_HISTOLOGY_ACCESS_USER) == session.get("userid")
+        and secrets.compare_digest(access_token, session.get(_HISTOLOGY_ACCESS_TOKEN, ""))
+    )
+
+
+def histology_key_required(view):
+    @wraps(view)
+    def wrapped_view(*args, **kwargs):
+        if not _has_histology_access(request.form.get("access_token", "")):
+            flash("請先輸入有效且已啟用的 Key，才能修改組織型態資料。", "danger")
+            return redirect(url_for("histology_mapping.histology_code_mapping"))
+        return view(*args, **kwargs)
+
+    return wrapped_view
 
 
 def _quote_identifier(identifier):
@@ -131,6 +156,7 @@ def _return_to_mapping():
             year=request.form.get("return_year", ""),
             column=request.form.get("return_column", ""),
             q=request.form.get("return_q", ""),
+            access_token=request.form.get("access_token", ""),
         )
     )
 
@@ -138,6 +164,26 @@ def _return_to_mapping():
 def _editable_columns(columns):
     primary_key = _primary_key(columns)
     return [column for column in columns if column != primary_key]
+
+
+def _validated_mapping_values(columns, values):
+    values = ["" if value is None else str(value).strip() for value in values]
+    empty_columns = [
+        _COLUMN_LABELS.get(column.lower(), column)
+        for column, value in zip(columns, values)
+        if not value
+    ]
+    if empty_columns:
+        raise ValueError(f"請完整填寫欄位：{'、'.join(empty_columns)}。")
+
+    invalid_columns = [
+        _COLUMN_LABELS.get(column.lower(), column)
+        for column, value in zip(columns, values)
+        if column.lower() in _NUMERIC_COLUMNS and not value.isdigit()
+    ]
+    if invalid_columns:
+        raise ValueError(f"{'、'.join(invalid_columns)} 僅能輸入整數。")
+    return values
 
 
 def _insert_mapping_rows(columns, rows):
@@ -181,11 +227,23 @@ def _read_import_rows(uploaded_file):
         workbook.close()
 
 
-@histology_mapping_bp.route("/dashboard/histology-code-mapping")
+@histology_mapping_bp.route("/dashboard/histology-code")
 @login_required
 def histology_code_mapping():
     search_column = request.args.get("column", "")
     search_query = request.args.get("q", "")
+    access_token = request.args.get("access_token", "")
+    if not _has_histology_access(access_token):
+        session.pop(_HISTOLOGY_ACCESS_TOKEN, None)
+        session.pop(_HISTOLOGY_ACCESS_USER, None)
+        return render_template(
+            "histology_key_access.html",
+            active="histology_code_mapping",
+            return_year=request.args.get("year", ""),
+            return_column=search_column,
+            return_q=search_query,
+        )
+
     edit_id = request.args.get("edit_id", "")
     columns, year_counts = _get_year_counts()
     available_years = [year for year, _ in year_counts]
@@ -199,7 +257,7 @@ def histology_code_mapping():
         key_index = columns.index(primary_key)
         editing_row = next((row for row in rows if str(row[key_index]) == edit_id), None)
     return render_template(
-        "histology_code_mapping.html",
+        "histology_code.html",
         active="histology_code_mapping",
         columns=columns,
         display_columns=[
@@ -215,22 +273,75 @@ def histology_code_mapping():
         search_column=search_column if search_column in columns else "",
         search_query=search_query,
         editing_row=editing_row,
+        access_token=access_token,
+        numeric_columns=_NUMERIC_COLUMNS,
     )
 
 
-@histology_mapping_bp.route("/dashboard/histology-code-mapping/create", methods=["POST"])
+@histology_mapping_bp.route("/dashboard/histology-code/access", methods=["POST"])
 @login_required
+def verify_histology_mapping_access():
+    api_key = request.form.get("api_key", "").strip()
+    if not api_key:
+        flash("請輸入 Key。", "danger")
+        return redirect(url_for("histology_mapping.histology_code_mapping"))
+
+    conn = get_conn()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT TOP 1 1
+            FROM dbo.User_applications
+            WHERE UserID = ? AND API_key = ? AND Status = 'Active' AND End_time >= GETDATE()
+            """,
+            session["userid"],
+            api_key,
+        )
+        key_is_valid = cursor.fetchone() is not None
+    finally:
+        conn.close()
+
+    if not key_is_valid:
+        flash("金鑰失效、未啟用或帳號不符，導致啟用失敗，請確認您的金鑰與登入帳號是否正確", "danger")
+        return redirect(url_for("histology_mapping.histology_code_mapping"))
+
+    access_token = secrets.token_urlsafe(24)
+    session[_HISTOLOGY_ACCESS_TOKEN] = access_token
+    session[_HISTOLOGY_ACCESS_USER] = session["userid"]
+    return redirect(
+        url_for(
+            "histology_mapping.histology_code_mapping",
+            year=request.form.get("return_year", ""),
+            column=request.form.get("return_column", ""),
+            q=request.form.get("return_q", ""),
+            access_token=access_token,
+        )
+    )
+
+
+@histology_mapping_bp.route("/dashboard/histology-code/create", methods=["POST"])
+@login_required
+@histology_key_required
 def create_histology_code_mapping():
     columns = _get_mapping_columns()
     editable_columns = _editable_columns(columns)
-    values = [request.form.get(column, "") for column in editable_columns]
+    try:
+        values = _validated_mapping_values(
+            editable_columns,
+            [request.form.get(column, "") for column in editable_columns],
+        )
+    except ValueError as error:
+        flash(str(error), "danger")
+        return _return_to_mapping()
     _insert_mapping_rows(columns, [values])
     flash("組織型態資料已新增。", "success")
     return _return_to_mapping()
 
 
-@histology_mapping_bp.route("/dashboard/histology-code-mapping/import", methods=["POST"])
+@histology_mapping_bp.route("/dashboard/histology-code/import", methods=["POST"])
 @login_required
+@histology_key_required
 def import_histology_code_mapping():
     uploaded_file = request.files.get("import_file")
     if not uploaded_file or not uploaded_file.filename:
@@ -252,21 +363,35 @@ def import_histology_code_mapping():
         flash("資料庫欄位與組織型態表範本不一致，無法匯入。", "danger")
         return _return_to_mapping()
 
+    try:
+        rows = [_validated_mapping_values(editable_columns, row) for row in rows]
+    except ValueError as error:
+        flash(str(error), "danger")
+        return _return_to_mapping()
+
     _insert_mapping_rows(columns, rows)
 
     flash(f"已新增 {len(rows)} 筆組織型態資料。", "success")
     return _return_to_mapping()
 
 
-@histology_mapping_bp.route("/dashboard/histology-code-mapping/<int:histcode_id>/update", methods=["POST"])
+@histology_mapping_bp.route("/dashboard/histology-code/<int:histcode_id>/update", methods=["POST"])
 @login_required
+@histology_key_required
 def update_histology_code_mapping(histcode_id):
     columns = _get_mapping_columns()
     primary_key = _primary_key(columns)
     if not primary_key:
         return "histology_code_mapping 缺少 HistCode_ID 主鍵", 500
     editable_columns = _editable_columns(columns)
-    values = [request.form.get(column, "") for column in editable_columns]
+    try:
+        values = _validated_mapping_values(
+            editable_columns,
+            [request.form.get(column, "") for column in editable_columns],
+        )
+    except ValueError as error:
+        flash(str(error), "danger")
+        return _return_to_mapping()
     assignments = ", ".join(f"{_quote_identifier(column)} = ?" for column in editable_columns)
     conn = get_conn()
     try:
@@ -283,8 +408,9 @@ def update_histology_code_mapping(histcode_id):
     return _return_to_mapping()
 
 
-@histology_mapping_bp.route("/dashboard/histology-code-mapping/<int:histcode_id>/delete", methods=["POST"])
+@histology_mapping_bp.route("/dashboard/histology-code/<int:histcode_id>/delete", methods=["POST"])
 @login_required
+@histology_key_required
 def delete_histology_code_mapping(histcode_id):
     columns = _get_mapping_columns()
     primary_key = _primary_key(columns)
@@ -304,8 +430,9 @@ def delete_histology_code_mapping(histcode_id):
     return _return_to_mapping()
 
 
-@histology_mapping_bp.route("/dashboard/histology-code-mapping/delete-selected", methods=["POST"])
+@histology_mapping_bp.route("/dashboard/histology-code/delete-selected", methods=["POST"])
 @login_required
+@histology_key_required
 def delete_selected_histology_code_mappings():
     histcode_ids = [value for value in request.form.getlist("histcode_ids") if value.isdigit()]
     if not histcode_ids:

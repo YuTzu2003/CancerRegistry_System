@@ -214,6 +214,8 @@
 
 {% if session.get('position') == 'Admin' %}
 <a class="admin-pending-notice" href="{{ url_for('key_approval.key_approval') }}" aria-label="前往金鑰申請審核"><i class="bi bi-bell"></i><div><strong>權限申請通知</strong><p>目前有 <span class="admin-pending-number">{{ pending_application_count }}</span> 筆權限申請尚待審核。</p></div><i class="bi bi-chevron-right ms-auto text-secondary"></i></a>
+{% elif key_application_status %}
+<a class="admin-pending-notice" href="{{ url_for('key_application.application') }}" aria-label="前往我的金鑰申請"><i class="bi bi-bell"></i><div><strong>金鑰申請通知</strong><p>{% if key_application_status == 'Approved' %}您的金鑰申請已核准，請前往啟用 Key。{% else %}您的金鑰申請未通過審核，請前往查看拒絕原因。{% endif %}</p></div><i class="bi bi-chevron-right ms-auto text-secondary"></i></a>
 {% endif %}
 
 <section class="card-flat">
@@ -222,18 +224,27 @@
     <span class="hint">常用功能入口</span>
   </div>
   <div class="section-body d-flex flex-wrap gap-2">
-    <a href="/clean" class="btn btn-primary">
+    <a href="/clean" class="btn btn-outline-dark">
       <i class="bi bi-funnel"></i> 前往資料清洗
     </a>
-    <a href="/dataGen" class="btn">
+    <a href="/dataGen" class="btn btn-outline-dark">
       <i class="bi bi-database-add"></i> 虛擬資料生成
     </a>
-    <a href="/history" class="btn">
+    <a href="/clean/history" class="btn btn-outline-dark">
       <i class="bi bi-file-earmark-text"></i> 申報紀錄
     </a>
-    <a href="/dashboard" class="btn">
+    <a href="/dashboard" class="btn btn-outline-dark">
       <i class="bi bi-bar-chart"></i> 年報分析
     </a>
+    {% if session.get('position') == 'Admin' %}
+    <a href="{{ url_for('key_approval.key_approval') }}" class="btn btn-outline-dark">
+      <i class="bi bi-key-fill"></i> 金鑰申請審核
+    </a>
+    {% else %}
+    <a href="{{ url_for('key_application.application') }}" class="btn btn-outline-dark">
+      <i class="bi bi-key"></i> 金鑰申請
+    </a>
+    {% endif %}
   </div>
 </section>
 

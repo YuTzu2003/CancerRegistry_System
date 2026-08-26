@@ -42,8 +42,10 @@ def allowed_file(filename: str) -> bool:
 @app.context_processor
 def inject_nav():
     NAV_ITEMS = [
-        {"endpoint":"clean.clean","title":"資料清洗模組","icon":"bi-funnel"},
-        {"endpoint":"history.history","title":"資料審核紀錄","icon":"bi-file-earmark-text"},
+        {"title":"資料審核", "icon":"bi-funnel", "subitems": [
+            {"endpoint":"clean.clean","title":"資料清洗","icon":"bi-play-circle"},
+            {"endpoint":"history.history","title":"資料審核紀錄","icon":"bi-file-earmark-text"}
+        ]},
         {"endpoint":"data_gen.dataGen","title":"虛擬資料生成","icon":"bi-database-add"},
         {"endpoint":"key_application.application","title":"權限申請","icon":"bi-key"},
         {"title":"報表分析","icon":"bi-bar-chart", "subitems": [
@@ -75,6 +77,7 @@ def inject_nav():
 @login_required
 def index():
     pending_application_count = 0
+    key_application_status = ""
     try:
         conn = get_conn()
         cursor = conn.cursor()
@@ -87,12 +90,25 @@ def index():
         if session.get("position") == "Admin":
             cursor.execute("SELECT COUNT(*) AS PendingCount FROM dbo.User_applications WHERE Status = 'Pending'")
             pending_application_count = int(getattr(cursor.fetchone(), "PendingCount", 0) or 0)
+        else:
+            cursor.execute(
+                "SELECT TOP 1 Status FROM dbo.User_applications WHERE UserID = ? ORDER BY CreatedAt DESC",
+                session["userid"],
+            )
+            row = cursor.fetchone()
+            key_application_status = row[0] if row and row[0] in {"Approved", "Rejected"} else ""
         conn.close()
     except Exception as e:
         app.logger.error(f"Error fetching dashboard stats: {e}")
         stats = {"sum_total_count": "0", "avg_completeness_score": "0.0%"}
     
-    return render_template("index.html", active="index", stats=stats, pending_application_count=pending_application_count)
+    return render_template(
+        "index.html",
+        active="index",
+        stats=stats,
+        pending_application_count=pending_application_count,
+        key_application_status=key_application_status,
+    )
 
 
 

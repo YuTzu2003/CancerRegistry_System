@@ -30,8 +30,6 @@
 
   .key-workbench { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(270px, .85fr); border: 1px solid var(--key-rule); border-radius: var(--key-radius); background: var(--key-panel); box-shadow: var(--shadow-sm); overflow: hidden; }
   .key-form-zone { padding: 28px; }
-  .key-section-kicker { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; color: var(--key-accent); font-size: .75rem; font-weight: 750; letter-spacing: .04em; }
-  .key-section-kicker::before { width: 7px; height: 7px; border-radius: 50%; background: currentColor; content: ""; }
   .key-form-zone h2 { margin: 0; color: var(--key-ink); font-size: 1.2rem; font-weight: 750; letter-spacing: -.015em; }
   .key-form-intro { max-width: 48ch; margin: 8px 0 22px; color: var(--key-muted); font-size: .88rem; }
   .key-form-grid { display: grid; grid-template-columns: minmax(0, 1fr) 150px; gap: 16px; align-items: end; }
@@ -115,7 +113,6 @@
 
   <section class="key-workbench" aria-labelledby="key-application-title">
     <div class="key-form-zone">
-      <div class="key-section-kicker">KEY APPLICATION</div>
       <h2 id="key-application-title">申請新的存取金鑰</h2>
       <p class="key-form-intro">請說明使用需求與預計借用時間；申請送出後，須由管理員審核。</p>
       <form class="key-form-grid" method="post" action="{{ url_for('key_application.create_application') }}">

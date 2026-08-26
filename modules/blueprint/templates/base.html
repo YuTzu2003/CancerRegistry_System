@@ -74,8 +74,8 @@
               {% for subitem in item.subitems %}
               <li>
                 <a href="{{ url_for(subitem.endpoint) }}" class="nav-link {% if active == subitem.endpoint or active == subitem.endpoint.split('.')[-1] %}submenu-active{% endif %}" style="padding-left: 48px; height: 38px; margin-top: 4px;">
-                  <span class="nav-icon" style="width: 16px; font-size: 14px;"><i class="bi {{ subitem.icon }}"></i></span>
-                  <span class="nav-text" style="font-size: 13px;">{{ subitem.title }}</span>
+                  <span class="nav-icon" style="width: 16px; font-size: 16px;"><i class="bi {{ subitem.icon }}"></i></span>
+                  <span class="nav-text">{{ subitem.title }}</span>
                 </a>
               </li>
               {% endfor %}
