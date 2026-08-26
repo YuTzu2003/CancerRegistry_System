@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}金鑰申請審核｜癌症資料登記{% endblock %}
+{% block page_title %}金鑰申請審核{% endblock %}
+
+{% block extra_head %}
+<style>
+  .review-page { --review-panel: var(--surface); --review-ink: var(--text); --review-muted: var(--muted); --review-rule: var(--border); --review-dark: var(--gray-900); --review-blue: var(--blue-600); --review-blue-soft: var(--blue-100); --review-danger: var(--danger); --review-danger-soft: var(--danger-soft); --review-warning: var(--warning); --review-warning-soft: var(--warning-soft); --review-ease: cubic-bezier(.16, 1, .3, 1); }
+  .review-page, .review-page * { min-width: 0; }
+  .review-page h1, .review-page h2, .review-page h3 { overflow-wrap: anywhere; }
+  .review-intro { margin-bottom: 20px; }
+  .review-intro h1 { margin: 0; color: var(--review-ink); font-size: clamp(1.55rem, 2vw, 2rem); font-weight: 750; letter-spacing: -.025em; line-height: 1.12; }
+  .review-intro p { margin: 7px 0 0; color: var(--review-muted); font-size: .9rem; }
+  .review-guide { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; gap: 12px; align-items: center; margin-bottom: 16px; padding: 15px 17px; border-left: 3px solid var(--review-blue); background: var(--review-panel); box-shadow: var(--shadow-sm); }
+  .review-guide > i { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 50%; background: var(--review-blue-soft); color: var(--review-blue); }
+  .review-guide h2 { margin: 0; color: var(--review-ink); font-size: .9rem; font-weight: 750; }
+  .review-guide p { margin: 3px 0 0; color: var(--review-muted); font-size: .8rem; }
+  .review-pending-count { justify-self: end; color: var(--gray-500); font-weight: 750; white-space: nowrap; }
+  .review-sheet { overflow: hidden; border: 1px solid var(--review-rule); border-radius: var(--radius); background: var(--review-panel); box-shadow: var(--shadow-sm); }
+  .review-sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 15px 20px; border-bottom: 1px solid var(--review-rule); background: var(--review-dark); color: var(--white); }
+  .review-sheet-head h2 { margin: 0; font-size: .92rem; font-weight: 750; }
+  .review-sheet-head span { color: var(--gray-300); font-size: .76rem; }
+  .review-row { display: grid; grid-template-columns: minmax(185px, .42fr) minmax(0, 1fr); border-bottom: 1px solid var(--review-rule); }
+  .review-row:last-child { border-bottom: 0; }
+  .review-identity { display: grid; grid-template-columns: 42px minmax(0, 1fr); column-gap: 13px; align-content: start; padding: 22px 20px; border-right: 1px solid var(--review-rule); background: var(--gray-50); }
+  .review-avatar { display: grid; grid-row: span 2; width: 42px; height: 42px; place-items: center; border-radius: var(--radius-sm); background: var(--gray-200); color: var(--gray-700); font-size: 1.1rem; }
+  .review-person { align-self: center; }
+  .review-person-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .review-user { display: block; color: var(--review-ink); font-size: 1.02rem; font-weight: 750; line-height: 1.25; overflow-wrap: anywhere; }
+  .review-account { display: block; margin-top: 3px; color: var(--review-muted); font-size: .82rem; overflow-wrap: anywhere; }
+  .review-status { display: inline-flex; flex: 0 0 auto; width: fit-content; padding: 4px 8px; border-radius: 999px; background: var(--review-warning-soft); color: var(--review-warning); font-size: .74rem; font-weight: 750; white-space: nowrap; }
+  .review-time { grid-column: 1 / -1; display: block; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--review-rule); color: var(--review-ink); font-size: .79rem; line-height: 1.55; text-align: left; }
+  .review-content { padding: 20px; }
+  .review-content-head { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
+  .review-detail-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(150px, 1fr); gap: 12px; margin: 14px 0 16px; }
+  .review-detail { min-height: 72px; padding: 4px 0; }
+  .review-detail-label { display: block; margin-bottom: 7px; color: var(--review-ink); font-size: .88rem; font-weight: 750; }
+  .review-request, .review-days { margin: 0; color: var(--review-ink); font-size: .86rem; line-height: 1.65; overflow-wrap: anywhere; }
+  .review-days { font-weight: 750; }
+  .review-decision { display: flex; flex-wrap: wrap; gap: 10px; }
+  .review-decision form { display: flex; gap: 8px; }
+  .review-approve, .review-show-reject { min-height: 36px; border-radius: var(--radius-sm); font-size: .8rem; font-weight: 700; white-space: nowrap; transition: transform 180ms var(--review-ease), background-color 180ms var(--review-ease), border-color 180ms var(--review-ease); }
+  .review-approve { padding: 0 14px; border: 1px solid var(--review-blue); background: var(--review-blue); color: var(--white); }
+  .review-approve:hover { background: var(--blue-700); color: var(--white); transform: translateY(-1px); }
+  .review-show-reject { padding: 0 13px; border: 1px solid var(--review-danger); background: var(--review-panel); color: var(--review-danger); }
+  .review-show-reject:hover { background: var(--review-danger-soft); transform: translateY(-1px); }
+  .review-approve:focus-visible, .review-show-reject:focus-visible { outline: 3px solid var(--review-blue-soft); outline-offset: 2px; }
+  .review-approve:active { transform: translateY(0); }
+  .review-empty { display: grid; min-height: 260px; place-items: center; padding: 32px; color: var(--review-muted); text-align: center; }
+  .review-empty i { display: block; margin-bottom: 10px; color: var(--review-blue); font-size: 1.65rem; }
+  .review-empty strong { display: block; color: var(--review-ink); font-size: .95rem; }
+  .review-empty p { margin: 5px 0 0; font-size: .82rem; }
+  @media (max-width: 767.98px) { .review-row { grid-template-columns: minmax(0, 1fr); } .review-identity { padding: 15px 18px; border-right: 0; border-bottom: 1px solid var(--review-rule); } .review-content { padding: 18px; } }
+  @media (max-width: 575.98px) { .review-guide { grid-template-columns: 32px minmax(0, 1fr); } .review-pending-count { grid-column: 2; justify-self: start; } }
+  @media (max-width: 575.98px) { .review-detail-grid { grid-template-columns: minmax(0, 1fr); } }
+  @media (max-width: 479.98px) { .review-sheet-head { align-items: flex-start; flex-direction: column; } .review-decision form { flex-direction: column; width: 100%; } .review-approve, .review-show-reject { width: 100%; } }
+  @media (prefers-reduced-motion: reduce) { .review-approve, .review-show-reject { transition-duration: 50ms; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<main class="review-page">
+  <header class="review-intro">
+    <div>
+      <h1>金鑰申請審核</h1>
+      <p>確認使用需求與借用時間後，再做出核准或拒絕決策。</p>
+    </div>
+  </header>
+  <section class="review-guide" aria-label="審核說明">
+    <i class="bi bi-shield-check"></i>
+    <div>
+      <h2>僅處理待審核申請</h2>
+      <p>核准後將產生金鑰，並由使用者自行啟用；拒絕原因會顯示給申請者。</p>
+    </div>
+    <strong class="review-pending-count">目前共 {{ pending_applications|length }} 筆待審核</strong>
+  </section>
+  <section class="review-sheet" aria-labelledby="review-queue-title">
+    <header class="review-sheet-head">
+      <h2 id="review-queue-title">待處理審核佇列</h2>
+      <span>依申請時間排序</span>
+    </header>
+    {% for item in pending_applications %}
+    <article class="review-row">
+      <div class="review-identity">
+        <div class="review-avatar">
+          <i class="bi bi-person"></i>
+        </div>
+        <div class="review-person"><div class="review-person-heading"><span class="review-user">{{ item.UserName }}</span><span class="review-status">待審核</span></div><span class="review-account">@{{ item.UserID }}</span></div>
+        <time class="review-time">申請時間<br>{{ item.CreatedAt }}</time>
+      </div>
+      <div class="review-content">
+        <div class="review-detail-grid">
+          <div class="review-detail"><span class="review-detail-label">使用需求</span><p class="review-request">{{ item.Content }}</p></div>
+          <div class="review-detail"><span class="review-detail-label">借用時間</span><p class="review-days">{{ item.Usage_days }} 天</p></div>
+        </div>
+        <div class="review-decision">
+          <form method="post" action="{{ url_for('key_approval.approve', application_id=item.Application_id) }}">
+            <button class="review-approve" type="submit">
+              <i class="bi bi-check-lg me-1"></i>核准申請
+            </button>
+          </form>
+          <button class="review-show-reject" type="button" data-reject-url="{{ url_for('key_approval.reject', application_id=item.Application_id) }}" data-user-name="{{ item.UserName }}">拒絕</button>
+        </div>
+      </div>
+    </article>
+    {% else %}
+    <div class="review-empty"><div><i class="bi bi-check2-circle"></i><strong>目前沒有待審核申請</strong><p>新的申請送出後會顯示於此。</p></div></div>
+    {% endfor %}
+  </section>
+</main>
+<div class="modal fade" id="rejectApplicationModal" tabindex="-1" aria-labelledby="rejectApplicationTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <form class="modal-content border-0 shadow" id="rejectApplicationForm" method="post">
+      <div class="modal-header bg-light"><h5 class="modal-title fw-bold" id="rejectApplicationTitle">拒絕申請</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="關閉"></button></div>
+      <div class="modal-body p-4"><p class="text-secondary small mb-3" id="rejectApplicationHint"></p><label class="form-label fw-bold" for="rejectReason">拒絕原因 <span class="text-danger">*</span></label><textarea class="form-control" id="rejectReason" name="reason" maxlength="500" required rows="4" placeholder="請輸入拒絕原因（使用者可查看）"></textarea></div>
+      <div class="modal-footer bg-light"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button><button class="btn btn-danger" type="submit">確認拒絕</button></div>
+    </form>
+  </div>
+</div>
+<script>
+  document.querySelectorAll("[data-reject-url]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const form = document.getElementById("rejectApplicationForm");
+      form.action = button.dataset.rejectUrl;
+      document.getElementById("rejectApplicationHint").textContent = `請填寫「${button.dataset.userName}」的拒絕原因。`;
+      document.getElementById("rejectReason").value = "";
+      const modal = new bootstrap.Modal(document.getElementById("rejectApplicationModal"));
+      modal.show();
+      document.getElementById("rejectApplicationModal").addEventListener("shown.bs.modal", () => document.getElementById("rejectReason").focus(), { once: true });
+    });
+  });
+</script>
+{% endblock %}

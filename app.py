@@ -3,8 +3,11 @@ import os
 import logging
 import sys
 from dotenv import load_dotenv
-from modules.services import auth_bp, login_required, member_bp, history_bp, clean_bp, data_gen_bp, dashboard_bp, histology_mapping_bp
+from modules.services import auth_bp, login_required, history_bp, clean_bp, data_gen_bp, dashboard_bp, histology_mapping_bp
 from modules.services.db import get_conn
+from modules.blueprint.admin.member import member_bp
+from modules.blueprint.auth.key_application import key_application_bp
+from modules.blueprint.admin.key_approval import key_approval_bp
 import jinja2
 
 load_dotenv()
@@ -24,6 +27,8 @@ app.register_blueprint(clean_bp)
 app.register_blueprint(data_gen_bp)
 app.register_blueprint(dashboard_bp)
 app.register_blueprint(histology_mapping_bp)
+app.register_blueprint(key_application_bp)
+app.register_blueprint(key_approval_bp)
 
 BASE_DIR = os.path.dirname(__file__)
 Jobs_FOLDER = 'tasks/Jobs'
@@ -40,6 +45,7 @@ def inject_nav():
         {"endpoint":"clean.clean","title":"資料清洗模組","icon":"bi-funnel"},
         {"endpoint":"history.history","title":"資料審核紀錄","icon":"bi-file-earmark-text"},
         {"endpoint":"data_gen.dataGen","title":"虛擬資料生成","icon":"bi-database-add"},
+        {"endpoint":"key_application.application","title":"權限申請","icon":"bi-key"},
         {"title":"報表分析","icon":"bi-bar-chart", "subitems": [
             {"endpoint":"dashboard.dashboard","title":"年報分析","icon":"bi-bar-chart"},
             {"endpoint":"dashboard.compare","title":"年度比較","icon":"bi-columns-gap"},
@@ -48,7 +54,10 @@ def inject_nav():
     ]
     if session.get("position") == "Admin":
         # NAV_ITEMS.append({"endpoint":"rag_config", "title": "RAG知識庫", "icon": "bi-robot"})
-        NAV_ITEMS.append({"endpoint":"member.member", "title": "使用者管理", "icon": "bi-people"})
+        NAV_ITEMS.append({"title":"權限管理", "icon":"bi-shield-lock", "subitems": [
+            {"endpoint":"member.member", "title":"使用者管理", "icon":"bi-people"},
+            {"endpoint":"key_approval.key_approval", "title":"金鑰申請審核", "icon":"bi-key-fill"},
+        ]})
         
     provider = os.environ.get("LLM_PROVIDER")
     if provider and provider.lower() == "openai":
@@ -65,6 +74,7 @@ def inject_nav():
 @app.route("/")
 @login_required
 def index():
+    pending_application_count = 0
     try:
         conn = get_conn()
         cursor = conn.cursor()
@@ -74,12 +84,15 @@ def index():
             "sum_total_count": f"{int(getattr(row,'Sum_TotalCount',0) or 0):,}",
             "avg_completeness_score": f"{(getattr(row,'Avg_CompletenessScore',0) or 0)*100:.2f}%"
         }
+        if session.get("position") == "Admin":
+            cursor.execute("SELECT COUNT(*) AS PendingCount FROM dbo.User_applications WHERE Status = 'Pending'")
+            pending_application_count = int(getattr(cursor.fetchone(), "PendingCount", 0) or 0)
         conn.close()
     except Exception as e:
         app.logger.error(f"Error fetching dashboard stats: {e}")
         stats = {"sum_total_count": "0", "avg_completeness_score": "0.0%"}
     
-    return render_template("index.html", active="index", stats=stats)
+    return render_template("index.html", active="index", stats=stats, pending_application_count=pending_application_count)
 
 
 
