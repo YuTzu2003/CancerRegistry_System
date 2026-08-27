@@ -1478,7 +1478,7 @@ function initDashboardControl() {
                       el.innerText = window.DashboardRenderer.t('autoInsight');
                   });
 
-                  const variantInsightPromises = [];
+                  const variantInsightTasks = [];
                   let initialStageReport = null;
                   let initialTreatmentSystem = '';
 
@@ -1510,11 +1510,10 @@ function initDashboardControl() {
                            chartData.stageReports = stageReports;
                            window.DashboardRenderer.renderStageReportTabs(stageReports, yearTitle, cancerTitle);
                            initialStageReport = stageReports[0] || null;
-                           // Generate only the active report; concurrent requests for every
-                           // variant can overwhelm the model service and time out.
-                           if (initialStageReport) {
-                               const request = window.DashboardRenderer.configureStageInsight(initialStageReport);
-                               if (request instanceof Promise) variantInsightPromises.push(request);
+                           if (stageReports.length) {
+                               stageReports.forEach(report => variantInsightTasks.push(
+                                   () => window.DashboardRenderer.configureStageInsight(report)
+                               ));
                            }
                        }
                        window.DashboardRenderer.renderStageFirstCourseTables(chartData.stageFirstCourseData, yearTitle, cancerTitle);
@@ -1527,10 +1526,9 @@ function initDashboardControl() {
                            ? window.stageFirstCourseActiveSystem
                            : treatmentSystems[0] || '';
                        const treatmentInsightButton = document.getElementById('btnAiTreatmentFirstCourse');
-                       if (initialTreatmentSystem) {
+                       if (document.getElementById('chkTreatmentFirstCourse')?.checked && initialTreatmentSystem) {
                            window.stageFirstCourseActiveSystem = initialTreatmentSystem;
-                           const request = treatmentInsightButton?.onclick?.();
-                           if (request instanceof Promise) variantInsightPromises.push(request);
+                           variantInsightTasks.push(() => treatmentInsightButton?.onclick?.());
                        }
                        window.stageFirstCourseActiveSystem = initialTreatmentSystem;
                        window.DashboardRenderer.renderStageFirstCourseTables(chartData.stageFirstCourseData, yearTitle, cancerTitle);                       const surgeryTables = Array.isArray(chartData.stageSurgeryData)
@@ -1541,10 +1539,9 @@ function initDashboardControl() {
                            ? window.stageSurgeryActiveSystem
                            : surgerySystems[0] || '';
                        const surgeryInsightButton = document.getElementById('btnAiTreatmentSurgery');
-                       if (initialSurgerySystem) {
+                       if (document.getElementById('chkTreatmentSurgery')?.checked && initialSurgerySystem) {
                            window.stageSurgeryActiveSystem = initialSurgerySystem;
-                           const request = surgeryInsightButton?.onclick?.();
-                           if (request instanceof Promise) variantInsightPromises.push(request);
+                           variantInsightTasks.push(() => surgeryInsightButton?.onclick?.());
                        }
                        window.stageSurgeryActiveSystem = initialSurgerySystem;
                        window.DashboardRenderer.renderStageSurgeryTables(chartData.stageSurgeryData, yearTitle, cancerTitle);
@@ -1569,7 +1566,17 @@ function initDashboardControl() {
                   if (window.DashboardRenderer) window.DashboardRenderer.updateHistologyChart(chartData.histologyData, chartData.histologyNoDataReason);
                   
                   // Collect all AI promises before showing the charts
-                   let aiPromises = [...variantInsightPromises];
+                  const completeInsight = async (task) => {
+                      let result = await task();
+                      if (!result?.success) result = await task();
+                      if (!result?.success) throw new Error(result?.error || 'LLM insight generation failed.');
+                      return result;
+                  };
+                  let aiPromises = variantInsightTasks.length
+                      ? [(async () => {
+                          for (const task of variantInsightTasks) await completeInsight(task);
+                      })()]
+                      : [];
                   document.querySelectorAll('.item-checkbox').forEach(itemChk => {
                       if (itemChk.checked) {
                           const targetSelector = itemChk.getAttribute('data-target');
@@ -1580,8 +1587,7 @@ function initDashboardControl() {
                                   const llmDiv = targetPane.querySelector('div[id^="llmResponse"]');
                                   if (aiBtn && llmDiv && llmDiv.innerText.includes('自動產生')) {
                                       if (typeof aiBtn.onclick === 'function') {
-                                          const prom = aiBtn.onclick();
-                                          if (prom instanceof Promise) aiPromises.push(prom);
+                                          aiPromises.push(completeInsight(() => aiBtn.onclick()));
                                       }
                                   }
                               }
@@ -1597,12 +1603,15 @@ function initDashboardControl() {
                       }
                   };
                   updateInsightProgress();
-                  Promise.allSettled(aiPromises.map(request => Promise.resolve(request).finally(() => {
+                  Promise.all(aiPromises.map(request => Promise.resolve(request).finally(() => {
                       completedInsights += 1;
                       updateInsightProgress();
                   }))).then(() => {
-                       if (initialStageReport) window.DashboardRenderer.configureStageInsight(initialStageReport);
-                       if (initialTreatmentSystem) {
+                       if (initialStageReport) {
+                           window.DashboardRenderer.configureStageInsight(initialStageReport, { generate: false });
+                           document.getElementById('btnAiStageSummary')?.onclick?.();
+                       }
+                       if (document.getElementById('chkTreatmentFirstCourse')?.checked && initialTreatmentSystem) {
                            window.stageFirstCourseActiveSystem = initialTreatmentSystem;
                            document.getElementById('btnAiTreatmentFirstCourse')?.onclick?.();
                        }
@@ -1626,12 +1635,14 @@ function initDashboardControl() {
                               if (emptyPane) emptyPane.classList.remove('d-none');
                           }
                       }
-                  }).catch(() => {
+                  }).catch(error => {
+                      console.error('LLM insight generation failed:', error);
                       if (window.utils && window.utils.hideLoading) {
                           window.utils.hideLoading();
                       } else if (window.dashboardChartInstance) {
                           window.dashboardChartInstance.hideLoading();
                       }
+                      utils.alert('語言模型敘述尚未完成，已自動重試一次仍失敗；請確認模型服務後重新查詢。', 'error');
                   });
               } else {
                   if (window.utils && window.utils.hideLoading) window.utils.hideLoading();
