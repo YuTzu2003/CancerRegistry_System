@@ -1,13 +1,13 @@
 <section class="card-flat" style="margin-bottom: 22px;">
   <div class="section-head d-flex justify-content-between align-items-center">
     <div class="d-flex align-items-center gap-2">
-      <h2 class="mb-0"><span class="dot" style="background:var(--warning)"></span> 資料上傳</h2>
+      <h2 class="mb-0"><span class="dot" style="background:var(--warning)"></span> 資料匯入</h2>
     </div>
   </div>
   <div class="section-body">
     <div class="upload-grid">
       <!-- 上傳區域 -->
-      <div>
+      <div id="dashboardUploadPanel" class="dashboard-upload-panel">
         <div class="upload-container-box d-flex flex-column justify-content-center">
           <form id="dashUploadForm" enctype="multipart/form-data" class="d-flex flex-column gap-3">
             <div class="p-4 border rounded-3 text-center upload-input-zone">
@@ -15,7 +15,6 @@
               <p class="text-secondary small mb-3">僅接受 .xls 或 .xlsx 格式的 Excel 檔案</p>
               <input type="file" class="form-control form-control-sm mx-auto" id="dashFileInput" name="file" accept=".xls,.xlsx" style="max-width: 280px; font-size: 13px;">
             </div>
-            <button class="btn btn-primary w-100 py-2 d-flex align-items-center justify-content-center gap-2" type="submit" id="btnDashUpload" style="font-size: 14px; font-weight: 500;">上傳檔案</button>
           </form>
         </div>
       </div>
@@ -33,7 +32,7 @@
             <span class="text-secondary" style="font-size: 12px;">點選檔案進行查詢</span>
           </div>
           <div class="file-list-container">
-            <div class="table-responsive" style="max-height: 250px;">
+            <div class="table-responsive dashboard-file-list-scroll{% if uploaded_files and uploaded_files|length > 3 %} is-scrollable{% endif %}">
               <table class="table table-hover align-middle mb-0" id="dashFileList" style="font-size: 13.5px;">
                 <thead class="table-light sticky-top">
                   <tr>
@@ -74,6 +73,46 @@
           </div>
         </div>
       </div>
+    </div>
+  </div>
+</section>
+
+<section class="card-flat dashboard-input-settings is-disabled" id="dashboardInputSettings" aria-disabled="true" style="margin-bottom: 22px;">
+  <div class="section-head">
+    <h2><span class="dot" style="background: var(--warning);"></span> 模組欄位輸入設定</h2>
+  </div>
+  <div class="section-body">
+    <div style="margin-bottom: 18px;">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <div style="font-size: 13px; font-weight: 600; color: var(--gray-700);">輸入欄位命名來源
+          <span class="hint" style="font-weight: 400; margin-left: 6px;">選擇輸入 XLSX 欄位標頭採用的命名來源</span>
+        </div>
+      </div>
+      <div class="naming-grid" id="dashboardInputScheme">
+        <label class="naming-chip"><input type="radio" name="dashboardInputScheme" value="original" disabled><span class="nc-mark"></span><span class="nc-body"><span class="nc-title">自動辨識欄位名稱</span><span class="nc-desc">還原為上傳時的原始欄位</span></span></label>
+        <label class="naming-chip"><input type="radio" name="dashboardInputScheme" value="field_name_zh" disabled><span class="nc-mark"></span><span class="nc-body"><span class="nc-title">中文欄位名稱</span><span class="nc-desc">以繁體中文呈現欄位</span></span></label>
+        <label class="naming-chip"><input type="radio" name="dashboardInputScheme" value="field_name_en" disabled><span class="nc-mark"></span><span class="nc-body"><span class="nc-title">英文欄位名稱</span><span class="nc-desc">以英文呈現欄位</span></span></label>
+        <label class="naming-chip"><input type="radio" name="dashboardInputScheme" value="ntu_yunlin" disabled><span class="nc-mark"></span><span class="nc-body"><span class="nc-title">台大雲林欄位名稱</span><span class="nc-desc">以台大雲林分院系統呈現欄位</span></span></label>
+        <label class="naming-chip"><input type="radio" name="dashboardInputScheme" value="ntu_system" disabled><span class="nc-mark"></span><span class="nc-body"><span class="nc-title">台大體系醫整庫欄位名稱</span><span class="nc-desc">以台大體系醫整庫呈現欄位</span></span></label>
+        <label class="naming-chip"><input type="radio" name="dashboardInputScheme" value="taiwan_cancer_registry" disabled><span class="nc-mark"></span><span class="nc-body"><span class="nc-title">台灣癌症登記中心</span><span class="nc-desc">以台灣癌症登記中心呈現欄位</span></span></label>
+        <label class="naming-chip"><input type="radio" name="dashboardInputScheme" value="AI_module" disabled><span class="nc-mark"></span><span class="nc-body"><span class="nc-title">雲醫癌AI模組</span><span class="nc-desc">以雲端醫療癌症AI模組呈現欄位</span></span></label>
+      </div>
+    </div>
+
+    <div>
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <div style="font-size: 13px; font-weight: 600; color: var(--gray-700);">未匹配欄位處理
+          <span class="hint" style="font-weight: 400; margin-left: 6px;">未匹配到的原始欄位，可勾選要保留的欄位</span>
+        </div>
+      </div>
+      <div class="field-chiplist" id="dashboardInputFieldList">
+        <span class="field-chip disabled"><i class="bi bi-asterisk"></i> 請先選擇檔案</span>
+      </div>
+    </div>
+
+    <div class="d-flex justify-content-end gap-2 mt-3 pt-3" style="border-top:1px solid var(--border);">
+      <button class="btn btn-light" type="button" id="btnPreviewDashboardInput" disabled><i class="bi bi-eye"></i> 預覽</button>
+      <button class="btn btn-primary d-flex align-items-center justify-content-center gap-2" type="submit" form="dashUploadForm" id="btnDashUpload" style="font-size: 14px; font-weight: 500;" disabled><i class="bi bi-upload"></i> 確認匯入</button>
     </div>
   </div>
 </section>
@@ -748,6 +787,37 @@
 </div>
 
 <style>
+  .dashboard-input-settings.is-disabled .naming-chip {
+    opacity: 0.5;
+    background-color: var(--gray-100);
+    border-color: var(--border) !important;
+    color: var(--muted);
+    cursor: default;
+  }
+
+  .dashboard-input-settings.is-disabled .naming-chip .nc-title,
+  .dashboard-input-settings.is-disabled .naming-chip .nc-desc {
+    color: var(--muted);
+  }
+
+  .dashboard-input-settings .naming-chip .nc-desc {
+    margin-left: 4px;
+  }
+
+  .dashboard-file-list-scroll.is-scrollable {
+    max-height: 174px;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+  }
+
+  #dashFileList thead tr {
+    height: 38px;
+  }
+
+  #dashFileList tbody tr {
+    height: 42px;
+  }
+
   #stageSummaryOptions {
     max-height: 0;
     overflow: hidden;

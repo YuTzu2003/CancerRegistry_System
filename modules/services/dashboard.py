@@ -11,8 +11,13 @@ from modules.blueprint.dashboard.pbi_settings import (
     get_pbi_publish_settings,
     save_pbi_publish_path,
 )
+from modules.blueprint.dashboard.input_format import (
+    preview_dashboard_upload,
+    validate_and_normalize_dashboard_upload,
+)
 import os
 import re
+import json
 import logging
 import uuid
 import pandas as pd
@@ -219,6 +224,16 @@ def dashboard_upload():
     ext = f.filename.rsplit(".", 1)[-1].lower() if "." in f.filename else ""
     if ext not in ("xls", "xlsx"):
         return jsonify({"ok": False, "error": "僅接受 .xls 或 .xlsx 格式"}), 400
+    input_scheme = str(request.form.get("input_scheme", "")).strip()
+    extra_fields_raw = request.form.get("extra_fields")
+    extra_fields = None
+    if extra_fields_raw is not None:
+        try:
+            extra_fields = json.loads(extra_fields_raw)
+        except json.JSONDecodeError:
+            return jsonify({"ok": False, "error": "未匹配欄位設定格式不正確"}), 400
+        if not isinstance(extra_fields, list):
+            return jsonify({"ok": False, "error": "未匹配欄位設定格式不正確"}), 400
     raw_filename = f.filename or ""
     basename = os.path.basename(raw_filename)
     filename = re.sub(r'[\\/:*?"<>|\s]', '_', basename)
@@ -233,6 +248,16 @@ def dashboard_upload():
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
     f.save(save_path)
     try:
+        normalized_path = validate_and_normalize_dashboard_upload(
+            save_path,
+            ext,
+            input_scheme,
+            get_conn,
+            extra_fields,
+        )
+        if normalized_path != save_path:
+            save_path = normalized_path
+            storage_path = os.path.relpath(save_path, DASHBOARD_DATA)
         conn = get_conn()
         cursor = conn.cursor()
         cursor.execute("""
@@ -241,12 +266,33 @@ def dashboard_upload():
         """, (file_id, str(user_id), filename, storage_path))
         conn.commit()
         conn.close()
+    except ValueError as error:
+        if os.path.isfile(save_path):
+            os.remove(save_path)
+        return jsonify({"ok": False, "error": str(error)}), 400
     except Exception:
         if os.path.isfile(save_path):
             os.remove(save_path)
         raise
     logging.info(f"Dashboard upload: {filename} saved for user {user_id}")
     return jsonify({"ok": True, "filename": filename, "file_id": file_id})
+
+
+@dashboard_bp.route("/dashboard/input-preview", methods=["POST"])
+@login_required
+def dashboard_input_preview():
+    uploaded_file = request.files.get("file")
+    if not uploaded_file or not uploaded_file.filename:
+        return jsonify({"ok": False, "error": "請先選擇檔案"}), 400
+    extension = uploaded_file.filename.rsplit(".", 1)[-1].lower() if "." in uploaded_file.filename else ""
+    if extension not in ("xls", "xlsx"):
+        return jsonify({"ok": False, "error": "僅接受 .xls 或 .xlsx 格式"}), 400
+    input_scheme = str(request.form.get("input_scheme", "")).strip()
+    try:
+        result = preview_dashboard_upload(uploaded_file.stream, extension, input_scheme, get_conn)
+        return jsonify({"ok": True, **result})
+    except ValueError as error:
+        return jsonify({"ok": False, "error": str(error)}), 400
 
 
 @dashboard_bp.route('/api/dashboard/year_range', methods=['POST'])
