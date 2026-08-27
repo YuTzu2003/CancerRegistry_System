@@ -209,6 +209,7 @@ def compare():
         cancer_name_translations=_get_cancer_name_translations(),
     )
 
+
 @dashboard_bp.route("/dashboard/upload", methods=["POST"])
 @login_required
 def dashboard_upload():

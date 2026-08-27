@@ -74,8 +74,8 @@
               {% for subitem in item.subitems %}
               <li>
                 <a href="{{ url_for(subitem.endpoint) }}" class="nav-link {% if active == subitem.endpoint or active == subitem.endpoint.split('.')[-1] %}submenu-active{% endif %}" style="padding-left: 48px; height: 38px; margin-top: 4px;">
-                  <span class="nav-icon" style="width: 16px; font-size: 14px;"><i class="bi {{ subitem.icon }}"></i></span>
-                  <span class="nav-text" style="font-size: 13px;">{{ subitem.title }}</span>
+                  <span class="nav-icon" style="width: 16px; font-size: 16px;"><i class="bi {{ subitem.icon }}"></i></span>
+                  <span class="nav-text">{{ subitem.title }}</span>
                 </a>
               </li>
               {% endfor %}
@@ -132,14 +132,20 @@
       <main class="content">
         {% with messages = get_flashed_messages(with_categories=true) %}
           {% if messages %}
-            <div class="mb-3">
-              {% for category, msg in messages %}
-                <div class="alert alert-{{ category }} alert-flat" role="alert">
-                  <i class="bi {% if category == 'success' %}bi-check-circle{% else %}bi-exclamation-triangle{% endif %} me-2"></i>
-                  {{ msg }}
-                </div>
-              {% endfor %}
-            </div>
+            <script>
+              document.addEventListener("DOMContentLoaded", function() {
+                {% for category, msg in messages %}
+                  {% set icon = 'success' if category == 'success' else ('error' if category == 'danger' else ('warning' if category == 'warning' else 'info')) %}
+                  {% set title = '成功' if category == 'success' else ('錯誤' if category == 'danger' else ('警告' if category == 'warning' else '提示')) %}
+                  Swal.fire({
+                    icon: '{{ icon }}',
+                    title: '{{ title }}',
+                    text: {{ msg|tojson|safe }},
+                    confirmButtonColor: '#2563eb'
+                  });
+                {% endfor %}
+              });
+            </script>
           {% endif %}
         {% endwith %}
         {% block content %}{% endblock %}

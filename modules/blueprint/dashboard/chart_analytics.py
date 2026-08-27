@@ -4,12 +4,16 @@ import logging
 from functools import lru_cache
 from modules.blueprint.dashboard.definition.cancer_grouping import classify_cancer_group
 from modules.blueprint.dashboard.definition.cancer_group_rules import CANCER_GROUP_RULES
-from modules.blueprint.dashboard.definition.histology_mapping import get_histology_rules
-from modules.blueprint.dashboard.definition.histology_validate import match_histology
+from modules.blueprint.dashboard.definition.histology_code_mapping import (
+    blood_or_lymphoid_name,
+    get_histology_code_rules,
+    is_blood_or_lymphoid,
+    resolve_histology_code,
+    should_append_in_situ,
+)
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 DASHBOARD_DATA = f"{BASE_DIR}/tasks/data"
-
 def _safe_dashboard_path(filename):
     relative_path = str(filename or "")
     fpath = os.path.abspath(os.path.join(DASHBOARD_DATA, relative_path))
@@ -51,7 +55,7 @@ def get_column_names(df):
         "hist_col": _find_column(df, ["hist", "組織型態"]),
         "year_col": _find_column(df, ["didiag", "最初診斷日", "診斷日期"]),
         "behavior_col": _find_column(df, ["behavior", "性態碼"]),
-        "ajcc_ed_col": _find_column(df, ["ajcc_ed", "ajcc edition", "ajcc版本"]),
+        "ajcc_ed_col": _find_column(df, ["ajcc_ed", "ajcc edition", "ajcc版本", "ajcc 癌症分期版本與章節", "癌症分期版本與章節"]),
         "class_col": _find_column(df, ["class", "診斷等級", "診斷方式", "個案分類"]) or _column_by_index(df, 9),
         "confirm_col": _find_column(df, ["confirm", "確診方式", "確診"]) or _column_by_index(df, 20),
         "diag_status_col": _find_column(df, ["診斷狀態分類", "診斷狀態"]),
@@ -84,6 +88,7 @@ def _empty_dashboard_response(message="查無符合條件資料！", histology_r
         "histologyNoDataReason": histology_reason or message,
         "diagnosisClassificationData": [],
         "stageFirstCourseData": [],
+        "stageSurgeryData": [],
         "survivalData": {
             "rows": [],
             "no_data_reason": message,
@@ -328,7 +333,7 @@ def calculate_analyzable_confirmed_cases(df, cols):
     return analyzable_confirmed_data
 
 # 組織型態(表,圖)
-def calculate_histology_distribution(df, cols, return_warnings=False):
+def calculate_histology_distribution(df, cols, cancers=None, year_start="", year_end="", return_warnings=False):
     hist_dist_data = []
     histology_warnings = []
     unknown_name = "Unknown / 未對應組織型態"
@@ -346,7 +351,7 @@ def calculate_histology_distribution(df, cols, return_warnings=False):
 
         total_valid_cases = len(df_filtered)
         if total_valid_cases > 0:
-            rules = get_histology_rules()
+            rules = get_histology_code_rules()
             hist_counts = {}
             for _, row in df_filtered.iterrows():
                 case_row = {
@@ -355,23 +360,47 @@ def calculate_histology_distribution(df, cols, return_warnings=False):
                     "site": row[site_col] if site_col in df.columns else "",
                     "didiag": row[year_col] if year_col in df.columns else "",
                 }
-                res = match_histology(case_row, rules)
+                cancer = classify_cancer_group(
+                    case_row["site"], case_row["hist"], CANCER_GROUP_RULES,
+                    behavior=case_row["behavior"], didiag=case_row["didiag"],
+                )
+                if is_blood_or_lymphoid(cancer):
+                    name_zh, name_en = blood_or_lymphoid_name(cancer)
+                    res = {
+                        "status": "matched", "icdo_code": f"{normalize_case_code(case_row['hist'])}/{normalize_case_code(case_row['behavior'])}",
+                        "name_zh": name_zh, "name_en": name_en,
+                    }
+                else:
+                    res = resolve_histology_code(case_row, cancer, rules, year_start, year_end)
                 icdo_code = res.get("icdo_code", "")
-                report_name = res.get("report_name", unknown_name)
-                key = (icdo_code, report_name)
+                report_name_zh = res.get("name_zh", unknown_name)
+                report_name_en = res.get("name_en", unknown_name)
+                if res.get("status") == "matched" and should_append_in_situ(
+                    case_row, cancer, case_row["hist"], case_row["behavior"]
+                ):
+                    report_name_zh = f"{report_name_zh}(原位癌)"
+                    report_name_en = f"{report_name_en}(in situ)"
+                key = (icdo_code, report_name_zh, report_name_en)
                 hist_counts[key] = hist_counts.get(key, 0) + 1
 
-                if report_name == unknown_name:
+                if res.get("status") != "matched":
                     user_id = display_value(row[patient_id_col]) if patient_id_col in df.columns else ""
                     site_value = display_value(row[site_col]) if site_col in df.columns else ""
                     hist_value = display_value(row[hist_col]) if hist_col in df.columns else ""
                     behavior_value = display_value(row[behavior_col]) if behavior_col in df.columns else ""
                     didiag_value = display_value(row[year_col]) if year_col in df.columns else ""
-                    warning_type = res.get("warning_type", "not_in_mapping")
-                    mismatch_fields = res.get("mismatch_fields", [])
-                    default_message = f"{icdo_code} 未納入 1.3 組織型態規則。"
-                    message = clean_warning_sentence(res.get("message", default_message))
-                    detail_message = clean_warning_sentence(res.get("detail_message", "若此組織型態無特殊適用條件，則此組織代碼組合不屬於目前統計規則範圍。"))
+                    warning_type = "ambiguous_mapping" if res.get("status") == "ambiguous" else "not_in_mapping"
+                    mismatch_fields = []
+                    default_message = f"{icdo_code} 未納入組織代碼表。"
+                    message = clean_warning_sentence(
+                        f"{icdo_code} 在組織代碼表中有重複且名稱不一致的資料，請確認。"
+                        if warning_type == "ambiguous_mapping" else default_message
+                    )
+                    detail_message = clean_warning_sentence(
+                        "請補充原發部位適用條件或確認此代碼的最終組織型態名稱。"
+                        if warning_type == "ambiguous_mapping"
+                        else "請確認常見癌別、組織型態代碼與性態碼是否已匯入組織代碼表。"
+                    )
                     raw_data_message = build_histology_raw_data_message(
                         warning_type,
                         mismatch_fields,
@@ -392,11 +421,13 @@ def calculate_histology_distribution(df, cols, return_warnings=False):
                         "detail_message": detail_message
                     })
 
-            for (icdo_code, report_name), count in hist_counts.items():
+            for (icdo_code, report_name_zh, report_name_en), count in hist_counts.items():
                 pct = (count / total_valid_cases) * 100
                 hist_dist_data.append({
                     "code": icdo_code,
-                    "name": report_name,
+                    "name": report_name_zh,
+                    "name_zh": report_name_zh,
+                    "name_en": report_name_en,
                     "count": count,
                     "percentage": f"{pct:.1f}%",
                     "pct_val": pct})
@@ -645,22 +676,24 @@ def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", beh
         source_df = source_df if source_df is not None else _read_dashboard_excel(filename)
         cols = cols or get_column_names(source_df)
 
+        no_data_message = "依目前選擇的年度、癌別與性態碼查無符合個案，無法產生分析結果。"
         if _query_year_range_outside_data(source_df, cols, year_start, year_end):
-            return _empty_dashboard_response(
-                histology_reason="所選年度區間不在檔案的診斷年度範圍內。"
-            )
+            return _empty_dashboard_response(message=no_data_message, histology_reason="所選年度區間不在檔案的診斷年度範圍內。")
 
         year_filtered_df = filter_dashboard_data(source_df, cols, [], year_start, year_end, "")
         if year_filtered_df.empty:
-            return _empty_dashboard_response(histology_reason="所選年度內沒有可分析個案。")
+            return _empty_dashboard_response(message=no_data_message, histology_reason="所選年度內沒有可分析個案。")
         behavior_filtered_df = filter_dashboard_data(source_df, cols, [], year_start, year_end, behavior)
         if behavior_filtered_df.empty:
-            return _empty_dashboard_response(histology_reason="所選年度內沒有符合性態碼條件的個案。")
+            return _empty_dashboard_response(message=no_data_message, histology_reason="所選年度內沒有符合性態碼條件的個案。")
         df = filtered_df if filtered_df is not None else filter_dashboard_data(
             source_df, cols, cancers, year_start, year_end, behavior
         )
         if df.empty:
-            return _empty_dashboard_response(histology_reason="沒有同時符合所選年度、性態碼與癌別條件的個案。")
+            return _empty_dashboard_response(
+                message=no_data_message,
+                histology_reason="沒有同時符合所選年度、性態碼與癌別條件的個案。",
+            )
         
         selected = set(analysis_items or [])
         calculate_all = not selected
@@ -674,6 +707,7 @@ def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", beh
             selected.intersection({"分期呈現最細碼", "分期不呈現最細碼"})
         )
         treatment_selected = calculate_all or "期別與首次療程" in selected
+        surgery_selected = calculate_all or "期別與手術術式" in selected
         result = _empty_dashboard_response()
         result.pop("noDataWarning", None)
         result["histologyNoDataReason"] = ""
@@ -685,7 +719,7 @@ def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", beh
             result["analyzableConfirmedData"] = calculate_analyzable_confirmed_cases(df, cols)
         if diagnosis_selected:
             histology_data, histology_warnings = calculate_histology_distribution(
-                df, cols, return_warnings=True
+                df, cols, cancers=cancers, year_start=year_start, year_end=year_end, return_warnings=True
             )
             result["histologyData"] = histology_data
             result["histologyWarnings"] = histology_warnings
@@ -704,6 +738,7 @@ def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", beh
                 from modules.blueprint.clean.field_mapping import field_mapping
                 from modules.blueprint.dashboard.period_rule import (
                     calculate_stage_first_course_distribution,
+                    calculate_stage_surgery_distribution,
                     calculate_stage_reports,
                 )
 
@@ -726,6 +761,11 @@ def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", beh
                 if treatment_selected:
                     result["stageFirstCourseData"] = calculate_stage_first_course_distribution(
                         chinese_df, stage_options
+                    )
+                if surgery_selected:
+                    result["stageSurgeryData"] = calculate_stage_surgery_distribution(
+                        chinese_df, stage_options,
+                        manual_keys=cancers,
                     )
         if calculate_all or "存活率" in selected:
             result["survivalData"] = calculate_survival_table(df, cols)
@@ -818,6 +858,19 @@ def compare_dashboard_files(main_filename, target_filename, behavior="", cancers
     target_filtered = filter_dashboard_data(
         target_source, target_cols, cancers or [], target_year, target_end, behavior
     )
+    no_data_message = "依目前選擇的年度、癌別與性態碼查無符合個案，無法進行年度比較。"
+    if main_filtered.empty or target_filtered.empty:
+        main_period = f"{main_year}年" if str(main_year) == str(main_end) else f"{main_year}-{main_end}年"
+        target_period = f"{target_year}年" if str(target_year) == str(target_end) else f"{target_year}-{target_end}年"
+        missing_periods = []
+        if main_filtered.empty:
+            missing_periods.append(f"基準期({main_period})")
+        if target_filtered.empty:
+            missing_periods.append(f"比較期({target_period})")
+        return {
+            "noDataWarning": f"{'、'.join(missing_periods)}{no_data_message}",
+            "missingPeriods": ["main" if main_filtered.empty else None, "target" if target_filtered.empty else None],
+        }
     main_data = summarize_dashboard_file(
         main_filename, behavior, cancers, main_year, main_end,
         main_source, main_cols, main_filtered
