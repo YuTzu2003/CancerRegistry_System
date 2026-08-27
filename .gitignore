@@ -13,12 +13,21 @@ Jobs/
 *.lock
 *.python-version
 *.xlsx
+!範本_組織型態表.xlsx
 *.csv
 *.pptx
 *.doc
 *.txt
 .env
 *.json
+*.jsonl
 AGENTS.md
 CLAUDE.md
 GEMINI.md
+
+# Node dependencies
+node_modules/
+**/node_modules/
+
+# Codex / AI workspace files
+.codex/

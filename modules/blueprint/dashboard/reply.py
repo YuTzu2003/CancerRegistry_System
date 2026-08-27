@@ -137,8 +137,7 @@ def get_chart_insight_logic(data):
                 {"role": "system", "content": "You are a professional cancer-registry data analyst. Return valid bilingual JSON only."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.5,
-            timeout=180.0
+            temperature=0.5
         )
         content = response.choices[0].message.content
         insights = _parse_bilingual_insights(content)

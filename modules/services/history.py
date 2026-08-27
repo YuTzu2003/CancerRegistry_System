@@ -42,7 +42,7 @@ def _should_include_result_file(filename, original_filename=None):
 
     return False
 
-@history_bp.route("/history")
+@history_bp.route("/clean/history")
 @login_required
 def history():
     user_id = session.get("id")
@@ -57,7 +57,7 @@ def history():
     conn.close()
     return render_template("history.html", active="history", history=history_data)
 
-@history_bp.route("/history/delete/<job_id>", methods=["POST"])
+@history_bp.route("/clean/history/delete/<job_id>", methods=["POST"])
 @login_required
 def delete_history(job_id):
     user_id = session.get("id")
@@ -79,7 +79,7 @@ def delete_history(job_id):
     flash("紀錄已成功刪除", "success")
     return redirect(url_for("history.history"))
 
-@history_bp.route("/history/batch_delete", methods=["POST"])
+@history_bp.route("/clean/history/batch_delete", methods=["POST"])
 @login_required
 def batch_delete_history():
     user_id = session.get("id")
@@ -105,7 +105,7 @@ def batch_delete_history():
     conn.close()
     return jsonify({"ok": True})
 
-@history_bp.route("/history/detail/<job_id>")
+@history_bp.route("/clean/history/detail/<job_id>")
 @login_required
 def detail_history(job_id):
     conn = get_conn()
@@ -119,7 +119,7 @@ def detail_history(job_id):
     conn.close()
     return jsonify({"ok": True, "data": data})
 
-@history_bp.route("/history/download/<job_id>")
+@history_bp.route("/clean/history/download/<job_id>")
 @login_required
 def history_download_zip(job_id):
     try:
@@ -149,7 +149,7 @@ def history_download_zip(job_id):
         return send_file(os.path.abspath(zip_path), as_attachment=True)
     except Exception as e: return jsonify({"ok": False, "error": str(e)}), 500
 
-@history_bp.route("/history/batch_download", methods=["POST"])
+@history_bp.route("/clean/history/batch_download", methods=["POST"])
 @login_required
 def batch_download_history():
     user_id = session.get("id")

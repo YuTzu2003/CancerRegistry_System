@@ -522,6 +522,21 @@
   background: #fff;
 }
 
+/* 組織型態表在中英文切換時維持相同欄寬，避免依文字長度跳動。 */
+.annual-histology-table {
+  table-layout: fixed;
+}
+
+.annual-histology-code-col { width: 20%; }
+.annual-histology-name-col { width: 50%; }
+.annual-histology-count-col { width: 13%; }
+.annual-histology-percent-col { width: 17%; }
+
+.annual-histology-table td:nth-child(2) {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
 .annual-report-table th,
 .annual-report-table td {
   border: 1px solid #111827;
@@ -807,4 +822,15 @@
 
 #stageSummaryOptions .col > section > .d-flex {
     margin-top: auto;
+}
+
+/* 附錄 B 手術術式表：標題與分類依據分兩列置中呈現。 */
+.stage-surgery-panel .surgery-table-caption {
+  text-align: center;
+}
+.stage-surgery-panel .surgery-table-caption-note {
+  display: inline-block;
+  margin-top: 2px;
+  font-size: 14px;
+  font-weight: 400;
 }

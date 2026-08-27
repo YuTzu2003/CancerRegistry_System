@@ -306,7 +306,7 @@
                   <label class="form-check-label text-dark" for="chkTreatmentFirstCourse" style="cursor: pointer;">期別與首次療程</label>
                 </div>
                 <div class="form-check">
-                  <input class="form-check-input item-checkbox" type="checkbox" name="subTab_treatment" id="chkTreatmentSurgery" data-parent="treatment" value="期別與手術術式" disabled>
+                  <input class="form-check-input item-checkbox" type="checkbox" name="subTab_treatment" id="chkTreatmentSurgery" data-parent="treatment" value="期別與手術術式" data-target="#chartPane-TreatmentSurgery" disabled>
                   <label class="form-check-label text-dark" for="chkTreatmentSurgery" style="cursor: pointer;">期別與手術術式</label>
                 </div>
               </div>
@@ -448,10 +448,10 @@
               <a class="list-group-item list-group-item-action bg-transparent border-0 py-3 cat-nav-btn text-secondary" id="list-Liver_and_Intrahepatic_bile_duct-list" data-bs-toggle="list" href="#list-Liver_and_Intrahepatic_bile_duct" role="tab" style="border-left: 4px solid transparent;">肝及肝內膽管
                 <span class="cat-badge float-end"></span>
               </a>
-              <a class="list-group-item list-group-item-action bg-transparent border-0 py-3 cat-nav-btn text-secondary" id="list-Breast-list" data-bs-toggle="list" href="#list-Breast" role="tab" style="border-left: 4px solid transparent;">乳房
+              <a class="list-group-item list-group-item-action bg-transparent border-0 py-3 cat-nav-btn text-secondary" id="list-Breast-list" data-bs-toggle="list" href="#list-Breast" role="tab" style="border-left: 4px solid transparent;">乳房 Breast
                 <span class="cat-badge float-end"></span>
               </a>
-              <a class="list-group-item list-group-item-action bg-transparent border-0 py-3 cat-nav-btn text-secondary" id="list-Lung_and_Bronchus-list" data-bs-toggle="list" href="#list-Lung_and_Bronchus" role="tab" style="border-left: 4px solid transparent;">肺
+              <a class="list-group-item list-group-item-action bg-transparent border-0 py-3 cat-nav-btn text-secondary" id="list-Lung_and_Bronchus-list" data-bs-toggle="list" href="#list-Lung_and_Bronchus" role="tab" style="border-left: 4px solid transparent;">肺 Lung
                 <span class="cat-badge float-end"></span>
               </a>
               <a class="list-group-item list-group-item-action bg-transparent border-0 py-3 cat-nav-btn text-secondary" id="list-Cervix_Uteri-list" data-bs-toggle="list" href="#list-Cervix_Uteri" role="tab" style="border-left: 4px solid transparent;">子宮頸 Cervix Uteri
@@ -612,7 +612,7 @@
               <div class="tab-pane fade  p-4" id="list-Breast" role="tabpanel">
                 <div class="form-check mb-3 pb-2 border-bottom d-flex align-items-center gap-2">
                   <input type="checkbox" class="form-check-input mt-0 cancer-cb-group" id="chk_group_Breast" data-group="Breast" style="transform: scale(1.2);">
-                  <label class="form-check-label fw-bold text-dark fs-6" for="chk_group_Breast">乳房 (全選)</label>
+                  <label class="form-check-label fw-bold text-dark fs-6" for="chk_group_Breast">乳房 Breast (全選)</label>
                 </div>
                 <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
                   <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Breast_Female" value="Breast_Female" data-parent="Breast">
@@ -626,7 +626,7 @@
               <div class="tab-pane fade  p-4" id="list-Lung_and_Bronchus" role="tabpanel">
                 <div class="form-check mb-3 pb-2 border-bottom d-flex align-items-center gap-2">
                   <input type="checkbox" class="form-check-input mt-0 cancer-cb-group" id="chk_group_Lung_and_Bronchus" data-group="Lung_and_Bronchus" style="transform: scale(1.2);">
-                  <label class="form-check-label fw-bold text-dark fs-6" for="chk_group_Lung_and_Bronchus">肺 (全選)</label>
+                  <label class="form-check-label fw-bold text-dark fs-6" for="chk_group_Lung_and_Bronchus">肺 Lung (全選)</label>
                 </div>
                 <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
                   <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Small_cell_carcinoma" value="Small_cell_carcinoma" data-parent="Lung_and_Bronchus">
@@ -840,4 +840,4 @@
 </style>
 
 <script src="{{ url_for('static', filename='js/annual_report_renderer.js') }}?v=20260729-common-cancers"></script>
-<script src="{{ url_for('static', filename='js/dashboard_control.js') }}?v=20260819-default-chinese-input"></script>
+<script src="{{ url_for('static', filename='js/dashboard_control.js') }}?v=20260826-annual-no-data"></script>

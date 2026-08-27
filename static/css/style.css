@@ -514,11 +514,7 @@ table.table-flat.centered td { text-align: center; }
   color: var(--text);
   transition: border-color .15s ease, box-shadow .15s ease;
 }
-.form-control:focus, .form-select:focus {
-  outline: none;
-  border-color: var(--blue-500);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, .12);
-}
+
 textarea.form-control { resize: vertical; min-height: 80px; }
 
 /* Uploader */
