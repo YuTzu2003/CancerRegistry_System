@@ -1351,13 +1351,6 @@ function initDashboardControl() {
                                                   window.DashboardRenderer?.updateSurvivalChartLayout?.();
                                               }
                                               
-                                              if (window.lastChartData) {
-                                                  const aiBtn = targetPane.querySelector('button[id^="btnAi"]');
-                                                  const llmDiv = targetPane.querySelector('div[id^="llmResponse"]');
-                                                  if (aiBtn && llmDiv && llmDiv.innerText.includes('自動產生')) {
-                                                      aiBtn.click();
-                                                  }
-                                              }
                                           }, 50);
                                       }
                                   }
@@ -1465,7 +1458,7 @@ function initDashboardControl() {
                                       };
                                   });
                               }
-                              const currentRequest = window.DashboardRenderer.fetchLlmInsight(
+                              const currentRequest = window.DashboardRenderer.fetchLlmInsightWithRetry(
                                   fieldKey, dataToSend, cfg.fields, cfg.respId, cfg.btnId,
                                   { forceRefresh: event?.isTrusted === true }
                               );
@@ -1479,7 +1472,6 @@ function initDashboardControl() {
                   });
 
                   const variantInsightTasks = [];
-                  let initialStageReport = null;
                   let initialTreatmentSystem = '';
 
                   if (window.DashboardRenderer) {
@@ -1509,9 +1501,8 @@ function initDashboardControl() {
                            }
                            chartData.stageReports = stageReports;
                            window.DashboardRenderer.renderStageReportTabs(stageReports, yearTitle, cancerTitle);
-                           initialStageReport = stageReports[0] || null;
                            if (stageReports.length) {
-                               stageReports.forEach(report => variantInsightTasks.push(
+                               [...stageReports.slice(1), stageReports[0]].forEach(report => variantInsightTasks.push(
                                    () => window.DashboardRenderer.configureStageInsight(report)
                                ));
                            }
@@ -1564,30 +1555,25 @@ function initDashboardControl() {
                   }
 
                   if (window.DashboardRenderer) window.DashboardRenderer.updateHistologyChart(chartData.histologyData, chartData.histologyNoDataReason);
-                  
-                  // Collect all AI promises before showing the charts
+
+                  // Generate narratives one at a time so a local LLM is not overloaded.
                   const completeInsight = async (task) => {
-                      let result = await task();
-                      if (!result?.success) result = await task();
+                      const result = await task();
                       if (!result?.success) throw new Error(result?.error || 'LLM insight generation failed.');
                       return result;
                   };
-                  let aiPromises = variantInsightTasks.length
-                      ? [(async () => {
-                          for (const task of variantInsightTasks) await completeInsight(task);
-                      })()]
-                      : [];
+                  const insightTasks = [...variantInsightTasks];
                   document.querySelectorAll('.item-checkbox').forEach(itemChk => {
                       if (itemChk.checked) {
                           const targetSelector = itemChk.getAttribute('data-target');
-                          if (targetSelector && targetSelector !== '#chartPane-StageSummary' && targetSelector !== '#chartPane-TreatmentFirstCourse') {
+                          if (targetSelector && !['#chartPane-StageSummary', '#chartPane-TreatmentFirstCourse', '#chartPane-TreatmentSurgery'].includes(targetSelector)) {
                               const targetPane = document.querySelector(targetSelector);
                               if (targetPane) {
                                   const aiBtn = targetPane.querySelector('button[id^="btnAi"]');
                                   const llmDiv = targetPane.querySelector('div[id^="llmResponse"]');
                                   if (aiBtn && llmDiv && llmDiv.innerText.includes('自動產生')) {
                                       if (typeof aiBtn.onclick === 'function') {
-                                          aiPromises.push(completeInsight(() => aiBtn.onclick()));
+                                          insightTasks.push(() => aiBtn.onclick());
                                       }
                                   }
                               }
@@ -1596,32 +1582,32 @@ function initDashboardControl() {
                   });
 
                   let completedInsights = 0;
-                  const totalInsights = aiPromises.length;
+                  const totalInsights = insightTasks.length;
                   const updateInsightProgress = () => {
                       if (window.utils?.showLoading) {
                           window.utils.showLoading(`正在產生 LLM 敘述（${completedInsights}/${totalInsights}）…`);
                       }
                   };
                   updateInsightProgress();
-                  Promise.all(aiPromises.map(request => Promise.resolve(request).finally(() => {
-                      completedInsights += 1;
-                      updateInsightProgress();
-                  }))).then(() => {
-                       if (initialStageReport) {
-                           window.DashboardRenderer.configureStageInsight(initialStageReport, { generate: false });
-                           document.getElementById('btnAiStageSummary')?.onclick?.();
-                       }
-                       if (document.getElementById('chkTreatmentFirstCourse')?.checked && initialTreatmentSystem) {
-                           window.stageFirstCourseActiveSystem = initialTreatmentSystem;
-                           document.getElementById('btnAiTreatmentFirstCourse')?.onclick?.();
-                       }
-                       window.DashboardRenderer.showAnnualDataContent();
-                       if (window.utils && window.utils.hideLoading) {
+                  (async () => {
+                      let failedInsights = 0;
+                      for (const task of insightTasks) {
+                          try {
+                              await completeInsight(task);
+                          } catch (error) {
+                              failedInsights += 1;
+                              console.error('LLM insight generation failed:', error);
+                          } finally {
+                              completedInsights += 1;
+                              updateInsightProgress();
+                          }
+                      }
+                      window.DashboardRenderer?.showAnnualDataContent();
+                      if (window.utils && window.utils.hideLoading) {
                           window.utils.hideLoading();
                       } else if (window.dashboardChartInstance) {
                           window.dashboardChartInstance.hideLoading();
                       }
-                      
                       if (chartTabsArea) {
                           if (anyChecked) {
                               chartTabsArea.classList.remove('d-none');
@@ -1635,15 +1621,10 @@ function initDashboardControl() {
                               if (emptyPane) emptyPane.classList.remove('d-none');
                           }
                       }
-                  }).catch(error => {
-                      console.error('LLM insight generation failed:', error);
-                      if (window.utils && window.utils.hideLoading) {
-                          window.utils.hideLoading();
-                      } else if (window.dashboardChartInstance) {
-                          window.dashboardChartInstance.hideLoading();
+                      if (failedInsights > 0) {
+                          utils.alert(`${failedInsights} 個語言模型敘述產生失敗，請在該圖表按「重新產生敘述」。`, 'warning');
                       }
-                      utils.alert('語言模型敘述尚未完成，已自動重試一次仍失敗；請確認模型服務後重新查詢。', 'error');
-                  });
+                  })();
               } else {
                   if (window.utils && window.utils.hideLoading) window.utils.hideLoading();
                   utils.alert('資料分析失敗: ' + data.error, 'error');
