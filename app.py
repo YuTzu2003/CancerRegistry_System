@@ -5,6 +5,7 @@ import sys
 from dotenv import load_dotenv
 from modules.services import auth_bp, login_required, history_bp, clean_bp, data_gen_bp, dashboard_bp, histology_mapping_bp
 from modules.services.db import get_conn
+import modules.blueprint.dashboard.national_import
 from modules.blueprint.admin.member import member_bp
 from modules.blueprint.auth.key_application import key_application_bp
 from modules.blueprint.admin.key_approval import key_approval_bp
@@ -51,6 +52,7 @@ def inject_nav():
         {"title":"報表分析","icon":"bi-bar-chart", "subitems": [
             {"endpoint":"dashboard.dashboard","title":"年報分析","icon":"bi-bar-chart"},
             {"endpoint":"dashboard.compare","title":"年度比較","icon":"bi-columns-gap"},
+            {"endpoint":"dashboard.national_import","title":"國家資料匯入","icon":"bi-file-earmark-arrow-up"},
             {"endpoint":"histology_mapping.histology_code_mapping","title":"組織型態","icon":"bi-list-ul"}
         ]},
     ]
