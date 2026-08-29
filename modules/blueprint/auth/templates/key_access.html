@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}資料維護金鑰驗證｜癌症資料登記{% endblock %}
+{% block page_title %}資料維護{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* Hallmark · genre: modern-minimal · macrostructure: Split Studio · theme: existing system · enrichment: none · nav: existing · footer: existing */
+  /* Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V5 · contrast: pass (40–41) · responsive: pass (34, 49–57) */
+  .data-access { width: min(100%, 920px); margin: clamp(1.5rem, 5vh, 4rem) auto 0; }
+  .data-access__layout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow-sm); }
+  .data-access__intro { display: flex; flex-direction: column; justify-content: space-between; gap: 2.5rem; padding: clamp(1.5rem, 4vw, 3rem); background: var(--gray-800); color: var(--white); }
+  .data-access__eyebrow { margin: 0 0 .75rem; color: var(--gray-300); font-size: .8rem; font-weight: 700; letter-spacing: .08em; }
+  .data-access__title { margin: 0 0 1rem; color: var(--white); font-size: 24px; font-weight: 700; letter-spacing: .3px; overflow-wrap: anywhere; min-width: 0; }
+  .data-access__note { margin: 0; color: var(--gray-300); font-size: 16px; line-height: 1.6; }
+  .data-access__form { display: flex; flex-direction: column; justify-content: center; gap: 1rem; padding: clamp(1.5rem, 4vw, 3rem); }
+  .data-access__icon { display: grid; width: 44px; height: 44px; place-items: center; border-radius: var(--radius-sm); background: var(--warning-soft); color: var(--warning); font-size: 1.2rem; }
+  .data-access__form h2 { margin: 0; font-size: 1.25rem; font-weight: 700; }
+  .data-access__form p { margin: 0; color: var(--muted); }
+  .data-access__input { min-height: 44px; border-width: 1px; outline: 2px solid transparent; outline-offset: 1px; }
+  .data-access__input:focus-visible { border-width: 1px; outline-color: var(--blue-600); box-shadow: none; }
+  .data-access__submit { min-height: 44px; white-space: nowrap; transition: transform 120ms cubic-bezier(.16, 1, .3, 1), background-color 120ms cubic-bezier(.16, 1, .3, 1); }
+  .data-access__submit:focus-visible { outline: 2px solid var(--blue-600); outline-offset: 2px; }
+  .data-access__submit:active { transform: translateY(1px); }
+  .data-access__submit:disabled { cursor: not-allowed; opacity: .55; }
+  [data-theme="dark"] .data-access__intro { background: var(--gray-50); color: var(--text); }
+  [data-theme="dark"] .data-access__title { color: var(--text); }
+  [data-theme="dark"] .data-access__eyebrow,
+  [data-theme="dark"] .data-access__note { color: var(--muted); }
+  @media (hover: hover) and (pointer: fine) { .data-access__submit:hover { transform: translateY(-1px); } }
+  @media (max-width: 47.99rem) { .data-access__layout { grid-template-columns: minmax(0, 1fr); } .data-access__intro { gap: 1.5rem; } }
+  @media (prefers-reduced-motion: reduce) { .data-access__submit { transition-duration: 0ms; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="data-access" aria-labelledby="dataAccessTitle">
+  <div class="data-access__layout">
+    <div class="data-access__intro">
+      <div>
+        <p class="data-access__eyebrow">資料維護授權</p>
+        <h1 class="data-access__title" id="dataAccessTitle">先驗證，再選擇更新內容。</h1>
+      </div>
+      <p class="data-access__note">同一份授權可用於組織型態與全國資料；進入後再選擇本次要維護的資料。</p>
+    </div>
+    <form class="data-access__form" method="post" action="{{ url_for('auth.verify_data_update_access') }}">
+      <div class="d-flex align-items-center gap-3">
+        <div class="data-access__icon" aria-hidden="true"><i class="bi bi-key"></i></div>
+        <h2>輸入授權金鑰</h2>
+      </div>
+      <p>Key 必須屬於目前登入帳號，且仍在啟用期間內。</p>
+      <div>
+        <label class="form-label fw-semibold" for="data-update-api-key">授權金鑰</label>
+        <input id="data-update-api-key" name="api_key" class="form-control data-access__input" type="password" autocomplete="off" aria-describedby="dataAccessHelp" required autofocus>
+        <div class="form-text" id="dataAccessHelp">驗證成功後會進入資料更新選擇頁。</div>
+      </div>
+      <button class="btn btn-dark data-access__submit" type="submit"><i class="bi bi-shield-check me-1"></i>驗證授權</button>
+    </form>
+  </div>
+</section>
+{% endblock %}

@@ -6,15 +6,8 @@ from modules.blueprint.dashboard.reply import get_chart_insight_logic, get_compa
 from modules.blueprint.dashboard.definition.cancer_group_rules import CANCER_GROUP_RULES
 from flask import send_file
 from modules.blueprint.dashboard.export_report import generate_export_files
-from modules.blueprint.dashboard.pbi_settings import (
-    get_pbi_publish_path,
-    get_pbi_publish_settings,
-    save_pbi_publish_path,
-)
-from modules.blueprint.dashboard.input_format import (
-    preview_dashboard_upload,
-    validate_and_normalize_dashboard_upload,
-)
+from modules.blueprint.dashboard.pbi_settings import (get_pbi_publish_path,get_pbi_publish_settings,save_pbi_publish_path,)
+from modules.blueprint.dashboard.input_format import (preview_dashboard_upload,validate_and_normalize_dashboard_upload,)
 import os
 import re
 import json
@@ -26,47 +19,10 @@ from flask import render_template
 dashboard_bp = Blueprint('dashboard', __name__, template_folder='../blueprint/dashboard/templates')
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DASHBOARD_DATA = os.path.join(BASE_DIR, 'tasks', 'data')
-DASHBOARD_UPLOADS = os.path.join(DASHBOARD_DATA, 'dashboard')
 os.makedirs(DASHBOARD_DATA, exist_ok=True)
-
-def _ensure_dashboard_file_table():
-    conn = get_conn()
-    cursor = conn.cursor()
-    cursor.execute("""
-        IF OBJECT_ID(N'dbo.DashboardFile', N'U') IS NULL
-        BEGIN
-            CREATE TABLE dbo.DashboardFile (
-                FileID NVARCHAR(36) NOT NULL PRIMARY KEY,
-                UserID NVARCHAR(50) NOT NULL,
-                DisplayName NVARCHAR(255) NOT NULL,
-                StoragePath NVARCHAR(512) NULL,
-                CreatedAt DATETIME2 NOT NULL DEFAULT SYSDATETIME()
-            );
-            CREATE INDEX IX_DashboardFile_UserID_CreatedAt
-                ON dbo.DashboardFile (UserID, CreatedAt DESC);
-        END
-        IF COL_LENGTH(N'dbo.DashboardFile', N'StoragePath') IS NULL
-            ALTER TABLE dbo.DashboardFile ADD StoragePath NVARCHAR(512) NULL;
-    """)
-    conn.commit()
-    conn.close()
-    if _dashboard_file_has_stored_name():
-        _migrate_legacy_dashboard_files()
-        _remove_dashboard_stored_name_column()
-
-
-def _dashboard_file_has_stored_name():
-    conn = get_conn()
-    cursor = conn.cursor()
-    cursor.execute("SELECT COL_LENGTH(N'dbo.DashboardFile', N'StoredName')")
-    exists = cursor.fetchone()[0] is not None
-    conn.close()
-    return exists
-
 
 def _dashboard_storage_path(file_id, stored_name):
     return os.path.join('dashboard', str(file_id), str(stored_name))
-
 
 def _absolute_dashboard_path(storage_path):
     data_dir = os.path.abspath(DASHBOARD_DATA)
@@ -75,80 +31,10 @@ def _absolute_dashboard_path(storage_path):
         raise ValueError('Invalid dashboard file path')
     return file_path
 
-
-def _migrate_legacy_dashboard_files():
-    """Move legacy flat dashboard uploads into one folder per FileID."""
-    conn = get_conn()
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT FileID, StoredName
-        FROM dbo.DashboardFile
-        WHERE StoragePath IS NULL OR StoragePath = ''
-    """)
-    legacy_files = cursor.fetchall()
-    for row in legacy_files:
-        file_id, stored_name = str(row[0]), str(row[1])
-        storage_path = _dashboard_storage_path(file_id, stored_name)
-        legacy_path = os.path.join(DASHBOARD_DATA, stored_name)
-        destination = _absolute_dashboard_path(storage_path)
-        if os.path.isfile(legacy_path):
-            os.makedirs(os.path.dirname(destination), exist_ok=True)
-            os.replace(legacy_path, destination)
-        cursor.execute(
-            "UPDATE dbo.DashboardFile SET StoragePath = ? WHERE FileID = ?",
-            (storage_path, file_id),
-        )
-    conn.commit()
-    conn.close()
-
-
-def _remove_dashboard_stored_name_column():
-    """Remove the legacy physical-filename column after StoragePath migration."""
-    conn = get_conn()
-    cursor = conn.cursor()
-    cursor.execute("""
-        DECLARE @constraint_name SYSNAME;
-        SELECT TOP 1 @constraint_name = kc.name
-        FROM sys.key_constraints kc
-        JOIN sys.index_columns ic
-          ON ic.object_id = kc.parent_object_id AND ic.index_id = kc.unique_index_id
-        JOIN sys.columns c
-          ON c.object_id = ic.object_id AND c.column_id = ic.column_id
-        WHERE kc.parent_object_id = OBJECT_ID(N'dbo.DashboardFile')
-          AND c.name = N'StoredName';
-        IF @constraint_name IS NOT NULL
-            EXEC(N'ALTER TABLE dbo.DashboardFile DROP CONSTRAINT [' + @constraint_name + N']');
-
-        DECLARE @index_name SYSNAME;
-        SELECT TOP 1 @index_name = i.name
-        FROM sys.indexes i
-        JOIN sys.index_columns ic
-          ON ic.object_id = i.object_id AND ic.index_id = i.index_id
-        JOIN sys.columns c
-          ON c.object_id = ic.object_id AND c.column_id = ic.column_id
-        WHERE i.object_id = OBJECT_ID(N'dbo.DashboardFile')
-          AND i.is_primary_key = 0 AND i.is_unique_constraint = 0
-          AND c.name = N'StoredName';
-        IF @index_name IS NOT NULL
-            EXEC(N'DROP INDEX [' + @index_name + N'] ON dbo.DashboardFile');
-
-        IF COL_LENGTH(N'dbo.DashboardFile', N'StoredName') IS NOT NULL
-            ALTER TABLE dbo.DashboardFile DROP COLUMN StoredName;
-    """)
-    conn.commit()
-    conn.close()
-
-
 def _get_uploaded_dashboard_files(user_id):
-    _ensure_dashboard_file_table()
     conn = get_conn()
     cursor = conn.cursor()
-    cursor.execute("""
-        SELECT FileID, DisplayName, CreatedAt
-        FROM dbo.DashboardFile
-        WHERE UserID = ?
-        ORDER BY CreatedAt DESC
-    """, (str(user_id),))
+    cursor.execute("""SELECT FileID, DisplayName, CreatedAt FROM dbo.DashboardFile WHERE UserID = ? ORDER BY CreatedAt DESC """, (str(user_id),))
     files = [
         {
             "id": str(row[0]),
@@ -160,24 +46,17 @@ def _get_uploaded_dashboard_files(user_id):
     conn.close()
     return files
 
-
 def _get_owned_dashboard_file(file_id, user_id):
     if not file_id:
         return None
-    _ensure_dashboard_file_table()
     conn = get_conn()
     cursor = conn.cursor()
-    cursor.execute("""
-        SELECT DisplayName, StoragePath
-        FROM dbo.DashboardFile
-        WHERE FileID = ? AND UserID = ?
-    """, (str(file_id), str(user_id)))
+    cursor.execute("""SELECT DisplayName, StoragePath FROM dbo.DashboardFile WHERE FileID = ? AND UserID = ?""", (str(file_id), str(user_id)))
     row = cursor.fetchone()
     conn.close()
     if not row:
         return None
     return {"name": str(row[0]), "storage_path": str(row[1])}
-
 
 def _get_cancer_name_translations():
     translations = {"All_Cancers": {"zh": "全癌別", "en": "All cancers"}}
@@ -195,25 +74,13 @@ def _get_cancer_name_translations():
 @login_required
 def dashboard():
     uploaded_files = _get_uploaded_dashboard_files(session.get("id"))
-    return render_template(
-        "dashboard.html",
-        active="dashboard",
-        uploaded_files=uploaded_files,
-        cancer_name_translations=_get_cancer_name_translations(),
-        pbi_publish_path=get_pbi_publish_path(),
-    )
+    return render_template("dashboard.html",active="dashboard",uploaded_files=uploaded_files,cancer_name_translations=_get_cancer_name_translations(),pbi_publish_path=get_pbi_publish_path(),)
 
 @dashboard_bp.route("/dashboard/compare")
 @login_required
 def compare():
     uploaded_files = _get_uploaded_dashboard_files(session.get("id"))
-    return render_template(
-        "compare.html",
-        active="compare",
-        uploaded_files=uploaded_files,
-        cancer_name_translations=_get_cancer_name_translations(),
-    )
-
+    return render_template("compare.html",active="compare",uploaded_files=uploaded_files,cancer_name_translations=_get_cancer_name_translations(),)
 
 @dashboard_bp.route("/dashboard/upload", methods=["POST"])
 @login_required
@@ -240,7 +107,6 @@ def dashboard_upload():
     if not filename.strip() or filename == f".{ext}":
         filename = f"uploaded_file.{ext}"
     user_id = session.get("id")
-    _ensure_dashboard_file_table()
     file_id = str(uuid.uuid4())
     storage_name = f"{file_id}{os.path.splitext(filename)[1].lower()}"
     storage_path = _dashboard_storage_path(file_id, storage_name)
@@ -248,22 +114,13 @@ def dashboard_upload():
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
     f.save(save_path)
     try:
-        normalized_path = validate_and_normalize_dashboard_upload(
-            save_path,
-            ext,
-            input_scheme,
-            get_conn,
-            extra_fields,
-        )
+        normalized_path = validate_and_normalize_dashboard_upload(save_path,ext,input_scheme,get_conn,extra_fields,)
         if normalized_path != save_path:
             save_path = normalized_path
             storage_path = os.path.relpath(save_path, DASHBOARD_DATA)
         conn = get_conn()
         cursor = conn.cursor()
-        cursor.execute("""
-            INSERT INTO dbo.DashboardFile (FileID, UserID, DisplayName, StoragePath)
-            VALUES (?, ?, ?, ?)
-        """, (file_id, str(user_id), filename, storage_path))
+        cursor.execute("""INSERT INTO dbo.DashboardFile (FileID, UserID, DisplayName, StoragePath) VALUES (?, ?, ?, ?)""", (file_id, str(user_id), filename, storage_path))
         conn.commit()
         conn.close()
     except ValueError as error:
@@ -276,7 +133,6 @@ def dashboard_upload():
         raise
     logging.info(f"Dashboard upload: {filename} saved for user {user_id}")
     return jsonify({"ok": True, "filename": filename, "file_id": file_id})
-
 
 @dashboard_bp.route("/dashboard/input-preview", methods=["POST"])
 @login_required

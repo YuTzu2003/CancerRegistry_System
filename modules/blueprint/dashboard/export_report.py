@@ -1,6 +1,5 @@
 import os
 import io
-import uuid
 import zipfile
 import base64
 from PIL import Image, ImageStat
@@ -11,9 +10,7 @@ from docx.enum.section import WD_ORIENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from playwright.sync_api import sync_playwright
 
-
 def _split_tall_chart_at_blank_rows(image_bytes, max_height_ratio=0.62):
-    """Split one continuous chart only at visually blank rows for safe report page breaks."""
     image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
     max_chunk_height = max(1, int(image.width * max_height_ratio))
     if image.height <= max_chunk_height:

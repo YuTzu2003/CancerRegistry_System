@@ -1,10 +1,13 @@
-from flask import Flask,render_template,session,request,jsonify,flash
+from flask import Flask,render_template,session
 import os
 import logging
 import sys
 from dotenv import load_dotenv
-from modules.services import auth_bp, login_required, history_bp, clean_bp, data_gen_bp, dashboard_bp, histology_mapping_bp
+from modules.services import auth_bp, login_required, history_bp, clean_bp, data_gen_bp, dashboard_bp
 from modules.services.db import get_conn
+import modules.blueprint.auth.key_access
+import modules.blueprint.auth.histology_code
+import modules.blueprint.auth.national_import
 from modules.blueprint.admin.member import member_bp
 from modules.blueprint.auth.key_application import key_application_bp
 from modules.blueprint.admin.key_approval import key_approval_bp
@@ -26,7 +29,6 @@ app.register_blueprint(history_bp)
 app.register_blueprint(clean_bp)
 app.register_blueprint(data_gen_bp)
 app.register_blueprint(dashboard_bp)
-app.register_blueprint(histology_mapping_bp)
 app.register_blueprint(key_application_bp)
 app.register_blueprint(key_approval_bp)
 
@@ -35,9 +37,6 @@ Jobs_FOLDER = 'tasks/Jobs'
 DASHBOARD_DATA = os.path.join(BASE_DIR, 'tasks', 'data')
 os.makedirs(Jobs_FOLDER, exist_ok=True)
 os.makedirs(DASHBOARD_DATA, exist_ok=True)
-
-def allowed_file(filename: str) -> bool:
-    return "." in filename and filename.rsplit(".", 1)[1].lower() in {"csv","xls","xlsx","txt"}
 
 @app.context_processor
 def inject_nav():
@@ -51,7 +50,7 @@ def inject_nav():
         {"title":"報表分析","icon":"bi-bar-chart", "subitems": [
             {"endpoint":"dashboard.dashboard","title":"年報分析","icon":"bi-bar-chart"},
             {"endpoint":"dashboard.compare","title":"年度比較","icon":"bi-columns-gap"},
-            {"endpoint":"histology_mapping.histology_code_mapping","title":"組織型態","icon":"bi-list-ul"}
+            {"endpoint":"auth.data_update_access","title":"資料維護","icon":"bi-database-gear"}
         ]},
     ]
     if session.get("position") == "Admin":
@@ -91,10 +90,7 @@ def index():
             cursor.execute("SELECT COUNT(*) AS PendingCount FROM dbo.User_applications WHERE Status = 'Pending'")
             pending_application_count = int(getattr(cursor.fetchone(), "PendingCount", 0) or 0)
         else:
-            cursor.execute(
-                "SELECT TOP 1 Status FROM dbo.User_applications WHERE UserID = ? ORDER BY CreatedAt DESC",
-                session["userid"],
-            )
+            cursor.execute("SELECT TOP 1 Status FROM dbo.User_applications WHERE UserID = ? ORDER BY CreatedAt DESC",session["userid"],)
             row = cursor.fetchone()
             key_application_status = row[0] if row and row[0] in {"Approved", "Rejected"} else ""
         conn.close()
@@ -102,17 +98,7 @@ def index():
         app.logger.error(f"Error fetching dashboard stats: {e}")
         stats = {"sum_total_count": "0", "avg_completeness_score": "0.0%"}
     
-    return render_template(
-        "index.html",
-        active="index",
-        stats=stats,
-        pending_application_count=pending_application_count,
-        key_application_status=key_application_status,
-    )
-
-
-
-
+    return render_template("index.html",active="index",stats=stats,pending_application_count=pending_application_count,key_application_status=key_application_status,)
 
 # @app.route("/rag_config")
 # @admin_required
