@@ -1,4 +1,4 @@
-from flask import Flask,render_template,session,request,jsonify,flash
+from flask import Flask,render_template,session
 import os
 import logging
 import sys
@@ -37,9 +37,6 @@ Jobs_FOLDER = 'tasks/Jobs'
 DASHBOARD_DATA = os.path.join(BASE_DIR, 'tasks', 'data')
 os.makedirs(Jobs_FOLDER, exist_ok=True)
 os.makedirs(DASHBOARD_DATA, exist_ok=True)
-
-def allowed_file(filename: str) -> bool:
-    return "." in filename and filename.rsplit(".", 1)[1].lower() in {"csv","xls","xlsx","txt"}
 
 @app.context_processor
 def inject_nav():
@@ -93,10 +90,7 @@ def index():
             cursor.execute("SELECT COUNT(*) AS PendingCount FROM dbo.User_applications WHERE Status = 'Pending'")
             pending_application_count = int(getattr(cursor.fetchone(), "PendingCount", 0) or 0)
         else:
-            cursor.execute(
-                "SELECT TOP 1 Status FROM dbo.User_applications WHERE UserID = ? ORDER BY CreatedAt DESC",
-                session["userid"],
-            )
+            cursor.execute("SELECT TOP 1 Status FROM dbo.User_applications WHERE UserID = ? ORDER BY CreatedAt DESC",session["userid"],)
             row = cursor.fetchone()
             key_application_status = row[0] if row and row[0] in {"Approved", "Rejected"} else ""
         conn.close()
@@ -104,17 +98,7 @@ def index():
         app.logger.error(f"Error fetching dashboard stats: {e}")
         stats = {"sum_total_count": "0", "avg_completeness_score": "0.0%"}
     
-    return render_template(
-        "index.html",
-        active="index",
-        stats=stats,
-        pending_application_count=pending_application_count,
-        key_application_status=key_application_status,
-    )
-
-
-
-
+    return render_template("index.html",active="index",stats=stats,pending_application_count=pending_application_count,key_application_status=key_application_status,)
 
 # @app.route("/rag_config")
 # @admin_required

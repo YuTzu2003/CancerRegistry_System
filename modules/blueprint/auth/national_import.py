@@ -8,7 +8,7 @@ from openpyxl.utils.exceptions import InvalidFileException
 from modules.blueprint.auth.key_access import data_update_key_required
 from modules.services.auth import auth_bp, login_required
 from modules.services.db import get_conn
-from modules.blueprint.auth.branch_versions import (commit_changes, create_empty_commit_file, discard_staging_changes, ensure_initial_commit, finalize_staging_commit, has_any_staging_changes, record_change, replace_staging_changes, reverse_commits, save_staging_commit, version_changes)
+from modules.blueprint.auth.branch_versions import (commit_changes, create_empty_commit_file, discard_staging_changes, ensure_initial_commit, finalize_staging_commit, has_any_staging_changes, record_change, record_changes, replace_staging_changes, reverse_commits, save_staging_commit, version_changes)
 
 NATIONAL_IMPORT_SHEETS = {
     "年齡": {"table": "National_Age", "item_column": "Age", "headers": ("年度", "癌別", "年齡", "合計", "男性", "女性", "醫學中心", "非醫學中心")},
@@ -105,9 +105,16 @@ def insert_national_rows(imported_rows):
     conn = get_conn()
     try:
         cursor = conn.cursor()
+        changes = []
         for sheet_name, config in NATIONAL_IMPORT_SHEETS.items():
             for row in imported_rows[sheet_name]:
-                record_change(cursor, "national", session["userid"], f"draft-{uuid4()}", "Create", after=dict(zip(["Year", "Cancer", config["item_column"], "Total", "Male", "Female", "Medical_Centers", "N_Medical_Centers"], row)), dataset='age' if sheet_name == '年齡' else 'period')
+                changes.append({
+                    "record_id": f"draft-{uuid4()}",
+                    "action": "Create",
+                    "after": dict(zip(["Year", "Cancer", config["item_column"], "Total", "Male", "Female", "Medical_Centers", "N_Medical_Centers"], row)),
+                    "dataset": "age" if sheet_name == "年齡" else "period",
+                })
+        record_changes(cursor, "national", session["userid"], changes)
     except Exception:
         conn.rollback()
         raise

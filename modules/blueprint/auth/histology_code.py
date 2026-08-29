@@ -7,7 +7,7 @@ from openpyxl.utils.exceptions import InvalidFileException
 from modules.blueprint.auth.key_access import data_update_key_required
 from modules.services.auth import auth_bp, login_required
 from modules.services.db import get_conn
-from modules.blueprint.auth.branch_versions import (commit_ids_equal, commit_changes, create_empty_commit_file, discard_staging_changes, ensure_initial_commit, finalize_staging_commit, has_any_staging_changes, latest_commit_id, record_change, replace_staging_changes, save_staging_commit, version_changes)
+from modules.blueprint.auth.branch_versions import (commit_ids_equal, commit_changes, create_empty_commit_file, discard_staging_changes, ensure_initial_commit, finalize_staging_commit, has_any_staging_changes, latest_commit_id, record_change, record_changes, replace_staging_changes, save_staging_commit, version_changes)
 
 _FIELD_CONFIG = (
     ("CodeYear", "年度", ("codeyear", "code_year"), True, True),
@@ -42,14 +42,11 @@ _IMPORT_COLUMNS = tuple(
 
 _NUMERIC_COLUMNS = frozenset({"codeyear", "code_year", "hist", "histcode", "behavior", "behaviorcode"})
 
-
 def record_staging_change(cursor, user_id, histcode_id, action, before=None, after=None):
     record_change(cursor, "histology_code", user_id, histcode_id, action, before, after)
 
-
 def staging_count(user_id):
     return len(version_changes("histology_code", user_id))
-
 
 def mapping_values_match(columns, actual, expected):
     return all(
@@ -57,7 +54,6 @@ def mapping_values_match(columns, actual, expected):
         == ("" if expected.get(column) is None else str(expected.get(column)))
         for column in columns
     )
-
 
 def normalize_change(record, columns):
     if "HistCodeId" in record:
@@ -67,7 +63,6 @@ def normalize_change(record, columns):
         change[f"Before{column}"] = record.get("before", {}).get(column)
         change[f"After{column}"] = record.get("after", {}).get(column)
     return change
-
 
 def _quote_identifier(identifier):
     return f"[{identifier.replace(']', ']]')}]"
@@ -124,7 +119,6 @@ def _get_year_counts(user_id=None):
     year_counts = sorted(counts.items(), key=lambda item: (item[0].isdigit(), int(item[0]) if item[0].isdigit() else item[0]), reverse=True)
     return columns, year_counts
 
-
 def _primary_key(columns):
     return next((column for column in columns if column.lower() == "histcode_id"), None)
 
@@ -167,8 +161,10 @@ def _insert_mapping_rows(columns, rows):
     conn = get_conn()
     try:
         cursor = conn.cursor()
-        for row in rows:
-            record_staging_change(cursor, session["userid"], f"draft-{uuid4()}", "Create", after=dict(zip(editable_columns, row)))
+        record_changes(cursor, "histology_code", session["userid"], [
+            {"record_id": f"draft-{uuid4()}", "action": "Create", "after": dict(zip(editable_columns, row))}
+            for row in rows
+        ])
     except Exception:
         conn.rollback()
         raise
@@ -298,7 +294,6 @@ def apply_histology_changes(cursor, changes, columns):
             if cursor.rowcount != 1:
                 raise ValueError("找不到要刪除的組織型態資料。")
             change["record_id"] = record_id
-
 
 @auth_bp.route("/dashboard/histology-code/versions/save", methods=["POST"])
 @login_required
