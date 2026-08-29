@@ -1,15 +1,13 @@
 from zipfile import BadZipFile
 from datetime import datetime
 from uuid import UUID, uuid4
-from flask import Blueprint, flash, redirect, render_template, request, session, url_for
+from flask import flash, redirect, render_template, request, session, url_for
 from openpyxl import load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
 from modules.blueprint.auth.key_access import data_update_key_required
-from modules.services.auth import login_required
+from modules.services.auth import auth_bp, login_required
 from modules.services.db import get_conn
-from modules.blueprint.dashboard.branch_versions import (commit_ids_equal, commit_changes, create_empty_commit_file, discard_staging_changes, ensure_initial_commit, finalize_staging_commit, has_any_staging_changes, latest_commit_id, record_change, replace_staging_changes, save_staging_commit, version_changes)
-
-histology_mapping_bp = Blueprint("histology_mapping",__name__,template_folder="templates",)
+from modules.blueprint.auth.branch_versions import (commit_ids_equal, commit_changes, create_empty_commit_file, discard_staging_changes, ensure_initial_commit, finalize_staging_commit, has_any_staging_changes, latest_commit_id, record_change, replace_staging_changes, save_staging_commit, version_changes)
 
 _FIELD_CONFIG = (
     ("CodeYear", "年度", ("codeyear", "code_year"), True, True),
@@ -133,7 +131,7 @@ def _primary_key(columns):
 def _return_to_mapping(draft=True):
     return redirect(
         url_for(
-            "histology_mapping.histology_code_mapping",
+            "auth.histology_code_mapping",
             year=request.form.get("return_year", ""),
             column=request.form.get("return_column", ""),
             q=request.form.get("return_q", ""),
@@ -198,7 +196,7 @@ def _read_import_rows(uploaded_file):
     finally:
         workbook.close()
 
-@histology_mapping_bp.route("/dashboard/histology-code")
+@auth_bp.route("/dashboard/histology-code")
 @login_required
 @data_update_key_required
 def histology_code_mapping():
@@ -245,7 +243,7 @@ def histology_code_mapping():
         pending_change_count=pending_change_count,
     )
 
-@histology_mapping_bp.route("/dashboard/histology-code/versions")
+@auth_bp.route("/dashboard/histology-code/versions")
 @login_required
 @data_update_key_required
 def histology_code_versions():
@@ -273,7 +271,7 @@ def histology_code_versions():
             for version in versions
             if version["CreatedAt"] and version["CreatedAt"].date().isoformat() == selected_date]
     conn.close()
-    return render_template("branch_version.html", active="data_update_access", title="組織型態版本紀錄", description="檢視與回復組織型態的已儲存版本。", back_url=url_for("histology_mapping.histology_code_mapping"), version_endpoint="histology_mapping.histology_code_versions", preview_endpoint="histology_mapping.preview_histology_code_version", restore_endpoint="histology_mapping.restore_histology_code_timeline", versions=versions, users=users, selected_user_id=selected_user_id, selected_date=selected_date, now=datetime.now(), show_filters=True)
+    return render_template("branch_version.html", active="data_update_access", title="組織型態版本紀錄", description="檢視與回復組織型態的已儲存版本。", back_url=url_for("auth.histology_code_mapping"), version_endpoint="auth.histology_code_versions", preview_endpoint="auth.preview_histology_code_version", restore_endpoint="auth.restore_histology_code_timeline", versions=versions, users=users, selected_user_id=selected_user_id, selected_date=selected_date, now=datetime.now(), show_filters=True)
 
 
 def apply_histology_changes(cursor, changes, columns):
@@ -302,7 +300,7 @@ def apply_histology_changes(cursor, changes, columns):
             change["record_id"] = record_id
 
 
-@histology_mapping_bp.route("/dashboard/histology-code/versions/save", methods=["POST"])
+@auth_bp.route("/dashboard/histology-code/versions/save", methods=["POST"])
 @login_required
 @data_update_key_required
 def save_histology_code_version():
@@ -323,7 +321,7 @@ def save_histology_code_version():
     finally:
         conn.close()
 
-@histology_mapping_bp.route("/dashboard/histology-code/versions/<version_id>/restore-timeline", methods=["POST"])
+@auth_bp.route("/dashboard/histology-code/versions/<version_id>/restore-timeline", methods=["POST"])
 @login_required
 @data_update_key_required
 def restore_histology_code_timeline(version_id):
@@ -331,13 +329,13 @@ def restore_histology_code_timeline(version_id):
         target_id = UUID(version_id)
     except ValueError:
         flash("版本識別碼無效。", "danger")
-        return redirect(url_for("histology_mapping.histology_code_versions"))
+        return redirect(url_for("auth.histology_code_versions"))
     conn = get_conn()
     try:
         cursor = conn.cursor()
         if has_any_staging_changes("histology_code"):
             flash("無法回到此時間點：仍有未儲存變更。", "danger")
-            return redirect(url_for("histology_mapping.histology_code_versions"))
+            return redirect(url_for("auth.histology_code_versions"))
         reverse_commits = []
         current_id = latest_commit_id(cursor, "histology_code")
         while current_id and not commit_ids_equal(current_id, target_id):
@@ -349,7 +347,7 @@ def restore_histology_code_timeline(version_id):
             current_id = parent[0]
         if not commit_ids_equal(current_id, target_id):
             flash("選取版本不在目前版本紀錄。", "danger")
-            return redirect(url_for("histology_mapping.histology_code_versions"))
+            return redirect(url_for("auth.histology_code_versions"))
         columns = _get_mapping_columns()
         primary_key, editable_columns = _primary_key(columns), _editable_columns(columns)
         changes = []
@@ -362,7 +360,7 @@ def restore_histology_code_timeline(version_id):
             after = {column: change.get(f"After{column}") for column in editable_columns}
             if (change["Action"] in ("Create", "Update") and (not current or not mapping_values_match(editable_columns, dict(zip(editable_columns, current)), after)) ) or (change["Action"] == "Delete" and current):
                 flash("無法回到此時間點：資料已與版本紀錄不一致。", "danger")
-                return redirect(url_for("histology_mapping.histology_code_versions"))
+                return redirect(url_for("auth.histology_code_versions"))
         for change in changes:
             histcode_id = change["HistCodeId"]
             before = {column: change.get(f"Before{column}") for column in editable_columns}
@@ -379,21 +377,21 @@ def restore_histology_code_timeline(version_id):
         flash("回到指定時間點失敗，資料未變更。", "danger")
     finally:
         conn.close()
-    return redirect(url_for("histology_mapping.histology_code_mapping", draft="1"))
+    return redirect(url_for("auth.histology_code_mapping", draft="1"))
 
 
-@histology_mapping_bp.route("/dashboard/histology-code/versions/<version_id>/preview")
+@auth_bp.route("/dashboard/histology-code/versions/<version_id>/preview")
 @login_required
 @data_update_key_required
 def preview_histology_code_version(version_id):
     if has_any_staging_changes("histology_code"):
         flash("有未儲存變更時無法預覽歷史版本。", "danger")
-        return redirect(url_for("histology_mapping.histology_code_versions"))
+        return redirect(url_for("auth.histology_code_versions"))
     try:
         target_id = UUID(version_id)
     except ValueError:
         flash("版本識別碼無效。", "danger")
-        return redirect(url_for("histology_mapping.histology_code_versions"))
+        return redirect(url_for("auth.histology_code_versions"))
     conn = get_conn()
     try:
         cursor = conn.cursor()
@@ -407,7 +405,7 @@ def preview_histology_code_version(version_id):
             current_id = parent[0]
         if not commit_ids_equal(current_id, target_id):
             flash("選取版本不在目前版本紀錄。", "danger")
-            return redirect(url_for("histology_mapping.histology_code_versions"))
+            return redirect(url_for("auth.histology_code_versions"))
     finally:
         conn.close()
 
@@ -479,7 +477,7 @@ def preview_histology_code_version(version_id):
         preview_commit_id=version_id,
     )
 
-@histology_mapping_bp.route("/dashboard/histology-code/create", methods=["POST"])
+@auth_bp.route("/dashboard/histology-code/create", methods=["POST"])
 @login_required
 @data_update_key_required
 def create_histology_code_mapping():
@@ -494,7 +492,7 @@ def create_histology_code_mapping():
     flash("組織型態資料已新增。", "success")
     return _return_to_mapping()
 
-@histology_mapping_bp.route("/dashboard/histology-code/import", methods=["POST"])
+@auth_bp.route("/dashboard/histology-code/import", methods=["POST"])
 @login_required
 @data_update_key_required
 def import_histology_code_mapping():
@@ -529,7 +527,7 @@ def import_histology_code_mapping():
     return _return_to_mapping()
 
 
-@histology_mapping_bp.route("/dashboard/histology-code/<histcode_id>/update", methods=["POST"])
+@auth_bp.route("/dashboard/histology-code/<histcode_id>/update", methods=["POST"])
 @login_required
 @data_update_key_required
 def update_histology_code_mapping(histcode_id):
@@ -555,7 +553,7 @@ def update_histology_code_mapping(histcode_id):
     return _return_to_mapping()
 
 
-@histology_mapping_bp.route("/dashboard/histology-code/<histcode_id>/delete", methods=["POST"])
+@auth_bp.route("/dashboard/histology-code/<histcode_id>/delete", methods=["POST"])
 @login_required
 @data_update_key_required
 def delete_histology_code_mapping(histcode_id):
@@ -576,7 +574,7 @@ def delete_histology_code_mapping(histcode_id):
     flash("組織型態資料已刪除。", "success")
     return _return_to_mapping()
 
-@histology_mapping_bp.route("/dashboard/histology-code/delete-selected", methods=["POST"])
+@auth_bp.route("/dashboard/histology-code/delete-selected", methods=["POST"])
 @login_required
 @data_update_key_required
 def delete_selected_histology_code_mappings():

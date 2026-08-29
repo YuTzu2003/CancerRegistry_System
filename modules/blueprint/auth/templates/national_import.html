@@ -34,7 +34,7 @@
 {% if preview_mode %}
 <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2 mb-2">
   <span class="text-secondary fw-medium">正在預覽版本 <code>{{ preview_commit_id }}</code>；此頁為唯讀，不會修改資料。</span>
-  <a class="btn btn-outline-dark btn-sm" href="{{ url_for('dashboard.national_import_versions') }}"><i class="bi bi-arrow-left me-1"></i>返回版本紀錄</a>
+  <a class="btn btn-outline-dark btn-sm" href="{{ url_for('auth.national_import_versions') }}"><i class="bi bi-arrow-left me-1"></i>返回版本紀錄</a>
 </div>
 {% endif %}
 <div class="page-head d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
@@ -49,8 +49,8 @@
     </div>
     {% endif %}
     <div class="d-flex flex-wrap gap-2">
-      <a class="btn btn-danger" href="{{ url_for('dashboard.national_import_versions') }}">版本紀錄</a>
-      <form method="post" action="{{ url_for('dashboard.save_national_import_version') }}" onsubmit="event.preventDefault(); Swal.fire({ title: '儲存目前版本', input: 'text', inputLabel: '本次更新內容', inputPlaceholder: '請輸入更新內容（最多 100 字）', inputAttributes: { maxlength: 100 }, showCancelButton: true, confirmButtonColor: '#2563eb', cancelButtonColor: '#6c757d', confirmButtonText: '確認儲存', cancelButtonText: '取消', inputValidator: (value) => { if (!value || !value.trim()) return '請輸入本次更新內容'; if (value.trim().length > 100) return '更新內容不可超過 100 字'; } }).then((result) => { if (result.isConfirmed) { this.querySelector('[name=info]').value = result.value.trim(); this.submit(); } });">
+      <a class="btn btn-danger" href="{{ url_for('auth.national_import_versions') }}">版本紀錄</a>
+      <form method="post" action="{{ url_for('auth.save_national_import_version') }}" onsubmit="event.preventDefault(); Swal.fire({ title: '儲存目前版本', input: 'text', inputLabel: '本次更新內容', inputPlaceholder: '請輸入更新內容（最多 100 字）', inputAttributes: { maxlength: 100 }, showCancelButton: true, confirmButtonColor: '#2563eb', cancelButtonColor: '#6c757d', confirmButtonText: '確認儲存', cancelButtonText: '取消', inputValidator: (value) => { if (!value || !value.trim()) return '請輸入本次更新內容'; if (value.trim().length > 100) return '更新內容不可超過 100 字'; } }).then((result) => { if (result.isConfirmed) { this.querySelector('[name=info]').value = result.value.trim(); this.submit(); } });">
         <input type="hidden" name="view" value="{{ dataset }}">
         <input type="hidden" name="info" value="">
         <input type="hidden" name="year" value="{{ selected_year }}">
@@ -93,9 +93,9 @@
       <div class="nav nav-pills gap-2">
         {% for key, option in datasets.items() %}
         {% if preview_mode %}
-        <a class="nav-link px-3 py-2 {% if key == dataset %}active{% endif %}" href="{{ url_for('dashboard.preview_national_import_version', version_id=preview_commit_id, view=key) }}">{{ option.label }}</a>
+        <a class="nav-link px-3 py-2 {% if key == dataset %}active{% endif %}" href="{{ url_for('auth.preview_national_import_version', version_id=preview_commit_id, view=key) }}">{{ option.label }}</a>
         {% else %}
-        <a class="nav-link px-3 py-2 {% if key == dataset %}active{% endif %}" href="{{ url_for('dashboard.national_import', view=key, draft='1' if pending_change_count else None) }}">{{ option.label }}</a>
+        <a class="nav-link px-3 py-2 {% if key == dataset %}active{% endif %}" href="{{ url_for('auth.national_import', view=key, draft='1' if pending_change_count else None) }}">{{ option.label }}</a>
         {% endif %}
         {% endfor %}
       </div>
@@ -125,9 +125,9 @@
             <button class="btn btn-dark px-4" type="submit"><i class="bi bi-search me-1"></i>搜尋</button>
             {% if search_query %}
               {% if preview_mode %}
-              <a class="btn btn-outline-secondary" href="{{ url_for('dashboard.preview_national_import_version', version_id=preview_commit_id, view=dataset, year=selected_year) }}">清除</a>
+              <a class="btn btn-outline-secondary" href="{{ url_for('auth.preview_national_import_version', version_id=preview_commit_id, view=dataset, year=selected_year) }}">清除</a>
               {% else %}
-              <a class="btn btn-outline-secondary" href="{{ url_for('dashboard.national_import', view=dataset, year=selected_year, draft='1' if pending_change_count else None) }}">清除</a>
+              <a class="btn btn-outline-secondary" href="{{ url_for('auth.national_import', view=dataset, year=selected_year, draft='1' if pending_change_count else None) }}">清除</a>
               {% endif %}
             {% endif %}
           </div>
@@ -149,9 +149,9 @@
           <div class="nav nav-pills gap-2">
             {% for year in available_years %}
             {% if preview_mode %}
-            <a class="nav-link px-3 py-2 {% if year == selected_year %}active{% endif %}" href="{{ url_for('dashboard.preview_national_import_version', version_id=preview_commit_id, view=dataset, year=year, column=search_column, q=search_query) }}">{{ year }} 年</a>
+            <a class="nav-link px-3 py-2 {% if year == selected_year %}active{% endif %}" href="{{ url_for('auth.preview_national_import_version', version_id=preview_commit_id, view=dataset, year=year, column=search_column, q=search_query) }}">{{ year }} 年</a>
             {% else %}
-            <a class="nav-link px-3 py-2 {% if year == selected_year %}active{% endif %}" href="{{ url_for('dashboard.national_import', view=dataset, year=year, column=search_column, q=search_query, draft='1' if pending_change_count else None) }}">{{ year }} 年</a>
+            <a class="nav-link px-3 py-2 {% if year == selected_year %}active{% endif %}" href="{{ url_for('auth.national_import', view=dataset, year=year, column=search_column, q=search_query, draft='1' if pending_change_count else None) }}">{{ year }} 年</a>
             {% endif %}
             {% endfor %}
           </div>
@@ -161,7 +161,7 @@
     </section>
 
     <div class="d-flex justify-content-end gap-2 mb-2 national-preview-hide">
-    <form id="nationalBatchDeleteForm" class="d-flex justify-content-end" method="post" action="{{ url_for('dashboard.delete_national_rows_route') }}" onsubmit="event.preventDefault(); Swal.fire({ title: '確認批次刪除', text: '選取的國家資料將無法復原。', icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545', cancelButtonColor: '#6c757d', confirmButtonText: '刪除', cancelButtonText: '取消' }).then((result) => { if (result.isConfirmed) { this.submit(); } });">
+    <form id="nationalBatchDeleteForm" class="d-flex justify-content-end" method="post" action="{{ url_for('auth.delete_national_rows_route') }}" onsubmit="event.preventDefault(); Swal.fire({ title: '確認批次刪除', text: '選取的國家資料將無法復原。', icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545', cancelButtonColor: '#6c757d', confirmButtonText: '刪除', cancelButtonText: '取消' }).then((result) => { if (result.isConfirmed) { this.submit(); } });">
       <input type="hidden" name="view" value="{{ dataset }}">
       <input type="hidden" name="year" value="{{ selected_year }}">
       <input type="hidden" name="column" value="{{ search_column }}">
@@ -186,16 +186,16 @@
           {% set inline_form_id = 'nationalInlineEdit-' ~ row[0] %}
           <tr class="national-inline-edit">
             <td class="text-center"><input class="form-check-input national-row-select" form="nationalBatchDeleteForm" type="checkbox" name="record_ids" value="{{ row[0] }}" aria-label="選取此筆資料"></td>
-            <td><form id="{{ inline_form_id }}" method="post" action="{{ url_for('dashboard.update_national_row_route', record_id=row[0]) }}" onsubmit="event.preventDefault(); Swal.fire({ title: '確認修改', text: '確定要儲存這筆資料的修改嗎？', icon: 'question', showCancelButton: true, confirmButtonColor: '#2563eb', cancelButtonColor: '#6c757d', confirmButtonText: '確定', cancelButtonText: '取消' }).then((result) => { if (result.isConfirmed) { this.submit(); } });"><input type="hidden" name="view" value="{{ dataset }}"><input type="hidden" name="year" value="{{ selected_year }}"><input type="hidden" name="column" value="{{ search_column }}"><input type="hidden" name="q" value="{{ search_query }}"><input class="form-control form-control-sm national-inline-input" name="Year" value="{{ row[1] if row[1] is not none else '' }}" required></form></td>
+            <td><form id="{{ inline_form_id }}" method="post" action="{{ url_for('auth.update_national_row_route', record_id=row[0]) }}" onsubmit="event.preventDefault(); Swal.fire({ title: '確認修改', text: '確定要儲存這筆資料的修改嗎？', icon: 'question', showCancelButton: true, confirmButtonColor: '#2563eb', cancelButtonColor: '#6c757d', confirmButtonText: '確定', cancelButtonText: '取消' }).then((result) => { if (result.isConfirmed) { this.submit(); } });"><input type="hidden" name="view" value="{{ dataset }}"><input type="hidden" name="year" value="{{ selected_year }}"><input type="hidden" name="column" value="{{ search_column }}"><input type="hidden" name="q" value="{{ search_query }}"><input class="form-control form-control-sm national-inline-input" name="Year" value="{{ row[1] if row[1] is not none else '' }}" required></form></td>
             <td><input class="form-control form-control-sm national-inline-input" form="{{ inline_form_id }}" name="Cancer" value="{{ row[2] if row[2] is not none else '' }}" required></td>
             <td><input class="form-control form-control-sm national-inline-input" form="{{ inline_form_id }}" name="{{ config.item_column }}" value="{{ row[3] if row[3] is not none else '' }}" required></td>
             {% for value, field in [(row[4], 'Total'), (row[5], 'Male'), (row[6], 'Female'), (row[7], 'Medical_Centers'), (row[8], 'N_Medical_Centers')] %}
             <td><input class="form-control form-control-sm national-inline-input" form="{{ inline_form_id }}" name="{{ field }}" type="number" min="0" value="{{ value if value is not none else 0 }}" required></td>
             {% endfor %}
-            <td><div class="national-actions"><button class="btn btn-sm btn-primary" form="{{ inline_form_id }}" type="submit" title="儲存"><i class="bi bi-check-lg"></i><span class="visually-hidden">儲存</span></button><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('dashboard.national_import', view=dataset, year=selected_year, column=search_column, q=search_query, draft='1' if pending_change_count else None) }}" title="取消"><i class="bi bi-x-lg"></i><span class="visually-hidden">取消</span></a></div></td>
+            <td><div class="national-actions"><button class="btn btn-sm btn-primary" form="{{ inline_form_id }}" type="submit" title="儲存"><i class="bi bi-check-lg"></i><span class="visually-hidden">儲存</span></button><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('auth.national_import', view=dataset, year=selected_year, column=search_column, q=search_query, draft='1' if pending_change_count else None) }}" title="取消"><i class="bi bi-x-lg"></i><span class="visually-hidden">取消</span></a></div></td>
           </tr>
           {% else %}
-          <tr><td class="text-center"><input class="form-check-input national-row-select" form="nationalBatchDeleteForm" type="checkbox" name="record_ids" value="{{ row[0] }}" aria-label="選取此筆資料"></td>{% for value in row[1:] %}<td>{{ value if value is not none else '' }}</td>{% endfor %}<td><div class="national-actions"><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('dashboard.national_import', edit_id=row[0], view=dataset, year=selected_year, column=search_column, q=search_query, draft='1' if pending_change_count else None) }}" title="編輯"><i class="bi bi-pencil-square"></i><span class="visually-hidden">編輯</span></a><form method="post" action="{{ url_for('dashboard.delete_national_row_route', record_id=row[0]) }}" onsubmit="event.preventDefault(); Swal.fire({ title: '確認刪除', text: '確定要刪除此筆資料嗎？此動作無法復原！', icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545', cancelButtonColor: '#6c757d', confirmButtonText: '確定刪除', cancelButtonText: '取消' }).then((result) => { if (result.isConfirmed) { this.submit(); } });"><input type="hidden" name="view" value="{{ dataset }}"><input type="hidden" name="year" value="{{ selected_year }}"><input type="hidden" name="column" value="{{ search_column }}"><input type="hidden" name="q" value="{{ search_query }}"><button class="btn btn-sm btn-outline-danger" type="submit" title="刪除"><i class="bi bi-trash"></i><span class="visually-hidden">刪除</span></button></form></div></td></tr>
+          <tr><td class="text-center"><input class="form-check-input national-row-select" form="nationalBatchDeleteForm" type="checkbox" name="record_ids" value="{{ row[0] }}" aria-label="選取此筆資料"></td>{% for value in row[1:] %}<td>{{ value if value is not none else '' }}</td>{% endfor %}<td><div class="national-actions"><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('auth.national_import', edit_id=row[0], view=dataset, year=selected_year, column=search_column, q=search_query, draft='1' if pending_change_count else None) }}" title="編輯"><i class="bi bi-pencil-square"></i><span class="visually-hidden">編輯</span></a><form method="post" action="{{ url_for('auth.delete_national_row_route', record_id=row[0]) }}" onsubmit="event.preventDefault(); Swal.fire({ title: '確認刪除', text: '確定要刪除此筆資料嗎？此動作無法復原！', icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545', cancelButtonColor: '#6c757d', confirmButtonText: '確定刪除', cancelButtonText: '取消' }).then((result) => { if (result.isConfirmed) { this.submit(); } });"><input type="hidden" name="view" value="{{ dataset }}"><input type="hidden" name="year" value="{{ selected_year }}"><input type="hidden" name="column" value="{{ search_column }}"><input type="hidden" name="q" value="{{ search_query }}"><button class="btn btn-sm btn-outline-danger" type="submit" title="刪除"><i class="bi bi-trash"></i><span class="visually-hidden">刪除</span></button></form></div></td></tr>
           {% endif %}
           {% else %}
           <tr class="national-empty-row"><td class="national-empty" colspan="10"><i class="bi bi-search fs-4 d-block mb-2"></i>找不到符合條件的資料。</td></tr>

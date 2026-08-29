@@ -38,7 +38,7 @@ def data_update_key_required(view):
 @login_required
 def data_update_access():
     if has_data_update_access():
-        return redirect(url_for("auth.data_update_selection"))
+        return redirect(url_for("auth.data_management"))
     clear_data_update_access()
     return render_template("key_access.html", active="data_update_access")
 
@@ -46,8 +46,8 @@ def data_update_access():
 @auth_bp.route("/dashboard/data-update/select")
 @login_required
 @data_update_key_required
-def data_update_selection():
-    return render_template("data_update_selection.html", active="data_update_access")
+def data_management():
+    return render_template("data_management.html", active="data_update_access")
 
 
 @auth_bp.route("/dashboard/data-update/access", methods=["POST"])
@@ -76,4 +76,4 @@ def verify_data_update_access():
 
     session[DATA_UPDATE_ACCESS_TOKEN] = secrets.token_urlsafe(24)
     session[DATA_UPDATE_ACCESS_USER] = session["userid"]
-    return redirect(url_for("auth.data_update_selection"))
+    return redirect(url_for("auth.data_management"))

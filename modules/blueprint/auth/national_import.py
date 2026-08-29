@@ -6,10 +6,9 @@ from flask import flash, redirect, render_template, request, session, url_for
 from openpyxl import load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
 from modules.blueprint.auth.key_access import data_update_key_required
-from modules.services.auth import login_required
-from modules.services.dashboard import dashboard_bp
+from modules.services.auth import auth_bp, login_required
 from modules.services.db import get_conn
-from modules.blueprint.dashboard.branch_versions import (commit_changes, create_empty_commit_file, discard_staging_changes, ensure_initial_commit, finalize_staging_commit, has_any_staging_changes, record_change, replace_staging_changes, reverse_commits, save_staging_commit, version_changes)
+from modules.blueprint.auth.branch_versions import (commit_changes, create_empty_commit_file, discard_staging_changes, ensure_initial_commit, finalize_staging_commit, has_any_staging_changes, record_change, replace_staging_changes, reverse_commits, save_staging_commit, version_changes)
 
 NATIONAL_IMPORT_SHEETS = {
     "年齡": {"table": "National_Age", "item_column": "Age", "headers": ("年度", "癌別", "年齡", "合計", "男性", "女性", "醫學中心", "非醫學中心")},
@@ -154,7 +153,7 @@ def update_national_row(dataset, record_id, values):
 
 
 def redirect_national_import(draft=False):
-    return redirect(url_for("dashboard.national_import", view=request.form.get("view", "age"), year=request.form.get("year", ""), column=request.form.get("column", ""), q=request.form.get("q", ""), draft="1" if draft else None))
+    return redirect(url_for("auth.national_import", view=request.form.get("view", "age"), year=request.form.get("year", ""), column=request.form.get("column", ""), q=request.form.get("q", ""), draft="1" if draft else None))
 
 
 def apply_national_changes(cursor, changes):
@@ -176,7 +175,7 @@ def apply_national_changes(cursor, changes):
             change["record_id"] = record_id
 
 
-@dashboard_bp.route("/dashboard/national-import/versions/save", methods=["POST"])
+@auth_bp.route("/dashboard/national-import/versions/save", methods=["POST"])
 @login_required
 @data_update_key_required
 def save_national_import_version():
@@ -201,7 +200,7 @@ def save_national_import_version():
         conn.close()
     return redirect_national_import()
 
-@dashboard_bp.route("/dashboard/national-import/versions")
+@auth_bp.route("/dashboard/national-import/versions")
 @login_required
 @data_update_key_required
 def national_import_versions():
@@ -212,10 +211,10 @@ def national_import_versions():
         versions = [dict(zip([column[0] for column in cursor.description], row)) for row in cursor.fetchall()]
     finally:
         conn.close()
-    return render_template("branch_version.html", active="data_update_access", title="全國資料版本紀錄", description="年齡與整併期別會一起儲存及回復。", back_url=url_for("dashboard.national_import"), version_endpoint="dashboard.national_import_versions", preview_endpoint="dashboard.preview_national_import_version", restore_endpoint="dashboard.restore_national_import_version", versions=versions, now=datetime.now(), show_filters=False)
+    return render_template("branch_version.html", active="data_update_access", title="全國資料版本紀錄", description="年齡與整併期別會一起儲存及回復。", back_url=url_for("auth.national_import"), version_endpoint="auth.national_import_versions", preview_endpoint="auth.preview_national_import_version", restore_endpoint="auth.restore_national_import_version", versions=versions, now=datetime.now(), show_filters=False)
 
 
-@dashboard_bp.route("/dashboard/national-import/versions/<version_id>/preview")
+@auth_bp.route("/dashboard/national-import/versions/<version_id>/preview")
 @login_required
 @data_update_key_required
 def preview_national_import_version(version_id):
@@ -223,10 +222,10 @@ def preview_national_import_version(version_id):
         target_id = UUID(version_id)
     except ValueError:
         flash("版本編號無效。", "danger")
-        return redirect(url_for("dashboard.national_import_versions"))
+        return redirect(url_for("auth.national_import_versions"))
     if has_any_staging_changes("national"):
         flash("有未儲存變更時無法預覽歷史版本。", "danger")
-        return redirect(url_for("dashboard.national_import_versions"))
+        return redirect(url_for("auth.national_import_versions"))
 
     conn = get_conn()
     try:
@@ -234,7 +233,7 @@ def preview_national_import_version(version_id):
         commits = reverse_commits(cursor, "national", target_id)
         if commits is None:
             flash("找不到指定版本。", "danger")
-            return redirect(url_for("dashboard.national_import_versions"))
+            return redirect(url_for("auth.national_import_versions"))
 
         states = {}
         for key, config in NATIONAL_DATASETS.items():
@@ -272,7 +271,7 @@ def preview_national_import_version(version_id):
     return render_template("national_import.html", active="data_update_access", version_id=version_id, preview_mode=True, preview_commit_id=version_id, pending_change_count=0, dataset=dataset, datasets=NATIONAL_DATASETS, config=config, column_labels=NATIONAL_COLUMN_LABELS, rows=rows, available_years=available_years, selected_year=selected_year, selected_year_count=year_counts.get(selected_year, 0), search_column=search_column, search_query=search_query, editing_id="")
 
 
-@dashboard_bp.route("/dashboard/national-import/versions/<version_id>/restore", methods=["POST"])
+@auth_bp.route("/dashboard/national-import/versions/<version_id>/restore", methods=["POST"])
 @login_required
 @data_update_key_required
 def restore_national_import_version(version_id):
@@ -280,10 +279,10 @@ def restore_national_import_version(version_id):
         target_id = UUID(version_id)
     except ValueError:
         flash("版本編號無效。", "danger")
-        return redirect(url_for("dashboard.national_import_versions"))
+        return redirect(url_for("auth.national_import_versions"))
     if has_any_staging_changes("national"):
         flash("仍有未儲存變更，無法回復版本。", "danger")
-        return redirect(url_for("dashboard.national_import_versions"))
+        return redirect(url_for("auth.national_import_versions"))
 
     conn = get_conn()
     try:
@@ -320,9 +319,9 @@ def restore_national_import_version(version_id):
         flash("回復國家資料版本失敗。", "danger")
     finally:
         conn.close()
-    return redirect(url_for("dashboard.national_import", draft="1"))
+    return redirect(url_for("auth.national_import", draft="1"))
 
-@dashboard_bp.route("/dashboard/national-import", methods=["GET", "POST"])
+@auth_bp.route("/dashboard/national-import", methods=["GET", "POST"])
 @login_required
 @data_update_key_required
 def national_import():
@@ -364,7 +363,7 @@ def national_import():
         flash(f"匯入完成：National_Age {len(imported_rows['年齡'])} 筆、National_Period {len(imported_rows['整併期別'])} 筆。", "success")
     return redirect_national_import(draft=True)
 
-@dashboard_bp.route("/dashboard/national-import/delete", methods=["POST"])
+@auth_bp.route("/dashboard/national-import/delete", methods=["POST"])
 @login_required
 @data_update_key_required
 def delete_national_rows_route():
@@ -387,7 +386,7 @@ def delete_national_rows_route():
     return redirect_national_import(draft=True)
 
 
-@dashboard_bp.route("/dashboard/national-import/<record_id>/update", methods=["POST"])
+@auth_bp.route("/dashboard/national-import/<record_id>/update", methods=["POST"])
 @login_required
 @data_update_key_required
 def update_national_row_route(record_id):
@@ -412,7 +411,7 @@ def update_national_row_route(record_id):
     return redirect_national_import(draft=True)
 
 
-@dashboard_bp.route("/dashboard/national-import/<record_id>/delete", methods=["POST"])
+@auth_bp.route("/dashboard/national-import/<record_id>/delete", methods=["POST"])
 @login_required
 @data_update_key_required
 def delete_national_row_route(record_id):
