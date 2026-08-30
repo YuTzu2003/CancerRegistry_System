@@ -4,11 +4,11 @@
 {% block content %}
 <style>
   :root {
-    --chat-bg: #f9f9f9;  
-    --ai-msg-bg: #ffffff; 
-    --user-msg-bg: #e3e3e3; 
+    --chat-bg: #f9f9f9;
+    --ai-msg-bg: #ffffff;
+    --user-msg-bg: #e3e3e3;
     --input-bg: #ffffff;
-    --accent-color: #10a37f; 
+    --accent-color: #10a37f;
   }
 
   .chat-container-dashboard {
@@ -33,156 +33,36 @@
     background: var(--chat-bg);
   }
 
-  /* Scrollbar styling */
-  .chat-display::-webkit-scrollbar {
-    width: 6px;
-  }
-  .chat-display::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  .chat-display::-webkit-scrollbar-thumb {
-    background: #e5e5e5;
-    border-radius: 10px;
-  }
+  .chat-display::-webkit-scrollbar { width: 6px; }
+  .chat-display::-webkit-scrollbar-track { background: transparent; }
+  .chat-display::-webkit-scrollbar-thumb { background: #e5e5e5; border-radius: 10px; }
 
-  .chat-msg {
-    display: flex;
-    gap: 16px;
-    max-width: 90%;
-    animation: fadeIn 0.3s ease;
-  }
+  .chat-msg { display: flex; gap: 16px; max-width: 90%; animation: fadeIn 0.3s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  .chat-msg.ai { align-self: flex-start; }
+  .chat-msg.user { align-self: flex-end; flex-direction: row-reverse; }
+  .chat-msg .avatar { width: 32px; height: 32px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; margin-top: 4px; }
+  .chat-msg.ai .avatar { background: var(--accent-color); color: white; }
+  .chat-msg.user .avatar { background: #6e7681; color: white; }
+  .chat-msg .msg-content { padding: 10px 16px; border-radius: 18px; font-size: 14.5px; line-height: 1.6; word-break: break-word; }
+  .chat-msg.ai .msg-content { background: var(--ai-msg-bg); color: #374151; border-bottom-left-radius: 4px; }
+  .chat-msg.user .msg-content { background: var(--user-msg-bg); color: #111827; border-bottom-right-radius: 4px; }
 
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  .chat-msg.ai {
-    align-self: flex-start;
-  }
-
-  .chat-msg.user {
-    align-self: flex-end;
-    flex-direction: row-reverse;
-  }
-
-  .chat-msg .avatar {
-    width: 32px;
-    height: 32px;
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 16px;
-    flex-shrink: 0;
-    margin-top: 4px;
-  }
-
-  .chat-msg.ai .avatar {
-    background: var(--accent-color);
-    color: white;
-  }
-
-  .chat-msg.user .avatar {
-    background: #6e7681;
-    color: white;
-  }
-
-  .chat-msg .msg-content {
-    padding: 10px 16px;
-    border-radius: 18px;
-    font-size: 14.5px;
-    line-height: 1.6;
-    word-break: break-word;
-  }
-
-  .chat-msg.ai .msg-content {
-    background: var(--ai-msg-bg);
-    color: #374151;
-    border-bottom-left-radius: 4px;
-  }
-
-  .chat-msg.user .msg-content {
-    background: var(--user-msg-bg);
-    color: #111827;
-    border-bottom-right-radius: 4px;
-  }
-
-  .chat-input-area {
-    padding: 16px 20px 24px;
-    background: white;
-  }
-
-  .chat-input-area .input-wrapper {
-    position: relative;
-    max-width: 800px;
-    margin: 0 auto;
-    display: flex;
-    align-items: center;
-    background: #ffffff;
-    border: 1px solid #d1d5db;
-    border-radius: 12px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-    transition: border-color 0.2s, box-shadow 0.2s;
-  }
-
-  .chat-input-area .input-wrapper:focus-within {
-    border-color: var(--accent-color);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-  }
-
-  .chat-input-area .form-control {
-    border: none;
-    background: transparent;
-    padding: 12px 16px;
-    font-size: 14px;
-    flex: 1;
-    resize: none;
-  }
-
-  .chat-input-area .form-control:focus {
-    box-shadow: none;
-  }
-
-  .btn-send-chat {
-    background: transparent;
-    border: none;
-    color: #d1d5db;
-    padding: 8px 12px;
-    cursor: pointer;
-    transition: color 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .chat-input-area .form-control:not(:placeholder-shown) + .btn-send-chat {
-    color: var(--accent-color);
-  }
-
-  .btn-send-chat i {
-    font-size: 18px;
-  }
-
-  .btn-send-chat:hover {
-    color: var(--accent-color);
-  }
-
-  .chat-footer-info {
-    font-size: 11px;
-    color: #9ca3af;
-    text-align: center;
-    margin-top: 10px;
-    letter-spacing: 0.3px;
-  }
+  .chat-input-area { padding: 16px 20px 24px; background: white; }
+  .chat-input-area .input-wrapper { position: relative; max-width: 800px; margin: 0 auto; display: flex; align-items: center; background: #ffffff; border: 1px solid #d1d5db; border-radius: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); transition: border-color 0.2s, box-shadow 0.2s; }
+  .chat-input-area .input-wrapper:focus-within { border-color: var(--accent-color); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+  .chat-input-area .form-control { border: none; background: transparent; padding: 12px 16px; font-size: 14px; flex: 1; resize: none; }
+  .chat-input-area .form-control:focus { box-shadow: none; }
+  .btn-send-chat { background: transparent; border: none; color: #d1d5db; padding: 8px 12px; cursor: pointer; transition: color 0.2s; display: flex; align-items: center; justify-content: center; }
+  .chat-input-area .form-control:not(:placeholder-shown) + .btn-send-chat { color: var(--accent-color); }
+  .btn-send-chat i { font-size: 18px; }
+  .btn-send-chat:hover { color: var(--accent-color); }
+  .chat-footer-info { font-size: 11px; color: #9ca3af; text-align: center; margin-top: 10px; letter-spacing: 0.3px; }
 
   .text-ai-theme { color: #6366f1 !important; }
   .kpi-grid-2 { grid-template-columns: repeat(2, 1fr) !important; }
   .kpi-content-wrap { display: flex; align-items: center; justify-content: space-between; width: 100%; }
-  .kpi-icon-lg {
-    font-size: 2.2rem; opacity: 0.15; position: absolute; right: 18px;
-    top: 50%; transform: translateY(-50%);
-  }
+  .kpi-icon-lg { font-size: 2.2rem; opacity: 0.15; position: absolute; right: 18px; top: 50%; transform: translateY(-50%); }
   .admin-pending-notice { display: flex; align-items: center; gap: 13px; margin: 18px 0; padding: 14px 16px; border: 1px solid var(--blue-100); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow-sm); transition: border-color .18s ease, transform .18s ease; }
   .admin-pending-notice:hover { border-color: var(--blue-600); transform: translateY(-1px); }
   .admin-pending-notice:focus-visible { outline: 3px solid var(--blue-100); outline-offset: 2px; }
@@ -191,25 +71,10 @@
   .admin-pending-notice p { margin: 2px 0 0; color: var(--muted); font-size: .8rem; }
   .admin-pending-number { color: var(--blue-700); font-size: 1.05rem; }
 </style>
+
 <div class="kpi-grid kpi-grid-2">
-  <div class="kpi" style="padding: 22px 20px;">
-    <div class="kpi-content-wrap">
-      <div>
-        <div class="label">已登錄個案數</div>
-        <div class="value blue">{{ stats.sum_total_count }}</div>
-      </div>
-      <i class="bi bi-people kpi-icon-lg text-primary"></i>
-    </div>
-  </div>
-  <div class="kpi cyan" style="padding: 22px 20px;">
-    <div class="kpi-content-wrap">
-      <div>
-        <div class="label">資料完整率</div>
-        <div class="value cyan">{{ stats.avg_completeness_score }}</div>
-      </div>
-      <i class="bi bi-check-all kpi-icon-lg text-ai"></i>
-    </div>
-  </div>
+  <div class="kpi" style="padding: 22px 20px;"><div class="kpi-content-wrap"><div><div class="label">已登錄個案數</div><div class="value blue">{{ stats.sum_total_count }}</div></div><i class="bi bi-people kpi-icon-lg text-primary"></i></div></div>
+  <div class="kpi cyan" style="padding: 22px 20px;"><div class="kpi-content-wrap"><div><div class="label">資料完整率</div><div class="value cyan">{{ stats.avg_completeness_score }}</div></div><i class="bi bi-check-all kpi-icon-lg text-ai"></i></div></div>
 </div>
 
 {% if session.get('position') == 'Admin' %}
@@ -219,57 +84,26 @@
 {% endif %}
 
 <section class="card-flat">
-  <div class="section-head">
-    <h2><span class="dot" style="background: var(--bs-danger);"></span> 快速操作</h2>
-    <span class="hint">常用功能入口</span>
-  </div>
+  <div class="section-head"><h2><span class="dot" style="background: var(--bs-danger);"></span> 快速操作</h2><span class="hint">常用功能入口</span></div>
   <div class="section-body d-flex flex-wrap gap-2">
-    <a href="/clean" class="btn btn-outline-dark">
-      <i class="bi bi-funnel"></i> 前往資料清洗
-    </a>
-    <a href="/dataGen" class="btn btn-outline-dark">
-      <i class="bi bi-database-add"></i> 虛擬資料生成
-    </a>
-    <a href="/clean/history" class="btn btn-outline-dark">
-      <i class="bi bi-file-earmark-text"></i> 申報紀錄
-    </a>
-    <a href="/dashboard" class="btn btn-outline-dark">
-      <i class="bi bi-bar-chart"></i> 年報分析
-    </a>
+    <a href="/clean" class="btn btn-outline-dark"><i class="bi bi-funnel"></i> 前往資料清洗</a>
+    <a href="/dataGen" class="btn btn-outline-dark"><i class="bi bi-database-add"></i> 虛擬資料生成</a>
+    <a href="/clean/history" class="btn btn-outline-dark"><i class="bi bi-file-earmark-text"></i> 申報紀錄</a>
+    <a href="/dashboard" class="btn btn-outline-dark"><i class="bi bi-bar-chart"></i> 年報分析</a>
     {% if session.get('position') == 'Admin' %}
-    <a href="{{ url_for('key_approval.key_approval') }}" class="btn btn-outline-dark">
-      <i class="bi bi-key-fill"></i> 金鑰申請審核
-    </a>
+    <a href="{{ url_for('key_approval.key_approval') }}" class="btn btn-outline-dark"><i class="bi bi-key-fill"></i> 金鑰申請審核</a>
     {% else %}
-    <a href="{{ url_for('key_application.application') }}" class="btn btn-outline-dark">
-      <i class="bi bi-key"></i> 金鑰申請
-    </a>
+    <a href="{{ url_for('key_application.application') }}" class="btn btn-outline-dark"><i class="bi bi-key"></i> 金鑰申請</a>
     {% endif %}
   </div>
 </section>
 
 <section class="card-flat">
-  <div class="section-head">
-    <h2>癌登知識LLM問答</h2>
-    <span class="hint">目前還沒建置</span>
-  </div>
+  <div class="section-head"><h2>癌登知識LLM問答</h2><span class="hint">目前還沒建置</span></div>
   <div class="section-body">
     <div class="chat-container-dashboard">
-      <div class="chat-display" id="chatDisplay">
-        <div class="chat-msg ai">
-          <div class="avatar"><i class="bi bi-emoji-smile-fill"></i></div>
-          <div class="msg-content">您好！關於癌症登記手冊、編碼規則或系統操作問題，歡迎隨時向我提問。</div>
-        </div>
-      </div>
-      <div class="chat-input-area">
-        <div class="input-wrapper">
-          <input type="text" class="form-control" id="userInput" placeholder="輸入您的問題... (例如：肺癌申報期限？)">
-          <button class="btn-send-chat" id="btnSend">
-            <i class="bi bi-arrow-up-circle-fill"></i>
-          </button>
-        </div>
-        <div class="chat-footer-info">模型：Gemma4 · 知識庫最新：2026年5月</div>
-      </div>
+      <div class="chat-display" id="chatDisplay"><div class="chat-msg ai"><div class="avatar"><i class="bi bi-emoji-smile-fill"></i></div><div class="msg-content">您好！關於癌症登記手冊、編碼規則或系統操作問題，歡迎隨時向我提問。</div></div></div>
+      <div class="chat-input-area"><div class="input-wrapper"><input type="text" class="form-control" id="userInput" placeholder="輸入您的問題... (例如：肺癌申報期限？)"><button class="btn-send-chat" id="btnSend"><i class="bi bi-arrow-up-circle-fill"></i></button></div><div class="chat-footer-info">模型：Gemma4 · 知識庫最新：2026年5月</div></div>
     </div>
   </div>
 </section>
