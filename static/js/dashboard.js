@@ -606,7 +606,7 @@ window.DashboardRenderer.configureStageInsight = function(stageReport, { generat
         button.style.display = 'block';
         button.textContent = this.t('regenerateInsight');
         button.dataset.insightFieldKey = fieldKey;
-        button.onclick = event => this.fetchLlmInsight(
+        button.onclick = event => this.fetchLlmInsightWithRetry(
             fieldKey,
             insightData,
             fields,
@@ -1679,7 +1679,13 @@ window.DashboardRenderer.fetchLlmInsight = function(fieldKey, chartData, fields,
 
         const cacheGeneration = this.insightCacheGeneration;
         const request = fetch('/api/chart_insight', {method: 'POST',headers: { 'Content-Type': 'application/json' },body: JSON.stringify({ field_key: fieldKey, data: chartData, fields: fields, mode_ai: modeAi, year_start: yearStart, year_end: yearEnd, language })})
-        .then(res => res.json())
+        .then(async res => {
+            try {
+                return await res.json();
+            } catch (_) {
+                return { success: false, error: `HTTP ${res.status}` };
+            }
+        })
         .then(data => {
             if (data.success) {
                 if (this.insightCacheGeneration === cacheGeneration) {
@@ -1693,7 +1699,7 @@ window.DashboardRenderer.fetchLlmInsight = function(fieldKey, chartData, fields,
         })
         .catch(error => ({
             success: false,
-            error: error.name === 'AbortError' ? '語言模型敘述產生逾時，請稍後重試。' : 'error'
+            error: error.message || 'error'
         }))
         .finally(() => {
             if (this.insightRequests.get(requestKey) === request) this.insightRequests.delete(requestKey);
@@ -1704,6 +1710,18 @@ window.DashboardRenderer.fetchLlmInsight = function(fieldKey, chartData, fields,
             showResult(result);
             return result;
         });
+    };
+
+window.DashboardRenderer.fetchLlmInsightWithRetry = async function(fieldKey, chartData, fields, responseContainerId, buttonId, options = {}) {
+        let result = null;
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+            result = await this.fetchLlmInsight(
+                fieldKey, chartData, fields, responseContainerId, buttonId,
+                { ...options, forceRefresh: options.forceRefresh === true || attempt > 0 }
+            );
+            if (result?.success) return result;
+        }
+        return result;
     };
 
 // 取得年度字串

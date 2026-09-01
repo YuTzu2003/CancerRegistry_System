@@ -82,6 +82,7 @@ window.DashboardI18n = (function() {
         t: translate,
         getLanguage: () => engine ? engine.language : language,
         setLanguage: async (nextLanguage) => {
+            if (nextLanguage === (engine ? engine.language : language)) return;
             language = nextLanguage;
             if (engine) await engine.changeLanguage(nextLanguage);
             document.documentElement.lang = nextLanguage;
