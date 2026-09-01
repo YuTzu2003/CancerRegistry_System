@@ -1,5 +1,5 @@
 from flask import Blueprint, request, session, jsonify
-from modules.services.auth import login_required, admin_required
+from modules.services.auth import login_required
 from modules.services.db import get_conn
 from modules.blueprint.dashboard import load_user_favorites, save_user_favorites
 from modules.blueprint.dashboard.reply import get_chart_insight_logic, get_compare_insight_logic
@@ -324,7 +324,7 @@ def analyze_dashboard_file_route():
 
 
 @dashboard_bp.route('/api/dashboard/publish_pbi', methods=['POST'])
-@admin_required
+@login_required
 def publish_dashboard_selection_to_pbi():
     data = request.json or {}
     file_id = data.get("file_id", "")
@@ -360,14 +360,14 @@ def publish_dashboard_selection_to_pbi():
 
 
 @dashboard_bp.route('/api/dashboard/pbi_settings', methods=['GET'])
-@admin_required
+@login_required
 def get_pbi_settings_route():
     settings = get_pbi_publish_settings()
     return jsonify({"ok": True, "settings": settings})
 
 
 @dashboard_bp.route('/api/dashboard/pbi_settings', methods=['PUT'])
-@admin_required
+@login_required
 def save_pbi_settings_route():
     path = (request.json or {}).get("publish_path", "")
     try:
