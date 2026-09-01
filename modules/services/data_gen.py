@@ -20,6 +20,7 @@ def dataGen():
     conn.close()
     return render_template("dataGen.html", active="dataGen", formats=formats)
 @data_gen_bp.route('/api/data_gen/analyze', methods=['POST'])
+@login_required
 def analyze_file():
     if 'file' not in request.files:
         return jsonify({"ok": False, "error": "無檔案"}), 400
@@ -43,6 +44,7 @@ def analyze_file():
     return jsonify(res), status
 
 @data_gen_bp.route('/api/data_gen/process', methods=['POST'])
+@login_required
 def process_file():
     data = request.json
     format_id = data.get('format_id')
@@ -58,6 +60,7 @@ def process_file():
     return jsonify(res), status
 
 @data_gen_bp.route('/api/data_gen/download')
+@login_required
 def download_file():
     path = session.get('last_gen_output')
     if path and os.path.exists(path):

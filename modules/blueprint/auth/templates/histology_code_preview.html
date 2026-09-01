@@ -59,9 +59,9 @@
     </div>
     {% endif %}
     <div class="d-flex flex-wrap gap-2">
-      <a class="btn btn-danger" href="{{ url_for('histology_mapping.histology_code_versions', access_token=access_token) }}">版本紀錄</a>
-      <form method="post" action="{{ url_for('histology_mapping.save_histology_code_version') }}" onsubmit="event.preventDefault(); Swal.fire({ title: '儲存目前版本', text: '將儲存所有年度的組織型態資料。', icon: 'question', showCancelButton: true, confirmButtonColor: '#2563eb', cancelButtonColor: '#6c757d', confirmButtonText: '確認儲存', cancelButtonText: '取消' }).then((result) => { if (result.isConfirmed) { this.submit(); } });">
-        <input type="hidden" name="access_token" value="{{ access_token }}">
+      <a class="btn btn-danger" href="{{ url_for('auth.histology_code_versions') }}">版本紀錄</a>
+      <form method="post" action="{{ url_for('auth.save_histology_code_version') }}" onsubmit="event.preventDefault(); Swal.fire({ title: '儲存目前版本', input: 'text', inputLabel: '本次更新內容', inputPlaceholder: '請輸入更新內容（最多 100 字）', inputAttributes: { maxlength: 100 }, showCancelButton: true, confirmButtonColor: '#2563eb', cancelButtonColor: '#6c757d', confirmButtonText: '確認儲存', cancelButtonText: '取消', inputValidator: (value) => { if (!value || !value.trim()) return '請輸入本次更新內容'; if (value.trim().length > 100) return '更新內容不可超過 100 字'; } }).then((result) => { if (result.isConfirmed) { this.querySelector('[name=info]').value = result.value.trim(); this.submit(); } });">
+      <input type="hidden" name="info" value="">
       <input type="hidden" name="return_year" value="{{ selected_year }}">
       <input type="hidden" name="return_column" value="{{ search_column }}">
       <input type="hidden" name="return_q" value="{{ search_query }}">
@@ -95,8 +95,7 @@
             <p class="text-secondary small mb-0">逐欄填寫一筆組織型態對照資料。</p>
             <button class="btn btn-dark btn-sm px-3" type="submit" form="histologyMappingForm">新增資料</button>
           </div>
-          <form id="histologyMappingForm" class="row g-2" method="post" action="{{ url_for('histology_mapping.create_histology_code_mapping') }}" onsubmit="event.preventDefault(); Swal.fire({ title: '確認新增', text: '確定要新增這筆資料嗎？', icon: 'question', showCancelButton: true, confirmButtonColor: '#2563eb', cancelButtonColor: '#6c757d', confirmButtonText: '確定', cancelButtonText: '取消' }).then((result) => { if (result.isConfirmed) { this.submit(); } });">
-            <input type="hidden" name="access_token" value="{{ access_token }}">
+          <form id="histologyMappingForm" class="row g-2" method="post" action="{{ url_for('auth.create_histology_code_mapping') }}" onsubmit="event.preventDefault(); Swal.fire({ title: '確認新增', text: '確定要新增這筆資料嗎？', icon: 'question', showCancelButton: true, confirmButtonColor: '#2563eb', cancelButtonColor: '#6c757d', confirmButtonText: '確定', cancelButtonText: '取消' }).then((result) => { if (result.isConfirmed) { this.submit(); } });">
             <input type="hidden" name="return_year" value="{{ selected_year }}">
             <input type="hidden" name="return_column" value="{{ search_column }}">
             <input type="hidden" name="return_q" value="{{ search_query }}">
@@ -112,8 +111,7 @@
       <div class="tab-pane fade" id="excel-entry-pane" role="tabpanel" aria-labelledby="excel-entry-tab">
         <div class="histology-entry-pane rounded-2 p-3">
           <p class="text-secondary small mb-3">下載右上角範本填寫多筆資料後上傳；所有資料檢查通過才會批次新增。</p>
-          <form class="row g-2 align-items-center" method="post" action="{{ url_for('histology_mapping.import_histology_code_mapping') }}" enctype="multipart/form-data" onsubmit="event.preventDefault(); Swal.fire({ title: '確認上傳', text: '確定要匯入這份 Excel 檔案嗎？', icon: 'question', showCancelButton: true, confirmButtonColor: '#198754', cancelButtonColor: '#6c757d', confirmButtonText: '確定', cancelButtonText: '取消' }).then((result) => { if (result.isConfirmed) { this.submit(); } });">
-            <input type="hidden" name="access_token" value="{{ access_token }}">
+          <form class="row g-2 align-items-center" method="post" action="{{ url_for('auth.import_histology_code_mapping') }}" enctype="multipart/form-data" onsubmit="event.preventDefault(); Swal.fire({ title: '確認上傳', text: '確定要匯入這份 Excel 檔案嗎？', icon: 'question', showCancelButton: true, confirmButtonColor: '#198754', cancelButtonColor: '#6c757d', confirmButtonText: '確定', cancelButtonText: '取消' }).then((result) => { if (result.isConfirmed) { this.submit(); } });">
             <input type="hidden" name="return_year" value="{{ selected_year }}">
             <input type="hidden" name="return_column" value="{{ search_column }}">
             <input type="hidden" name="return_q" value="{{ search_query }}">
@@ -139,7 +137,7 @@
   </div>
   <div class="section-body">
     <form class="card histology-search-card mb-4" method="get">
-      <input type="hidden" name="access_token" value="{{ access_token }}">
+      {% if pending_change_count %}<input type="hidden" name="draft" value="1">{% endif %}
       <div class="card-body p-3 p-lg-4">
         <div class="row g-3 align-items-end">
           <div class="col-md-4 col-xl-3">
@@ -162,9 +160,9 @@
             <button class="btn btn-dark px-4" type="submit"><i class="bi bi-search me-1"></i>搜尋</button>
             {% if search_query %}
               {% if preview_mode %}
-              <a class="btn btn-outline-secondary" href="{{ url_for('histology_mapping.preview_histology_code_version', version_id=preview_commit_id, access_token=access_token) }}">清除</a>
+              <a class="btn btn-outline-secondary" href="{{ url_for('auth.preview_histology_code_version', version_id=preview_commit_id) }}">清除</a>
               {% else %}
-              <a class="btn btn-outline-secondary" href="{{ url_for('histology_mapping.histology_code_mapping', access_token=access_token) }}">清除</a>
+              <a class="btn btn-outline-secondary" href="{{ url_for('auth.histology_code_mapping', draft='1' if pending_change_count else None) }}">清除</a>
               {% endif %}
             {% endif %}
           </div>
@@ -186,9 +184,9 @@
           <div class="nav nav-pills gap-2">
             {% for year in available_years %}
             {% if preview_mode %}
-            <a class="nav-link px-3 py-2 {% if year == selected_year %}active{% endif %}" href="{{ url_for('histology_mapping.preview_histology_code_version', version_id=preview_commit_id, year=year, column=search_column, q=search_query, access_token=access_token) }}">{{ year }} 年</a>
+            <a class="nav-link px-3 py-2 {% if year == selected_year %}active{% endif %}" href="{{ url_for('auth.preview_histology_code_version', version_id=preview_commit_id, year=year, column=search_column, q=search_query) }}">{{ year }} 年</a>
             {% else %}
-            <a class="nav-link px-3 py-2 {% if year == selected_year %}active{% endif %}" href="{{ url_for('histology_mapping.histology_code_mapping', year=year, column=search_column, q=search_query, access_token=access_token) }}">{{ year }} 年</a>
+            <a class="nav-link px-3 py-2 {% if year == selected_year %}active{% endif %}" href="{{ url_for('auth.histology_code_mapping', year=year, column=search_column, q=search_query, draft='1' if pending_change_count else None) }}">{{ year }} 年</a>
             {% endif %}
             {% endfor %}
           </div>
@@ -198,8 +196,7 @@
     </section>
 
     {% if primary_key %}
-    <form id="batchDeleteForm" class="d-flex justify-content-end mb-2" method="post" action="{{ url_for('histology_mapping.delete_selected_histology_code_mappings') }}" onsubmit="event.preventDefault(); Swal.fire({ title: '確認刪除', text: '確定要刪除勾選的資料嗎？此動作無法復原！', icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545', cancelButtonColor: '#6c757d', confirmButtonText: '確定刪除', cancelButtonText: '取消' }).then((result) => { if (result.isConfirmed) { this.submit(); } });">
-      <input type="hidden" name="access_token" value="{{ access_token }}">
+    <form id="batchDeleteForm" class="d-flex justify-content-end mb-2" method="post" action="{{ url_for('auth.delete_selected_histology_code_mappings') }}" onsubmit="event.preventDefault(); Swal.fire({ title: '確認刪除', text: '確定要刪除勾選的資料嗎？此動作無法復原！', icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545', cancelButtonColor: '#6c757d', confirmButtonText: '確定刪除', cancelButtonText: '取消' }).then((result) => { if (result.isConfirmed) { this.submit(); } });">
       <input type="hidden" name="return_year" value="{{ selected_year }}">
       <input type="hidden" name="return_column" value="{{ search_column }}">
       <input type="hidden" name="return_q" value="{{ search_query }}">
@@ -243,8 +240,7 @@
             {% for column in display_columns %}
             <td>
               {% if loop.first %}
-              <form id="{{ inline_form_id }}" method="post" action="{{ url_for('histology_mapping.update_histology_code_mapping', histcode_id=row[columns.index(primary_key)]) }}" onsubmit="event.preventDefault(); Swal.fire({ title: '確認修改', text: '確定要儲存這筆資料的修改嗎？', icon: 'question', showCancelButton: true, confirmButtonColor: '#2563eb', cancelButtonColor: '#6c757d', confirmButtonText: '確定', cancelButtonText: '取消' }).then((result) => { if (result.isConfirmed) { this.submit(); } });">
-                <input type="hidden" name="access_token" value="{{ access_token }}">
+              <form id="{{ inline_form_id }}" method="post" action="{{ url_for('auth.update_histology_code_mapping', histcode_id=row[columns.index(primary_key)]) }}" onsubmit="event.preventDefault(); Swal.fire({ title: '確認修改', text: '確定要儲存這筆資料的修改嗎？', icon: 'question', showCancelButton: true, confirmButtonColor: '#2563eb', cancelButtonColor: '#6c757d', confirmButtonText: '確定', cancelButtonText: '取消' }).then((result) => { if (result.isConfirmed) { this.submit(); } });">
                 <input type="hidden" name="return_year" value="{{ selected_year }}">
                 <input type="hidden" name="return_column" value="{{ search_column }}">
                 <input type="hidden" name="return_q" value="{{ search_query }}">
@@ -261,7 +257,7 @@
             <td>
               <div class="histology-actions">
                 <button class="btn btn-sm btn-dark" type="submit" form="{{ inline_form_id }}" title="儲存"><i class="bi bi-check-lg"></i><span class="visually-hidden">儲存</span></button>
-                <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('histology_mapping.histology_code_mapping', year=selected_year, column=search_column, q=search_query, access_token=access_token) }}" title="取消"><i class="bi bi-x-lg"></i><span class="visually-hidden">取消</span></a>
+                <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('auth.histology_code_mapping', year=selected_year, column=search_column, q=search_query, draft='1' if pending_change_count else None) }}" title="取消"><i class="bi bi-x-lg"></i><span class="visually-hidden">取消</span></a>
               </div>
             </td>
           </tr>
@@ -272,9 +268,8 @@
             {% if primary_key %}
             <td>
               <div class="histology-actions">
-                <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('histology_mapping.histology_code_mapping', edit_id=row[columns.index(primary_key)], year=selected_year, column=search_column, q=search_query, access_token=access_token) }}" title="編輯"><i class="bi bi-pencil-square"></i><span class="visually-hidden">編輯</span></a>
-                <form method="post" action="{{ url_for('histology_mapping.delete_histology_code_mapping', histcode_id=row[columns.index(primary_key)]) }}" onsubmit="event.preventDefault(); Swal.fire({ title: '確認刪除', text: '確定要刪除此筆資料嗎？此動作無法復原！', icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545', cancelButtonColor: '#6c757d', confirmButtonText: '確定刪除', cancelButtonText: '取消' }).then((result) => { if (result.isConfirmed) { this.submit(); } });">
-                  <input type="hidden" name="access_token" value="{{ access_token }}">
+                <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('auth.histology_code_mapping', edit_id=row[columns.index(primary_key)], year=selected_year, column=search_column, q=search_query, draft='1' if pending_change_count else None) }}" title="編輯"><i class="bi bi-pencil-square"></i><span class="visually-hidden">編輯</span></a>
+                <form method="post" action="{{ url_for('auth.delete_histology_code_mapping', histcode_id=row[columns.index(primary_key)]) }}" onsubmit="event.preventDefault(); Swal.fire({ title: '確認刪除', text: '確定要刪除此筆資料嗎？此動作無法復原！', icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545', cancelButtonColor: '#6c757d', confirmButtonText: '確定刪除', cancelButtonText: '取消' }).then((result) => { if (result.isConfirmed) { this.submit(); } });">
                   <input type="hidden" name="return_year" value="{{ selected_year }}">
                   <input type="hidden" name="return_column" value="{{ search_column }}">
                   <input type="hidden" name="return_q" value="{{ search_query }}">

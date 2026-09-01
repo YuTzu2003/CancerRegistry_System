@@ -4,7 +4,7 @@ from flask import Blueprint, request, session, redirect, url_for, render_templat
 from modules.services.db import get_conn
 import os, json, datetime
 
-auth_bp = Blueprint('auth', __name__)
+auth_bp = Blueprint('auth', __name__, template_folder='../blueprint/auth/templates')
 
 def login_log(user_id, ip, success, reason=""):
     log_dir = "tasks/cache"

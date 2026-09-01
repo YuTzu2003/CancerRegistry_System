@@ -39,7 +39,6 @@ def _should_include_result_file(filename, original_filename=None):
 
         if file_base == original_base and file_ext.lower() in [".txt", ".xls", ".xlsx"]:
             return True
-
     return False
 
 @history_bp.route("/clean/history")
@@ -108,11 +107,15 @@ def batch_delete_history():
 @history_bp.route("/clean/history/detail/<job_id>")
 @login_required
 def detail_history(job_id):
+    user_id = session.get("id")
     conn = get_conn()
     cursor = conn.cursor()
     cursor.execute("""SELECT Job.JobID,DataFormat.FmtName,DataFormat.Version,Job.TotalCount,Job.CompletenessScore,Job.CorrectScore,Job.ConsistencyScore,Job.DQI,Job.Path,Job.CreatedAt
-                      FROM DataFormat RIGHT JOIN Job ON DataFormat.FmtID = Job.FmtID WHERE Job.JobID = ?""", (job_id,))
+                      FROM DataFormat RIGHT JOIN Job ON DataFormat.FmtID = Job.FmtID WHERE Job.JobID = ? AND Job.UserID = ?""", (job_id, user_id))
     row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return jsonify({"ok": False, "error": "找不到紀錄"}), 404
     data = dict(zip([c[0] for c in cursor.description], row))
     if isinstance(data['CreatedAt'], datetime.datetime): 
         data['CreatedAt'] = data['CreatedAt'].strftime("%Y/%m/%d %H:%M:%S")
@@ -123,9 +126,10 @@ def detail_history(job_id):
 @login_required
 def history_download_zip(job_id):
     try:
+        user_id = session.get("id")
         conn = get_conn()
         cursor = conn.cursor()
-        cursor.execute("SELECT Path, FileName FROM Job WHERE JobID=?", (job_id,))
+        cursor.execute("SELECT Path, FileName FROM Job WHERE JobID=? AND UserID=?", (job_id, user_id))
         row = cursor.fetchone()
         conn.close()
         if not row or not row[0]: return jsonify({"ok": False, "error": "Not found"}), 404
