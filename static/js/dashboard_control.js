@@ -1351,13 +1351,6 @@ function initDashboardControl() {
                                                   window.DashboardRenderer?.updateSurvivalChartLayout?.();
                                               }
                                               
-                                              if (window.lastChartData) {
-                                                  const aiBtn = targetPane.querySelector('button[id^="btnAi"]');
-                                                  const llmDiv = targetPane.querySelector('div[id^="llmResponse"]');
-                                                  if (aiBtn && llmDiv && llmDiv.innerText.includes('自動產生')) {
-                                                      aiBtn.click();
-                                                  }
-                                              }
                                           }, 50);
                                       }
                                   }
@@ -1465,7 +1458,7 @@ function initDashboardControl() {
                                       };
                                   });
                               }
-                              const currentRequest = window.DashboardRenderer.fetchLlmInsight(
+                              const currentRequest = window.DashboardRenderer.fetchLlmInsightWithRetry(
                                   fieldKey, dataToSend, cfg.fields, cfg.respId, cfg.btnId,
                                   { forceRefresh: event?.isTrusted === true }
                               );
@@ -1478,8 +1471,7 @@ function initDashboardControl() {
                       el.innerText = window.DashboardRenderer.t('autoInsight');
                   });
 
-                  const variantInsightPromises = [];
-                  let initialStageReport = null;
+                  const variantInsightTasks = [];
                   let initialTreatmentSystem = '';
 
                   if (window.DashboardRenderer) {
@@ -1509,12 +1501,10 @@ function initDashboardControl() {
                            }
                            chartData.stageReports = stageReports;
                            window.DashboardRenderer.renderStageReportTabs(stageReports, yearTitle, cancerTitle);
-                           initialStageReport = stageReports[0] || null;
-                           // Generate only the active report; concurrent requests for every
-                           // variant can overwhelm the model service and time out.
-                           if (initialStageReport) {
-                               const request = window.DashboardRenderer.configureStageInsight(initialStageReport);
-                               if (request instanceof Promise) variantInsightPromises.push(request);
+                           if (stageReports.length) {
+                               [...stageReports.slice(1), stageReports[0]].forEach(report => variantInsightTasks.push(
+                                   () => window.DashboardRenderer.configureStageInsight(report)
+                               ));
                            }
                        }
                        window.DashboardRenderer.renderStageFirstCourseTables(chartData.stageFirstCourseData, yearTitle, cancerTitle);
@@ -1527,10 +1517,9 @@ function initDashboardControl() {
                            ? window.stageFirstCourseActiveSystem
                            : treatmentSystems[0] || '';
                        const treatmentInsightButton = document.getElementById('btnAiTreatmentFirstCourse');
-                       if (initialTreatmentSystem) {
+                       if (document.getElementById('chkTreatmentFirstCourse')?.checked && initialTreatmentSystem) {
                            window.stageFirstCourseActiveSystem = initialTreatmentSystem;
-                           const request = treatmentInsightButton?.onclick?.();
-                           if (request instanceof Promise) variantInsightPromises.push(request);
+                           variantInsightTasks.push(() => treatmentInsightButton?.onclick?.());
                        }
                        window.stageFirstCourseActiveSystem = initialTreatmentSystem;
                        window.DashboardRenderer.renderStageFirstCourseTables(chartData.stageFirstCourseData, yearTitle, cancerTitle);                       const surgeryTables = Array.isArray(chartData.stageSurgeryData)
@@ -1541,10 +1530,9 @@ function initDashboardControl() {
                            ? window.stageSurgeryActiveSystem
                            : surgerySystems[0] || '';
                        const surgeryInsightButton = document.getElementById('btnAiTreatmentSurgery');
-                       if (initialSurgerySystem) {
+                       if (document.getElementById('chkTreatmentSurgery')?.checked && initialSurgerySystem) {
                            window.stageSurgeryActiveSystem = initialSurgerySystem;
-                           const request = surgeryInsightButton?.onclick?.();
-                           if (request instanceof Promise) variantInsightPromises.push(request);
+                           variantInsightTasks.push(() => surgeryInsightButton?.onclick?.());
                        }
                        window.stageSurgeryActiveSystem = initialSurgerySystem;
                        window.DashboardRenderer.renderStageSurgeryTables(chartData.stageSurgeryData, yearTitle, cancerTitle);
@@ -1567,21 +1555,25 @@ function initDashboardControl() {
                   }
 
                   if (window.DashboardRenderer) window.DashboardRenderer.updateHistologyChart(chartData.histologyData, chartData.histologyNoDataReason);
-                  
-                  // Collect all AI promises before showing the charts
-                   let aiPromises = [...variantInsightPromises];
+
+                  // Generate narratives one at a time so a local LLM is not overloaded.
+                  const completeInsight = async (task) => {
+                      const result = await task();
+                      if (!result?.success) throw new Error(result?.error || 'LLM insight generation failed.');
+                      return result;
+                  };
+                  const insightTasks = [...variantInsightTasks];
                   document.querySelectorAll('.item-checkbox').forEach(itemChk => {
                       if (itemChk.checked) {
                           const targetSelector = itemChk.getAttribute('data-target');
-                          if (targetSelector && targetSelector !== '#chartPane-StageSummary' && targetSelector !== '#chartPane-TreatmentFirstCourse') {
+                          if (targetSelector && !['#chartPane-StageSummary', '#chartPane-TreatmentFirstCourse', '#chartPane-TreatmentSurgery'].includes(targetSelector)) {
                               const targetPane = document.querySelector(targetSelector);
                               if (targetPane) {
                                   const aiBtn = targetPane.querySelector('button[id^="btnAi"]');
                                   const llmDiv = targetPane.querySelector('div[id^="llmResponse"]');
                                   if (aiBtn && llmDiv && llmDiv.innerText.includes('自動產生')) {
                                       if (typeof aiBtn.onclick === 'function') {
-                                          const prom = aiBtn.onclick();
-                                          if (prom instanceof Promise) aiPromises.push(prom);
+                                          insightTasks.push(() => aiBtn.onclick());
                                       }
                                   }
                               }
@@ -1590,29 +1582,32 @@ function initDashboardControl() {
                   });
 
                   let completedInsights = 0;
-                  const totalInsights = aiPromises.length;
+                  const totalInsights = insightTasks.length;
                   const updateInsightProgress = () => {
                       if (window.utils?.showLoading) {
                           window.utils.showLoading(`正在產生 LLM 敘述（${completedInsights}/${totalInsights}）…`);
                       }
                   };
                   updateInsightProgress();
-                  Promise.allSettled(aiPromises.map(request => Promise.resolve(request).finally(() => {
-                      completedInsights += 1;
-                      updateInsightProgress();
-                  }))).then(() => {
-                       if (initialStageReport) window.DashboardRenderer.configureStageInsight(initialStageReport);
-                       if (initialTreatmentSystem) {
-                           window.stageFirstCourseActiveSystem = initialTreatmentSystem;
-                           document.getElementById('btnAiTreatmentFirstCourse')?.onclick?.();
-                       }
-                       window.DashboardRenderer.showAnnualDataContent();
-                       if (window.utils && window.utils.hideLoading) {
+                  (async () => {
+                      let failedInsights = 0;
+                      for (const task of insightTasks) {
+                          try {
+                              await completeInsight(task);
+                          } catch (error) {
+                              failedInsights += 1;
+                              console.error('LLM insight generation failed:', error);
+                          } finally {
+                              completedInsights += 1;
+                              updateInsightProgress();
+                          }
+                      }
+                      window.DashboardRenderer?.showAnnualDataContent();
+                      if (window.utils && window.utils.hideLoading) {
                           window.utils.hideLoading();
                       } else if (window.dashboardChartInstance) {
                           window.dashboardChartInstance.hideLoading();
                       }
-                      
                       if (chartTabsArea) {
                           if (anyChecked) {
                               chartTabsArea.classList.remove('d-none');
@@ -1626,13 +1621,10 @@ function initDashboardControl() {
                               if (emptyPane) emptyPane.classList.remove('d-none');
                           }
                       }
-                  }).catch(() => {
-                      if (window.utils && window.utils.hideLoading) {
-                          window.utils.hideLoading();
-                      } else if (window.dashboardChartInstance) {
-                          window.dashboardChartInstance.hideLoading();
+                      if (failedInsights > 0) {
+                          utils.alert(`${failedInsights} 個語言模型敘述產生失敗，請在該圖表按「重新產生敘述」。`, 'warning');
                       }
-                  });
+                  })();
               } else {
                   if (window.utils && window.utils.hideLoading) window.utils.hideLoading();
                   utils.alert('資料分析失敗: ' + data.error, 'error');
@@ -1652,10 +1644,153 @@ function initDashboardControl() {
   /* ── 檔案上傳邏輯 ── */
   const form = document.getElementById('dashUploadForm');
   const fileInput = document.getElementById('dashFileInput');
-  
+  const inputFormatChips = document.querySelectorAll('#dashboardInputScheme .naming-chip');
+  const inputFieldList = document.getElementById('dashboardInputFieldList');
+  const previewInputBtn = document.getElementById('btnPreviewDashboardInput');
+  const inputSettings = document.getElementById('dashboardInputSettings');
+  const uploadButton = document.getElementById('btnDashUpload');
+  let dashboardInputPreview = null;
+  let dashboardInputPreviewLoading = false;
+  let dashboardInputPreviewRequestId = 0;
+  const escapeDashboardInputHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+  })[char]);
+
+  const syncDashboardInputFormat = () => {
+      const hasSelectedFile = Boolean(fileInput?.files?.length);
+      inputFormatChips.forEach(chip => {
+          const input = chip.querySelector('input[type="radio"]');
+          if (input) input.disabled = !hasSelectedFile;
+          chip.classList.toggle('selected', Boolean(input?.checked));
+      });
+      const hasSelectedScheme = Boolean(document.querySelector('input[name="dashboardInputScheme"]:checked'));
+      const previewReady = Boolean(dashboardInputPreview) && !dashboardInputPreviewLoading;
+      if (previewInputBtn) previewInputBtn.disabled = !(hasSelectedFile && hasSelectedScheme && previewReady);
+      if (uploadButton) uploadButton.disabled = !(hasSelectedFile && hasSelectedScheme && previewReady);
+      inputSettings?.classList.toggle('is-disabled', !hasSelectedFile);
+      inputSettings?.setAttribute('aria-disabled', String(!hasSelectedFile));
+  };
+
+  const loadDashboardInputPreview = async () => {
+      const selectedFile = fileInput?.files?.[0];
+      const inputScheme = document.querySelector('input[name="dashboardInputScheme"]:checked')?.value;
+      if (!selectedFile || !inputScheme) return;
+
+      dashboardInputPreview = null;
+      dashboardInputPreviewLoading = true;
+      const requestId = ++dashboardInputPreviewRequestId;
+      if (inputFieldList) {
+          inputFieldList.innerHTML = '<span class="field-chip disabled"><span class="spinner-border spinner-border-sm me-1"></span> 正在辨識欄位…</span>';
+      }
+      syncDashboardInputFormat();
+
+      const previewData = new FormData();
+      previewData.set('file', selectedFile);
+      previewData.set('input_scheme', inputScheme);
+      try {
+          const response = await fetch('/dashboard/input-preview', { method: 'POST', body: previewData });
+          const data = await response.json();
+          if (requestId !== dashboardInputPreviewRequestId) return;
+          if (!response.ok || !data.ok) throw new Error(data.error || '欄位辨識失敗');
+          dashboardInputPreview = data;
+          if (inputFieldList) {
+              const unmatched = data.columns.filter(column => !column.matched);
+              const summary = `<span class="field-chip disabled"><i class="bi bi-check-circle text-success"></i> 已匹配 ${data.matched_count}／${data.total_count} 個欄位</span>`;
+              const unmatchedChips = unmatched.length
+                ? unmatched.map(column => `<label class="field-chip selected"><input type="checkbox" class="dashboard-extra-field-checkbox" value="${escapeDashboardInputHtml(column.original)}" checked><span>${escapeDashboardInputHtml(column.original)}</span></label>`).join('')
+                : '<span class="field-chip disabled"><i class="bi bi-check2 text-success"></i> 無未匹配欄位</span>';
+              inputFieldList.innerHTML = summary + unmatchedChips;
+              inputFieldList.querySelectorAll('.dashboard-extra-field-checkbox').forEach(checkbox => {
+                  checkbox.addEventListener('change', () => {
+                      checkbox.closest('.field-chip')?.classList.toggle('selected', checkbox.checked);
+                  });
+              });
+          }
+      } catch (error) {
+          if (requestId !== dashboardInputPreviewRequestId) return;
+          if (inputFieldList) {
+              inputFieldList.innerHTML = `<span class="field-chip disabled text-danger"><i class="bi bi-x-circle"></i> ${escapeDashboardInputHtml(error.message || '欄位辨識失敗')}</span>`;
+          }
+      } finally {
+          if (requestId !== dashboardInputPreviewRequestId) return;
+          dashboardInputPreviewLoading = false;
+          syncDashboardInputFormat();
+      }
+  };
+
+  inputFormatChips.forEach(chip => {
+      chip.querySelector('input[type="radio"]')?.addEventListener('change', () => {
+          dashboardInputPreview = null;
+          syncDashboardInputFormat();
+          loadDashboardInputPreview();
+      });
+  });
+  syncDashboardInputFormat();
+
+  fileInput?.addEventListener('change', () => {
+      const selectedFile = fileInput.files?.[0];
+      dashboardInputPreviewRequestId += 1;
+      dashboardInputPreview = null;
+      dashboardInputPreviewLoading = false;
+      inputFormatChips.forEach(chip => {
+          const input = chip.querySelector('input[type="radio"]');
+          if (input) input.checked = false;
+      });
+      if (selectedFile) {
+          const defaultChineseScheme = document.querySelector('input[name="dashboardInputScheme"][value="field_name_zh"]');
+          if (defaultChineseScheme) defaultChineseScheme.checked = true;
+      }
+      if (inputFieldList) {
+          inputFieldList.innerHTML = selectedFile
+            ? `<span class="field-chip disabled"><i class="bi bi-file-earmark-excel"></i> 已選擇 ${escapeDashboardInputHtml(selectedFile.name)}，請選擇欄位命名來源</span>`
+            : '<span class="field-chip disabled"><i class="bi bi-asterisk"></i> 請先選擇檔案</span>';
+      }
+      syncDashboardInputFormat();
+      if (selectedFile) loadDashboardInputPreview();
+  });
+
+  previewInputBtn?.addEventListener('click', () => {
+      const selectedScheme = document.querySelector('input[name="dashboardInputScheme"]:checked');
+      if (!selectedScheme) {
+          Swal.fire({ icon: 'warning', title: '請先選擇欄位命名格式', confirmButtonColor: '#2563eb' });
+          return;
+      }
+      const selectedFile = fileInput?.files?.[0];
+      if (!selectedFile) {
+          Swal.fire({ icon: 'warning', title: '請先選擇檔案', confirmButtonColor: '#2563eb' })
+            .then(() => fileInput?.click());
+          return;
+      }
+      const selectedLabel = document.querySelector('input[name="dashboardInputScheme"]:checked')
+        ?.closest('.naming-chip')?.querySelector('.nc-title')?.textContent?.trim() || '';
+      if (!dashboardInputPreview) {
+          Swal.fire({ icon: 'warning', title: '欄位尚未完成辨識', confirmButtonColor: '#2563eb' });
+          return;
+      }
+      const selectedExtraFields = new Set(Array.from(document.querySelectorAll('.dashboard-extra-field-checkbox:checked')).map(input => input.value));
+      const previewRows = dashboardInputPreview.columns.map(column => `
+          <tr>
+            <td class="text-start">${escapeDashboardInputHtml(column.original)}</td>
+            <td class="text-center">→</td>
+            <td class="text-start">${escapeDashboardInputHtml(column.normalized)}</td>
+            <td class="text-center">${column.matched ? '<span class="text-success">已匹配</span>' : selectedExtraFields.has(column.original) ? '<span class="text-warning">保留原名</span>' : '<span class="text-secondary">不匯入</span>'}</td>
+          </tr>`).join('');
+      Swal.fire({
+          title: '輸入檔案預覽',
+          width: 900,
+          html: `<div class="text-start mb-3"><strong>檔案：</strong>${escapeDashboardInputHtml(selectedFile.name)}<span class="mx-2">｜</span><strong>命名來源：</strong>${escapeDashboardInputHtml(selectedLabel)}</div><div class="table-responsive" style="max-height:420px"><table class="table table-sm table-bordered align-middle mb-0"><thead class="table-light sticky-top"><tr><th>原始欄位</th><th style="width:45px"></th><th>標準欄位</th><th style="width:90px">狀態</th></tr></thead><tbody>${previewRows}</tbody></table></div>`,
+          confirmButtonColor: '#2563eb'
+      });
+  });
+
   if (form && fileInput) {
       form.addEventListener('submit', function(e) {
           e.preventDefault();
+          const inputScheme = document.querySelector('input[name="dashboardInputScheme"]:checked')?.value;
+          if (!inputScheme) {
+            Swal.fire({ icon: 'warning', title: '請先選擇欄位命名格式', allowOutsideClick: false, confirmButtonColor: '#2563eb' });
+            return;
+          }
           if (!fileInput.files.length) {
             Swal.fire({ icon: 'warning', title: '請先選擇檔案', allowOutsideClick: false, confirmButtonColor: '#2563eb' });
             return;
@@ -1666,27 +1801,35 @@ function initDashboardControl() {
             Swal.fire({ icon: 'error', title: '格式錯誤', text: '僅接受 .xls 或 .xlsx 檔案', allowOutsideClick: false, confirmButtonColor: '#2563eb' });
             return;
           }
-          
+          if (!dashboardInputPreview) {
+            Swal.fire({ icon: 'warning', title: '請等待欄位辨識完成', allowOutsideClick: false, confirmButtonColor: '#2563eb' });
+            return;
+          }
+
           const btn = document.getElementById('btnDashUpload');
           btn.disabled = true;
-          btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> 上傳中…';
+          btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> 匯入中…';
           
-          fetch('/dashboard/upload', { method: 'POST', body: new FormData(form) })
+          const uploadData = new FormData(form);
+          uploadData.set('input_scheme', inputScheme);
+          uploadData.set('extra_fields', JSON.stringify(Array.from(document.querySelectorAll('.dashboard-extra-field-checkbox:checked')).map(input => input.value)));
+          fetch('/dashboard/upload', { method: 'POST', body: uploadData })
             .then(r => r.json())
             .then(data => {
               if (data.ok) {
-                Swal.fire({ icon: 'success', title: '上傳成功', text: `${data.filename} 已儲存`, allowOutsideClick: false, confirmButtonColor: '#2563eb' })
+                Swal.fire({ icon: 'success', title: '匯入成功', text: `${data.filename} 已匯入`, allowOutsideClick: false, confirmButtonColor: '#2563eb' })
                   .then(() => location.reload());
               } else {
-                Swal.fire({ icon: 'error', title: '上傳失敗', text: data.error || '未知錯誤', allowOutsideClick: false, confirmButtonColor: '#2563eb' });
+                Swal.fire({ icon: 'error', title: '匯入失敗', text: data.error || '未知錯誤', allowOutsideClick: false, confirmButtonColor: '#2563eb' });
               }
             })
             .catch(() => {
-              Swal.fire({ icon: 'error', title: '上傳失敗', allowOutsideClick: false, confirmButtonColor: '#2563eb' });
+              Swal.fire({ icon: 'error', title: '匯入失敗', allowOutsideClick: false, confirmButtonColor: '#2563eb' });
             })
             .finally(() => {
               btn.disabled = false;
-              btn.innerHTML = '<i class="bi bi-upload"></i> 上傳檔案';
+              btn.innerHTML = '<i class="bi bi-upload"></i> 確認匯入';
+              syncDashboardInputFormat();
             });
       });
   }

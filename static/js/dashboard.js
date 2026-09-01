@@ -537,7 +537,7 @@ window.DashboardRenderer.renderStageReportTabs = function(stageReports, yearTitl
             sex: document.getElementById('annualStageSexSection'),
             age: document.getElementById('annualStageAgeSection')
         };
-        const showReport = (report, button) => {
+        const showReport = (report, button, { generateInsight = false } = {}) => {
             Object.values(sections).forEach(section => section?.classList.add('d-none'));
             tabs.querySelectorAll('button').forEach(item => item.classList.remove('active'));
             button?.classList.add('active');
@@ -550,7 +550,7 @@ window.DashboardRenderer.renderStageReportTabs = function(stageReports, yearTitl
             if (view === 'sex') this.renderStageSexReport(report, yearTitle, cancerTitle);
             else if (view === 'age') this.renderStageAgeReport(report, yearTitle, cancerTitle);
             else this.renderStageDistributionReport(report, yearTitle, cancerTitle);
-            this.configureStageInsight(report);
+            this.configureStageInsight(report, { generate: generateInsight });
 
             requestAnimationFrame(() => {
                 if (view === 'sex') window.dashboardStageSexChartInstance?.resize();
@@ -567,14 +567,14 @@ window.DashboardRenderer.renderStageReportTabs = function(stageReports, yearTitl
             button.textContent = window.DashboardI18n?.getLanguage() === 'en'
                 ? this.t(tabKey, { system: this.getStageSystemTitle(report.staging_system) })
                 : (report.option || this.t(tabKey, { system: report.staging_system }));
-            button.addEventListener('click', () => showReport(report, button));
+            button.addEventListener('click', () => showReport(report, button, { generateInsight: true }));
             tabs.appendChild(button);
             if (index === 0) showReport(report, button);
         });
     };
 
 /* 目前顯示的期別分頁共用同一個敘述區塊；切換分頁時改用該報表資料產生敘述。 */
-window.DashboardRenderer.configureStageInsight = function(stageReport) {
+window.DashboardRenderer.configureStageInsight = function(stageReport, { generate = true } = {}) {
         const button = document.getElementById('btnAiStageSummary');
         const response = document.getElementById('llmResponseStageSummary');
         if (!button || !response || !stageReport) return;
@@ -606,7 +606,7 @@ window.DashboardRenderer.configureStageInsight = function(stageReport) {
         button.style.display = 'block';
         button.textContent = this.t('regenerateInsight');
         button.dataset.insightFieldKey = fieldKey;
-        button.onclick = event => this.fetchLlmInsight(
+        button.onclick = event => this.fetchLlmInsightWithRetry(
             fieldKey,
             insightData,
             fields,
@@ -615,7 +615,7 @@ window.DashboardRenderer.configureStageInsight = function(stageReport) {
             { forceRefresh: event?.isTrusted === true }
         );
         if (reportChanged) response.textContent = this.t('autoInsight');
-        return button.onclick();
+        return generate ? button.onclick() : null;
     };
 
 /* ── 表一、圖一：期別分布 ── */
@@ -1678,10 +1678,14 @@ window.DashboardRenderer.fetchLlmInsight = function(fieldKey, chartData, fields,
         if (shouldManageButton && button) button.disabled = true;
 
         const cacheGeneration = this.insightCacheGeneration;
-        const controller = new AbortController();
-        const timeoutId = window.setTimeout(() => controller.abort(), 210000);
-        const request = fetch('/api/chart_insight', {method: 'POST',headers: { 'Content-Type': 'application/json' },signal: controller.signal,body: JSON.stringify({ field_key: fieldKey, data: chartData, fields: fields, mode_ai: modeAi, year_start: yearStart, year_end: yearEnd, language })})
-        .then(res => res.json())
+        const request = fetch('/api/chart_insight', {method: 'POST',headers: { 'Content-Type': 'application/json' },body: JSON.stringify({ field_key: fieldKey, data: chartData, fields: fields, mode_ai: modeAi, year_start: yearStart, year_end: yearEnd, language })})
+        .then(async res => {
+            try {
+                return await res.json();
+            } catch (_) {
+                return { success: false, error: `HTTP ${res.status}` };
+            }
+        })
         .then(data => {
             if (data.success) {
                 if (this.insightCacheGeneration === cacheGeneration) {
@@ -1695,10 +1699,9 @@ window.DashboardRenderer.fetchLlmInsight = function(fieldKey, chartData, fields,
         })
         .catch(error => ({
             success: false,
-            error: error.name === 'AbortError' ? '語言模型敘述產生逾時，請稍後重試。' : 'error'
+            error: error.message || 'error'
         }))
         .finally(() => {
-            window.clearTimeout(timeoutId);
             if (this.insightRequests.get(requestKey) === request) this.insightRequests.delete(requestKey);
         });
         this.insightRequests.set(requestKey, request);
@@ -1707,6 +1710,18 @@ window.DashboardRenderer.fetchLlmInsight = function(fieldKey, chartData, fields,
             showResult(result);
             return result;
         });
+    };
+
+window.DashboardRenderer.fetchLlmInsightWithRetry = async function(fieldKey, chartData, fields, responseContainerId, buttonId, options = {}) {
+        let result = null;
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+            result = await this.fetchLlmInsight(
+                fieldKey, chartData, fields, responseContainerId, buttonId,
+                { ...options, forceRefresh: options.forceRefresh === true || attempt > 0 }
+            );
+            if (result?.success) return result;
+        }
+        return result;
     };
 
 // 取得年度字串
