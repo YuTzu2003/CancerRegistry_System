@@ -1284,7 +1284,7 @@ window.DashboardRenderer.renderHistologyTable = function(histologyData, yearTitl
         }
         if (!histologyData || histologyData.length === 0) {
             const reason = this.escapeHtml(noDataReason || '查無符合條件的組織型態資料。');
-            body.innerHTML = `<tr><td colspan="4" class="text-center py-4">${this.t('noData')}<br><span class="text-muted small">${reason}</span></td></tr>`;
+            body.innerHTML = `<tr><td colspan="3" class="text-center py-4">${this.t('noData')}<br><span class="text-muted small">${reason}</span></td></tr>`;
             this.renderColonHistologyTableNote([]);
             return;}
 
@@ -1294,7 +1294,6 @@ window.DashboardRenderer.renderHistologyTable = function(histologyData, yearTitl
             const pct = totalCount > 0 ? ((item.count / totalCount) * 100).toFixed(1) : '0.0';
             return `
                 <tr>
-                    <td>${item.code}</td>
                     <td class="text-start">${this.escapeHtml(this.histologyDisplayName(item))}</td>
                     <td>${item.count}</td>
                     <td>${pct}%</td>
@@ -1305,7 +1304,6 @@ window.DashboardRenderer.renderHistologyTable = function(histologyData, yearTitl
         const totalRowHtml = `
             <tr class="fw-bold" style="background-color: var(--gray-50);">
                 <td>${this.t('total')}</td>
-                <td></td>
                 <td>${totalCount}</td>
                 <td>100.0%</td>
             </tr>`;
@@ -1968,7 +1966,7 @@ window.DashboardRenderer.rerenderDashboardLanguage = function(options = {}) {
         const languageLabel = document.getElementById('dashboardLanguageLabel');
         if (languageLabel && selector) languageLabel.textContent = selector.value === 'en' ? 'English' : '繁體中文';
         const headerMap = {
-            histologyCodeHeader: this.t('icdoCode'), histologyNameHeader: this.t('histology'),
+            histologyNameHeader: this.t('histology'),
             histologyCountHeader: this.t('people'),
             histologyPercentageHeader: window.DashboardI18n?.getLanguage() === 'en' ? '%' : `${this.t('percentage')}%`
         };

@@ -380,7 +380,10 @@ def calculate_histology_distribution(df, cols, cancers=None, year_start="", year
                 ):
                     report_name_zh = f"{report_name_zh}(原位癌)"
                     report_name_en = f"{report_name_en}(in situ)"
-                key = (icdo_code, report_name_zh, report_name_en)
+                # Annual reports aggregate codes sharing the same resolved histology name.
+                # Keep in-situ cases distinct even when a mapping name happens to match.
+                is_in_situ = normalize_case_code(case_row["behavior"]) == "2"
+                key = (report_name_zh, report_name_en, is_in_situ)
                 hist_counts[key] = hist_counts.get(key, 0) + 1
 
                 if res.get("status") != "matched":
@@ -421,10 +424,9 @@ def calculate_histology_distribution(df, cols, cancers=None, year_start="", year
                         "detail_message": detail_message
                     })
 
-            for (icdo_code, report_name_zh, report_name_en), count in hist_counts.items():
+            for (report_name_zh, report_name_en, _is_in_situ), count in hist_counts.items():
                 pct = (count / total_valid_cases) * 100
                 hist_dist_data.append({
-                    "code": icdo_code,
                     "name": report_name_zh,
                     "name_zh": report_name_zh,
                     "name_en": report_name_en,

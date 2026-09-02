@@ -64,19 +64,16 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir, expo
             }
             /* Keep the histology table consistent in Chinese and English exports. */
             .annual-histology-table { table-layout: fixed; }
-            .annual-histology-table .annual-histology-code-col,
-            .annual-histology-table th:nth-child(1),
-            .annual-histology-table td:nth-child(1) { width: 20%; }
             .annual-histology-table .annual-histology-name-col,
-            .annual-histology-table th:nth-child(2),
-            .annual-histology-table td:nth-child(2) { width: 50%; }
+            .annual-histology-table th:nth-child(1),
+            .annual-histology-table td:nth-child(1) { width: 70%; }
             .annual-histology-table .annual-histology-count-col,
-            .annual-histology-table th:nth-child(3),
-            .annual-histology-table td:nth-child(3) { width: 13%; }
+            .annual-histology-table th:nth-child(2),
+            .annual-histology-table td:nth-child(2) { width: 15%; }
             .annual-histology-table .annual-histology-percent-col,
-            .annual-histology-table th:nth-child(4),
-            .annual-histology-table td:nth-child(4) { width: 17%; }
-            .annual-histology-table td:nth-child(2) {
+            .annual-histology-table th:nth-child(3),
+            .annual-histology-table td:nth-child(3) { width: 15%; }
+            .annual-histology-table td:nth-child(1) {
                 text-align: left;
                 overflow-wrap: anywhere;
                 word-break: break-word;
@@ -287,10 +284,16 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir, expo
                         if max_cols > 0:
                             w_table = doc.add_table(rows=len(rows), cols=max_cols)
                             w_table.style = 'Table Grid'
-                            if is_histology_table and max_cols == 4:
-                                # Match the fixed 20 / 50 / 13 / 17 percent layout used in the PDF.
+                            if is_histology_table:
                                 w_table.autofit = False
-                                histology_widths = [Inches(1.8), Inches(4.5), Inches(1.17), Inches(1.53)]
+                                if max_cols == 3:
+                                    # Histology name / count / percentage layout used by annual and comparison reports.
+                                    histology_widths = [Inches(5.8), Inches(1.6), Inches(1.6)]
+                                elif max_cols == 4:
+                                    # Backward compatibility for any legacy four-column histology table.
+                                    histology_widths = [Inches(1.8), Inches(4.5), Inches(1.17), Inches(1.53)]
+                                else:
+                                    histology_widths = []
                                 for row in w_table.rows:
                                     for col_idx, width in enumerate(histology_widths):
                                         row.cells[col_idx].width = width
