@@ -643,7 +643,7 @@ html[lang="en"] .compare-summary-range-gender-detail {
 .compare-result-item .compare-histology-table td {
     box-sizing: border-box;
 }
-.compare-result-item .compare-histology-table td:nth-child(2) {
+.compare-result-item .compare-histology-table td:nth-child(1) {
     overflow-wrap: anywhere;
 }
 .compare-result-item .annual-report-table th,

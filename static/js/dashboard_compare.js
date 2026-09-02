@@ -582,9 +582,21 @@
       .join('\n');
   }
 
+  function histologyAxisLabel(value) {
+    const text = String(value ?? '').replace(/\s*\n\s*/g, ' ').trim();
+    // The in-situ suffix is part of the histology name, so keep it on one line.
+    return /[\u3400-\u9fff]/.test(text) || /\(in situ\)$/i.test(text)
+      ? `{right|${text}}`
+      : rightAlignedAxisLabel(text);
+  }
+
   function histologyRowHeight(names) {
-    return window.AnnualReportRenderer.histologyRowHeight(names);
-    const maxLines = Math.max(1, ...names.map(name => axisLabelLines(name).length));
+    const maxLines = Math.max(1, ...(names || []).map(name => {
+      const text = String(name ?? '').replace(/\s*\n\s*/g, ' ').trim();
+      return /[\u3400-\u9fff]/.test(text) || /\(in situ\)$/i.test(text)
+        ? 1
+        : axisLabelLines(text).length;
+    }));
     return Math.max(40, maxLines * 18 + 8);
   }
 
@@ -860,7 +872,7 @@
           const pct = totalCount > 0 ? (Number(item.count || 0) / totalCount * 100).toFixed(1) : '0.0';
           return `
             <tr>
-              <td>${escapeHtml(item.code)}</td>
+
               <td class="text-start">${escapeHtml(item.name)}</td>
               <td>${Number(item.count || 0)}</td>
               <td>${pct}%</td>
@@ -869,11 +881,11 @@
         }).join('') + `
           <tr class="fw-bold" style="background-color: var(--gray-50);">
             <td>${t('total')}</td>
-            <td></td>
+
             <td>${totalCount}</td>
             <td>${validData.length ? '100.0%' : '0.0%'}</td>
           </tr>`
-      : `<tr><td colspan="4" class="text-center">${t('noData')}<br><span class="text-muted small">${noDataReason}</span></td></tr>`;
+      : `<tr><td colspan="3" class="text-center">${t('noData')}<br><span class="text-muted small">${noDataReason}</span></td></tr>`;
 
     const cancer = reportCancerTitle(cancerTitle);
 
@@ -886,17 +898,16 @@
       </div>
       <div data-compare-view-panel="table" class="d-none">
         <div class="annual-report-table-wrap">
-          <table class="annual-report-table compare-histology-table">
+          <table class="annual-report-table annual-histology-table compare-histology-table">
             <caption>${isEnglish() ? `Table. Histological Distribution of ${cancer},\u00a0${yearTitle}` : `表、${yearTitle}年${cancer}組織型態分佈表`}${sourceLine()}</caption>
             <colgroup>
-              <col style="width: 10%;">
-              <col style="width: 75%;">
-              <col style="width: 7.5%;">
-              <col style="width: 7.5%;">
+              <col class="annual-histology-name-col">
+              <col class="annual-histology-count-col">
+              <col class="annual-histology-percent-col">
             </colgroup>
             <thead>
               <tr>
-                <th>${t('icdoCode')}</th>
+
                 <th>${t('histology')}</th>
                 <th>${t('people')}</th>
                 <th>${isEnglish() ? '%' : `${t('percentage')}%`}</th>
@@ -1048,7 +1059,9 @@
       chartEl.style.height = '450px';
       chart.setOption({
         animation: false,
-        title: { text: chartTitle, subtext: t('source'), left: 'center', textStyle: { fontSize: 18, fontWeight: 'bold' } },
+        title: { text: chartTitle, subtext: t('source'), left: 500,
+        right: 60,
+        textAlign: 'center', },
         tooltip: { show: false },
         toolbox: { show: false },
         xAxis: { show: false },
@@ -1076,7 +1089,8 @@
       title: {
         text: chartTitle,
         subtext: t('source'),
-        left: 'center',
+        left: '50%',
+        textAlign: 'center',
         textStyle: { fontSize: 18, fontWeight: 'bold' }
       },
       tooltip: {
@@ -1107,7 +1121,7 @@
           width: 420,
           align: 'right',
           margin: 20,
-          formatter: value => rightAlignedAxisLabel(value),
+          formatter: value => histologyAxisLabel(value),
           rich: {
             right: { width: 420, align: 'right', lineHeight: 18, fontSize: 12 },
             bracket: { width: 420, align: 'right', lineHeight: 18, fontSize: 10.5 }
