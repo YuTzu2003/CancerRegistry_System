@@ -154,14 +154,12 @@
             <table class="annual-report-table annual-histology-table">
               <caption id="annualHistologyCaption">表、XXXX年XX癌組織型態分佈表</caption>
               <colgroup>
-                <col class="annual-histology-code-col">
                 <col class="annual-histology-name-col">
                 <col class="annual-histology-count-col">
                 <col class="annual-histology-percent-col">
               </colgroup>
               <thead>
                 <tr>
-                  <th id="histologyCodeHeader">ICD-O編碼</th>
                   <th id="histologyNameHeader">組織型態</th>
                   <th id="histologyCountHeader">人數</th>
                   <th id="histologyPercentageHeader">百分比%</th>
@@ -368,5 +366,5 @@
 </script>
 <script src="{{ url_for('static', filename='js/dashboard_i18n.js') }}?v=20260828-llm-retry-scope"></script>
 <script src="{{ url_for('static', filename='js/annual_report_renderer.js') }}?v=20260729-common-cancers"></script>
-<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=20260828-llm-three-attempts"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=20260902-histology-summary"></script>
 {% endblock %}
