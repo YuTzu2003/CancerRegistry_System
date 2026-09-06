@@ -2,6 +2,7 @@ import datetime
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from modules.services.db import get_conn
 from modules.services.auth import login_required, admin_required
+from werkzeug.security import generate_password_hash
 
 member_bp = Blueprint('member', __name__, template_folder='templates')
 
@@ -11,7 +12,7 @@ member_bp = Blueprint('member', __name__, template_folder='templates')
 def member():
     conn = get_conn()
     cursor = conn.cursor()
-    cursor.execute("SELECT [ID], [UserID], [Password], [Name], [Position], [Location], [Last_login] FROM [dbo].[Users] ORDER BY UserID")
+    cursor.execute("SELECT [ID], [UserID], [Name], [Position], [Location], [Last_login] FROM [dbo].[Users] ORDER BY UserID")
     columns = [column[0] for column in cursor.description]
     users = [dict(zip(columns, row)) for row in cursor.fetchall()]
     for u in users:
@@ -69,10 +70,17 @@ def admin_save_user():
     conn = get_conn()
     cursor = conn.cursor()
     if user_db_id:
-        cursor.execute("UPDATE [dbo].[Users] SET [UserID]=?, [Password]=?, [Name]=?, [Position]=?, [Location]=? WHERE [ID]=?", (user_id, password, name, position, location, user_db_id))
+        if password:
+            cursor.execute("UPDATE [dbo].[Users] SET [UserID]=?, [Password]=?, [Name]=?, [Position]=?, [Location]=? WHERE [ID]=?", (user_id, generate_password_hash(password), name, position, location, user_db_id))
+        else:
+            cursor.execute("UPDATE [dbo].[Users] SET [UserID]=?, [Name]=?, [Position]=?, [Location]=? WHERE [ID]=?", (user_id, name, position, location, user_db_id))
         flash(f"使用者 {name} 資料已更新", "success")
+    elif not password:
+        conn.close()
+        flash("新增使用者時必須設定密碼", "danger")
+        return redirect(url_for("member.member"))
     else:
-        cursor.execute("INSERT INTO [dbo].[Users] ([UserID], [Password], [Name], [Position], [Location]) VALUES (?, ?, ?, ?, ?)", (user_id, password, name, position, location))
+        cursor.execute("INSERT INTO [dbo].[Users] ([UserID], [Password], [Name], [Position], [Location]) VALUES (?, ?, ?, ?, ?)", (user_id, generate_password_hash(password), name, position, location))
         flash(f"成功新增使用者 {name}", "success")
     conn.commit()
     conn.close()

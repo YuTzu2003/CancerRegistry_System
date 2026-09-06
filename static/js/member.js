@@ -43,7 +43,7 @@ function prepareEditUser(user) {
     document.getElementById('modalTitle').textContent = '編輯帳號資訊';
     document.getElementById('formId').value = user.ID;
     document.getElementById('formUserID').value = user.UserID;
-    document.getElementById('formPassword').value = user.Password;
+    document.getElementById('formPassword').value = '';
     document.getElementById('formName').value = user.Name;
     document.getElementById('formPosition').value = user.Position;
     document.getElementById('formLocation').value = user.Location || '';

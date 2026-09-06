@@ -1,10 +1,8 @@
 {% extends "base.html" %}
 {% block title %}使用者管理｜癌症資料登記{% endblock %}
 {% block page_title %}帳號權限管理{% endblock %}
-
 {% block extra_head %}
 <style>
-    /* Hallmark — modern-minimal app surface; preserves project palette and controls. */
     .member-page { max-width: 1440px; margin: 0 auto; }
     .member-workspace-head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
     .member-workspace-head h1 { margin: 0 0 6px; font-size: 24px; font-weight: 700; letter-spacing: .3px; }
@@ -192,7 +190,7 @@
 
           <div class="mb-3">
             <label for="formPassword" class="form-label fw-bold">密碼(Password) <span class="text-danger">*</span></label>
-            <input type="password" class="form-control" id="formPassword" name="Password" placeholder="請輸入密碼" required>
+            <input type="password" class="form-control" id="formPassword" name="Password" placeholder="新增時必填；編輯時留白表示不變更">
           </div>
 
           <div class="mb-3">

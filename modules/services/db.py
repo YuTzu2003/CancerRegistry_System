@@ -1,18 +1,16 @@
-import pyodbc
 import os
+from sqlalchemy import create_engine
+
+_engine = None
+
+def get_engine():
+    global _engine
+    if _engine is None:
+        db_uri = os.environ.get("SQLALCHEMY_DATABASE_URI")
+        if not db_uri:
+            raise ValueError("環境變數 SQLALCHEMY_DATABASE_URI 未設定")
+        _engine = create_engine(db_uri, pool_pre_ping=True)
+    return _engine
 
 def get_conn():
-    server = os.environ.get("DB_SERVER")
-    port = os.environ.get("DB_PORT")
-    database = os.environ.get("DB_NAME")
-    uid = os.environ.get("DB_USER")
-    pwd = os.environ.get("DB_PASSWORD")
-
-    return pyodbc.connect(
-        'DRIVER={ODBC Driver 17 for SQL Server};'
-        f'SERVER={server};'
-        f'port={port};' 
-        f'DATABASE={database};'
-        f'UID={uid};'           
-        f'PWD={pwd};'      
-        'TrustServerCertificate=yes;')
+    return get_engine().raw_connection()

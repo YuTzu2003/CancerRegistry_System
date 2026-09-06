@@ -2,6 +2,7 @@ from flask import Flask,render_template,session
 import os
 import logging
 import sys
+from datetime import timedelta
 from dotenv import load_dotenv
 from modules.services import auth_bp, login_required, history_bp, clean_bp, data_gen_bp, dashboard_bp
 from modules.services.db import get_conn
@@ -22,7 +23,15 @@ werkzeug_logger.propagate = True
 
 app = Flask(__name__)
 app.jinja_loader = jinja2.ChoiceLoader([jinja2.FileSystemLoader('modules/blueprint/templates'),jinja2.FileSystemLoader('templates')])
-app.secret_key = "your_secret_key"
+secret_key = os.environ.get("SECRET_KEY")
+if not secret_key:
+    raise RuntimeError("環境變數 SECRET_KEY 未設定")
+app.secret_key = secret_key
+app.config.update(
+    PERMANENT_SESSION_LIFETIME=timedelta(hours=8),
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+)
 app.register_blueprint(auth_bp)
 app.register_blueprint(member_bp)
 app.register_blueprint(history_bp)
