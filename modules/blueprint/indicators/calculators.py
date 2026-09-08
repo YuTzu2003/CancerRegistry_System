@@ -9,7 +9,7 @@ import re
 
 import pandas as pd
 
-from modules.blueprint.indicators.rules import _clean_code
+from modules.blueprint.indicators.exclusion_rules import _clean_code
 
 
 def number_value(frame, column):
