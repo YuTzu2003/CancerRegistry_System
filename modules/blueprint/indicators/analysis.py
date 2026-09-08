@@ -52,7 +52,7 @@ def run_indicators_analysis(frame, cancers, year_start, year_end):
             reports.append({"cancer_key": cancer_key, "input_count": int(len(cancer_cases)), "indicators": [], "message": "此癌別尚未設定監測指標定義。"})
             continue
 
-        # All current oral definitions use hospital self-reported registry fields.
+        # Cancer-specific definitions identify whether shared exclusions apply.
         included_cases, audit_cases, global_summary = apply_global_indicators_exclusions(
             cancer_cases, is_hospital_self_reported=True
         )
