@@ -71,7 +71,7 @@ def _get_mapping_columns():
     conn = get_conn()
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT TOP 0 * FROM dbo.histology_code_mapping")
+        cursor.execute("SELECT TOP 0 * FROM dbo.Histology_code_mapping")
         return [column[0] for column in cursor.description]
     finally:
         conn.close()
@@ -80,7 +80,7 @@ def _get_mapping_data(search_column="", search_query="", selected_year="", user_
     conn = get_conn()
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM dbo.histology_code_mapping")
+        cursor.execute("SELECT * FROM dbo.Histology_code_mapping")
         columns = [column[0] for column in cursor.description]
         primary_key = _primary_key(columns)
         rows = {str(row[columns.index(primary_key)]): dict(zip(columns, row)) for row in cursor.fetchall()}
@@ -280,17 +280,17 @@ def apply_histology_changes(cursor, changes, columns):
     for change in changes:
         record_id = draft_ids.get(str(change["record_id"]), change["record_id"])
         if change["action"] == "Create":
-            cursor.execute(f"INSERT INTO dbo.histology_code_mapping ({fields}) OUTPUT INSERTED.{_quote_identifier(primary_key)} VALUES ({placeholders})", *(change["after"].get(column) for column in editable_columns))
+            cursor.execute(f"INSERT INTO dbo.Histology_code_mapping ({fields}) OUTPUT INSERTED.{_quote_identifier(primary_key)} VALUES ({placeholders})", *(change["after"].get(column) for column in editable_columns))
             actual_id = cursor.fetchone()[0]
             draft_ids[str(change["record_id"])] = actual_id
             change["record_id"] = actual_id
         elif change["action"] == "Update":
-            cursor.execute(f"UPDATE dbo.histology_code_mapping SET {assignments} WHERE {_quote_identifier(primary_key)} = ?", *(change["after"].get(column) for column in editable_columns), record_id)
+            cursor.execute(f"UPDATE dbo.Histology_code_mapping SET {assignments} WHERE {_quote_identifier(primary_key)} = ?", *(change["after"].get(column) for column in editable_columns), record_id)
             if cursor.rowcount != 1:
                 raise ValueError("找不到要修改的組織型態資料。")
             change["record_id"] = record_id
         else:
-            cursor.execute(f"DELETE FROM dbo.histology_code_mapping WHERE {_quote_identifier(primary_key)} = ?", record_id)
+            cursor.execute(f"DELETE FROM dbo.Histology_code_mapping WHERE {_quote_identifier(primary_key)} = ?", record_id)
             if cursor.rowcount != 1:
                 raise ValueError("找不到要刪除的組織型態資料。")
             change["record_id"] = record_id
@@ -350,7 +350,7 @@ def restore_histology_code_timeline(version_id):
             changes.extend(reversed(commit_changes("histology_code", commit_id)))
         changes = [normalize_change(change, editable_columns) for change in changes]
         for change in changes:
-            cursor.execute(f"SELECT {', '.join(_quote_identifier(column) for column in editable_columns)} FROM dbo.histology_code_mapping WHERE {_quote_identifier(primary_key)} = ?", change["HistCodeId"])
+            cursor.execute(f"SELECT {', '.join(_quote_identifier(column) for column in editable_columns)} FROM dbo.Histology_code_mapping WHERE {_quote_identifier(primary_key)} = ?", change["HistCodeId"])
             current = cursor.fetchone()
             after = {column: change.get(f"After{column}") for column in editable_columns}
             if (change["Action"] in ("Create", "Update") and (not current or not mapping_values_match(editable_columns, dict(zip(editable_columns, current)), after)) ) or (change["Action"] == "Delete" and current):
@@ -372,7 +372,7 @@ def restore_histology_code_timeline(version_id):
         flash("回到指定時間點失敗，資料未變更。", "danger")
     finally:
         conn.close()
-    return redirect(url_for("auth.histology_code_mapping", draft="1"))
+    return redirect(url_for("auth.Histology_code_mapping", draft="1"))
 
 
 @auth_bp.route("/dashboard/histology-code/versions/<version_id>/preview")
