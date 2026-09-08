@@ -384,8 +384,8 @@
       fieldEmpty.hidden = true;
       $('#analysisByField tbody').innerHTML = byField.map(r => `
         <tr>
-          <td>${r.name}</td>
-          <td><span class="badge-soft gray">${r.format || '—'}</span></td>
+          <td>${escapeHtml(r.name)}</td>
+          <td><span class="badge-soft gray">${escapeHtml(r.format || '—')}</span></td>
           <td style="text-align:right;">${r.errors ?? 0}</td>
         </tr>`).join('');
     }
@@ -606,9 +606,9 @@
         if (info && data.mapped && data.mapped.length > 0) {
           info.innerHTML = data.mapped.map(f => `
             <div class="d-flex justify-content-between mb-1">
-              <span>${f.label}</span>
+              <span>${escapeHtml(f.label)}</span>
               <i class="bi bi-arrow-right mx-2 text-muted"></i>
-              <span class="text-primary">${f.target}</span>
+              <span class="text-primary">${escapeHtml(f.target)}</span>
             </div>`).join('');
         } else if (info) {
           info.innerHTML = '<span class="text-muted">體系無匹配欄位</span>';
@@ -618,7 +618,7 @@
         if (data.unmapped && data.unmapped.length > 0) {
           list.innerHTML = data.unmapped.map(f => `
             <label class="field-chip">
-              <input type="checkbox" value="${f.key}" checked />${f.label}
+              <input type="checkbox" value="${escapeHtml(f.key)}" checked />${escapeHtml(f.label)}
             </label>`).join('');
           
           $$('#outputFieldList .field-chip input').forEach(cb => {
@@ -743,8 +743,8 @@
         const thead = $('#previewThead');
         const tbody = $('#previewTbody');
         
-        thead.innerHTML = data.headers.map(h => `<th>${h}</th>`).join('');
-        tbody.innerHTML = data.data.map(row => `<tr>${row.map(val => `<td>${val}</td>`).join('')}</tr>`).join('');
+        thead.innerHTML = data.headers.map(h => `<th>${escapeHtml(h)}</th>`).join('');
+        tbody.innerHTML = data.data.map(row => `<tr>${row.map(val => `<td>${escapeHtml(val)}</td>`).join('')}</tr>`).join('');
         $('#previewModal').removeAttribute('hidden');
       } 
       else {

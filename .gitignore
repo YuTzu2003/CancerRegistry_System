@@ -6,6 +6,8 @@ dist/
 wheels/
 other/
 Jobs/
+.codex/
+.hallmark/
 *.egg-info
 
 # Virtual environments

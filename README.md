@@ -27,6 +27,9 @@ playwright install chromium
 ```env
 # Flask設定
 FLASK_PORT=5000
+FLASK_HOST=127.0.0.1
+# 正式 HTTPS 環境請設為 true；本機 HTTP 開發維持 false。
+SESSION_COOKIE_SECURE=false
 
 # SQL Server 資料庫連接設定
 DB_SERVER=127.0.0.1

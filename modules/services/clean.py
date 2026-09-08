@@ -8,14 +8,14 @@ clean_bp = Blueprint('clean', __name__, template_folder='../blueprint/clean/temp
 @login_required
 def api_categorize_fields():
     data = request.json
-    res, status = categorize_fields_logic(data.get("job_id"), data.get("scheme"))
+    res, status = categorize_fields_logic(data.get("job_id"), session.get("id"), data.get("scheme"))
     return jsonify(res), status
 
 @clean_bp.route("/api/export", methods=["POST"])
 @login_required
 def api_export():
     data = request.json
-    res, status = export_logic(data.get("job_id"), data.get("scheme"), data.get("fields", []))
+    res, status = export_logic(data.get("job_id"), session.get("id"), data.get("scheme"), data.get("fields", []))
     if res.get("send_file"):
         resp = send_file(res["path"], as_attachment=True, download_name=res["download_name"])
         resp.headers['Access-Control-Expose-Headers'] = 'Content-Disposition'
@@ -26,7 +26,7 @@ def api_export():
 @login_required
 def api_preview():
     data = request.json
-    res, status = preview_logic(data.get("job_id"), data.get("scheme"), data.get("fields", []))
+    res, status = preview_logic(data.get("job_id"), session.get("id"), data.get("scheme"), data.get("fields", []))
     return jsonify(res), status
 
 @clean_bp.route("/clean")
@@ -67,14 +67,14 @@ def api_clean():
 @login_required
 def api_date_errors():
     data = request.get_json(silent=True) or {}
-    res, status = get_date_errors_logic(data.get("job_id"))
+    res, status = get_date_errors_logic(data.get("job_id"), session.get("id"))
     return jsonify(res), status
 
 @clean_bp.route("/api/date_errors/update", methods=["POST"])
 @login_required
 def api_update_date_error():
     data = request.get_json(silent=True) or {}
-    res, status = update_date_error_logic(data.get("job_id"), data.get("row_index"), data.get("updates"))
+    res, status = update_date_error_logic(data.get("job_id"), session.get("id"), data.get("row_index"), data.get("updates"))
     return jsonify(res), status
 
 @clean_bp.route("/api/download_temp/<file_type>/<temp_id>/<filename>")
@@ -88,7 +88,7 @@ def download_temp_file(file_type, temp_id, filename):
 @clean_bp.route("/api/download/<file_type>/<job_id>")
 @login_required
 def download_file(file_type, job_id):
-    res, status = download_file_logic(file_type, job_id)
+    res, status = download_file_logic(file_type, job_id, session.get("id"))
     if res.get("send_file"):
         return send_file(res["path"], as_attachment=True, download_name=res["download_name"])
     return jsonify(res), status

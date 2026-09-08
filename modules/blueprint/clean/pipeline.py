@@ -130,26 +130,15 @@ def _resolve_source_row_index(date_error_file, row_index):
     return row_index
 
 
-def _load_job(job_id):
+def _load_job(job_id, user_id):
     conn = get_conn()
     cursor = conn.cursor()
 
-    cursor.execute("""
-        SELECT 
-            Job.Path,
-            Job.FileName,
-            DataFormat.FmtName,
-            DataFormat.Version,
-            DataFormat.Revision_date
-        FROM [Job]
-        JOIN [DataFormat]
-            ON Job.FmtID = DataFormat.FmtID
-        WHERE Job.JobID = ?
-    """, (job_id,))
-
+    cursor.execute("""SELECT Job.Path,Job.FileName,DataFormat.FmtName,DataFormat.Version,DataFormat.Revision_date FROM [Job]
+                        JOIN [DataFormat] ON Job.FmtID = DataFormat.FmtID
+                        WHERE Job.JobID = ? AND Job.UserID = ?""", (job_id, user_id))
     row = cursor.fetchone()
     conn.close()
-
     return row
 
 
@@ -455,19 +444,15 @@ def parse_fixed_width_line(line_text, spec):
     return parsed_row
 
 
-def categorize_fields_logic(job_id, scheme):
+def categorize_fields_logic(job_id, user_id, scheme):
     if not job_id or not scheme:
-        return {"ok": False, "error": "參數不足"}, 400
+        return {"ok": False, "error": "發生錯誤"}, 400
 
-    conn = get_conn()
-    cursor = conn.cursor()
-    cursor.execute("SELECT Job.Path, Job.FileName, DataFormat.FmtName FROM [Job] JOIN [DataFormat] ON Job.FmtID = DataFormat.FmtID WHERE Job.JobID=?", (job_id,))
-    row = cursor.fetchone()
-    conn.close()
+    row = _load_job(job_id, user_id)
     if not row:
         return {"ok": False, "error": "找不到該紀錄"}, 404
 
-    project_path, original_filename, fmt_name = row
+    project_path, original_filename, fmt_name, *_ = row
     base_name, _ = os.path.splitext(original_filename)
     cleaned_file = os.path.join(project_path, f"fmt{fmt_name}_{base_name}_Clean.xlsx")
 
@@ -553,17 +538,13 @@ def categorize_fields_logic(job_id, scheme):
     except Exception as e:
         return {"ok": False, "error": str(e)}, 500
 
-def export_logic(job_id, scheme, selected_fields):
-    conn = get_conn()
-    cursor = conn.cursor()
-    cursor.execute("SELECT Job.Path, Job.FileName, DataFormat.FmtName FROM [Job] JOIN [DataFormat] ON Job.FmtID = DataFormat.FmtID WHERE Job.JobID=?", (job_id,))
-    row = cursor.fetchone()
-    conn.close()
+def export_logic(job_id, user_id, scheme, selected_fields):
+    row = _load_job(job_id, user_id)
 
     if not row:
         return {"ok": False, "error": "找不到該紀錄"}, 404
 
-    project_path, original_filename, fmt_name = row
+    project_path, original_filename, fmt_name, *_ = row
     base_name, _ = os.path.splitext(original_filename)
     cleaned_file = os.path.join(project_path, f"fmt{fmt_name}_{base_name}_Clean.xlsx")
 
@@ -715,14 +696,13 @@ def export_logic(job_id, scheme, selected_fields):
     except Exception as e:
         return {"ok": False, "error": str(e)}, 500
 
-def preview_logic(job_id, scheme, selected_fields):
-    conn = get_conn()
-    cursor = conn.cursor()
-    cursor.execute("SELECT Job.Path, Job.FileName, DataFormat.FmtName FROM [Job] JOIN [DataFormat] ON Job.FmtID = DataFormat.FmtID WHERE Job.JobID=?", (job_id,))
-    row = cursor.fetchone()
-    conn.close()
+def preview_logic(job_id, user_id, scheme, selected_fields):
+    row = _load_job(job_id, user_id)
 
-    project_path, original_filename, fmt_name = row
+    if not row:
+        return {"ok": False, "error": "找不到該紀錄"}, 404
+
+    project_path, original_filename, fmt_name, *_ = row
     base_name, _ = os.path.splitext(original_filename)
     cleaned_file = os.path.join(project_path, f"fmt{fmt_name}_{base_name}_Clean.xlsx")
 
@@ -1124,11 +1104,11 @@ def clean_job_logic(user_id, format_id, convert_txt_flag, uploaded_file):
     }, 200
 
 
-def get_date_errors_logic(job_id):
+def get_date_errors_logic(job_id, user_id):
     if not job_id:
         return {"ok": False, "error": "缺少 job_id"}, 400
 
-    row = _load_job(job_id)
+    row = _load_job(job_id, user_id)
 
     if not row:
         return {"ok": False, "error": "找不到該紀錄"}, 404
@@ -1156,14 +1136,14 @@ def get_date_errors_logic(job_id):
         "date_error_limit": DATE_ERROR_LIMIT
     }, 200
 
-def update_date_error_logic(job_id, row_index, updates):
+def update_date_error_logic(job_id, user_id, row_index, updates):
     if not job_id:
         return {"ok": False, "error": "缺少 job_id"}, 400
 
     if row_index is None or not isinstance(updates, dict) or not updates:
         return {"ok": False, "error": "缺少修正資料"}, 400
 
-    row = _load_job(job_id)
+    row = _load_job(job_id, user_id)
     if not row:
         return {"ok": False, "error": "找不到該紀錄"}, 404
 
@@ -1194,13 +1174,14 @@ def update_date_error_logic(job_id, row_index, updates):
 
         conn = get_conn()
         cursor = conn.cursor()
-        cursor.execute("UPDATE [Job] SET TotalCount = ?,CompletenessScore = ?,CorrectScore = ?,ConsistencyScore = ?,DQI = ?WHERE JobID = ?", (
+        cursor.execute("UPDATE [Job] SET TotalCount = ?,CompletenessScore = ?,CorrectScore = ?,ConsistencyScore = ?,DQI = ? WHERE JobID = ? AND UserID = ?", (
             int(stats["total"]),
             float(stats["completeness"]),
             float(stats["correctness"]),
             float(stats["consistency"]),
             float(stats["quality_score"]),
-            job_id
+            job_id,
+            user_id
         ))
         conn.commit()
         conn.close()
@@ -1250,14 +1231,11 @@ def download_temp_file_logic(file_type, temp_id, filename):
     except Exception as e:
         return {"ok": False, "error": str(e)}, 500
 
-def download_file_logic(file_type, job_id):
+def download_file_logic(file_type, job_id, user_id):
     try:
-        conn = get_conn()
-        cursor = conn.cursor()
-        cursor.execute("SELECT Job.Path, Job.FileName, DataFormat.FmtName FROM [Job] JOIN [DataFormat] ON Job.FmtID = DataFormat.FmtID WHERE Job.JobID=?", (job_id,))
-        row = cursor.fetchone()
+        row = _load_job(job_id, user_id)
         if not row: return {"ok": False, "error": "找不到該紀錄"}, 404
-        project_path, original_filename, fmt_name = row
+        project_path, original_filename, fmt_name, *_ = row
         base_name, _ = os.path.splitext(original_filename)
         
         display_name = None
@@ -1277,7 +1255,6 @@ def download_file_logic(file_type, job_id):
             return {"ok": False, "error": "無效的下載類型"}, 400
 
         file_path = os.path.join(project_path, target_filename)
-        conn.close()
         if not os.path.exists(file_path): 
             return {"ok": False, "error": "檔案不存在"}, 404
             

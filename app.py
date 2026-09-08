@@ -27,11 +27,7 @@ secret_key = os.environ.get("SECRET_KEY")
 if not secret_key:
     raise RuntimeError("環境變數 SECRET_KEY 未設定")
 app.secret_key = secret_key
-app.config.update(
-    PERMANENT_SESSION_LIFETIME=timedelta(hours=8),
-    SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SAMESITE="Lax",
-)
+app.config.update(PERMANENT_SESSION_LIFETIME=timedelta(hours=8),SESSION_COOKIE_HTTPONLY=True,SESSION_COOKIE_SAMESITE="Lax",SESSION_COOKIE_SECURE=os.environ.get("SESSION_COOKIE_SECURE", "false").lower() == "true",)
 app.register_blueprint(auth_bp)
 app.register_blueprint(member_bp)
 app.register_blueprint(history_bp)
@@ -115,4 +111,5 @@ def index():
 
 if __name__ == "__main__":
     flask_port = int(os.environ.get("FLASK_PORT"))
-    app.run(host="0.0.0.0", port=flask_port, debug=True)
+    flask_host = os.environ.get("FLASK_HOST", "127.0.0.1")
+    app.run(host=flask_host, port=flask_port, debug=True)

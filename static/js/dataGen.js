@@ -70,13 +70,17 @@ fileInput.onchange = async (e) => {
 function renderFixedFields(analyzedColumns) {
     const dateGrid = document.getElementById('dateFields');
     const specialGrid = document.getElementById('specialFields');
-    
-    const dateHtml = analyzedColumns.map(col => `
-        <label class="field-chip ${col.is_date ? 'selected' : ''}">
-            <input type="checkbox" value="${col.name}" ${col.is_date ? 'checked' : ''}> ${col.name}
-        </label>
-    `).join('');
-    dateGrid.innerHTML = dateHtml;
+
+    dateGrid.replaceChildren(...analyzedColumns.map(col => {
+        const label = document.createElement('label');
+        label.className = `field-chip${col.is_date ? ' selected' : ''}`;
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.value = col.name;
+        input.checked = col.is_date;
+        label.append(input, document.createTextNode(` ${col.name}`));
+        return label;
+    }));
 
     const specialRules = [
         { key: 'cno', label: '病歷號', hint: '轉為TEST+編號' },
@@ -124,12 +128,17 @@ function renderExtraFields(analyzedColumns, selectedScheme) {
     if (extraCols.length === 0) {
         outputFieldList.innerHTML = '<span class="text-muted small">所有欄位皆已正確匹配，無額外欄位。</span>';
     } else {
-        const extraHtml = extraCols.map(col => `
-            <label class="field-chip selected">
-                <input type="checkbox" class="extra-field-checkbox" value="${col.name}" checked> ${col.name}
-            </label>
-        `).join('');
-        outputFieldList.innerHTML = extraHtml;
+        outputFieldList.replaceChildren(...extraCols.map(col => {
+            const label = document.createElement('label');
+            label.className = 'field-chip selected';
+            const input = document.createElement('input');
+            input.type = 'checkbox';
+            input.className = 'extra-field-checkbox';
+            input.value = col.name;
+            input.checked = true;
+            label.append(input, document.createTextNode(` ${col.name}`));
+            return label;
+        }));
     }
 
     outputFieldList.querySelectorAll('input').forEach(cb => {
@@ -193,15 +202,31 @@ function renderPreview(data, headers) {
     if (!headers) {
         headers = Object.keys(data[0]);
     }
-    thead.innerHTML = '<th>#</th>' + headers.map(h => `<th>${h}</th>`).join('');
-    
-    // 資料列
-    tbody.innerHTML = data.map((row, idx) => {
-        return `<tr>
-            <td>${idx + 1}</td>
-            ${headers.map(h => `<td>${row[h] || ''}</td>`).join('')}
-        </tr>`;
-    }).join('');
+    const headerRow = document.createDocumentFragment();
+    const indexHeader = document.createElement('th');
+    indexHeader.textContent = '#';
+    headerRow.append(indexHeader);
+    headers.forEach(header => {
+        const cell = document.createElement('th');
+        cell.textContent = header;
+        headerRow.append(cell);
+    });
+    thead.replaceChildren(headerRow);
+
+    const rows = document.createDocumentFragment();
+    data.forEach((row, idx) => {
+        const tr = document.createElement('tr');
+        const indexCell = document.createElement('td');
+        indexCell.textContent = idx + 1;
+        tr.append(indexCell);
+        headers.forEach(header => {
+            const cell = document.createElement('td');
+            cell.textContent = row[header] ?? '';
+            tr.append(cell);
+        });
+        rows.append(tr);
+    });
+    tbody.replaceChildren(rows);
 }
 
 function downloadResult() {
