@@ -3,7 +3,7 @@ import os
 import logging
 import sys
 from dotenv import load_dotenv
-from modules.services import auth_bp, login_required, history_bp, clean_bp, data_gen_bp, dashboard_bp
+from modules.services import auth_bp, login_required, history_bp, clean_bp, data_gen_bp, dashboard_bp, indicators_bp
 from modules.services.db import get_conn
 import modules.blueprint.auth.key_access
 import modules.blueprint.auth.histology_code
@@ -29,6 +29,7 @@ app.register_blueprint(history_bp)
 app.register_blueprint(clean_bp)
 app.register_blueprint(data_gen_bp)
 app.register_blueprint(dashboard_bp)
+app.register_blueprint(indicators_bp)
 app.register_blueprint(key_application_bp)
 app.register_blueprint(key_approval_bp)
 
@@ -52,6 +53,7 @@ def inject_nav():
             {"endpoint":"dashboard.compare","title":"年度比較","icon":"bi-columns-gap"},
             {"endpoint":"auth.data_update_access","title":"資料維護","icon":"bi-database-gear"}
         ]},
+        {"endpoint":"indicators.indicators","title":"監測指標","icon":"bi-clipboard2-pulse"},
     ]
     if session.get("position") == "Admin":
         # NAV_ITEMS.append({"endpoint":"rag_config", "title": "RAG知識庫", "icon": "bi-robot"})
