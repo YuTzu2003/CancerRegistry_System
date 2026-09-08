@@ -52,7 +52,7 @@ def _load_field_map(connection_factory):
         cursor.execute("""
             SELECT [序號], [中文欄位名稱], [英文欄位名稱], [台大雲林欄位名稱],
                    [台大體系醫整庫欄位名稱], [台灣癌症登記中心], [雲醫癌AI模組]
-            FROM [Hospital_data].[dbo].[CancerRegistry_FieldMap]
+            FROM [CancerRegistry_FieldMap]
         """)
         rows = []
         for row in cursor.fetchall():

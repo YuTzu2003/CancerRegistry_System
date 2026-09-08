@@ -14,7 +14,7 @@ data_gen_bp = Blueprint('data_gen', __name__, template_folder='../blueprint/data
 def dataGen():
     conn = get_conn()
     cursor = conn.cursor()
-    cursor.execute("SELECT FmtID, FmtName, Version FROM [Hospital_data].[dbo].[DataFormat] ORDER BY FmtName ASC")
+    cursor.execute("SELECT FmtID, FmtName, Version FROM [DataFormat] ORDER BY FmtName ASC")
     rows = cursor.fetchall()
     formats = [{"id": str(r[0]), "name": str(r[1]), "version": str(r[2])} for r in rows]
     conn.close()

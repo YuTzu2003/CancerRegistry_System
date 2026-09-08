@@ -85,7 +85,7 @@ def index():
     try:
         conn = get_conn()
         cursor = conn.cursor()
-        cursor.execute("SELECT SUM(TotalCount) as Sum_TotalCount ,avg(CompletenessScore) as Avg_CompletenessScore FROM [Hospital_data].[dbo].[Job];")
+        cursor.execute("SELECT SUM(TotalCount) as Sum_TotalCount ,avg(CompletenessScore) as Avg_CompletenessScore FROM [Job];")
         row = cursor.fetchone()
         stats = {
             "sum_total_count": f"{int(getattr(row,'Sum_TotalCount',0) or 0):,}",

@@ -76,7 +76,7 @@ def get_chart_insight_logic(data):
             conn = get_conn()
             cursor = conn.cursor()
             placeholders = ','.join(['?'] * len(fields))
-            query = f"""SELECT [中文欄位名稱], [define] FROM [Hospital_data].[dbo].[CancerRegistry_FieldMap] WHERE [中文欄位名稱] IN ({placeholders})"""
+            query = f"""SELECT [中文欄位名稱], [define] FROM [CancerRegistry_FieldMap] WHERE [中文欄位名稱] IN ({placeholders})"""
             cursor.execute(query, fields)
             rows = cursor.fetchall()
             for row in rows:

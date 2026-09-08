@@ -372,7 +372,7 @@ def load_period_codes():
     conn = get_conn()
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT site, hist, ostage, label, stage_value, stage_detail, stage_detail_hide FROM [Hospital_data].[dbo].[Period_Code]")
+        cursor.execute("SELECT site, hist, ostage, label, stage_value, stage_detail, stage_detail_hide FROM [Period_Code]")
         return pd.DataFrame.from_records(cursor.fetchall(), columns=[column[0] for column in cursor.description])
     finally:
         conn.close()
