@@ -9,14 +9,14 @@ from typing import Any
 
 ORAL_CANCER_RULES: dict[int, dict[str, Any]] = {
     1: {
-        "name": "口腔癌病人手術後6週內開始輔助治療的比率",
+        "name": "口腔癌病人手術後 6 週內開始輔助治療（放射治療或化學放射治療)的比率。",
         "type": "positive",
         "denominator": {
             "op": "all",
             "rules": [
                 {"op": "between", "field": "surgery_code", "min": 30, "max": 90},
                 {"op": "valid_date", "field": "surgery_date"},
-                # 依目前表格的新增條件：放射治療開始日期不得為 00000000。
+                # 放射治療開始日期不得為 00000000。
                 {"op": "valid_date", "field": "radiation_date"},
                 {
                     "op": "any",
@@ -164,13 +164,11 @@ ORAL_CANCER_RULES: dict[int, dict[str, Any]] = {
     },
 }
 
+
 """食道癌品質指標
 注意：surgical_margin 等欄位包含英文字母，因此使用文字型運算子
 """
 
-from __future__ import annotations
-
-from typing import Any
 
 ESOPHAGEAL_CANCER_RULES: dict[int, dict[str, Any]] = {
     1: {
