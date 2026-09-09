@@ -6,7 +6,7 @@ import pandas as pd
 from modules.blueprint.dashboard.definition.cancer_grouping import classify_cancer_group
 from modules.blueprint.dashboard.definition.cancer_group_rules import CANCER_GROUP_RULES
 from modules.blueprint.indicators.indicator_definitions import get_indicator_definitions
-from modules.blueprint.indicators.rules import _clean_code, _date_key, _find_column, apply_global_indicators_exclusions
+from modules.blueprint.indicators.exclusion_rules import _clean_code, _date_key, _find_column, apply_global_indicators_exclusions
 
 
 def _cancer_mask(frame, cancer_key):

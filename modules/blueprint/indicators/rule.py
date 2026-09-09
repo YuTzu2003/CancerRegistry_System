@@ -10,12 +10,10 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any
 
-from indicators import INDICATOR_RULES
-
 Record = dict[str, Any]
 RuleConfig = dict[str, Any]
 
-INVALID_DATE_VALUES = {"", "00000000", None}
+INVALID_DATE_VALUES = {"", "00000000", "88888888", "99999999", None}
 
 
 # ---------------------------------------------------------------------------
@@ -23,27 +21,33 @@ INVALID_DATE_VALUES = {"", "00000000", None}
 # ---------------------------------------------------------------------------
 
 def to_int(value: Any) -> int | None:
-    """安全轉換整數，例如 '040' 轉成 40。"""
+    """安全轉換整數，例如 '040' 或 Excel 的 40.0 都轉成 40。"""
     if value is None:
         return None
     text = str(value).strip()
     if not text:
         return None
     try:
-        return int(text)
+        number = float(text)
+        return int(number) if number.is_integer() else None
     except (TypeError, ValueError):
         return None
 
 
 def parse_date(value: Any) -> date | None:
-    """將 YYYYMMDD 轉成日期；空值、00000000 或錯誤日期回傳 None。"""
+    """接受 YYYYMMDD、YYYY/MM/DD、YYYY-MM-DD 及 Excel 日期物件。"""
     if value is None:
         return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
     text = str(value).strip()
-    if text in INVALID_DATE_VALUES:
+    digits = "".join(character for character in text if character.isdigit())
+    if digits in INVALID_DATE_VALUES or len(digits) != 8:
         return None
     try:
-        return datetime.strptime(text, "%Y%m%d").date()
+        return datetime.strptime(digits, "%Y%m%d").date()
     except ValueError:
         return None
 
@@ -64,54 +68,67 @@ def evaluate_rule(record: Record, rule: RuleConfig) -> bool:
     """遞迴解讀一個規則設定。"""
     operation = rule.get("op")
 
+    #全部都要成立，相當於「且」
     if operation == "all":
         return all(evaluate_rule(record, item) for item in rule["rules"])
 
+    #至少一條成立即可，相當於「或」
     if operation == "any":
         return any(evaluate_rule(record, item) for item in rule["rules"])
 
+    #數字完全相等
     if operation == "equals":
         return to_int(record.get(rule["field"])) == to_int(rule["value"])
 
+    #文字完全相等，不分大小寫
     if operation == "text_equals":
         return normalize_text(record.get(rule["field"])) == normalize_text(rule["value"])
 
+    #文字屬於清單之一
     if operation == "text_in":
         value = normalize_text(record.get(rule["field"]))
         allowed = {normalize_text(item) for item in rule["values"]}
         return value is not None and value in allowed
 
+    #文字不屬於清單
     if operation == "text_not_in":
         value = normalize_text(record.get(rule["field"]))
         excluded = {normalize_text(item) for item in rule["values"]}
         return value is not None and value not in excluded
 
+    #文字第一碼在清單中
     if operation == "first_char_in":
         value = normalize_text(record.get(rule["field"]))
         allowed = {normalize_text(item) for item in rule["values"]}
         return value is not None and value[0] in allowed
 
+    #數字介於範圍內，含上下限
     if operation == "between":
         value = to_int(record.get(rule["field"]))
         return value is not None and rule["min"] <= value <= rule["max"]
 
+    #數字大於某值
     if operation == "greater_than":
         value = to_int(record.get(rule["field"]))
         return value is not None and value > rule["value"]
 
+    #數字不在排除清單
     if operation == "not_in":
         value = to_int(record.get(rule["field"]))
         excluded = {to_int(item) for item in rule["values"]}
         return value is not None and value not in excluded
 
+    #欄位是可用日期
     if operation == "valid_date":
         return parse_date(record.get(rule["field"])) is not None
 
+    #後一日期嚴格晚於前一日期
     if operation == "date_after":
         start_date = parse_date(record.get(rule["start_field"]))
         end_date = parse_date(record.get(rule["end_field"]))
         return start_date is not None and end_date is not None and end_date > start_date
 
+    #兩日期相差落在範圍內
     if operation == "date_interval":
         start_date = parse_date(record.get(rule["start_field"]))
         end_date = parse_date(record.get(rule["end_field"]))
@@ -120,6 +137,7 @@ def evaluate_rule(record: Record, rule: RuleConfig) -> bool:
         days = (end_date - start_date).days
         return rule["min_days"] <= days <= rule["max_days"]
 
+    #多個日期中找某基準日之後最早者
     if operation == "earliest_after_within":
         reference_date = parse_date(record.get(rule["reference_field"]))
         if reference_date is None:
@@ -137,6 +155,7 @@ def evaluate_rule(record: Record, rule: RuleConfig) -> bool:
         days = (min(candidate_dates) - reference_date).days
         return rule["min_days"] <= days <= rule["max_days"]
 
+    #多個起始日中取最早者，再計算到結束日
     if operation == "earliest_date_interval":
         start_dates = [
             parsed
