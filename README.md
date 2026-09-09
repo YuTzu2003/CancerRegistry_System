@@ -1,58 +1,71 @@
-## 癌症登記資料管理平台
-是一個專為醫療機構設計的癌症登記資料管理系統，透過自動化的資料清洗、年報分析與版本控制，提升申報品質與效率。
+# 癌症登記資料管理平台
 
----
+以 Flask 與 SQL Server 建置的癌症登記資料處理、資料清洗與分析系統。
 
-### 1. 環境建置與安裝指南
+## 系統需求
 
-請開啟終端機 (Terminal / PowerShell) 並執行以下指令：
-```bash
+- Python 3.12 以上
+- [uv](https://docs.astral.sh/uv/)
+- SQL Server 與 ODBC Driver 17 或 18
+- 正式環境另需 IIS、IIS URL Rewrite 2.1 與 IIS ARR 3.0
+
+## 本機開發
+
+```powershell
 git clone https://github.com/YuTzu2003/CancerRegistry_System.git
-cd CancerRegistry_System
-
-# 使用uv建立虛擬環境
+Set-Location CancerRegistry_System
 uv sync
-playwright install chromium
+Copy-Item .env.example .env
 ```
 
-### 2. 資料庫還原配置
-系統預設資料需透過還原備份檔來建立：
-1. 開啟 **SQL Server Management Studio (SSMS)**。
-2. 找到本專案資料夾下的 `data/Hospital_data.bak` 備份檔。
-3. 確認登入的 SQL 使用者帳號擁有讀寫該資料庫的完整權限。
+設定 `.env` 的 `SQLALCHEMY_DATABASE_URI` 與 `SECRET_KEY` 後，以 Flask 開發模式啟動：
 
-### 3. 環境變數設定 (`.env`)
-請在專案根目錄下建立一個名為 `.env` 的純文字檔案，並填入以下系統設定（請依據您的實際MSSQL帳密與語言模型選擇進行修改）：
-
-```env
-# Flask設定
-FLASK_PORT=5000
-FLASK_HOST=127.0.0.1
-# 正式 HTTPS 環境請設為 true；本機 HTTP 開發維持 false。
-SESSION_COOKIE_SECURE=false
-
-# SQL Server 資料庫連接設定
-DB_SERVER=127.0.0.1
-DB_PORT=1433
-DB_NAME=Hospital_data
-DB_USER=您的資料庫帳號 (例如: YLH)
-DB_PASSWORD=您的資料庫密碼
-
-# Ollama:
-LLM_PROVIDER=ollama
-LLM_BASE_URL=http://localhost:11434
-LLM_API_KEY=ollama
-LLM_MODEL=gemma4:26b  # 替換為您實際下載的本地模型名稱
-
-# OpenAI:
-# LLM_PROVIDER=openai
-# OPENAI_API_KEY=您的_OPENAI_API_KEY
-# OPENAI_MODEL=gpt-4o-mini
-```
-
-### 4. 啟動系統
-當上述環境變數與資料庫皆設定完成後，於終端機輸入以下指令啟動系統：
-
-```bash
+```powershell
 uv run app.py
 ```
+
+或使用不改寫 `.env` 的 debug 指令：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\deploy\start-development.ps1
+```
+
+## 正式部署
+
+正式架構為：
+
+```text
+使用者 → IIS + ARR → Waitress → Flask → SQL Server
+```
+
+完整的 Windows IIS 架設、SQL Server 初始化、首次一鍵部署、後續更新、開機自啟、健康檢查、停止與 debug／production 模式切換，請參閱：[架設步驟](架設步驟.md)。
+
+首次正式部署需以系統管理員 PowerShell 執行：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\deploy\setup-and-deploy.ps1
+```
+
+後續程式更新不重跑 schema SQL：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\deploy\deploy-production.ps1
+```
+
+## 重要設定
+
+- 資料庫由 `.env` 的 `SQLALCHEMY_DATABASE_URI` 決定；schema SQL 不固定資料庫名稱。
+- 首次正式部署的目標必須是空白資料庫。
+- `.env` 含有密鑰與資料庫連線資訊，禁止提交到 Git。
+- 只有 IIS 已完成 HTTPS binding 時，才將 `SESSION_COOKIE_SECURE=true`。
+
+## 主要目錄
+
+| 目錄／檔案 | 說明 |
+| --- | --- |
+| `app.py` | Flask 與 Waitress 啟動入口 |
+| `modules/` | 系統功能模組與 Blueprint |
+| `static/` | CSS、JavaScript 與靜態資源 |
+| `deploy/` | IIS、ARR、Waitress 與 SQL Server 部署腳本 |
+| `deploy/database/CancerRegistry_System.sql` | 首次部署使用的 schema SQL |
+| `架設步驟.md` | 完整 Windows 架設與維運手冊 |

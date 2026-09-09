@@ -1,4 +1,4 @@
-from flask import Flask,render_template,session
+from flask import Flask,jsonify,render_template,session
 import os
 import logging
 import sys
@@ -13,8 +13,22 @@ from modules.blueprint.admin.member import member_bp
 from modules.blueprint.auth.key_application import key_application_bp
 from modules.blueprint.admin.key_approval import key_approval_bp
 import jinja2
+from waitress import serve
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 load_dotenv()
+
+APP_ENV = os.environ.get("APP_ENV", "development").strip().lower()
+if APP_ENV not in {"development", "production"}:
+    raise RuntimeError("APP_ENV must be development or production")
+
+APP_DEBUG = os.environ.get("APP_DEBUG", "true").strip().lower() in {"1", "true", "yes", "on"}
+if APP_ENV == "production":
+    APP_DEBUG = False
+
+def get_int_env(name, default):
+    value = os.environ.get(name)
+    return int(value) if value not in (None, "") else default
 
 logging.basicConfig(level=logging.INFO,format='%(asctime)s | %(levelname)s | %(message)s',datefmt='%Y-%m-%d %H:%M:%S',handlers=[logging.StreamHandler(sys.stdout)])
 werkzeug_logger = logging.getLogger('werkzeug')
@@ -26,8 +40,15 @@ app.jinja_loader = jinja2.ChoiceLoader([jinja2.FileSystemLoader('modules/bluepri
 secret_key = os.environ.get("SECRET_KEY")
 if not secret_key:
     raise RuntimeError("環境變數 SECRET_KEY 未設定")
+if APP_ENV == "production" and (len(secret_key) < 32 or secret_key == "development-only-change-before-production"):
+    raise RuntimeError("Production SECRET_KEY must contain at least 32 characters")
 app.secret_key = secret_key
-app.config.update(PERMANENT_SESSION_LIFETIME=timedelta(hours=8),SESSION_COOKIE_HTTPONLY=True,SESSION_COOKIE_SAMESITE="Lax",SESSION_COOKIE_SECURE=os.environ.get("SESSION_COOKIE_SECURE", "false").lower() == "true",)
+app.config.update(PERMANENT_SESSION_LIFETIME=timedelta(seconds=get_int_env("SESSION_LIFETIME_SECONDS", 28800)),SESSION_COOKIE_HTTPONLY=True,SESSION_COOKIE_SAMESITE=os.environ.get("SESSION_COOKIE_SAMESITE", "Lax"),SESSION_COOKIE_SECURE=os.environ.get("SESSION_COOKIE_SECURE", "false").lower() == "true",)
+if APP_ENV == "production":
+    proxy_count = get_int_env("PROXY_COUNT", 1)
+    if proxy_count != 1:
+        raise RuntimeError("PROXY_COUNT must be 1 in production")
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=proxy_count, x_proto=proxy_count, x_host=proxy_count, x_port=proxy_count)
 app.register_blueprint(auth_bp)
 app.register_blueprint(member_bp)
 app.register_blueprint(history_bp)
@@ -42,6 +63,10 @@ Jobs_FOLDER = 'tasks/Jobs'
 DASHBOARD_DATA = os.path.join(BASE_DIR, 'tasks', 'data')
 os.makedirs(Jobs_FOLDER, exist_ok=True)
 os.makedirs(DASHBOARD_DATA, exist_ok=True)
+
+@app.get("/health")
+def health():
+    return jsonify({"status": "ok", "environment": APP_ENV})
 
 @app.context_processor
 def inject_nav():
@@ -110,6 +135,12 @@ def index():
 # def rag_config(): return render_template("rag_config.html", active="rag_config")
 
 if __name__ == "__main__":
-    flask_port = int(os.environ.get("FLASK_PORT"))
-    flask_host = os.environ.get("FLASK_HOST", "127.0.0.1")
-    app.run(host=flask_host, port=flask_port, debug=True)
+    if APP_ENV == "production":
+        waitress_host = os.environ.get("WAITRESS_HOST", "127.0.0.1")
+        waitress_port = get_int_env("WAITRESS_PORT", 51001)
+        logging.info("Waitress server starting on %s:%s", waitress_host, waitress_port)
+        serve(app, host=waitress_host, port=waitress_port, threads=get_int_env("WAITRESS_THREADS", 8), backlog=get_int_env("WAITRESS_BACKLOG", 256), connection_limit=get_int_env("WAITRESS_CONNECTION_LIMIT", 256), channel_timeout=get_int_env("WAITRESS_CHANNEL_TIMEOUT", 300), trusted_proxy=os.environ.get("TRUSTED_PROXY", "127.0.0.1"), trusted_proxy_headers={"x-forwarded-for", "x-forwarded-host", "x-forwarded-proto", "x-forwarded-port"}, clear_untrusted_proxy_headers=True)
+    else:
+        flask_port = get_int_env("FLASK_PORT", 5000)
+        flask_host = os.environ.get("FLASK_HOST", "127.0.0.1")
+        app.run(host=flask_host, port=flask_port, debug=APP_DEBUG)
