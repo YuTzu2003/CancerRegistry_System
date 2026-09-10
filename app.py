@@ -24,12 +24,11 @@ def inject_nav():
         nav_items.append({"title": "權限管理", "icon": "bi-shield-lock", "subitems": [
             {"endpoint": "member.member", "title": "使用者管理", "icon": "bi-people"},
             {"endpoint": "key_approval.key_approval", "title": "金鑰申請審核", "icon": "bi-key-fill"},
-        ]})
+            {"endpoint": "audit_logs.audit_logs", "title": "系統操作日誌", "icon": "bi-journal-text"},]})
 
     provider = os.environ.get("LLM_PROVIDER")
     model = os.environ.get("OPENAI_MODEL") if provider and provider.lower() == "openai" else os.environ.get("LLM_MODEL")
     return {"nav_items": nav_items, "llm_provider": provider, "llm_model": model}
-
 
 if __name__ == "__main__":
     run_server(app, APP_ENV, APP_DEBUG)

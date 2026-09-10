@@ -2,32 +2,7 @@
 {% block title %}國家資料匯入｜癌症資料登記{% endblock %}
 {% block page_title %}國家資料匯入{% endblock %}
 {% block extra_head %}
-<style>
-  .national-search-card, .national-year-card { border-color: var(--border); border-radius: var(--radius); box-shadow: var(--shadow-sm); }
-  .national-search-card { background: var(--gray-50); }
-  .national-entry-pane { border: 1px solid var(--border); background: var(--gray-50); }
-  .national-tabs, .national-year-tabs { overflow-x: auto; }
-  .national-tabs .nav, .national-year-tabs .nav { flex-wrap: nowrap; min-width: max-content; }
-  .national-tabs .nav-link, .national-year-tabs .nav-link { color: var(--text); border: 1px solid var(--border); background: var(--surface); }
-  .national-tabs .nav-link.active, .national-year-tabs .nav-link.active { background: var(--gray-800); border-color: var(--gray-800); color: var(--white); }
-  .national-table-wrap { border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: auto; }
-  .national-table { margin: 0; min-width: 1010px; }
-  .national-table th { background: var(--gray-100); color: var(--text); font-size: 13px; white-space: nowrap; }
-  .national-table td { color: var(--text); font-size: 14px; vertical-align: middle; }
-  .national-table th:first-child, .national-table th:nth-child(n+5), .national-table td:first-child, .national-table td:nth-child(n+5) { text-align: center; }
-  .national-table .sortable-header { cursor: pointer; user-select: none; }
-  .national-actions { display: flex; justify-content: flex-end; gap: 6px; }
-  .national-actions form { margin: 0; }
-  .national-inline-edit td { background: var(--warning-soft); }
-  .national-inline-input { min-width: 92px; }
-  .national-empty { color: var(--muted); padding: 48px 24px; text-align: center; }
-  [data-theme="dark"] .national-search-card, [data-theme="dark"] .national-year-card, [data-theme="dark"] .national-entry-pane { background: var(--surface); color: var(--text); }
-  [data-theme="dark"] .national-table { --bs-table-bg: var(--surface); --bs-table-color: var(--text); --bs-table-striped-bg: #151518; --bs-table-hover-bg: #1f1f23; --bs-table-border-color: var(--border); }
-  [data-theme="dark"] .national-table th { background: var(--gray-100); color: var(--text); }
-  {% if preview_mode %}
-  .national-import-uploader, form[action*="/versions/save"], .national-preview-hide, .national-table th:first-child, .national-table td:first-child, .national-table th:last-child, .national-table td:last-child { display: none; }
-  {% endif %}
-</style>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/auth/national_import.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -60,6 +35,7 @@
   </div>
 </div>
 
+<div class="{% if preview_mode %}national-preview-mode{% endif %}">
 <section class="card-flat national-import-uploader">
   <div class="section-head">
     <h2><span class="dot" style="background:var(--warning)"></span>Excel 批次匯入</h2>
@@ -205,40 +181,6 @@
     </div>
   </div>
 </section>
-<script>
-  const nationalSelectAll = document.getElementById("nationalSelectAll");
-  const nationalRowSelections = document.querySelectorAll(".national-row-select");
-  if (nationalSelectAll) {
-    nationalSelectAll.addEventListener("change", () => nationalRowSelections.forEach((checkbox) => { checkbox.checked = nationalSelectAll.checked; }));
-    nationalRowSelections.forEach((checkbox) => checkbox.addEventListener("change", () => {
-      nationalSelectAll.checked = nationalRowSelections.length > 0 && [...nationalRowSelections].every((item) => item.checked);
-    }));
-  }
-
-  const nationalTable = document.querySelector(".national-table");
-  if (nationalTable) {
-    const headers = nationalTable.querySelectorAll("th.sortable-header");
-    headers.forEach((header) => header.addEventListener("click", () => {
-      const tbody = nationalTable.querySelector("tbody");
-      const rows = Array.from(tbody.querySelectorAll("tr:not(.national-empty-row)"));
-      const index = Number(header.dataset.sortIdx);
-      const ascending = header.classList.contains("sort-asc");
-      headers.forEach((item) => {
-        item.classList.remove("sort-asc", "sort-desc");
-        item.querySelector("i").className = "bi bi-caret-down text-muted ms-1";
-      });
-      header.classList.add(ascending ? "sort-desc" : "sort-asc");
-      header.querySelector("i").className = ascending ? "bi bi-caret-down-fill text-dark ms-1" : "bi bi-caret-up-fill text-dark ms-1";
-      rows.sort((left, right) => {
-        const leftValue = left.children[index].innerText.trim();
-        const rightValue = right.children[index].innerText.trim();
-        const leftNumber = Number(leftValue);
-        const rightNumber = Number(rightValue);
-        if (!Number.isNaN(leftNumber) && !Number.isNaN(rightNumber)) return ascending ? rightNumber - leftNumber : leftNumber - rightNumber;
-        return ascending ? rightValue.localeCompare(leftValue, "zh-TW") : leftValue.localeCompare(rightValue, "zh-TW");
-      });
-      rows.forEach((row) => tbody.appendChild(row));
-    }));
-  }
-</script>
+</div>
+<script src="{{ url_for('static', filename='js/auth/national_import.js') }}"></script>
 {% endblock %}

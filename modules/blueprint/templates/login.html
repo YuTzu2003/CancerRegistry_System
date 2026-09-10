@@ -6,8 +6,8 @@
   <link rel="stylesheet" href="/static/vendor/noto-sans-tc/noto-sans-tc.css">
   <link href="/static/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet"/>
   <link rel="stylesheet" href="/static/vendor/bootstrap-icons/font/bootstrap-icons.min.css">
-  <link rel="stylesheet" href="/static/css/style.css">
-  <link rel="stylesheet" href="/static/css/login.css">
+  <link rel="stylesheet" href="/static/css/core/style.css">
+  <link rel="stylesheet" href="/static/css/auth/login.css">
 </head>
 
 <body>
@@ -22,34 +22,12 @@
       <script src="/static/vendor/sweetalert2/sweetalert2.all.min.js"></script>
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
-          <script>
-            document.addEventListener("DOMContentLoaded", function() {
-              {% for category, msg in messages %}
-                {% set icon = 'success' if category == 'success' else ('error' if category == 'danger' else ('warning' if category == 'warning' else 'info')) %}
-                {% set title = '成功' if category == 'success' else ('錯誤' if category == 'danger' else ('警告' if category == 'warning' else '提示')) %}
-                Swal.fire({
-                  icon: '{{ icon }}',
-                  title: '{{ title }}',
-                  text: {{ msg|tojson|safe }},
-                  confirmButtonColor: '#2563eb'
-                });
-              {% endfor %}
-            });
-          </script>
+          <script id="loginFlashMessagesData" type="application/json">{{ messages | tojson }}</script>
         {% endif %}
       {% endwith %}
 
       {% if error %}
-        <script>
-          document.addEventListener("DOMContentLoaded", function() {
-            Swal.fire({
-              icon: 'error',
-              title: '錯誤',
-              text: {{ error|tojson|safe }},
-              confirmButtonColor: '#2563eb'
-            });
-          });
-        </script>
+        <script id="loginErrorData" type="application/json">{{ error | tojson }}</script>
       {% endif %}
 
       <form method="POST">
@@ -80,5 +58,6 @@
     </div>
   </div>
 
+  <script src="{{ url_for('static', filename='js/auth/login.js') }}"></script>
 </body>
 </html>

@@ -1,0 +1,40 @@
+.member-page { max-width: 1440px; margin: 0 auto; }
+    .member-workspace-head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+    .member-workspace-head h1 { margin: 0 0 6px; font-size: 24px; font-weight: 700; letter-spacing: .3px; }
+    .member-workspace-head p { margin: 0; color: var(--muted); font-size: 16px; line-height: 1.6; }
+    .member-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+    .member-page .card-flat { overflow: hidden; margin-top: 20px; }
+    .member-page .section-head { min-height: 58px; padding: 0 20px; background: var(--gray-50); border-bottom: 1px solid var(--border); }
+    .member-page .table-flat th { font-size: 0.78rem; letter-spacing: 0.03em; color: var(--muted); }
+    .member-page .table-flat td { vertical-align: middle; }
+    .member-page .table-flat tr:hover td { background: var(--gray-50); }
+    .search-wrapper {
+        position: relative;
+        max-width: 400px;
+    }
+    .search-wrapper .bi-search {
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--gray-400);
+    }
+    .search-wrapper .form-control {
+        padding-left: 38px;
+    }
+    .user-main-info {
+        display: flex;
+        flex-direction: column;
+    }
+    .user-main-info .u-name {
+        font-weight: 600;
+        color: var(--gray-900);
+    }
+    .user-main-info .u-id {
+        font-size: 0.85rem;
+        color: var(--gray-500);
+    }
+    .badge {
+        font-size: 0.8rem;
+        font-weight: 400;
+    }

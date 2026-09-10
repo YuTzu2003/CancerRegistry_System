@@ -1,6 +1,8 @@
 import datetime
+import json
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from modules.services.db import get_conn
+from modules.services.audit import write_audit_log
 from modules.services.auth import login_required, admin_required
 from werkzeug.security import generate_password_hash
 
@@ -20,41 +22,29 @@ def member():
         if u['Last_login'] and isinstance(u['Last_login'], datetime.datetime):
             u['Last_login'] = u['Last_login'].strftime("%Y/%m/%d %H:%M:%S")
             
-    # Read login logs
-    import os, json
-    log_file = r"D:\YLH\CancerRegistry_System\tasks\cache\login_logs.json"
+    # Login results are stored in dbo.Audit_logs so deployments do not depend on local files.
+    cursor.execute("SELECT audit.[CreatedAt] AS login_time, audit.[Action], audit.[User_id], audit.[detail_json], audit.[Remote_addr] AS ip, [user].[UserID], [user].[Name], [user].[Position] FROM dbo.Audit_logs AS audit LEFT JOIN dbo.Users AS [user] ON CONVERT(varchar(36), [user].[ID]) = audit.[User_id] WHERE audit.[Action] IN ('auth_login_success', 'auth_login_failed') ORDER BY audit.[CreatedAt] DESC")
+    login_columns = [column[0] for column in cursor.description]
     login_logs = []
-    if os.path.exists(log_file):
-        with open(log_file, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if line:
-                    try:
-                        login_logs.append(json.loads(line))
-                    except:
-                        pass
-                        
-    # Join user data (Name, Position) into logs using userid
-    user_dict = {u['UserID']: u for u in users}
-    for log in login_logs:
-        uid = log.get('userid', '')
-        if uid in user_dict:
-            log['Name'] = user_dict[uid].get('Name', '未知')
-            log['Position'] = user_dict[uid].get('Position', '未知')
-        else:
-            log['Name'] = '未知使用者'
-            log['Position'] = '未知角色'
-            
-    # Sort logs by login_time descending
-    login_logs.sort(key=lambda x: x.get('login_time', ''), reverse=True)
+    for row in cursor.fetchall():
+        log = dict(zip(login_columns, row))
+        try:
+            detail = json.loads(log["detail_json"] or "{}")
+        except (TypeError, json.JSONDecodeError):
+            detail = {}
+        login_time = log["login_time"]
+        login_logs.append({
+            "login_time": login_time.strftime("%Y/%m/%d %H:%M:%S") if isinstance(login_time, datetime.datetime) else login_time,
+            "userid": log["UserID"] or detail.get("login_id", "-"),
+            "Name": log["Name"] or "??",
+            "Position": log["Position"] or "????",
+            "ip": log["ip"] or "-",
+            "success": log["Action"] == "auth_login_success",
+            "reason": "????" if log["Action"] == "auth_login_success" else detail.get("reason", "???????"),
+        })
 
     conn.close()
-    return render_template(
-        "member.html",
-        active="member",
-        users=users,
-        login_logs=login_logs,
-    )
+    return render_template("member.html",active="member",users=users,login_logs=login_logs,)
 
 @member_bp.route("/member/tool", methods=["POST"])
 @login_required
@@ -84,6 +74,8 @@ def admin_save_user():
         flash(f"成功新增使用者 {name}", "success")
     conn.commit()
     conn.close()
+    action = "member_member_update" if user_db_id else "member_member_create"
+    write_audit_log(action, {"target_user": user_id, "name": name, "position": position, "location": location})
     return redirect(url_for("member.member"))
 
 @member_bp.route("/member/delete/<user_id>", methods=["POST"])
@@ -93,7 +85,10 @@ def admin_delete_user(user_id):
     conn = get_conn()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM [dbo].[Users] WHERE [ID]=?", (user_id,))
+    deleted = cursor.rowcount
     conn.commit()
     conn.close()
+    if deleted:
+        write_audit_log("member_member_delete", {"target_user_id": user_id})
     flash("使用者已成功刪除", "success")
     return redirect(url_for("member.member"))

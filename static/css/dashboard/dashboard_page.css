@@ -1,0 +1,21 @@
+.dashboard-language-picker { position: relative; min-width: 132px; }
+    .dashboard-language-picker summary {
+      align-items: center; background: var(--white); border: 1px solid var(--gray-300); border-radius: 4px;
+      cursor: pointer; display: flex; font-size: .875rem; height: 31px; justify-content: center;
+      list-style: none; padding: .25rem 2rem .25rem .5rem; position: relative;
+    }
+    .dashboard-language-picker summary::-webkit-details-marker { display: none; }
+    .dashboard-language-picker summary::after {
+      border: solid currentColor; border-width: 0 1px 1px 0; content: ''; height: 6px; position: absolute;
+      right: .75rem; top: 10px; transform: rotate(45deg); width: 6px;
+    }
+    .dashboard-language-picker-menu {
+      background: var(--white); border: 1px solid var(--gray-300); border-radius: 4px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, .12); left: 0; margin-top: 4px;
+      overflow: hidden; position: absolute; right: 0; z-index: 20;
+    }
+    .dashboard-language-option {
+      background: transparent; border: 0; cursor: pointer; display: block; font-size: .875rem;
+      padding: .45rem .5rem; text-align: center; width: 100%;
+    }
+    .dashboard-language-option:hover { background: var(--gray-100); }

@@ -8,33 +8,10 @@
   <link rel="stylesheet" href="/static/vendor/bootstrap-icons/font/bootstrap-icons.min.css"/>
   <link rel="stylesheet" href="/static/vendor/noto-sans-tc/noto-sans-tc.css"/>
   <link rel="stylesheet" href="/static/vendor/sweetalert2/sweetalert2.min.css">
-  <link rel="stylesheet" href="/static/css/style.css" />
-  <script>
-    if (localStorage.getItem('theme') === 'dark') {
-      document.documentElement.setAttribute('data-theme', 'dark');
-    }
-  </script>
+  <link rel="stylesheet" href="/static/css/core/style.css" />
+  <script src="{{ url_for('static', filename='js/core/base.js') }}"></script>
 
-<style>
-  .nav-link.submenu-active {
-    background: var(--gray-200) !important;
-    color: var(--gray-900) !important;
-    font-weight: 600;
-  }
-  .nav-link.submenu-active .nav-icon {
-    color: var(--gray-800) !important;
-  }
-  [data-theme="dark"] .nav-link.submenu-active {
-    background: rgba(255, 255, 255, 0.2) !important;
-    color: #ffffff !important;
-  }
-  [data-theme="dark"] .nav-link.submenu-active .nav-icon {
-    color: #e2e8f0 !important;
-  }
-  .nav-link[aria-expanded="true"] .submenu-icon {
-    transform: rotate(180deg);
-  }
-</style>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/core/base.css') }}">
 {% block extra_head %}{% endblock %}
 </head>
 <body>
@@ -148,20 +125,7 @@
       <main class="content">
         {% with messages = get_flashed_messages(with_categories=true) %}
           {% if messages %}
-            <script>
-              document.addEventListener("DOMContentLoaded", function() {
-                {% for category, msg in messages %}
-                  {% set icon = 'success' if category == 'success' else ('error' if category == 'danger' else ('warning' if category == 'warning' else 'info')) %}
-                  {% set title = '成功' if category == 'success' else ('錯誤' if category == 'danger' else ('警告' if category == 'warning' else '提示')) %}
-                  Swal.fire({
-                    icon: '{{ icon }}',
-                    title: '{{ title }}',
-                    text: {{ msg|tojson|safe }},
-                    confirmButtonColor: '#2563eb'
-                  });
-                {% endfor %}
-              });
-            </script>
+            <script id="flashMessagesData" type="application/json">{{ messages | tojson }}</script>
           {% endif %}
         {% endwith %}
         {% block content %}{% endblock %}
@@ -178,6 +142,7 @@
 
   <script src="/static/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
   <script src="/static/vendor/sweetalert2/sweetalert2.all.min.js"></script>
-  <script src="/static/js/app.js"></script>
+  <script src="{{ url_for('static', filename='js/core/app.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/core/flash_messages.js') }}"></script>
 </body>
 </html>

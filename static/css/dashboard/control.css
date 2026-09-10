@@ -1,0 +1,50 @@
+.dashboard-input-settings.is-disabled .naming-chip {
+    opacity: 0.5;
+    background-color: var(--gray-100);
+    border-color: var(--border) !important;
+    color: var(--muted);
+    cursor: default;
+  }
+
+  .dashboard-input-settings.is-disabled .naming-chip .nc-title,
+  .dashboard-input-settings.is-disabled .naming-chip .nc-desc {
+    color: var(--muted);
+  }
+
+  .dashboard-input-settings .naming-chip .nc-desc {
+    margin-left: 4px;
+  }
+
+  .dashboard-file-list-scroll.is-scrollable {
+    max-height: 174px;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+  }
+
+  #dashFileList thead tr {
+    height: 38px;
+  }
+
+  #dashFileList tbody tr {
+    height: 42px;
+  }
+
+  #stageSummaryOptions {
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+    transition: max-height .25s ease, opacity .2s ease, margin .25s ease, padding .25s ease;
+  }
+
+  #stageSummaryOptions.is-open {
+    max-height: 900px;
+    opacity: 1;
+    margin-top: 1rem !important;
+    padding-top: 1rem !important;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    #stageSummaryOptions { transition: none; }
+  }

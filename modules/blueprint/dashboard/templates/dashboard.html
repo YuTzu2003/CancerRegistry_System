@@ -4,30 +4,8 @@
 {% block extra_head %}
   <script src="/static/vendor/echarts/echarts.min.js"></script>
   <script src="/static/vendor/i18next/i18next.min.js"></script>
-  <link rel="stylesheet" href="/static/css/dashboard.css?v=20260825-export-ai-progress">
-  <style>
-    .dashboard-language-picker { position: relative; min-width: 132px; }
-    .dashboard-language-picker summary {
-      align-items: center; background: var(--white); border: 1px solid var(--gray-300); border-radius: 4px;
-      cursor: pointer; display: flex; font-size: .875rem; height: 31px; justify-content: center;
-      list-style: none; padding: .25rem 2rem .25rem .5rem; position: relative;
-    }
-    .dashboard-language-picker summary::-webkit-details-marker { display: none; }
-    .dashboard-language-picker summary::after {
-      border: solid currentColor; border-width: 0 1px 1px 0; content: ''; height: 6px; position: absolute;
-      right: .75rem; top: 10px; transform: rotate(45deg); width: 6px;
-    }
-    .dashboard-language-picker-menu {
-      background: var(--white); border: 1px solid var(--gray-300); border-radius: 4px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, .12); left: 0; margin-top: 4px;
-      overflow: hidden; position: absolute; right: 0; z-index: 20;
-    }
-    .dashboard-language-option {
-      background: transparent; border: 0; cursor: pointer; display: block; font-size: .875rem;
-      padding: .45rem .5rem; text-align: center; width: 100%;
-    }
-    .dashboard-language-option:hover { background: var(--gray-100); }
-  </style>
+  <link rel="stylesheet" href="/static/css/dashboard/dashboard.css?v=20260825-export-ai-progress">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/dashboard_page.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -357,16 +335,8 @@
 <script id="dashboardCancerNameTranslationsData" type="application/json">
   {{ cancer_name_translations | tojson }}
 </script>
-<script>
-  const dashboardCancerNameTranslationsData = document.getElementById('dashboardCancerNameTranslationsData');
-  try {
-    window.dashboardCancerNameTranslations = JSON.parse(dashboardCancerNameTranslationsData?.textContent || '{}');
-  } catch (error) {
-    console.error('癌別翻譯資料解析失敗：', error);
-    window.dashboardCancerNameTranslations = {};
-  }
-</script>
-<script src="{{ url_for('static', filename='js/dashboard_i18n.js') }}?v=20260828-llm-retry-scope"></script>
-<script src="{{ url_for('static', filename='js/annual_report_renderer.js') }}?v=20260729-common-cancers"></script>
-<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=20260828-llm-three-attempts"></script>
+<script src="{{ url_for('static', filename='js/dashboard/dashboard_page.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard/dashboard_i18n.js') }}?v=20260828-llm-retry-scope"></script>
+<script src="{{ url_for('static', filename='js/dashboard/annual_report_renderer.js') }}?v=20260729-common-cancers"></script>
+<script src="{{ url_for('static', filename='js/dashboard/dashboard.js') }}?v=20260828-llm-three-attempts"></script>
 {% endblock %}

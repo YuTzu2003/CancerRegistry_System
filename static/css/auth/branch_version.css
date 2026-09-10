@@ -1,0 +1,27 @@
+.commit-ledger { max-width: 100%; }
+  .commit-ledger__toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 0 20px; border-bottom: 1px solid var(--border); }
+  .commit-ledger__branch { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-weight: 700; white-space: nowrap; }
+  .commit-ledger__filters { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+  .commit-ledger__filter { position: relative; }
+  .commit-ledger__filter > i { position: absolute; top: 50%; left: 10px; z-index: 1; color: var(--muted); pointer-events: none; transform: translateY(-50%); }
+  .commit-ledger__filter select, .commit-ledger__filter input { min-height: 36px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: .875rem; }
+  .commit-ledger__filter select { min-width: 148px; padding: 0 28px 0 32px; }
+  .commit-ledger__filter input { padding: 0 9px 0 32px; }
+  .commit-ledger__clear { color: var(--muted); font-size: .85rem; white-space: nowrap; }
+  .commit-day { position: relative; margin-top: 28px; padding-left: 36px; }
+  .commit-day::before { content: ""; position: absolute; top: 30px; bottom: -28px; left: 10px; width: 2px; background: var(--border); }
+  .commit-day:last-child::before { bottom: 0; }
+  .commit-day__label { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; color: var(--muted); font-size: .875rem; font-weight: 700; }
+  .commit-day__node { position: absolute; left: 3px; display: grid; width: 16px; height: 16px; place-items: center; border: 2px solid var(--surface); border-radius: 50%; background: var(--gray-700); color: var(--surface); font-size: .55rem; }
+  .commit-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 18px 20px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow-sm); }
+  .commit-card + .commit-card { margin-top: -1px; border-top-left-radius: 0; border-top-right-radius: 0; }
+  .commit-card__title { margin: 0; color: var(--text); font-size: 1rem; font-weight: 750; }
+  .commit-card__meta { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 7px; color: var(--muted); font-size: .85rem; }
+  .commit-card__meta code { color: var(--text); font-size: .8rem; }
+  .commit-card__actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+  .commit-card__actions form { margin: 0; }
+  .commit-card__commit-id { color: var(--text); font-family: var(--bs-font-monospace); font-size: .85rem; font-weight: 700; white-space: nowrap; }
+  .commit-card__action-icon { display: inline-grid; width: 34px; height: 34px; padding: 0; place-items: center; border-color: var(--border); background: var(--surface); }
+  .commit-card__deadline { color: var(--muted); font-size: .78rem; white-space: nowrap; }
+  .commit-ledger__empty { padding: 48px 24px; border: 1px dashed var(--border); border-radius: var(--radius); color: var(--muted); text-align: center; }
+  @media (max-width: 48rem) { .commit-ledger__toolbar { align-items: flex-start; flex-direction: column; } .commit-ledger__filters { justify-content: flex-start; width: 100%; } .commit-day { padding-left: 28px; } .commit-card { grid-template-columns: minmax(0, 1fr); } .commit-card__actions { justify-content: flex-start; flex-wrap: wrap; } .commit-card__deadline { width: 100%; } }

@@ -4,8 +4,8 @@
 {% block extra_head %}
   <script src="/static/vendor/echarts/echarts.min.js"></script>
   <script src="/static/vendor/i18next/i18next.min.js"></script>
-  <link rel="stylesheet" href="/static/css/dashboard.css?v=20260801-stage-card-compact">
-  <link rel="stylesheet" href="/static/css/dashboard_compare.css?v=20260801-stage-card-compact">
+  <link rel="stylesheet" href="/static/css/dashboard/dashboard.css?v=20260801-stage-card-compact">
+  <link rel="stylesheet" href="/static/css/dashboard/dashboard_compare.css?v=20260801-stage-card-compact">
 {% endblock %}
 
 {% block content %}
@@ -331,14 +331,8 @@
 </div>
 
 <script id="dashboardCancerNameTranslationsData" type="application/json">{{ cancer_name_translations | tojson }}</script>
-<script>
-  try {
-    window.dashboardCancerNameTranslations = JSON.parse(document.getElementById('dashboardCancerNameTranslationsData')?.textContent || '{}');
-  } catch (error) {
-    window.dashboardCancerNameTranslations = {};
-  }
-</script>
-<script src="{{ url_for('static', filename='js/dashboard_i18n.js') }}?v=20260802-unified-loading-copy"></script>
-<script src="{{ url_for('static', filename='js/annual_report_renderer.js') }}?v=20260729-treatment-labels"></script>
-<script src="{{ url_for('static', filename='js/dashboard_compare.js') }}?v=20260826-surgery-caption"></script>
+<script src="{{ url_for('static', filename='js/dashboard/compare_page.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard/dashboard_i18n.js') }}?v=20260802-unified-loading-copy"></script>
+<script src="{{ url_for('static', filename='js/dashboard/annual_report_renderer.js') }}?v=20260729-treatment-labels"></script>
+<script src="{{ url_for('static', filename='js/dashboard/dashboard_compare.js') }}?v=20260826-surgery-caption"></script>
 {% endblock %}

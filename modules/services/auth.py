@@ -2,7 +2,7 @@ import logging
 from functools import wraps
 from flask import Blueprint, request, session, redirect, url_for, render_template, flash, jsonify
 from modules.services.db import get_conn
-import os, json, datetime
+from modules.services.audit import write_audit_log
 from werkzeug.security import check_password_hash, generate_password_hash
 
 auth_bp = Blueprint('auth', __name__, template_folder='../blueprint/auth/templates')
@@ -23,27 +23,11 @@ def current_session_user():
     if not user:
         session.clear()
         return None
-
     session["userid"] = user.UserID
     session["name"] = user.Name
     session["position"] = user.Position
     session["location"] = user.Location
     return user
-
-def login_log(user_id, ip, success, reason=""):
-    log_dir = "tasks/cache"
-    os.makedirs(log_dir, exist_ok=True) 
-
-    log_entry = {
-        "userid": user_id,
-        "ip": ip,
-        "login_time": datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S"),
-        "success": success,
-        "reason": reason
-    }
-    
-    with open(f"{log_dir}/login_logs.json", "a", encoding="utf-8") as f:
-        f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
 
 
 # ---- 登入驗證 ----
@@ -98,7 +82,6 @@ def login():
 
         if password_valid:
             logging.info(f"使用者 {user_id} 登入成功")
-            login_log(user_id, request.remote_addr, True, "登入成功")
             session.clear()
             session.permanent = True
             session["id"] = str(user.ID)
@@ -109,14 +92,16 @@ def login():
             cursor.execute("UPDATE [dbo].[Users] SET Last_login = GETDATE() WHERE ID = ?", (user.ID,))
             conn.commit()
             conn.close()
+            write_audit_log("auth_login_success", {"login_id": user.UserID, "status": "success"}, user_id=str(user.ID), remote_addr=request.remote_addr)
             return redirect("/")          
         conn.close()
-        login_log(user_id, request.remote_addr, False, "帳號或密碼錯誤")
+        write_audit_log("auth_login_failed", {"login_id": user_id, "status": "failed", "reason": "password_or_account_incorrect"}, remote_addr=request.remote_addr)
         return render_template("login.html", error="帳號或密碼錯誤")
     return render_template("login.html")
 
 @auth_bp.route("/logout")
 def logout():
+    write_audit_log("auth_logout_success", {"result": "success"})
     session.clear()
     return redirect("/")
 
@@ -151,6 +136,7 @@ def profile():
             if password_valid:
                 cursor.execute("UPDATE [dbo].[Users] SET [Password] = ? WHERE [ID] = ?", (generate_password_hash(new_password), user["ID"]))
                 conn.commit()
+                write_audit_log("auth_profile_password_changed", {"target_user": user["UserID"]})
                 flash("密碼已更新", "success")
             else:
                 flash("目前密碼不正確", "danger")
