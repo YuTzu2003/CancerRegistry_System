@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from threading import Lock
-from urllib.parse import urljoin
+from pathlib import PurePosixPath
+from urllib.parse import unquote, urljoin, urlparse
 from urllib.request import Request, urlopen
 from bs4 import BeautifulSoup
 from flask import jsonify, render_template, session
@@ -8,6 +9,23 @@ from modules.services.db import get_conn
 
 TWCR_SOURCES = (("latest", "最新公告", "https://twcr.tw/?page_id=1314"), ("downloads", "最新下載", "https://twcr.tw/?page_id=1809"))
 cache = {"expires_at": datetime.min, "updates": {"latest": [], "downloads": []}}
+DOWNLOAD_FILE_TYPES = {
+    ".csv": ("CSV", "bi-filetype-csv"),
+    ".pdf": ("PDF", "bi-filetype-pdf"),
+    ".txt": ("TXT", "bi-filetype-txt"),
+    ".xls": ("Excel", "bi-file-earmark-spreadsheet"),
+    ".xlsx": ("Excel", "bi-file-earmark-spreadsheet"),
+    ".doc": ("Word", "bi-file-earmark-word"),
+    ".docx": ("Word", "bi-file-earmark-word"),
+    ".zip": ("ZIP", "bi-file-earmark-zip"),
+}
+
+
+def _get_download_file_type(url):
+    extension = PurePosixPath(unquote(urlparse(url).path)).suffix.lower()
+    label, icon = DOWNLOAD_FILE_TYPES.get(extension, (chr(0x6a94) + chr(0x6848), "bi-file-earmark-arrow-down"))
+    return {"file_type": label, "file_icon": icon, "file_type_class": label.lower()}
+
 
 def fetch_twcr_updates():
     with Lock():
@@ -39,7 +57,7 @@ def _fetch_twcr_source(source, source_url):
         title, url = link.get_text(" ", strip=True), urljoin(source_url, link["href"])
         if title and url not in seen:
             seen.add(url)
-            updates.append({"source": source, "title": title, "url": url})
+            updates.append({"source": source, "title": title, "url": url, **_get_download_file_type(url)})
     return updates
 
 
