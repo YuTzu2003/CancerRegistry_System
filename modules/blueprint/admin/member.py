@@ -36,11 +36,11 @@ def member():
         login_logs.append({
             "login_time": login_time.strftime("%Y/%m/%d %H:%M:%S") if isinstance(login_time, datetime.datetime) else login_time,
             "userid": log["UserID"] or detail.get("login_id", "-"),
-            "Name": log["Name"] or "??",
-            "Position": log["Position"] or "????",
+            "Name": log["Name"] or "未知",
+            "Position": log["Position"] or "未知角色",
             "ip": log["ip"] or "-",
             "success": log["Action"] == "auth_login_success",
-            "reason": "????" if log["Action"] == "auth_login_success" else detail.get("reason", "???????"),
+            "reason": "登入成功" if log["Action"] == "auth_login_success" else detail.get("reason", "帳號或密碼錯誤"),
         })
 
     conn.close()

@@ -1,9 +1,8 @@
 {% extends "base.html" %}
-{% block title %}工作總覽｜癌症資料登記{% endblock %}
-{% block page_title %}工作總覽{% endblock %}
+{% block title %}功能總覽｜癌症資料登記{% endblock %}
+{% block page_title %}功能總覽{% endblock %}
 {% block extra_head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/home/index.css') }}">{% endblock %}
 {% block content %}
-
 <div class="home-page">
   <section class="home-header" aria-labelledby="home-title">
     <div class="home-brief"><div class="home-kicker"><i class="bi bi-activity"></i> 癌症資料登記</div><h2 id="home-title">功能總覽</h2><p>提供癌症登記資料處理方案，涵蓋資料清洗、虛擬資料生成、統計分析比較，以及資料使用權限之申請與審核管理。</p></div>
@@ -12,7 +11,7 @@
   {% if session.get('position') == 'Admin' %}<a class="home-notice" href="{{ url_for('key_approval.key_approval') }}"><span class="notice-mark"><i class="bi bi-shield-check"></i></span><span><strong>權限申請待審核</strong><small><span class="notice-count">{{ pending_application_count }}</span> 筆申請正等待處理。</small></span><i class="bi bi-arrow-right notice-arrow"></i></a>{% elif key_application_status %}<a class="home-notice {% if key_application_status == 'Approved' %}is-approved{% else %}is-rejected{% endif %}" href="{{ url_for('key_application.application') }}"><span class="notice-mark"><i class="bi bi-bell"></i></span><span><strong>權限申請已完成審核</strong><small>前往權限申請頁查看結果與後續操作。</small></span><i class="bi bi-arrow-right notice-arrow"></i></a>{% endif %}
   <section class="home-announcements" aria-labelledby="announcement-title">
     <div class="home-announcements__title"><span><i class="bi bi-megaphone"></i> SYSTEM UPDATES</span><h2 id="announcement-title">台灣癌症登記中心更新報告</h2><p>顯示台灣癌症登記中心公開的最新公告與最新下載。</p></div>
-    <div class="announcement-list"><div class="announcement-tabs"><button type="button" class="announcement-tab is-active" data-target="latest">最新公告</button><button type="button" class="announcement-tab" data-target="downloads">最新下載</button></div><div class="announcement-pane" data-pane="latest">{% for announcement in announcements.latest %}<a class="announcement-item" href="{{ announcement.url }}" target="_blank" rel="noopener noreferrer"><span class="announcement-item__type">{{ announcement.source }}</span><span class="announcement-item__info">{{ announcement.title }}</span></a>{% else %}<p class="announcement-empty">目前無法取得最新公告。</p>{% endfor %}</div><div class="announcement-pane d-none" data-pane="downloads">{% for announcement in announcements.downloads %}<a class="announcement-item" href="{{ announcement.url }}" target="_blank" rel="noopener noreferrer"><span class="announcement-item__type">{{ announcement.source }}</span><span class="announcement-item__info">{{ announcement.title }}</span></a>{% else %}<p class="announcement-empty">目前無法取得最新下載。</p>{% endfor %}</div></div>
+    <div class="announcement-list"><div class="announcement-tabs"><button type="button" class="announcement-tab is-active" data-target="latest">最新公告</button><button type="button" class="announcement-tab" data-target="downloads">最新下載</button></div><div class="announcement-pane" data-pane="latest">{% for announcement in announcements.latest %}<a class="announcement-item" href="{{ announcement.url }}" target="_blank" rel="noopener noreferrer"><span class="announcement-item__type">{{ announcement.source }}</span><span class="announcement-item__info">{{ announcement.title }}</span></a>{% else %}<p class="announcement-empty">目前無法取得最新公告。</p>{% endfor %}</div><div class="announcement-pane d-none" data-pane="downloads">{% for announcement in announcements.downloads %}<a class="announcement-item" href="{{ announcement.url }}" target="_blank" rel="noopener noreferrer"><span class="announcement-item__info">{{ announcement.title }}</span></a>{% else %}<p class="announcement-empty">目前無法取得最新下載。</p>{% endfor %}</div></div>
   </section>
   <div class="intro-sections">
     <div class="intro-card is-prepare">
@@ -47,6 +46,17 @@
       <div class="intro-card-actions">
         <a href="{{ url_for('dashboard.dashboard') }}">年報分析 <i class="bi bi-arrow-right"></i></a>
         <a href="{{ url_for('dashboard.compare') }}">年度比較 <i class="bi bi-arrow-right"></i></a>
+      </div>
+    </div>
+
+    <div class="intro-card is-monitoring">
+      <div class="intro-card-header">
+        <div class="intro-card-icon" style="background: #f3e8ff; color: #7e22ce;"><i class="bi bi-activity"></i></div>
+        <h2 class="intro-card-title">監測指標</h2>
+      </div>
+      <p class="intro-card-desc">透過選定的癌別與年度區間，運算並檢視各項醫療品質監測指標的達成率與結果。</p>
+      <div class="intro-card-actions">
+        <a href="{{ url_for('indicators.indicators') }}">指標分析 <i class="bi bi-arrow-right"></i></a>
       </div>
     </div>
 

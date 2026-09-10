@@ -12,13 +12,14 @@ def inject_nav():
             {"endpoint": "clean.clean", "title": "資料清洗", "icon": "bi-play-circle"},
             {"endpoint": "clean.history", "title": "資料審核紀錄", "icon": "bi-file-earmark-text"},
         ]},
-        {"endpoint": "data_gen.dataGen", "title": "虛擬資料生成", "icon": "bi-database-add"},
-        {"endpoint": "key_application.application", "title": "權限申請", "icon": "bi-key"},
         {"title": "報表分析", "icon": "bi-bar-chart", "subitems": [
             {"endpoint": "dashboard.dashboard", "title": "年報分析", "icon": "bi-bar-chart"},
             {"endpoint": "dashboard.compare", "title": "年度比較", "icon": "bi-columns-gap"},
             {"endpoint": "auth.data_update_access", "title": "資料維護", "icon": "bi-database-gear"},
         ]},
+        {"endpoint": "data_gen.dataGen", "title": "虛擬資料生成", "icon": "bi-database-add"},      
+        {"endpoint": "indicators.indicators", "title": "監測指標", "icon": "bi-clipboard2-pulse"},
+        {"endpoint": "key_application.application", "title": "權限申請", "icon": "bi-key"},      
     ]
     if session.get("position") == "Admin":
         nav_items.append({"title": "權限管理", "icon": "bi-shield-lock", "subitems": [

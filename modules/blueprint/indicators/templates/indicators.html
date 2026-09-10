@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+
+{% block title %}指標模組｜癌症資料登記{% endblock %}
+{% block page_title %}指標模組{% endblock %}
+
+{% block extra_head %}
+<style>
+  .indicators-step { border: 1px solid var(--gray-200); border-radius: 12px; background: var(--white); margin-bottom: 18px; overflow: hidden; }
+  .indicators-step-title { align-items: center; background: var(--gray-50); border-bottom: 1px solid var(--gray-200); display: flex; font-size: 16px; font-weight: 700; gap: 10px; padding: 14px 18px; }
+  .indicators-step-number { align-items: center; background: #166534; border-radius: 50%; color: #fff; display: inline-flex; font-size: 13px; height: 25px; justify-content: center; width: 25px; }
+  .indicators-step-body { padding: 18px; }
+  .indicators-help { color: var(--gray-600); font-size: 13px; line-height: 1.65; }
+  .indicators-cancer-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+  .indicators-cancer-option { align-items: center; border: 1px solid var(--gray-200); border-radius: 8px; display: flex; gap: 9px; margin: 0; padding: 10px 12px; }
+  .indicators-cancer-option:has(input:checked) { background: #f0fdf4; border-color: #86efac; }
+  .indicators-cancer-option small { color: var(--gray-500); }
+  .indicators-result-empty { border: 1px dashed var(--gray-300); border-radius: 8px; color: var(--gray-600); padding: 28px 18px; text-align: center; }
+  .indicators-result { border: 1px solid var(--gray-200); border-radius: 8px; padding: 20px; }
+  .indicators-export-option { border: 1px solid var(--gray-200); border-radius: 8px; padding: 12px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="mb-4">
+  <h1 class="h4 fw-bold mb-1">癌症監測指標模組</h1>
+  <p class="text-secondary mb-0">依上傳資料、診斷年度與癌別，產製指標預覽與匯出資料。</p>
+</section>
+
+<section class="indicators-step">
+  <div class="indicators-step-title"><span class="indicators-step-number">1</span>上傳欲分析的資料</div>
+  <div class="indicators-step-body">
+    <div class="row g-3 align-items-end">
+      <div class="col-lg-7"><label for="indicatorsFile" class="form-label fw-semibold">原始匯入資料</label><input id="indicatorsFile" class="form-control" type="file" accept=".xlsx,.xls,.csv"></div>
+      <div class="col-lg-auto"><button id="uploadIndicatorsFile" class="btn btn-success" type="button" disabled><i class="bi bi-upload me-1"></i>上傳資料</button></div>
+      <div class="col-lg"><div id="indicatorsFileStatus" class="indicators-help">請自行上傳 Excel 或 CSV 檔案；不會自動帶入年報分析資料。</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="indicators-step">
+  <div class="indicators-step-title"><span class="indicators-step-number">2</span>拉選欲分析的資料診斷年度</div>
+  <div class="indicators-step-body">
+    <div class="row g-3 align-items-center"><div class="col-md-4"><label class="form-label" for="indicatorsYearStart">起始年度</label><select id="indicatorsYearStart" class="form-select" disabled><option value="">起始年度</option></select></div><div class="col-md-1 text-center pt-md-4">至</div><div class="col-md-4"><label class="form-label" for="indicatorsYearEnd">結束年度</label><select id="indicatorsYearEnd" class="form-select" disabled><option value="">結束年度</option></select></div></div>
+    <p class="indicators-help mt-3 mb-0">設定說明：資料診斷年度以拉選方式進行，匯入資料的診斷年度區間即為拉選範圍；診斷年度以西元年呈現。</p>
+  </div>
+</section>
+
+<section class="indicators-step">
+  <div class="indicators-step-title"><span class="indicators-step-number">3</span>選擇癌症部位</div>
+  <div class="indicators-step-body">
+    <div id="indicatorsCancerGrid" class="indicators-cancer-grid">
+      {% for value, zh, en in [('Oral_Cavity','口腔癌','Oral Cavity'),('Esophagus','食道癌','Esophagus'),('Stomach','胃癌','Stomach'),('Pancreas','胰臟癌','Pancreas'),('Colon_Rectum','結腸、直腸癌','Colon / Rectum'),('Liver','肝癌','Liver'),('Breast','乳癌','Breast'),('Lung','肺癌','Lung'),('Cervix_Uteri','子宮頸癌','Cervix Uteri'),('Corpus_Uteri','子宮體癌','Corpus Uteri'),('Ovary','卵巢癌','Ovary'),('Prostate','攝護腺癌','Prostate'),('Bladder','膀胱癌','Bladder')] %}
+      <label class="indicators-cancer-option"><input class="form-check-input indicators-cancer" type="checkbox" value="{{ value }}" disabled><span>{{ zh }}<br><small>{{ en }}</small></span></label>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="indicators-step">
+  <div class="indicators-step-title"><span class="indicators-step-number">4</span>產生指標表內容</div>
+  <div class="indicators-step-body">
+    <p class="indicators-help">分子件數為符合指標分子定義的案件數；分母件數為符合指標分母定義的案件數；監測結果為分子件數／分母件數。</p>
+    <button id="generateIndicatorsPreview" class="btn btn-dark mb-3" type="button" disabled><i class="bi bi-bar-chart-line me-1"></i>產生指標內容預覽</button>
+    <div id="indicatorsPreview" class="indicators-result-empty">請先上傳資料、選擇診斷年度與癌別。</div>
+  </div>
+</section>
+
+<section class="indicators-step">
+  <div class="indicators-step-title"><span class="indicators-step-number">5</span>指標合併檔下載</div>
+  <div class="indicators-step-body">
+    <div class="row g-3">
+      <div class="col-md-4"><div class="indicators-export-option"><div class="form-check"><input class="form-check-input" type="checkbox" id="exportWithNarrative" disabled><label class="form-check-label" for="exportWithNarrative">產生文字分析並下載</label></div><div class="indicators-help mt-2">可選 Word、PDF 或兩者；包含監測表、圖表與 AI 文字分析。</div></div></div>
+      <div class="col-md-4"><div class="indicators-export-option"><div class="form-check"><input class="form-check-input" type="checkbox" id="exportWithoutNarrative" disabled><label class="form-check-label" for="exportWithoutNarrative">不產生文字分析，直接下載</label></div><div class="indicators-help mt-2">僅包含監測表與圖表。</div></div></div>
+      <div class="col-md-4"><div class="indicators-export-option"><div class="form-check"><input class="form-check-input" type="checkbox" id="exportIndicatorsExcel" disabled><label class="form-check-label" for="exportIndicatorsExcel">匯出資料（Excel）</label></div><div class="indicators-help mt-2">保留原始資料，並在右側加入每項指標的分子／分母判定欄位。</div></div></div>
+    </div>
+    <div class="mt-3"><button id="downloadIndicators" class="btn btn-outline-dark" type="button" disabled><i class="bi bi-download me-1"></i>下載指標合併檔</button></div>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(() => {
+  const fileInput = document.getElementById('indicatorsFile');
+  const uploadButton = document.getElementById('uploadIndicatorsFile');
+  const fileStatus = document.getElementById('indicatorsFileStatus');
+  const startSelect = document.getElementById('indicatorsYearStart');
+  const endSelect = document.getElementById('indicatorsYearEnd');
+  const cancerInputs = [...document.querySelectorAll('.indicators-cancer')];
+  const previewButton = document.getElementById('generateIndicatorsPreview');
+  const preview = document.getElementById('indicatorsPreview');
+  let uploaded = false;
+  let availableYears = [];
+
+  const updateReadyState = () => {
+    const cancerSelected = cancerInputs.some(input => input.checked);
+    previewButton.disabled = !(uploaded && startSelect.value && endSelect.value && cancerSelected);
+  };
+
+  const populateEndYears = () => {
+    const startYear = Number(startSelect.value);
+    const eligibleYears = startYear ? availableYears.filter(year => year >= startYear) : [];
+    endSelect.innerHTML = `<option value="">結束年度</option>${eligibleYears.map(year => `<option value="${year}">${year}</option>`).join('')}`;
+    endSelect.disabled = !startYear;
+    updateReadyState();
+  };
+
+  fileInput.addEventListener('change', () => { uploadButton.disabled = !fileInput.files.length; });
+  startSelect.addEventListener('change', populateEndYears);
+  endSelect.addEventListener('change', updateReadyState);
+  cancerInputs.forEach(input => input.addEventListener('change', updateReadyState));
+
+  uploadButton.addEventListener('click', async () => {
+    const file = fileInput.files[0];
+    if (!file) return;
+    uploadButton.disabled = true;
+    fileStatus.textContent = '正在讀取資料與診斷年度…';
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const response = await fetch('/api/indicators/upload', { method: 'POST', body: formData });
+      const result = await response.json();
+      if (!response.ok || !result.ok) throw new Error(result.error || '資料上傳失敗。');
+      const years = result.years || [];
+      if (!years.length) throw new Error('找不到可用的診斷年度欄位，請確認資料欄位內容。');
+      availableYears = years;
+      startSelect.innerHTML = `<option value="">起始年度</option>${years.map(year => `<option value="${year}">${year}</option>`).join('')}`;
+      endSelect.innerHTML = '<option value="">結束年度</option>';
+      startSelect.value = '';
+      endSelect.value = '';
+      startSelect.disabled = false;
+      endSelect.disabled = true;
+      cancerInputs.forEach(input => { input.disabled = false; });
+      uploaded = true;
+      fileStatus.textContent = `已載入 ${result.filename}，共 ${result.record_count.toLocaleString()} 筆資料；診斷年度範圍 ${years[0]}–${years[years.length - 1]}。`;
+    } catch (error) {
+      uploaded = false;
+      fileStatus.textContent = error.message || '資料上傳失敗。';
+    } finally {
+      uploadButton.disabled = false;
+      updateReadyState();
+    }
+  });
+
+  const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (character) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+  }[character]));
+
+  const renderIndicatorsPreview = (result) => {
+    const cancerLabels = Object.fromEntries(cancerInputs.map((input) => [
+      input.value, input.parentElement.querySelector('span').childNodes[0].textContent.trim()
+    ]));
+    const reports = result.reports || [];
+    const content = reports.map((report) => {
+      const cancerName = cancerLabels[report.cancer_key] || report.cancer_key;
+      if (!report.indicators || !report.indicators.length) {
+        return `<div class="alert alert-warning mb-3"><strong>${escapeHtml(cancerName)}</strong><div>${escapeHtml(report.message || '尚未設定監測指標定義。')}</div></div>`;
+      }
+      const exclusion = report.global_exclusions || {};
+      const reasonSummary = Object.entries(exclusion.excluded_by_reason || {}).map(([reason, count]) => `${escapeHtml(reason)} ${Number(count).toLocaleString()} 筆`).join('；');
+      const warnings = (exclusion.warnings || []).map(warning => `<div class="small text-warning-emphasis mt-1">${escapeHtml(warning)}</div>`).join('');
+      const rows = report.indicators.map((indicator) => `<tr>
+        <td>${escapeHtml(cancerName)}</td>
+        <td>${escapeHtml(indicator.id)}</td>
+        <td class="text-start">${escapeHtml(indicator.name)}</td>
+        <td class="text-start">${escapeHtml(indicator.numerator_definition)}</td>
+        <td class="text-start">${escapeHtml(indicator.denominator_definition)}</td>
+        <td>${Number(indicator.numerator || 0).toLocaleString()}</td>
+        <td>${Number(indicator.denominator || 0).toLocaleString()}</td>
+        <td>${indicator.percentage == null ? '-' : `${escapeHtml(indicator.percentage)}%`}</td>
+      </tr>`).join('');
+      return `<div class="mb-4">
+        <div class="small text-secondary mb-2">符合年度與癌別 ${Number(report.input_count || 0).toLocaleString()} 筆；共用排除規則後納入 ${Number(report.included_count || 0).toLocaleString()} 筆${reasonSummary ? `；排除：${reasonSummary}` : ''}。</div>
+        ${warnings}
+        <div class="table-responsive"><table class="table table-bordered align-middle text-center mb-0"><thead><tr><th>癌別</th><th>指標編號</th><th>指標名稱</th><th>分子定義</th><th>分母定義</th><th>分子件數</th><th>分母件數</th><th>監測結果(%)</th></tr></thead><tbody>${rows}</tbody></table></div>
+      </div>`;
+    }).join('');
+    preview.className = 'indicators-result';
+    preview.innerHTML = `<div class="mb-3"><strong>${escapeHtml(startSelect.value)}–${escapeHtml(endSelect.value)} 年指標結果預覽</strong></div>${content}`;
+  };
+
+  previewButton.addEventListener('click', async () => {
+    const cancers = cancerInputs.filter(input => input.checked).map(input => input.value);
+    const originalLabel = previewButton.innerHTML;
+    previewButton.disabled = true;
+    previewButton.innerHTML = '<span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>產生中…';
+    preview.className = 'indicators-result-empty';
+    preview.textContent = '正在依指標定義計算分子與分母…';
+    try {
+      const response = await fetch('/api/indicators/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ year_start: startSelect.value, year_end: endSelect.value, cancers })
+      });
+      const result = await response.json();
+      if (!response.ok || !result.ok) throw new Error(result.error || '監測內容產生失敗。');
+      renderIndicatorsPreview(result);
+    } catch (error) {
+      preview.className = 'alert alert-danger mb-0';
+      preview.textContent = error.message || '監測內容產生失敗。';
+    } finally {
+      previewButton.innerHTML = originalLabel;
+      updateReadyState();
+    }
+  });
+})();
+</script>
+{% endblock %}

@@ -13,7 +13,7 @@ from modules.blueprint.auth.key_application import key_application_bp
 from modules.services.home import register_main_routes
 from modules.services.audit import register_audit_logging
 from modules.config import get_env, get_int_env
-from modules.services import auth_bp, clean_bp, dashboard_bp, data_gen_bp, login_required
+from modules.services import auth_bp, clean_bp, dashboard_bp, data_gen_bp, indicators_bp, login_required
 import modules.blueprint.auth.histology_code
 import modules.blueprint.auth.key_access
 import modules.blueprint.auth.national_import
@@ -47,7 +47,7 @@ def create_app():
             raise RuntimeError("PROXY_COUNT must be 1 in production")
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=proxy_count, x_proto=proxy_count, x_host=proxy_count, x_port=proxy_count)
 
-    for blueprint in (auth_bp, member_bp, audit_logs_bp, clean_bp, data_gen_bp, dashboard_bp, key_application_bp, key_approval_bp):
+    for blueprint in (auth_bp, member_bp, audit_logs_bp, clean_bp, data_gen_bp, dashboard_bp, indicators_bp, key_application_bp, key_approval_bp):
         app.register_blueprint(blueprint)
     register_main_routes(app, app_env, login_required)
     register_audit_logging(app)
