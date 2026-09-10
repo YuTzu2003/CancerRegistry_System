@@ -10,7 +10,7 @@ def inject_nav():
     nav_items = [
         {"title": "資料審核", "icon": "bi-funnel", "subitems": [
             {"endpoint": "clean.clean", "title": "資料清洗", "icon": "bi-play-circle"},
-            {"endpoint": "history.history", "title": "資料審核紀錄", "icon": "bi-file-earmark-text"},
+            {"endpoint": "clean.history", "title": "資料審核紀錄", "icon": "bi-file-earmark-text"},
         ]},
         {"endpoint": "data_gen.dataGen", "title": "虛擬資料生成", "icon": "bi-database-add"},
         {"endpoint": "key_application.application", "title": "權限申請", "icon": "bi-key"},
