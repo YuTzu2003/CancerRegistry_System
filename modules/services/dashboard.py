@@ -2,7 +2,7 @@ from flask import Blueprint, request, session, jsonify
 from modules.services.auth import login_required, admin_required
 from modules.services.db import get_conn
 from modules.blueprint.dashboard import load_user_favorites, save_user_favorites
-from modules.blueprint.dashboard.reply import get_chart_insight_logic, get_compare_insight_logic
+from modules.services.llm_tasks import create_llm_task, get_llm_task, list_llm_tasks
 from modules.blueprint.dashboard.definition.cancer_group_rules import CANCER_GROUP_RULES
 from flask import send_file
 from modules.blueprint.dashboard.export_report import generate_export_files
@@ -213,25 +213,39 @@ def dashboard_delete():
 def chart_insight_route():
     try:
         data = request.json or {}
-        result = get_chart_insight_logic(data)
-        return jsonify(result), 200
-    except Exception as e:
-        logging.error(f"Error in chart_insight_route: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
+        owned_file = _get_owned_dashboard_file(data.get("file_id", ""), session.get("id"))
+        data["_document_label"] = owned_file["display_name"] if owned_file else "年報分析"
+        return jsonify({"success": True, **create_llm_task(session.get("id"), "chart", data)}), 202
+    except Exception as exc:
+        logging.exception("Unable to queue chart insight")
+        return jsonify({"success": False, "error": str(exc)}), 500
 
 @dashboard_bp.route("/api/dashboard/compare_insight", methods=["POST"])
 @login_required
 def compare_insight_route():
     try:
         data = request.json or {}
-        result = get_compare_insight_logic(data)
-        status_code = 200 if result.get("success") else 400
-        return jsonify(result), status_code
-    except Exception as e:
-        logging.error(f"Error in compare_insight_route: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
+        return jsonify({"success": True, **create_llm_task(session.get("id"), "compare", data)}), 202
+    except Exception as exc:
+        logging.exception("Unable to queue comparison insight")
+        return jsonify({"success": False, "error": str(exc)}), 500
 
+@dashboard_bp.route("/api/llm-tasks/<task_id>", methods=["GET", "DELETE"])
+@login_required
+def llm_task_status(task_id):
+    if request.method == "DELETE":
+        from modules.services.llm_tasks import delete_llm_task
+        deleted = delete_llm_task(task_id, session.get("id"))
+        return jsonify({"success": deleted})
+
+    task = get_llm_task(task_id, session.get("id"))
+    if not task: return jsonify({"success": False, "error": "找不到任務"}), 404
+    return jsonify({"success": True, "task": task})
+
+@dashboard_bp.route("/api/llm-tasks")
+@login_required
+def llm_task_history():
+    return jsonify({"success": True, "tasks": list_llm_tasks(session.get("id"), request.args.get("limit", 50))})
 @dashboard_bp.route('/api/favorites', methods=['GET'])
 @login_required
 def get_favorites():

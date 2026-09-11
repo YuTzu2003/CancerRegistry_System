@@ -6,6 +6,7 @@
   <script src="/static/vendor/i18next/i18next.min.js"></script>
   <link rel="stylesheet" href="/static/css/dashboard/dashboard.css?v=20260825-export-ai-progress">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/dashboard_page.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/llm_task_panel.css') }}?v=13">
 {% endblock %}
 
 {% block content %}
@@ -332,10 +333,12 @@
   </div>
 </div>
 
+<section id="annualLlmTaskPanel" style="margin-bottom: 22px;" data-llm-task-type="chart" data-llm-record-title="年報製作紀錄"></section>
 <script id="dashboardCancerNameTranslationsData" type="application/json">
   {{ cancer_name_translations | tojson }}
 </script>
 <script src="{{ url_for('static', filename='js/dashboard/dashboard_page.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard/llm_task_panel.js') }}?v=13"></script>
 <script src="{{ url_for('static', filename='js/dashboard/dashboard_i18n.js') }}?v=20260828-llm-retry-scope"></script>
 <script src="{{ url_for('static', filename='js/dashboard/annual_report_renderer.js') }}?v=20260729-common-cancers"></script>
 <script src="{{ url_for('static', filename='js/dashboard/dashboard.js') }}?v=20260828-llm-three-attempts"></script>

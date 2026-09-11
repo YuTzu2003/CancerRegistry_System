@@ -1687,6 +1687,10 @@ window.DashboardRenderer.fetchLlmInsight = function(fieldKey, chartData, fields,
             }
         })
         .then(data => {
+            if (data.task_id) {
+                window.dispatchEvent(new CustomEvent('llm-task-created'));
+                return { success: false, queued: true, task_id: data.task_id };
+            }
             if (data.success) {
                 if (this.insightCacheGeneration === cacheGeneration) {
                     Object.entries(data.insights || {}).forEach(([resultLanguage, insight]) => {
@@ -1719,7 +1723,7 @@ window.DashboardRenderer.fetchLlmInsightWithRetry = async function(fieldKey, cha
                 fieldKey, chartData, fields, responseContainerId, buttonId,
                 { ...options, forceRefresh: options.forceRefresh === true || attempt > 0 }
             );
-            if (result?.success) return result;
+            if (result?.success || result?.queued) return result;
         }
         return result;
     };
