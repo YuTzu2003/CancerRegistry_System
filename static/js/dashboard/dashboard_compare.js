@@ -1,4 +1,10 @@
 (function() {
+  const previewDataElement = document.getElementById('comparisonPreviewData');
+  let comparisonPreview = null;
+  try { comparisonPreview = previewDataElement ? JSON.parse(previewDataElement.textContent || '{}') : null; } catch (error) {}
+  const isComparisonPreview = Boolean(comparisonPreview?.task && comparisonPreview?.payload);
+  const previewNarratives = new Map();
+
   window.AnnualReportRenderer?.applyConditionCatalog(document, 'comparison');
 
   const mainFile = document.getElementById('mainCompareFile');
@@ -2193,7 +2199,57 @@
     return `${window.DashboardI18n?.getLanguage() || 'zh-TW'}|${analysisItem}${stageSystem}`;
   }
 
+  function previewNarrativeKey(analysisItem) {
+    const stageSystem = analysisItem === '期別與首次療程'
+      ? activeTreatmentStageSystem
+      : analysisItem === '期別與手術術式' ? activeSurgeryTableKey : '';
+    return `${analysisItem}|${stageSystem || ''}`;
+  }
+
+  function previewNarrativeItemId(analysisItem) {
+    const fieldKey = previewNarrativeKey(analysisItem);
+    return comparisonPreview?.payload?.items?.find(item => item.field_key === fieldKey)?.item_id || '';
+  }
+
+  function regeneratePreviewNarrative() {
+    const itemId = previewNarrativeItemId(activeAiNarrativeItem);
+    const retryButton = document.getElementById('btnRetryAiNarrative');
+    const text = document.getElementById('compareAiNarrativeText');
+    if (!isComparisonPreview || !itemId) return;
+    retryButton.disabled = true;
+    text.textContent = '正在重新產生 LLM 敘述…';
+    fetch(`/api/llm-tasks/${encodeURIComponent(comparisonPreview.task.TaskID)}/regenerate/${encodeURIComponent(itemId)}`, { method: 'POST' })
+      .then(response => response.json().then(result => ({ response, result })))
+      .then(({ response, result }) => {
+        if (!response.ok || !result.success) throw new Error(result.error || '無法重新產生敘述');
+        comparisonPreview.task = result.task;
+        aiNarrativeCache.clear();
+        updatePreviewNarratives(result.task);
+        renderAiNarrative(lastComparisonData, activeAiNarrativeItem, true);
+        refreshComparisonPreviewTask();
+      })
+      .catch(error => {
+        text.textContent = error.message;
+        retryButton.disabled = false;
+      });
+  }
+  function updatePreviewNarratives(task) {
+    previewNarratives.clear();
+    (task?.result || []).forEach(entry => {
+      if (entry?.field_key) previewNarratives.set(entry.field_key, entry.result || {});
+    });
+  }
   function fetchAiNarrative(data, analysisItem, force = false) {
+    if (isComparisonPreview) {
+      const result = previewNarratives.get(previewNarrativeKey(analysisItem));
+      if (result?.success) {
+        const stageSystemAtRequest = analysisItem === '期別與首次療程' ? activeTreatmentStageSystem : analysisItem === '期別與手術術式' ? activeSurgeryTableKey : '';
+        const insights = result.insights || {};
+        Object.entries(insights).forEach(([language, insight]) => aiNarrativeCache.set(`${language}|${analysisItem}${stageSystemAtRequest ? `|${stageSystemAtRequest}` : ''}`, insight));
+        return Promise.resolve(insights[window.DashboardI18n?.getLanguage() || 'zh-TW'] || result.insight || 'LLM 敘述正在處理中…');
+      }
+      return Promise.resolve('LLM 敘述正在處理中…');
+    }
     const stageSystemAtRequest = analysisItem === '期別與首次療程' ? activeTreatmentStageSystem : analysisItem === '期別與手術術式' ? activeSurgeryTableKey : '';
     const language = window.DashboardI18n?.getLanguage() || 'zh-TW';
     const cacheKey = `${language}|${analysisItem}${stageSystemAtRequest ? `|${stageSystemAtRequest}` : ''}`;
@@ -2244,11 +2300,12 @@
     const retryButton = document.getElementById('btnRetryAiNarrative');
     activeAiNarrativeItem = analysisItem;
     section.classList.remove('d-none');
-    retryButton.disabled = true;
+    retryButton.classList.remove('d-none');
+    retryButton.disabled = isComparisonPreview && !['completed', 'partial_failed', 'failed'].includes(comparisonPreview.task.Status);
     const cacheKey = aiNarrativeCacheKey(analysisItem);
     if (!force && aiNarrativeCache.has(cacheKey)) {
       text.textContent = aiNarrativeCache.get(cacheKey);
-      retryButton.disabled = false;
+      retryButton.disabled = isComparisonPreview && !['completed', 'partial_failed', 'failed'].includes(comparisonPreview.task.Status);
       return Promise.resolve(aiNarrativeCache.get(cacheKey));
     }
     const requestId = ++aiNarrativeRequestId;
@@ -2259,7 +2316,7 @@
         if (requestId === aiNarrativeRequestId && activeAiNarrativeItem === analysisItem) text.textContent = insight;
       })
       .finally(() => {
-        if (requestId === aiNarrativeRequestId && activeAiNarrativeItem === analysisItem) retryButton.disabled = false;
+        if (requestId === aiNarrativeRequestId && activeAiNarrativeItem === analysisItem) retryButton.disabled = isComparisonPreview && !['completed', 'partial_failed', 'failed'].includes(comparisonPreview.task.Status);
       });
   }
 
@@ -2554,7 +2611,8 @@
     updateButtonState();
   });
   document.getElementById('btnRetryAiNarrative').addEventListener('click', () => {
-    if (lastComparisonData && activeAiNarrativeItem) renderAiNarrative(lastComparisonData, activeAiNarrativeItem, true);
+    if (isComparisonPreview) regeneratePreviewNarrative();
+    else if (lastComparisonData && activeAiNarrativeItem) renderAiNarrative(lastComparisonData, activeAiNarrativeItem, true);
   });
   resetButton.addEventListener('click', resetComparison);
   document.getElementById('btnReselectMain').addEventListener('click', () => {
@@ -2563,6 +2621,43 @@
   document.getElementById('btnReselectTarget').addEventListener('click', () => {
     reselectData(targetFile, targetYear, targetYearEnd, targetMeta, targetPreview, '比較期資料預覽');
   });
+  function applyComparisonPreviewState() {
+    const state = comparisonPreview?.payload?.comparison_state || {};
+    window.selectedCancers = new Set(state.cancers || []);
+    window.dashboardSelectedCancerTitle = state.cancer_title || 'XX';
+    const modeInput = Array.from(document.querySelectorAll('input[name="compareMode"]')).find(input => input.value === state.compare_mode);
+    const typeInput = Array.from(document.querySelectorAll('input[name="compareType"]')).find(input => input.value === state.compare_type);
+    if (modeInput) modeInput.checked = true;
+    if (typeInput) typeInput.checked = true;
+    if (behavior && state.behavior) behavior.value = state.behavior;
+    if (modeAi && state.mode_ai) modeAi.value = state.mode_ai;
+    const stageModeId = state.stage_selection?.mode === 'detailed' ? 'compareItemStageDetailed' : 'compareItemStageSummary';
+    const stageMode = document.getElementById(stageModeId);
+    if (stageMode && state.stage_selection?.mode) stageMode.checked = true;
+    renderCompareSubItems();
+    if (state.stage_selection?.mode) updateCompareStageOptions();
+    const selectedItems = new Set(state.compare_items || []);
+    document.querySelectorAll('.compare-subitem-check, .compare-stage-option').forEach(input => {
+      if (selectedItems.has(input.value)) {
+        input.disabled = false;
+        input.checked = true;
+      }
+    });
+  }
+
+  function refreshComparisonPreviewTask() {
+    if (!isComparisonPreview) return;
+    fetch(`/api/llm-tasks/${encodeURIComponent(comparisonPreview.task.TaskID)}`)
+      .then(response => response.ok ? response.json() : Promise.reject(new Error('Unable to load task')))
+      .then(payload => {
+        if (!payload.success || !payload.task) return;
+        comparisonPreview.task = payload.task;
+        updatePreviewNarratives(payload.task);
+        if (lastComparisonData && activeAiNarrativeItem) renderAiNarrative(lastComparisonData, activeAiNarrativeItem);
+        if (['queued', 'running', 'retrying'].includes(payload.task.Status)) window.setTimeout(refreshComparisonPreviewTask, 3000);
+      })
+      .catch(() => window.setTimeout(refreshComparisonPreviewTask, 5000));
+  }
   document.addEventListener('DOMContentLoaded', () => {
     setTimeout(updateButtonState, 0);
     const languagePicker = document.getElementById('compareLanguagePicker');
@@ -2573,6 +2668,12 @@
       });
     });
     window.DashboardCompare.rerenderCompareLanguage();
+    if (isComparisonPreview) {
+      applyComparisonPreviewState();
+      updatePreviewNarratives(comparisonPreview.task);
+      if (comparisonPreview.payload.comparison_data) renderResult(comparisonPreview.payload.comparison_data);
+      refreshComparisonPreviewTask();
+    }
   });
 
   runButton.addEventListener('click', () => {
@@ -2613,10 +2714,7 @@
     document.querySelectorAll('.compare-preview-toggle').forEach(button => { button.textContent = '查看資料預覽'; });
     resultBox.classList.add('d-none');
     runButton.disabled = true;
-    runButton.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> 資料分析中，請稍候…';
-    if (window.utils && window.utils.showLoading) {
-      window.utils.showLoading('資料分析中，請稍候…');
-    }
+    runButton.textContent = '正在建立任務…';
     const compareItems = selectedCompareItems();
     const stageOptions = [...selectedCompareStageOptions().options];
     if (compareItems.includes('期別與首次療程') || compareItems.includes('期別與手術術式')) {
@@ -2664,12 +2762,20 @@
           return;
         }
         const items = selectedCompareItems();
-        aiNarrativeCache.clear();
+        const selectedStageOptions = selectedCompareStageOptions();
+        const stageOptions = [...selectedStageOptions.options];
+        if (items.includes('期別與首次療程') || items.includes('期別與手術術式')) {
+          treatmentStageOptions().forEach(option => {
+            if (!stageOptions.some(selected => selected.system === option.system && selected.option === option.option)) {
+              stageOptions.push(option);
+            }
+          });
+        }
         const treatmentSystems = Array.from(new Set([
           ...(data.data.analysis_data?.main?.stageFirstCourseData || []).map(table => table.system),
           ...(data.data.analysis_data?.target?.stageFirstCourseData || []).map(table => table.system)
         ]));
-const originalTreatmentSystem = activeTreatmentStageSystem;
+        const originalTreatmentSystem = activeTreatmentStageSystem;
         const surgeryTables = [
           ...(data.data.analysis_data?.main?.stageSurgeryData || []),
           ...(data.data.analysis_data?.target?.stageSurgeryData || [])
@@ -2678,36 +2784,63 @@ const originalTreatmentSystem = activeTreatmentStageSystem;
         if (!surgeryTables.some(table => surgeryKeyOf(table) === activeSurgeryTableKey)) {
           activeSurgeryTableKey = surgeryKeyOf(surgeryTables[0] || {});
         }
+        const originalSurgeryKey = activeSurgeryTableKey;
         const narrativeRequests = items.flatMap(item => {
-          if (item !== '期別與首次療程') return [{ item, stageSystem: '' }];
+          if (item !== '期別與首次療程') return [{ item, treatmentStageSystem: '', surgeryKey: item === '期別與手術術式' ? activeSurgeryTableKey : '' }];
           return treatmentSystems.length
-            ? treatmentSystems.map(stageSystem => ({ item, stageSystem }))
-            : [{ item, stageSystem: '' }];
+            ? treatmentSystems.map(treatmentStageSystem => ({ item, treatmentStageSystem, surgeryKey: '' }))
+            : [{ item, treatmentStageSystem: '', surgeryKey: '' }];
         });
-        let completedNarratives = 0;
-        const updateNarrativeProgress = () => {
-          if (window.utils && window.utils.showLoading) {
-            window.utils.showLoading(`正在產生 LLM 敘述（${completedNarratives}/${narrativeRequests.length}）…`);
-          }
+        const jobItems = narrativeRequests.map(({ item, treatmentStageSystem, surgeryKey }, index) => {
+          activeTreatmentStageSystem = treatmentStageSystem;
+          activeSurgeryTableKey = surgeryKey || originalSurgeryKey;
+          const comparisonPayload = buildAiComparisonPayload(data.data, item);
+          return {
+            item_id: `comparison-${index + 1}`,
+            field_key: previewNarrativeKey(item),
+            analysis_item: item,
+            comparison_direction: comparisonPayload.comparison_direction,
+            selected_conditions: comparisonPayload.selected_conditions,
+            baseline: comparisonPayload.baseline,
+            comparison: comparisonPayload.comparison,
+            total_difference: comparisonPayload.total_difference,
+            mode_ai: modeAi.value,
+            language: window.DashboardI18n?.getLanguage() || 'zh-TW'
+          };
+        });
+        activeTreatmentStageSystem = originalTreatmentSystem;
+        activeSurgeryTableKey = originalSurgeryKey;
+        const comparisonState = {
+          compare_mode: selectedCompareMode(),
+          compare_type: selectedCompareType(),
+          compare_items: items,
+          stage_selection: selectedStageOptions,
+          cancers: selectedCancerValues(),
+          cancer_title: selectedCancerTitle(),
+          behavior: behavior.value,
+          mode_ai: modeAi.value
         };
-        updateNarrativeProgress();
-        return narrativeRequests.reduce((chain, { item, stageSystem }) => chain.then(() => {
-          activeTreatmentStageSystem = stageSystem;
-          return fetchAiNarrative(data.data, item).finally(() => {
-            completedNarratives += 1;
-            updateNarrativeProgress();
-          });
-        }), Promise.resolve())
-          .then(() => {
-            activeTreatmentStageSystem = originalTreatmentSystem;
-            renderResult(data.data);
-            setTimeout(() => resultBox.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+        return fetch('/api/dashboard/comparison-report-job', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            main_file_id: mainFile.value,
+            target_file_id: targetFile.value,
+            comparison_data: data.data,
+            comparison_state: comparisonState,
+            items: jobItems
+          })
+        })
+          .then(response => response.json().then(result => ({ response, result })))
+          .then(({ response, result }) => {
+            if (!response.ok || !result.success) throw new Error(result.error || '無法建立年度比較任務');
+            window.dispatchEvent(new CustomEvent('llm-task-created', { detail: result }));
+            runButton.innerHTML = '<i class="bi bi-check2 me-1"></i> 已建立工作任務';
           });
       })
       .catch(err => showAlert('比較失敗', err.message))
       .finally(() => {
-        if (window.utils && window.utils.hideLoading) window.utils.hideLoading();
-        runButton.innerHTML = '<i class="bi bi-columns-gap me-1"></i> 開始比較';
+        if (!runButton.textContent.includes('已建立')) runButton.innerHTML = '<i class="bi bi-columns-gap me-1"></i> 開始比較';
         updateButtonState();
       });
   });

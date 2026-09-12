@@ -91,6 +91,15 @@ def dashboard_preview(task_id):
     if not task or not payload:
         return jsonify({"success": False, "error": "找不到任務"}), 404
     return render_template("dashboard.html", active="dashboard", uploaded_files=[], cancer_name_translations=_get_cancer_name_translations(), pbi_publish_path="", preview_task=task, preview_payload=payload)
+@dashboard_bp.route("/comparison-preview/<task_id>")
+@login_required
+def comparison_preview(task_id):
+    from modules.services.llm_tasks import get_llm_task_payload
+    task = get_llm_task(task_id, session.get("id"))
+    payload = get_llm_task_payload(task_id, session.get("id"))
+    if not task or not payload or task.get("TaskType") != "comparison_report":
+        return jsonify({"success": False, "error": "找不到年度比較任務"}), 404
+    return render_template("compare.html", active="compare", uploaded_files=[], cancer_name_translations=_get_cancer_name_translations(), preview_task=task, preview_payload=payload)
 @dashboard_bp.route("/dashboard/upload", methods=["POST"])
 @login_required
 def dashboard_upload():
@@ -244,6 +253,24 @@ def annual_report_job_route():
     except Exception as exc:
         logging.exception("Unable to queue annual report")
         return jsonify({"success": False, "error": str(exc)}), 500
+@dashboard_bp.route("/api/dashboard/comparison-report-job", methods=["POST"])
+@login_required
+def comparison_report_job_route():
+    try:
+        data = request.json or {}
+        items = data.get("items", [])
+        if not isinstance(items, list) or not items:
+            return jsonify({"success": False, "error": "請至少選擇一個比較分析項目"}), 400
+        main_file = _get_owned_dashboard_file(data.get("main_file_id", ""), session.get("id"))
+        target_file = _get_owned_dashboard_file(data.get("target_file_id", ""), session.get("id"))
+        main_name = main_file["name"] if main_file else "基準資料"
+        target_name = target_file["name"] if target_file else "比較資料"
+        data["_document_label"] = f"{main_name} vs {target_name}"
+        data["job_title"] = "年度比較"
+        return jsonify({"success": True, **create_llm_task(session.get("id"), "comparison_report", data)}), 202
+    except Exception as exc:
+        logging.exception("Unable to queue comparison report")
+        return jsonify({"success": False, "error": str(exc)}), 500
 @dashboard_bp.route("/api/dashboard/compare_insight", methods=["POST"])
 @login_required
 def compare_insight_route():
@@ -279,8 +306,8 @@ def llm_task_preview(task_id):
     task = get_llm_task(task_id, session.get("id"))
     if not task or not task.get("preview_available"):
         return jsonify({"success": False, "error": "找不到圖表預覽"}), 404
-    from modules.services.llm_tasks import TASK_ROOT
-    return send_from_directory(TASK_ROOT / str(task_id), "chart_preview.png", mimetype="image/png")
+    from modules.services.llm_tasks import get_llm_task_directory
+    return send_from_directory(get_llm_task_directory(task['TaskType'], task_id), "chart_preview.png", mimetype="image/png")
 
 @dashboard_bp.route("/api/llm-tasks")
 @login_required

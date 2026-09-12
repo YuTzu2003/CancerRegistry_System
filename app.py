@@ -1,7 +1,10 @@
+import atexit
 import os
+from pathlib import Path
 from flask import session
 from modules.application import create_app
 from modules.server import run_server
+from modules.worker_process import start_llm_worker, stop_llm_worker
 
 app, APP_ENV, APP_DEBUG = create_app()
 
@@ -32,4 +35,12 @@ def inject_nav():
     return {"nav_items": nav_items, "llm_provider": provider, "llm_model": model}
 
 if __name__ == "__main__":
-    run_server(app, APP_ENV, APP_DEBUG)
+    worker = None
+    should_start_worker = not APP_DEBUG or os.environ.get("WERKZEUG_RUN_MAIN") == "true"
+    if should_start_worker:
+        worker = start_llm_worker(Path(__file__).resolve().parent)
+        atexit.register(stop_llm_worker, worker)
+    try:
+        run_server(app, APP_ENV, APP_DEBUG)
+    finally:
+        stop_llm_worker(worker)

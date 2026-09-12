@@ -28,7 +28,7 @@
     selected.forEach((item) => {
       const target = document.getElementById(item.response);
       if (!target) return;
-      target.textContent = results[item.field_key]?.['zh-TW'] || (['failed', 'partial_failed'].includes(currentTask.Status || currentTask.status) ? '此圖表敘述未能完成。' : '正在處理中…');
+      target.textContent = results[item.field_key]?.['zh-TW'] || (['failed', 'partial_failed', 'completed'].includes(currentTask.Status || currentTask.status) ? '此圖表敘述未能完成。' : '正在處理中…');
     });
     bindRegenerateButtons(currentTask);
   };
@@ -36,10 +36,10 @@
     try {
       const response = await fetch(`/api/llm-tasks/${encodeURIComponent(taskId)}`);
       const data = await response.json();
-      if (!response.ok || !data.task) return;
       applyNarratives(data.task);
       const status = data.task.Status || data.task.status;
-      document.querySelector('.page-head .lead').textContent = `${data.task.DocumentLabel || '年報分析'}｜${data.task.ProgressCurrent}/${data.task.ProgressTotal}｜${status}`;
+      const statusText = ['queued', 'running', 'retrying'].includes(status) ? '處理中' : status;
+      document.querySelector('.page-head .lead').textContent = `${data.task.DocumentLabel || '年報分析'}｜${statusText}｜${data.task.ProgressCurrent || 0}/${data.task.ProgressTotal || 0}`;
       if (['queued', 'running', 'retrying'].includes(status)) setTimeout(refreshNarratives, 3000);
     } catch (_) { setTimeout(refreshNarratives, 3000); }
   };

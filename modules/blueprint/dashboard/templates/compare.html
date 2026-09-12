@@ -6,6 +6,15 @@
   <script src="/static/vendor/i18next/i18next.min.js"></script>
   <link rel="stylesheet" href="/static/css/dashboard/dashboard.css?v=20260801-stage-card-compact">
   <link rel="stylesheet" href="/static/css/dashboard/dashboard_compare.css?v=20260801-stage-card-compact">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/llm_task_panel.css') }}?v=13">
+{% if preview_task %}
+  <style>
+    .compare-mode-bar,
+    #compareDataGrid,
+    .card-flat.compare-settings,
+    .compare-cancer-source { display: none !important; }
+  </style>
+{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -15,6 +24,11 @@
     <p class="lead">選擇基準期資料與比較期資料，檢視不同年度間的癌別統計分析結果。</p>
   </div>
 </div>
+{% if preview_task %}
+<div class="d-flex justify-content-end mb-4">
+  <button type="button" class="btn btn-outline-secondary" onclick="window.location.assign('/dashboard/compare')">返回上一頁</button>
+</div>
+{% endif %}
 
 <div class="compare-mode-bar" aria-label="比較模式">
   <span class="compare-label">比較模式</span>
@@ -326,13 +340,23 @@
   </section>
 </section>
 
+{% if not preview_task %}
+<section id="annualLlmTaskPanel" style="margin-bottom: 22px;" data-llm-task-type="comparison_report" data-llm-record-title="年度比較工作任務"></section>
+{% endif %}
+
 <div class="compare-cancer-source">
   {% include "control.html" %}
 </div>
 
 <script id="dashboardCancerNameTranslationsData" type="application/json">{{ cancer_name_translations | tojson }}</script>
+{% if preview_task %}
+<script id="comparisonPreviewData" type="application/json">{{ {"task": preview_task, "payload": preview_payload} | tojson }}</script>
+{% endif %}
 <script src="{{ url_for('static', filename='js/dashboard/compare_page.js') }}"></script>
 <script src="{{ url_for('static', filename='js/dashboard/dashboard_i18n.js') }}?v=20260802-unified-loading-copy"></script>
 <script src="{{ url_for('static', filename='js/dashboard/annual_report_renderer.js') }}?v=20260729-treatment-labels"></script>
-<script src="{{ url_for('static', filename='js/dashboard/dashboard_compare.js') }}?v=20260826-surgery-caption"></script>
+<script src="{{ url_for('static', filename='js/dashboard/dashboard_compare.js') }}?v=20260912-comparison-job"></script>
+{% if not preview_task %}
+<script src="{{ url_for('static', filename='js/dashboard/llm_task_panel.js') }}?v=14"></script>
+{% endif %}
 {% endblock %}
