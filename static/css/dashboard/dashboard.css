@@ -527,12 +527,11 @@
   table-layout: fixed;
 }
 
-.annual-histology-code-col { width: 20%; }
-.annual-histology-name-col { width: 50%; }
-.annual-histology-count-col { width: 13%; }
-.annual-histology-percent-col { width: 17%; }
+.annual-histology-name-col { width: 70%; }
+.annual-histology-count-col { width: 15%; }
+.annual-histology-percent-col { width: 15%; }
 
-.annual-histology-table td:nth-child(2) {
+.annual-histology-table td:nth-child(1) {
   overflow-wrap: anywhere;
   white-space: normal;
 }

@@ -77,6 +77,19 @@ def _rewrite(task_type, task_id, filename, rows):
     path.write_text(''.join(json.dumps(row, ensure_ascii=False, default=str) + '\n' for row in rows), encoding='utf-8')
 
 
+def _batched_task_status(inputs, outputs):
+    expected_ids = [entry.get('custom_id') for entry in inputs]
+    output_ids = [entry.get('custom_id') for entry in outputs]
+    is_complete = (
+        len(outputs) == len(inputs)
+        and len(set(expected_ids)) == len(expected_ids)
+        and len(set(output_ids)) == len(output_ids)
+        and set(output_ids) == set(expected_ids)
+        and all(entry.get('result', {}).get('success') for entry in outputs)
+    )
+    return 'completed' if is_complete else 'partial_failed'
+
+
 def _row(cursor, row):
     return dict(zip([column[0] for column in cursor.description], row))
 
@@ -240,9 +253,7 @@ def process_next_llm_task(worker_id):
                 retry_path.unlink(missing_ok=True)
             outputs = _rows(task_type, task_id, 'output.jsonl')
             inputs = _rows(task_type, task_id, 'input.jsonl')
-            missing_count = max(0, len(inputs) - len(outputs))
-            failures = sum(not row.get('result', {}).get('success') for row in outputs) + missing_count
-            status = 'partial_failed' if failures else 'completed'
+            status = _batched_task_status(inputs, outputs)
             _update(task_id, status=status)
             return {'task_id': task_id, 'status': status}
 

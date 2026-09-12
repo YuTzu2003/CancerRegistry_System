@@ -64,19 +64,16 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir, expo
             }
             /* Keep the histology table consistent in Chinese and English exports. */
             .annual-histology-table { table-layout: fixed; }
-            .annual-histology-table .annual-histology-code-col,
-            .annual-histology-table th:nth-child(1),
-            .annual-histology-table td:nth-child(1) { width: 20%; }
             .annual-histology-table .annual-histology-name-col,
-            .annual-histology-table th:nth-child(2),
-            .annual-histology-table td:nth-child(2) { width: 50%; }
+            .annual-histology-table th:nth-child(1),
+            .annual-histology-table td:nth-child(1) { width: 70%; }
             .annual-histology-table .annual-histology-count-col,
-            .annual-histology-table th:nth-child(3),
-            .annual-histology-table td:nth-child(3) { width: 13%; }
+            .annual-histology-table th:nth-child(2),
+            .annual-histology-table td:nth-child(2) { width: 15%; }
             .annual-histology-table .annual-histology-percent-col,
-            .annual-histology-table th:nth-child(4),
-            .annual-histology-table td:nth-child(4) { width: 17%; }
-            .annual-histology-table td:nth-child(2) {
+            .annual-histology-table th:nth-child(3),
+            .annual-histology-table td:nth-child(3) { width: 15%; }
+            .annual-histology-table td:nth-child(1) {
                 text-align: left;
                 overflow-wrap: anywhere;
                 word-break: break-word;

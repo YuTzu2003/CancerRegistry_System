@@ -787,7 +787,6 @@
           const pct = totalCount > 0 ? (Number(item.count || 0) / totalCount * 100).toFixed(1) : '0.0';
           return `
             <tr>
-              <td>${escapeHtml(item.code)}</td>
               <td class="text-start">${escapeHtml(item.name)}</td>
               <td>${Number(item.count || 0)}</td>
               <td>${pct}%</td>
@@ -796,11 +795,10 @@
         }).join('') + `
           <tr class="fw-bold" style="background-color: var(--gray-50);">
             <td>${t('total')}</td>
-            <td></td>
             <td>${totalCount}</td>
             <td>${validData.length ? '100.0%' : '0.0%'}</td>
           </tr>`
-      : `<tr><td colspan="4" class="text-center">${t('noData')}<br><span class="text-muted small">${noDataReason}</span></td></tr>`;
+      : `<tr><td colspan="3" class="text-center">${t('noData')}<br><span class="text-muted small">${noDataReason}</span></td></tr>`;
 
     const cancer = reportCancerTitle(cancerTitle);
 
@@ -813,17 +811,15 @@
       </div>
       <div data-compare-view-panel="table" class="d-none">
         <div class="annual-report-table-wrap">
-          <table class="annual-report-table compare-histology-table">
+          <table class="annual-report-table annual-histology-table compare-histology-table">
             <caption>${isEnglish() ? `Table. Histological Distribution of ${cancer},\u00a0${yearTitle}` : `表、${yearTitle}年${cancer}組織型態分佈表`}${sourceLine()}</caption>
             <colgroup>
-              <col style="width: 10%;">
-              <col style="width: 75%;">
-              <col style="width: 7.5%;">
-              <col style="width: 7.5%;">
+              <col class="annual-histology-name-col">
+              <col class="annual-histology-count-col">
+              <col class="annual-histology-percent-col">
             </colgroup>
             <thead>
               <tr>
-                <th>${t('icdoCode')}</th>
                 <th>${t('histology')}</th>
                 <th>${t('people')}</th>
                 <th>${isEnglish() ? '%' : `${t('percentage')}%`}</th>
@@ -2847,4 +2843,1756 @@
 
   renderCompareSubItems();
   updateButtonState();
+  // Dashboard-v3 chart and statistics renderers.
+  function t(key, options) {
+    return window.DashboardI18n?.t(key, options) || key;
+  }
+
+
+
+  function isEnglish() {
+    return window.DashboardI18n?.getLanguage() === 'en';
+  }
+
+
+
+  function sourceLine() {
+    return `<br><span class="text-muted fw-normal" style="font-size: 0.85em;">${t('source')}</span>`;
+  }
+
+
+
+  function selectedCancerEnglishTitle() {
+    const translations = window.dashboardCancerNameTranslations || {};
+    const values = selectedCancerValues();
+    const names = values.map(value => translations[value]?.en).filter(Boolean);
+    const fallback = selectedCancerTitle();
+    return names.length ? names.join(', ') : (translations[fallback]?.en || fallback || 'Cancer');
+  }
+
+
+
+  function englishCancerPatientLabel() {
+    const cancer = selectedCancerEnglishTitle();
+    return /cancer|carcinoma|lymphoma|leukemia/i.test(cancer) ? cancer : `${cancer} Cancer`;
+  }
+
+
+
+  function reportCancerTitle(cancerTitle) {
+    return isEnglish() ? englishCancerPatientLabel() : getCancerTitleForSentence(cancerTitle);
+  }
+
+
+
+  function getCancerTitleForSentence(cancerTitle) {
+    if (!cancerTitle || cancerTitle === 'XX') return 'XX癌';
+    if (cancerTitle.includes('癌') || cancerTitle.includes('全癌別')) return cancerTitle;
+    return `${cancerTitle}癌`;
+  }
+
+
+
+  function selectedCancerTitle() {
+    return window.dashboardSelectedCancerTitle && window.dashboardSelectedCancerTitle !== 'XX'
+      ? window.dashboardSelectedCancerTitle
+      : 'XX';
+  }
+
+
+
+  function sum(values) {
+    return window.AnnualReportRenderer.sum(values);
+  }
+
+
+
+  function axisLabelLines(value, maxLength = 68) {
+    return window.AnnualReportRenderer.axisLabelLines(value, maxLength);
+    const lines = [];
+    const segments = String(value ?? '')
+      .trim()
+      .replace(/\s*(?=[\[［])/g, '\n')
+      .split('\n')
+      .filter(Boolean);
+    segments.forEach(segment => {
+      let line = '';
+      const segmentMaxLength = /^[\[［]/.test(segment) ? 88 : 82;
+      segment.split(/\s+/).filter(Boolean).forEach(word => {
+        const candidate = line ? `${line} ${word}` : word;
+        if (line && candidate.length > segmentMaxLength) {
+          lines.push(line);
+          line = word;
+        } else {
+          line = candidate;
+        }
+      });
+      if (line) lines.push(line);
+    });
+    return lines.length ? lines : [''];
+  }
+
+
+
+  function rightAlignedAxisLabel(value, maxLength = 68) {
+    return window.AnnualReportRenderer.rightAlignedAxisLabel(value, maxLength);
+    return axisLabelLines(value, maxLength)
+      .map(text => `{${/^[\[［]/.test(text) ? 'bracket' : 'right'}|${text}}`)
+      .join('\n');
+  }
+
+
+
+  function histologyAxisLabel(value) {
+    const text = String(value ?? '').replace(/\s*\n\s*/g, ' ').trim();
+    // The in-situ suffix is part of the histology name, so keep it on one line.
+    return /[\u3400-\u9fff]/.test(text) || /\(in situ\)$/i.test(text)
+      ? `{right|${text}}`
+      : rightAlignedAxisLabel(text);
+  }
+
+
+
+  function histologyRowHeight(names) {
+    const maxLines = Math.max(1, ...(names || []).map(name => {
+      const text = String(name ?? '').replace(/\s*\n\s*/g, ' ').trim();
+      return /[\u3400-\u9fff]/.test(text) || /\(in situ\)$/i.test(text)
+        ? 1
+        : axisLabelLines(text).length;
+    }));
+    return Math.max(40, maxLines * 18 + 8);
+  }
+
+
+
+  function normalizeGenderAgeData(genderAgeData) {
+    return window.AnnualReportRenderer.normalizeGenderAgeData(genderAgeData);
+    const labels = ['≦19', '20-24', '25-29', '30-34', '35-39', '40-44', '45-49', '50-54', '55-59', '60-64', '65-69', '70-74', '75-79', '80-84', '≧85'];
+    const categories = genderAgeData?.categories?.length ? genderAgeData.categories : labels;
+    const fillValues = values => {
+      const source = Array.isArray(values) ? values : [];
+      return categories.map((_, index) => Number(source[index] || 0));
+    };
+
+    return {
+      categories,
+      male: fillValues(genderAgeData?.male),
+      female: fillValues(genderAgeData?.female),
+      total: fillValues(genderAgeData?.total)
+    };
+  }
+
+
+
+  function getGenderAgeChartOption(genderAgeData, sharedMax = null) {
+    const data = normalizeGenderAgeData(genderAgeData);
+    const maxValue = Math.max(0, ...data.male, ...data.female, ...data.total);
+    const yMax = sharedMax || Math.max(10, Math.ceil((maxValue * 1.15) / 5) * 5);
+
+    return {
+      title: {
+        text: '性別與年齡分佈',
+        subtext: '資料來源：癌症登記資料庫',
+        left: 'center',
+        top: 0,
+        textStyle: { fontSize: 18, fontWeight: 'bold' }
+      },
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      grid: { left: 72, right: 72, top: 70, bottom: 78, containLabel: false },
+      legend: { data: ['男性', '女性', '總計'], bottom: 28, itemGap: 12 },
+      toolbox: {
+        right: 16,
+        top: 0,
+        feature: {
+          dataView: { show: true, readOnly: false, title: '數據檢視', lang: ['數據檢視', '關閉', '更新'] },
+          saveAsImage: { show: true, title: '下載圖片' }
+        }
+      },
+      xAxis: [{
+        type: 'category',
+        data: data.categories,
+        axisPointer: { type: 'shadow' },
+        axisTick: { alignWithLabel: true },
+        axisLabel: { interval: 0 }
+      }],
+      yAxis: [{
+        type: 'value',
+        name: '個案數',
+        min: 0,
+        max: yMax,
+        minInterval: 1,
+        splitNumber: 5,
+        splitLine: { lineStyle: { color: '#e5eaf3' } }
+      }],
+      series: [
+        { name: '男性', type: 'bar', data: data.male, barWidth: 20, barGap: '20%', barCategoryGap: '42%', itemStyle: { color: '#5470C6' } },
+        { name: '女性', type: 'bar', data: data.female, barWidth: 20, itemStyle: { color: '#EE6666' } },
+        { name: '總計', type: 'bar', data: data.total, barWidth: 20, z: 5, itemStyle: { color: '#91CC75' } }
+      ]
+    };
+  }
+
+
+
+  function sexAgeBlock(chartData, yearTitle, cancerTitle, chartId) {
+    const genderAgeData = normalizeGenderAgeData(chartData?.genderAgeData || {});
+    const ageLabels = genderAgeData.categories;
+    const male = genderAgeData.male || [];
+    const female = genderAgeData.female || [];
+    const total = genderAgeData.total || [];
+    return `
+      ${viewSwitchBlock()}
+      <div data-compare-view-panel="chart">
+        <div id="${chartId}" class="compare-chart"></div>
+        <div class="compare-chart-caption">圖、${yearTitle}年新診斷${getCancerTitleForSentence(cancerTitle)}病患性別及年齡分佈圖</div>
+      </div>
+      <div data-compare-view-panel="table" class="d-none">
+        <div class="annual-report-table-wrap">
+          <table class="annual-report-table">
+            <caption>表、${yearTitle}年新診斷${getCancerTitleForSentence(cancerTitle)}病患性別及年齡分佈表<br><span class="text-muted fw-normal" style="font-size: 0.85em;">資料來源：癌症登記資料庫</span></caption>
+            <thead>
+              <tr><th rowspan="2">性別</th><th colspan="${ageLabels.length}">年齡層次</th><th rowspan="2">總計</th></tr>
+              <tr>${ageLabels.map(label => `<th>${label}</th>`).join('')}</tr>
+            </thead>
+            <tbody>
+              <tr><td>男</td>${male.map(value => `<td>${value}</td>`).join('')}<td>${sum(male)}</td></tr>
+              <tr><td>女</td>${female.map(value => `<td>${value}</td>`).join('')}<td>${sum(female)}</td></tr>
+              <tr><td>總計</td>${total.map(value => `<td>${value}</td>`).join('')}<td>${sum(total)}</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+
+
+  function getUpdatedGenderAgeChartOption(genderAgeData, sharedMax = null, yearTitle = '', cancerTitle = '') {
+    return window.AnnualReportRenderer.getGenderAgeChartOption(genderAgeData, {
+      sharedMax,
+      title: isEnglish()
+        ? `Age and Sex Distribution of Newly Diagnosed with ${reportCancerTitle(cancerTitle)} Patients, ${yearTitle}`
+        : (yearTitle ? `${yearTitle}年新診斷${reportCancerTitle(cancerTitle)}病患性別及年齡分布圖` : '性別及年齡分布圖'),
+      source: t('source'),
+      labels: {
+        male: t('male'),
+        female: t('female'),
+        total: t('total'),
+        age: t('age'),
+        dataView: t('dataView'),
+        close: t('close'),
+        refresh: t('refresh'),
+        downloadImage: t('downloadImage')
+      }
+    });
+    const raw = normalizeGenderAgeData(genderAgeData);
+    const data = {
+      ...raw,
+      categories: raw.categories.map(label => ['<=19', '≤19', '≦19'].includes(label) ? '≦19' : ['>=85', '≥85', '≧85'].includes(label) ? '≧85' : label)
+    };
+    const maxValue = Math.max(0, ...data.male, ...data.female, ...data.total);
+    const yMax = sharedMax || Math.max(10, Math.ceil((maxValue * 1.15) / 5) * 5);
+    const cancer = reportCancerTitle(cancerTitle);
+    const title = isEnglish()
+      ? `Age and Sex Distribution of Newly Diagnosed with ${cancer} Patients, ${yearTitle}`
+      : (yearTitle ? `${yearTitle}年新診斷${cancer}病患性別及年齡分佈圖` : '性別及年齡分佈圖');
+    const legendLabels = [t('male'), t('female'), t('total')];
+
+    return {
+      title: { text: title, subtext: t('source'), left: 'center', top: 0, textStyle: { fontSize: 18, fontWeight: 'bold' }, subtextStyle: { fontSize: 12 } },
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      grid: { left: 72, right: 72, top: 98, bottom: 74, containLabel: false },
+      legend: { data: legendLabels, top: 52, left: 'center', itemGap: 12 },
+      toolbox: { right: 16, top: 0, feature: { dataView: { show: true, readOnly: false, title: t('dataView'), lang: [t('dataView'), t('close'), t('refresh')] }, saveAsImage: { show: true, title: t('downloadImage') } } },
+      xAxis: [{ type: 'category', data: data.categories, name: t('age'), nameLocation: 'middle', nameGap: 30, axisPointer: { type: 'shadow' }, axisTick: { alignWithLabel: true }, axisLabel: { interval: 0 } }],
+      yAxis: [{ type: 'value', min: 0, max: yMax, minInterval: 1, splitNumber: 5, splitLine: { lineStyle: { color: '#e5eaf3' } } }],
+      series: [
+        { name: legendLabels[0], type: 'bar', data: data.male, barWidth: 20, barGap: '20%', barCategoryGap: '42%', itemStyle: { color: '#5470C6' } },
+        { name: legendLabels[1], type: 'bar', data: data.female, barWidth: 20, itemStyle: { color: '#EE6666' } },
+        { name: legendLabels[2], type: 'bar', data: data.total, barWidth: 20, z: 5, itemStyle: { color: '#91CC75' } }
+      ]
+    };
+  }
+
+
+
+  function sexAgeBlockV2(chartData, yearTitle, cancerTitle, chartId) {
+    const genderAgeData = normalizeGenderAgeData(chartData?.genderAgeData || {});
+    const ageLabels = genderAgeData.categories.map(label => ['<=19', '≤19', '≦19'].includes(label) ? '≦19' : ['>=85', '≥85', '≧85'].includes(label) ? '≧85' : label);
+    const male = genderAgeData.male || [];
+    const female = genderAgeData.female || [];
+    const total = genderAgeData.total || [];
+    const totalCount = sum(total);
+    const percentage = value => totalCount ? `${(Number(value || 0) / totalCount * 100).toFixed(1)}%` : '0.0%';
+    const cancer = reportCancerTitle(cancerTitle);
+    return `
+      ${viewSwitchBlock()}
+      <div data-compare-view-panel="chart">
+        <div id="${chartId}" class="compare-chart"></div>
+        <div class="compare-chart-caption">${isEnglish() ? `Figure : Age and Sex Distribution of Newly Diagnosed with ${cancer} Patients, ${yearTitle}` : `圖、${yearTitle}年新診斷${cancer}病患性別及年齡分佈圖`}</div>
+      </div>
+      <div data-compare-view-panel="table" class="d-none">
+        <div class="annual-report-table-wrap">
+          <table class="annual-report-table">
+            <caption>${isEnglish() ? `Table . Age and Sex Distribution of Newly Diagnosed with ${cancer} Patients,\u00a0${yearTitle}` : `表、${yearTitle}年新診斷${cancer}病患性別及年齡分佈表`}${sourceLine()}</caption>
+            <thead>
+              <tr><th rowspan="2">${t('sex')}</th><th colspan="${ageLabels.length}">${t('ageGroup')}</th><th rowspan="2">${t('subtotal')}</th><th rowspan="2">${t('percent')}</th></tr>
+              <tr>${ageLabels.map(label => `<th>${label}</th>`).join('')}</tr>
+            </thead>
+            <tbody>
+              <tr><td>${t('male')}</td>${male.map(value => `<td>${value}</td>`).join('')}<td>${sum(male)}</td><td>${percentage(sum(male))}</td></tr>
+              <tr><td>${t('female')}</td>${female.map(value => `<td>${value}</td>`).join('')}<td>${sum(female)}</td><td>${percentage(sum(female))}</td></tr>
+              <tr><td>${t('total')}</td>${total.map(value => `<td>${value}</td>`).join('')}<td>${totalCount}</td><td>${percentage(totalCount)}</td></tr>
+              <tr><td>%</td>${total.map(value => `<td>${percentage(value)}</td>`).join('')}<td>${percentage(totalCount)}</td><td>-</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+
+
+  function viewSwitchBlock() {
+    return `
+      <div class="compare-view-switch" role="group" aria-label="結果顯示方式">
+        <button type="button" class="compare-view-button active" data-compare-view="chart"><i class="bi bi-bar-chart me-1"></i>${t('chart')}</button>
+        <button type="button" class="compare-view-button" data-compare-view="table"><i class="bi bi-table me-1"></i>${t('table')}</button>
+      </div>
+    `;
+  }
+
+
+
+  function ageMedianBlock(chartData, yearTitle, cancerTitle) {
+    const item = chartData?.ageMedianData || {};
+    const cancer = reportCancerTitle(cancerTitle);
+    return `
+      <div class="annual-report-table-wrap compare-compact-table">
+        <table class="annual-report-table">
+          <caption>${isEnglish() ? `Table . Median Age of Patients Newly Diagnosed with ${cancer},\u00a0${yearTitle}` : `表、${yearTitle}年新診斷${cancer}病患年齡中位數表`}${sourceLine()}</caption>
+          <thead><tr><th rowspan="2">${t('medianCharacteristic')}</th><th colspan="2">${t('medianSex')}</th></tr><tr><th>${t('male')}</th><th>${t('female')}</th></tr></thead>
+          <tbody>
+            <tr><td>${t('medianN')}</td><td>${item.male_count || 0}</td><td>${item.female_count || 0}</td></tr>
+            <tr><td>${t('medianAgeYears')}</td><td>${item.male || 0}</td><td>${item.female || 0}</td></tr>
+            <tr><td>${t('medianMaleToFemaleRatio')}</td><td>${item.male_ratio || '0.00'}</td><td>${item.female_ratio || '0.00'}</td></tr>
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+
+
+  function analyzableBlock(chartData, yearTitle, cancerTitle) {
+    const item = chartData?.analyzableConfirmedData || {};
+    const cancer = reportCancerTitle(cancerTitle);
+    return `
+      <div class="annual-report-table-wrap compare-analyzable-table">
+        <table class="annual-report-table">
+          <caption>${isEnglish() ? `Table . Analysis-Eligible and Confirmed Cases of ${cancer} in the Cancer Registry,\u00a0${yearTitle}` : `表、${yearTitle}年${cancer}-癌症登記可分析個案與確診個案`}${sourceLine()}</caption>
+          <thead>
+            <tr>
+              <th>${isEnglish() ? `${t('cancerTotal')}, ${yearTitle}` : `${yearTitle}年癌症總數`}<br>(A)</th>
+              <th>${t('analysisEligibleCases')}<br>(B)</th>
+              <th>${t('analysisEligiblePercent')}<br>(B/A)</th>
+              <th>${t('microscopicallyConfirmedCases')}<br>(C)</th>
+              <th>${t('microscopicallyConfirmedPercent')}<br>(C/B)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>${item.total_count || 0}</td>
+              <td>${item.analyzable_count || 0}</td>
+              <td>${item.analyzable_percent || '0.0%'}</td>
+              <td>${item.confirmed_count || 0}</td>
+              <td>${item.confirmed_percent || '0.0%'}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="compare-note">
+        <div>${t('analysisEligibleNote')}</div>
+        <div class="compare-note-lines">${t('analysisEligibleClass1')}</div>
+        <div class="compare-note-lines">${t('analysisEligibleClass2')}</div>
+      </div>
+    `;
+  }
+
+
+
+  function escapeHtml(value) {
+    return window.AnnualReportRenderer.escapeHtml(value);
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+
+
+  function histologyBlock(chartData, yearTitle, cancerTitle, chartId) {
+    const histologyData = Array.isArray(chartData?.histologyData) ? chartData.histologyData : [];
+    const warnings = Array.isArray(chartData?.histologyWarnings) ? chartData.histologyWarnings : [];
+    const colonNotes = warnings.filter(item => {
+      const code = String(item.icdo_code || '');
+      const site = String(item.site || '').toUpperCase();
+      return code === '8211/2' && site.startsWith('C18');
+    });
+    const chartNotes = colonNotes.length
+      ? `<div class="text-danger small mt-1">${colonNotes.map(item => {
+          const user = escapeHtml(item.user || '未知個案');
+          return `註：有一筆組織型態不適用，已排除統計（${user} 不符合 M8211 診斷年度規範）`;
+        }).join('<br>')}</div>`
+      : '';
+    const validData = histologyData.filter(item => item.name !== 'Unknown / 未對應組織型態');
+    const noDataReason = escapeHtml(chartData?.histologyNoDataReason || '查無符合條件的組織型態資料。');
+    const totalCount = validData.reduce((total, item) => total + Number(item.count || 0), 0);
+    const rows = validData.length
+      ? validData.map(item => {
+          const pct = totalCount > 0 ? (Number(item.count || 0) / totalCount * 100).toFixed(1) : '0.0';
+          return `
+            <tr>
+
+              <td class="text-start">${escapeHtml(item.name)}</td>
+              <td>${Number(item.count || 0)}</td>
+              <td>${pct}%</td>
+            </tr>
+          `;
+        }).join('') + `
+          <tr class="fw-bold" style="background-color: var(--gray-50);">
+            <td>${t('total')}</td>
+
+            <td>${totalCount}</td>
+            <td>${validData.length ? '100.0%' : '0.0%'}</td>
+          </tr>`
+      : `<tr><td colspan="3" class="text-center">${t('noData')}<br><span class="text-muted small">${noDataReason}</span></td></tr>`;
+
+    const cancer = reportCancerTitle(cancerTitle);
+
+    return `
+      ${viewSwitchBlock()}
+      <div data-compare-view-panel="chart">
+        <div id="${chartId}" class="compare-chart" style="height: 450px;"></div>
+        <div class="compare-chart-caption">${isEnglish() ? `Figure. Histological Distribution of ${cancer}, ${yearTitle}` : `圖、${yearTitle}年${cancer}組織型態分佈圖`}</div>
+        ${chartNotes}
+      </div>
+      <div data-compare-view-panel="table" class="d-none">
+        <div class="annual-report-table-wrap">
+          <table class="annual-report-table annual-histology-table compare-histology-table">
+            <caption>${isEnglish() ? `Table. Histological Distribution of ${cancer},\u00a0${yearTitle}` : `表、${yearTitle}年${cancer}組織型態分佈表`}${sourceLine()}</caption>
+            <colgroup>
+              <col class="annual-histology-name-col">
+              <col class="annual-histology-count-col">
+              <col class="annual-histology-percent-col">
+            </colgroup>
+            <thead>
+              <tr>
+
+                <th>${t('histology')}</th>
+                <th>${t('people')}</th>
+                <th>${isEnglish() ? '%' : `${t('percentage')}%`}</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+
+
+  function diagnosisClassificationMappings() {
+    return [
+      {
+        title: t('class0'),
+        totalKey: 'class0_total',
+        subClasses: [
+          { key: '0_1_0', label: t('class010') },
+          { key: '0_1_2', label: t('class012') }
+        ]
+      },
+      {
+        title: t('class1'),
+        totalKey: 'class1_total',
+        subClasses: [
+          { key: '1_1_1', label: t('class111') },
+          { key: '1_1_3', label: t('class113') },
+          { key: '1_1_4', label: t('class114') }
+        ]
+      },
+      {
+        title: t('class2'),
+        totalKey: 'class2_total',
+        subClasses: [
+          { key: '2_2_1', label: t('class221') },
+          { key: '2_2_3', label: t('class223') }
+        ]
+      },
+      {
+        title: t('class3'),
+        totalKey: 'class3_total',
+        subClasses: [
+          { key: '3_2_0', label: t('class320') },
+          { key: '3_3_2', label: t('class332') }
+        ]
+      }
+    ];
+  }
+
+
+
+  function classificationBlock(chartData, yearTitle, cancerTitle, chartId) {
+    const tableData = chartData?.diagnosisClassificationData || {};
+    const total = tableData.total_count || 0;
+    const calcPct = value => total > 0 ? (Number(value || 0) / total * 100).toFixed(1) + '%' : '0.0%';
+    let rows = '';
+
+    diagnosisClassificationMappings().forEach(cls => {
+      const clsTotal = Number(tableData[cls.totalKey] || 0);
+      rows += `<tr class="table-light" style="border-top: 2px solid #6c757d;"><td style="font-size: 1.1em; font-weight: 900;">${cls.title}</td><td class="text-center fw-bold">${clsTotal}</td><td class="text-center fw-bold">${calcPct(clsTotal)}</td></tr>`;
+      cls.subClasses.forEach(sub => {
+        const count = Number(tableData[sub.key] || 0);
+        rows += `<tr><td class="ps-4">${sub.label}</td><td class="text-end">${count}</td><td class="text-end">${calcPct(count)}</td></tr>`;
+      });
+    });
+
+    rows += `<tr class="table-secondary fw-bold" style="font-weight: bold; border-top: 2px solid #6c757d;"><td class="text-center">${t('total')}</td><td class="text-center">${total}</td><td class="text-center">${total > 0 ? '100.0%' : '0.0%'}</td></tr>`;
+
+    const cancer = reportCancerTitle(cancerTitle);
+
+    return `
+      ${viewSwitchBlock()}
+      <div data-compare-view-panel="chart">
+        <div id="${chartId}" class="compare-chart" style="height: 450px;"></div>
+        <div class="compare-chart-caption">${isEnglish() ? `Figure. ${cancer} Case Class Distribution, ${yearTitle}` : `圖、${yearTitle}年${cancer}個案分類分佈圖`}</div>
+      </div>
+      <div data-compare-view-panel="table" class="d-none">
+        <div class="annual-report-table-wrap mb-4">
+          <table class="annual-report-table text-start" style="width: 100%;">
+            <caption>${isEnglish() ? `Table . ${cancer} Case Class Distribution,\u00a0${yearTitle}` : `表、${yearTitle}年${cancer}個案分類分佈表`}${sourceLine()}</caption>
+            <thead><tr><th class="text-center">${isEnglish() ? 'Class' : '個案分類'}</th><th class="text-center">${t('people')}</th><th class="text-center">${isEnglish() ? '%' : `${t('percentage')}%`}</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+
+
+  function bindViewSwitch(container, side) {
+    const buttons = container.querySelectorAll('[data-compare-view]');
+    if (!buttons.length) return;
+
+    function applyView(selectedView) {
+      viewPreferences[side] = selectedView;
+      buttons.forEach(item => item.classList.toggle('active', item.dataset.compareView === selectedView));
+      container.querySelectorAll('[data-compare-view-panel]').forEach(panel => {
+        panel.classList.toggle('d-none', panel.dataset.compareViewPanel !== selectedView);
+      });
+      if (selectedView === 'chart' && window.echarts) {
+        setTimeout(() => container.querySelectorAll('.compare-chart').forEach(chartEl => {
+          echarts.getInstanceByDom(chartEl)?.resize();
+        }), 0);
+      }
+    }
+
+    buttons.forEach(button => {
+      button.addEventListener('click', () => applyView(button.dataset.compareView));
+    });
+    applyView(viewPreferences[side] || 'chart');
+  }
+
+
+
+  function renderSexAgeChart(chartId, chartData, sharedScale, yearTitle, cancerTitle) {
+    if (!window.echarts) return;
+    const chartEl = document.getElementById(chartId);
+    if (!chartEl) return;
+    const oldChart = echarts.getInstanceByDom(chartEl);
+    if (oldChart) oldChart.dispose();
+    const chart = echarts.init(chartEl);
+    chart.setOption(getUpdatedGenderAgeChartOption(chartData?.genderAgeData || {}, sharedScale?.genderAgeMax, yearTitle, cancerTitle));
+    setTimeout(() => chart.resize(), 50);
+  }
+
+
+
+  function renderHistologyChart(chartId, chartData, yearTitle, cancerTitle, sharedScale) {
+    if (!window.echarts) return;
+    const chartEl = document.getElementById(chartId);
+    if (!chartEl) return;
+    const oldChart = echarts.getInstanceByDom(chartEl);
+    if (oldChart) oldChart.dispose();
+
+    const histologyData = Array.isArray(chartData?.histologyData) ? chartData.histologyData : [];
+    const validData = histologyData.filter(item => item.name !== 'Unknown / 未對應組織型態');
+    const totalCount = validData.reduce((total, item) => total + Number(item.count || 0), 0);
+    // 與年報分析頁一致：由低比例到高比例排列，長清單依項目數自動增高。
+    const displayData = [...validData].reverse();
+    const names = displayData.map(item => item.name);
+    const noDataReason = chartData?.histologyNoDataReason || '查無符合條件的組織型態資料。';
+    const values = displayData.map(item => {
+      const value = totalCount > 0 ? Number((Number(item.count || 0) / totalCount * 100).toFixed(1)) : 0;
+      return { value, count: Number(item.count || 0) };
+    });
+
+    chartEl.style.height = `${Math.max(450, names.length * histologyRowHeight(names))}px`;
+    const cancer = reportCancerTitle(cancerTitle);
+    const chartTitle = isEnglish()
+      ? `Histological Distribution of ${cancer}, ${yearTitle}`
+      : `${yearTitle}年${cancer}組織型態分佈圖`;
+
+    const chart = echarts.init(chartEl);
+    if (!names.length) {
+      chartEl.style.height = '450px';
+      chart.setOption({
+        animation: false,
+        title: { text: chartTitle, subtext: t('source'), left: 500,
+        right: 60,
+        textAlign: 'center', },
+        tooltip: { show: false },
+        toolbox: { show: false },
+        xAxis: { show: false },
+        yAxis: { show: false },
+        series: [],
+        graphic: [{
+          type: 'text',
+          left: 'center',
+          top: 'middle',
+          style: {
+            text: `${t('noData')}\n${noDataReason}`,
+            fill: '#6b7280',
+            fontSize: 14,
+            fontWeight: 500,
+            lineHeight: 24,
+            textAlign: 'center'
+          }
+        }]
+      });
+      setTimeout(() => chart.resize(), 50);
+      return;
+    }
+    chart.setOption({
+      animation: false,
+      title: {
+        text: chartTitle,
+        subtext: t('source'),
+        left: '50%',
+        textAlign: 'center',
+        textStyle: { fontSize: 18, fontWeight: 'bold' }
+      },
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'shadow' },
+        formatter: function(params) {
+          const p = params[0];
+          if (!p || p.value === undefined || p.value === '-') return '';
+          const count = p.data && p.data.count !== undefined ? p.data.count : '-';
+          const val = typeof p.value === 'number' ? p.value.toFixed(1) : p.value;
+          return `${p.name}<br/>${p.marker}${t('caseRatio')}: ${val}% (${isEnglish() ? `N = ${count}` : `${count} 人`})`;
+        }
+      },
+      grid: { left: 500, right: 60, bottom: 50, top: 60, containLabel: false },
+      legend: { show: false },
+      toolbox: {
+        feature: {
+          dataView: { show: true, readOnly: false, title: t('dataView'), lang: [t('dataView'), t('close'), t('refresh')] },
+          saveAsImage: { show: true, title: t('downloadImage') }
+        }
+      },
+      xAxis: { type: 'value', name: isEnglish() ? '%' : '百分比 (%)', nameLocation: 'middle', nameGap: 30, min: 0, max: sharedScale?.histologyMax, interval: 10, axisLabel: { formatter: value => Number(value).toFixed(1) + '%' } },
+      yAxis: {
+        type: 'category',
+        data: names,
+        inverse: true,
+        axisLabel: {
+          width: 420,
+          align: 'right',
+          margin: 20,
+          formatter: value => histologyAxisLabel(value),
+          rich: {
+            right: { width: 420, align: 'right', lineHeight: 18, fontSize: 12 },
+            bracket: { width: 420, align: 'right', lineHeight: 18, fontSize: 10.5 }
+          }
+        }
+      },
+      series: [{
+        name: '個案比例',
+        type: 'bar',
+        data: values,
+        itemStyle: { color: '#73c0de' },
+        label: {
+          show: true,
+          position: 'right',
+          color: '#333',
+          fontSize: 13,
+          distance: 8,
+          formatter: params => `${Number(params.value || 0).toFixed(1)}% (${isEnglish() ? `N = ${Number(params.data?.count || 0)}` : `${Number(params.data?.count || 0)} 人`})`
+        }
+      }]
+    });
+    setTimeout(() => chart.resize(), 50);
+  }
+
+
+
+  function renderClassificationChart(chartId, chartData, sharedScale, yearTitle, cancerTitle) {
+    if (!window.echarts) return;
+    const chartEl = document.getElementById(chartId);
+    if (!chartEl) return;
+    const oldChart = echarts.getInstanceByDom(chartEl);
+    if (oldChart) oldChart.dispose();
+
+    const data = chartData?.diagnosisClassificationData || {};
+    const total = data.total_count || 1;
+    const calcPctNum = value => Number((Number(value || 0) / total * 100).toFixed(1));
+    const labels = [t('class0'), t('class1'), t('class2'), t('class3')];
+    const colors = ['#5470C6', '#91CC75', '#FAC858', '#EE6666'];
+    const chartTitle = isEnglish()
+      ? `${reportCancerTitle(cancerTitle)} Case Class Distribution, ${yearTitle}`
+      : `${yearTitle}年${reportCancerTitle(cancerTitle)}個案分類分佈圖`;
+
+    const chart = echarts.init(chartEl);
+    chart.setOption({
+      animation: false,
+      toolbox: { show: true, feature: { dataView: { show: true, readOnly: false, title: t('dataView'), lang: [t('dataView'), t('close'), t('refresh')] }, saveAsImage: { show: true, title: t('downloadImage') } } },
+      title: { text: chartTitle, subtext: t('source'), left: 'center', textStyle: { fontSize: 18, fontWeight: 'bold', color: '#333' } },
+      legend: { orient: 'vertical', right: '2%', top: 'middle', itemWidth: 14, itemHeight: 14, data: labels, textStyle: { fontSize: 14, lineHeight: 22, width: 450, overflow: 'break' } },
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      grid: { left: '3%', right: '32%', top: '15%', bottom: '3%', containLabel: true },
+      xAxis: [{ type: 'category', data: ['Class0', 'Class1', 'Class2', 'Class3'], axisTick: { alignWithLabel: true } }],
+      yAxis: [{ type: 'value', min: 0, max: sharedScale?.classificationMax, axisLabel: { formatter: '{value}%' } }],
+      series: [
+        { name: labels[0], type: 'bar', stack: 'total', barWidth: '60%', data: [calcPctNum(data.class0_total), '-', '-', '-'], itemStyle: { borderRadius: [6, 6, 0, 0], color: colors[0] }, label: { show: true, position: 'top', color: '#333', fontSize: 14, fontWeight: 'bold', formatter: '{c}%' } },
+        { name: labels[1], type: 'bar', stack: 'total', barWidth: '60%', data: ['-', calcPctNum(data.class1_total), '-', '-'], itemStyle: { borderRadius: [6, 6, 0, 0], color: colors[1] }, label: { show: true, position: 'top', color: '#333', fontSize: 14, fontWeight: 'bold', formatter: '{c}%' } },
+        { name: labels[2], type: 'bar', stack: 'total', barWidth: '60%', data: ['-', '-', calcPctNum(data.class2_total), '-'], itemStyle: { borderRadius: [6, 6, 0, 0], color: colors[2] }, label: { show: true, position: 'top', color: '#333', fontSize: 14, fontWeight: 'bold', formatter: '{c}%' } },
+        { name: labels[3], type: 'bar', stack: 'total', barWidth: '60%', data: ['-', '-', '-', calcPctNum(data.class3_total)], itemStyle: { borderRadius: [6, 6, 0, 0], color: colors[3] }, label: { show: true, position: 'top', color: '#333', fontSize: 14, fontWeight: 'bold', formatter: '{c}%' } }
+      ]
+    });
+    setTimeout(() => chart.resize(), 50);
+  }
+
+
+
+  function treatmentLabel(treatment) {
+    if (!isEnglish()) return treatment;
+    const labels = {
+      '手術': 'Surgery', '放療': 'Radiotherapy', '化療': 'Chemotherapy',
+      '標靶': 'Targeted Therapy', '荷爾蒙': 'Hormone Therapy',
+      '類固醇治療': 'Steroid Therapy', '免疫': 'Immunotherapy',
+      '骨髓/幹細胞移植': 'Hematopoietic Stem Cell Transplantation (HSCT)',
+      '內分泌處置': 'Endocrine Procedure', '其他治療': 'Other Treatment',
+      '密切觀察或不予治療': 'No Treatment', '待確認': 'Pending Confirmation',
+      'RFA/TAE/PEI混合治療': 'RFA/TAE/PEI Combined Treatment'
+    };
+    return String(treatment || '').split('、').map(value => labels[value] || value).join('、');
+  }
+
+
+
+  function treatmentFirstCourseBlock(chartData, yearTitle, cancerTitle, activeSystem) {
+    const tables = Array.isArray(chartData?.stageFirstCourseData) ? chartData.stageFirstCourseData : [];
+    const item = tables.find(table => table.system === activeSystem) || tables[0];
+    if (!item) return '<div class="alert alert-light border mb-0">目前沒有可呈現的期別與首次療程資料。</div>';
+    const stages = item.stage_columns || [];
+    const rows = item.rows || [];
+    const totalCount = Number(item.total_count || 0);
+    const displayStage = stage => String(stage || '').replace(/^Stage\s+/i, '').trim();
+    const rowPercentage = row => totalCount ? `${(Number(row.subtotal || 0) / totalCount * 100).toFixed(1)}%` : '0.0%';
+    const unknown = Number(item.excluded_unknown || 0);
+    const notApplicable = Number(item.excluded_not_applicable || 0);
+    const unclassified = Number(item.excluded_unclassified_treatment || 0);
+    const excluded = unknown + notApplicable + unclassified;
+    const definitionNote = isEnglish()
+      ? 'Note: First course treatment refers to all treatments administered before disease progression or recurrence.'
+      : '註：首次療程的定義係指在癌病惡化或復發之前所執行的治療方法。';
+    const stageNote = isEnglish()
+      ? `Note: Of ${Number(item.analyzable_count || 0)} analyzable cases (Class 1–2), ${unknown} had unknown stage and ${notApplicable} had non-applicable stage${unclassified ? `; ${unclassified} case(s) could not be classified using the defined treatment codes` : ''}. A total of ${excluded} case(s) were excluded (percentage denominator = ${Number(item.included_count ?? totalCount)}).`
+      : `註：可分析個案數（Class 1–2）共計 ${Number(item.analyzable_count || 0)} 例，其中分期不明 ${unknown} 例、分期不適用 ${notApplicable} 例${unclassified ? `；另有 ${unclassified} 例治療方式無法依既定治療代碼判定` : ''}。上述共 ${excluded} 例未納入期別與首次療程分佈百分比計算（百分比分母＝${Number(item.included_count ?? totalCount)}）。`;
+    const caption = isEnglish()
+      ? `Table . ${escapeHtml(item.system)} Stage and First Course Treatment Distribution of Newly Diagnosed ${escapeHtml(reportCancerTitle(cancerTitle))} Cases, ${yearTitle}${sourceLine()}`
+      : `表、${yearTitle}年新診斷${escapeHtml(reportCancerTitle(cancerTitle))}${escapeHtml(item.system)}期別與首次療程表${sourceLine()}`;
+    const bodyRows = rows.map(row => `<tr><td class="text-start ps-3">${escapeHtml(treatmentLabel(row.treatment))}</td>${(row.values || []).map(value => `<td>${value}</td>`).join('')}<td>${row.subtotal}</td><td>${rowPercentage(row)}</td></tr>`).join('');
+    const totals = (item.totals || []).map(value => `<td>${value}</td>`).join('');
+    const percentages = (item.percentages || []).map(value => `<td>${value}%</td>`).join('');
+    return `<div class="annual-report-table-wrap"><table class="annual-report-table"><caption>${caption}</caption><thead><tr><th rowspan="2">${isEnglish() ? 'First Course of Treatment' : '首次療程'}</th><th colspan="${Math.max(stages.length, 1)}">${escapeHtml(item.system)} ${isEnglish() ? 'Stage' : '期別'}</th><th rowspan="2">${isEnglish() ? 'Total' : '小計'}</th><th rowspan="2">%</th></tr><tr>${stages.map(stage => `<th>${escapeHtml(displayStage(stage))}</th>`).join('')}</tr></thead><tbody>${bodyRows}<tr class="fw-bold"><td>${isEnglish() ? 'Total' : '總計'}</td>${totals}<td>${totalCount}</td><td>${totalCount ? '100.0%' : '0.0%'}</td></tr><tr><td>%</td>${percentages}<td>${totalCount ? '100.0%' : '0.0%'}</td><td>-</td></tr></tbody></table></div><div class="compare-note"><div>${definitionNote}</div><div>${stageNote}</div></div>`;
+  }
+
+
+
+  function surgeryProcedureBlock(chartData, yearTitle, cancerTitle, activeKey) {
+    const tables = Array.isArray(chartData?.stageSurgeryData) ? chartData.stageSurgeryData : [];
+    const tableKeyOf = table => `${table.manual_key || 'unknown'}::${table.system || 'stage'}`;
+    const item = tables.find(table => tableKeyOf(table) === activeKey) || tables[0];
+    if (!item) return `<div class="alert alert-light border mb-0">${isEnglish() ? 'No stage and surgical procedure data are available.' : '目前沒有可呈現的期別與手術術式資料。'}</div>`;
+    const stages = item.stage_columns || [];
+    const rows = item.rows || [];
+    const rowByKey = new Map(rows.map(row => [row.row_key, row]));
+    const levelOf = row => {
+      if (row.display_level !== null && row.display_level !== undefined && row.display_level !== '' && Number.isFinite(Number(row.display_level))) return Math.max(0, Number(row.display_level));
+      let level = 0, parent = rowByKey.get(row.parent_row_key), seen = new Set();
+      while (parent && !seen.has(parent.row_key)) { seen.add(parent.row_key); level += 1; parent = rowByKey.get(parent.parent_row_key); }
+      return level;
+    };
+    const total = Number(item.total_count || 0);
+    const stageSystem = item.system || (isEnglish() ? 'Unspecified' : '未指定');
+    const procedure = row => {
+      const code = row.code_short && row.code_long ? `${row.code_short}/${row.code_long}` : (row.code_short || row.code_long || '');
+      return row.row_type === 'heading' ? (row.procedure || '') : `${code}${code && row.procedure ? ' ' : ''}${row.procedure || ''}`;
+    };
+    const body = rows.map(row => {
+      const indent = Math.min(levelOf(row), 3) * 1.5;
+      const values = (row.values || []).map(value => `<td>${value}</td>`).join('');
+      return `<tr class="${row.row_type === 'heading' ? 'table-light fw-semibold' : ''}"><td class="text-start" style="padding-left: calc(0.75rem + ${indent}rem) !important">${escapeHtml(procedure(row))}</td>${values}<td>${Number(row.subtotal || 0)}</td><td>${total ? (Number(row.subtotal || 0) / total * 100).toFixed(1) : '0.0'}%</td></tr>`;
+    }).join('');
+    const caption = isEnglish()
+      ? `Table. Surgical Procedure Distribution of Newly Diagnosed ${escapeHtml(reportCancerTitle(cancerTitle))} Cases by ${escapeHtml(stageSystem)} Stage, ${yearTitle}${sourceLine()}`
+      : `表、${yearTitle}年新診斷${escapeHtml(reportCancerTitle(cancerTitle))}病患${escapeHtml(stageSystem)}期別與手術術式分佈${sourceLine()}`;
+    return `<div class="annual-report-table-wrap"><table class="annual-report-table"><caption class="surgery-table-caption">${caption}</caption><thead><tr><th class="text-center">${isEnglish() ? 'Surgical Codes/Surgical Procedure' : '術式編碼/術式名稱'}</th><th colspan="${Math.max(stages.length, 1)}">${escapeHtml(stageSystem)} ${isEnglish() ? 'Stage' : '期別'}</th><th rowspan="2">${isEnglish() ? 'Total' : '小計'}</th><th rowspan="2">%</th></tr><tr><th class="text-center">${isEnglish() ? '(Taiwan Cancer Registry Surgery Codes)' : '（按台灣癌症登記術式編碼分類）'}</th>${stages.map(stage => `<th>${escapeHtml(String(stage || '').replace(/^Stage\s+/i, ''))}</th>`).join('')}</tr></thead><tbody>${body}<tr class="fw-bold"><td>${isEnglish() ? 'Total' : '總計'}</td>${(item.totals || []).map(value => `<td>${value}</td>`).join('')}<td>${total}</td><td>${total ? '100.0%' : '0.0%'}</td></tr><tr><td>%</td>${(item.percentages || []).map(value => `<td>${value}%</td>`).join('')}<td>${total ? '100.0%' : '0.0%'}</td><td>-</td></tr></tbody></table></div>`;
+  }
+
+
+  function normalizeStageReport(report) {
+    const stageLabels = Array.isArray(report?.stage_labels) ? report.stage_labels.map(String) : [];
+    const values = source => stageLabels.map((_, index) => Number(source?.[index] || 0));
+    return {
+      ...report,
+      stage_labels: stageLabels,
+      stage_totals: values(report?.stage_totals),
+      sex_rows: (report?.sex_rows || []).map(row => ({ ...row, values: values(row.values) }))
+        .filter(row => row.values.some(value => value > 0)),
+      age_rows: (report?.age_rows || []).map(row => ({ ...row, values: values(row.values) })),
+      chart_stage_labels: Array.isArray(report?.chart_stage_labels) ? report.chart_stage_labels.map(String) : stageLabels,
+      chart_age_rows: Array.isArray(report?.chart_age_rows) ? report.chart_age_rows : (report?.age_rows || []),
+      analyzable_count: Number(report?.analyzable_count || 0),
+      unknown_count: Number(report?.unknown_count || 0),
+      not_applicable_count: Number(report?.not_applicable_count || 0),
+      included_count: Number(report?.included_count || 0)
+    };
+  }
+
+
+
+  function stageLabelSortKey(label) {
+    const text = String(label || '').trim().toUpperCase();
+    const match = text.match(/^(0|IV|III|II|I|4|3|2|1)(.*)$/);
+    const order = { '0': 0, I: 10, '1': 10, II: 20, '2': 20, III: 30, '3': 30, IV: 40, '4': 40 };
+    if (match) return [order[match[1]], match[2], text];
+    return [999, '', text];
+  }
+
+
+
+  function compareStageLabels(left, right) {
+    const leftKey = stageLabelSortKey(left);
+    const rightKey = stageLabelSortKey(right);
+    return leftKey[0] - rightKey[0]
+      || leftKey[1].localeCompare(rightKey[1], undefined, { numeric: true })
+      || leftKey[2].localeCompare(rightKey[2], undefined, { numeric: true });
+  }
+
+
+
+  function alignStageReportLabels(report, labels, chartLabels) {
+    const source = normalizeStageReport(report);
+    const valueMap = (sourceLabels, values) => Object.fromEntries(
+      sourceLabels.map((label, index) => [label, Number(values?.[index] || 0)])
+    );
+    const alignValues = (sourceLabels, values, targetLabels) => {
+      const mapped = valueMap(sourceLabels, values);
+      return targetLabels.map(label => Number(mapped[label] || 0));
+    };
+    return {
+      ...source,
+      stage_labels: labels,
+      stage_totals: alignValues(source.stage_labels, source.stage_totals, labels),
+      sex_rows: source.sex_rows.map(row => ({
+        ...row,
+        values: alignValues(source.stage_labels, row.values, labels)
+      })),
+      age_rows: source.age_rows.map(row => ({
+        ...row,
+        values: alignValues(source.stage_labels, row.values, labels)
+      })),
+      chart_stage_labels: chartLabels,
+      chart_age_rows: source.chart_age_rows.map(row => ({
+        ...row,
+        values: alignValues(source.chart_stage_labels, row.values, chartLabels)
+      }))
+    };
+  }
+
+
+
+  function alignStageComparisonReports(data, item) {
+    const mainReports = data.analysis_data?.main?.stageReports || [];
+    const targetReports = data.analysis_data?.target?.stageReports || [];
+    const mainIndex = mainReports.findIndex(report => report.option === item);
+    const targetIndex = targetReports.findIndex(report => report.option === item);
+    if (mainIndex < 0 || targetIndex < 0) return;
+
+    const main = normalizeStageReport(mainReports[mainIndex]);
+    const target = normalizeStageReport(targetReports[targetIndex]);
+    const labels = [...new Set([...main.stage_labels, ...target.stage_labels])].sort(compareStageLabels);
+    const chartLabels = [...new Set([...main.chart_stage_labels, ...target.chart_stage_labels])]
+      .sort(compareStageLabels);
+    mainReports[mainIndex] = alignStageReportLabels(main, labels, chartLabels);
+    targetReports[targetIndex] = alignStageReportLabels(target, labels, chartLabels);
+  }
+
+
+
+  function stageSystemTitle(system) {
+    const name = String(system || '').trim();
+    return isEnglish() ? name.replace(/\s+Stage$/i, '') : name;
+  }
+
+
+
+  function stageReportTitleOptions(report, yearTitle, cancerTitle) {
+    return {
+      year: yearTitle,
+      cancer: reportCancerTitle(cancerTitle),
+      system: stageSystemTitle(report.staging_system)
+    };
+  }
+
+
+
+  function stageNote(report) {
+    return t('stageStatisticsNote', {
+      analyzable: report.analyzable_count,
+      unknown: report.unknown_count,
+      notApplicable: report.not_applicable_count,
+      included: report.included_count
+    });
+  }
+
+
+
+  function stageTableHtml(report, yearTitle, cancerTitle) {
+    const titleOptions = stageReportTitleOptions(report, yearTitle, cancerTitle);
+    const pct = value => report.included_count ? `${(Number(value || 0) / report.included_count * 100).toFixed(1)}%` : '0.0%';
+    const total = values => values.reduce((sumValue, value) => sumValue + Number(value || 0), 0);
+    let captionKey = 'stageTableTitle';
+    let head = `<tr><th>${t('stage')}</th>${report.stage_labels.map(label => `<th>${escapeHtml(label)}</th>`).join('')}<th>${t('subtotal')}</th></tr>`;
+    let rows = `<tr><th>${t('total')}</th>${report.stage_totals.map(value => `<td>${value}</td>`).join('')}<td>${report.included_count}</td></tr>
+      <tr><th>%</th>${report.stage_totals.map(value => `<td>${pct(value)}</td>`).join('')}<td>${report.included_count ? '100.0%' : '0.0%'}</td></tr>`;
+
+    if (report.view === 'sex') {
+      captionKey = 'stageSexTableTitle';
+      head = `<tr><th>${t('sex')}</th>${report.stage_labels.map(label => `<th>${escapeHtml(label)}</th>`).join('')}<th>${t('subtotal')}</th><th>%</th></tr>`;
+      const sexLabel = sex => sex === '男性' ? t('male') : sex === '女性' ? t('female') : sex;
+      rows = report.sex_rows.map(row => {
+        const rowTotal = total(row.values);
+        return `<tr><th>${escapeHtml(sexLabel(row.sex))}</th>${row.values.map(value => `<td>${value}</td>`).join('')}<td>${rowTotal}</td><td>${pct(rowTotal)}</td></tr>`;
+      }).join('');
+      rows += `<tr><th>${t('total')}</th>${report.stage_totals.map(value => `<td>${value}</td>`).join('')}<td>${report.included_count}</td><td>${report.included_count ? '100.0%' : '0.0%'}</td></tr>
+        <tr><th>%</th>${report.stage_totals.map(value => `<td>${pct(value)}</td>`).join('')}<td>${report.included_count ? '100.0%' : '0.0%'}</td><td>-</td></tr>`;
+    } else if (report.view === 'age') {
+      captionKey = 'stageAgeTableTitle';
+      head = `<tr><th>${t('ageGroup')}</th>${report.stage_labels.map(label => `<th>${escapeHtml(label)}</th>`).join('')}<th>${t('subtotal')}</th><th>%</th></tr>`;
+      rows = report.age_rows.map(row => {
+        const rowTotal = total(row.values);
+        return `<tr><th>${escapeHtml(row.age)}</th>${row.values.map(value => `<td>${value}</td>`).join('')}<td>${rowTotal}</td><td>${pct(rowTotal)}</td></tr>`;
+      }).join('');
+      rows += `<tr><th>${t('total')}</th>${report.stage_totals.map(value => `<td>${value}</td>`).join('')}<td>${report.included_count}</td><td>${report.included_count ? '100.0%' : '0.0%'}</td></tr>
+        <tr><th>%</th>${report.stage_totals.map(value => `<td>${pct(value)}</td>`).join('')}<td>${report.included_count ? '100.0%' : '0.0%'}</td><td>-</td></tr>`;
+    }
+
+    return `<div class="annual-report-table-wrap compare-stage-table-wrap">
+      <table class="annual-report-table">
+        <caption>${t(captionKey, titleOptions)}${sourceLine()}</caption>
+        <thead>${head}</thead><tbody>${rows}</tbody>
+      </table>
+      <div class="annual-stage-report-note small text-secondary mt-2 mb-0 text-start">${escapeHtml(stageNote(report))}</div>
+    </div>`;
+  }
+
+
+
+  function stageBlock(chartData, yearTitle, cancerTitle, chartId, item) {
+    const source = (chartData?.stageReports || []).find(report => report.option === item);
+    if (!source) return `<div class="alert alert-light border mb-0">${t('noData')}</div>`;
+    const report = normalizeStageReport(source);
+    const titleOptions = stageReportTitleOptions(report, yearTitle, cancerTitle);
+    const figureKey = report.view === 'sex' ? 'stageSexFigureTitle' : report.view === 'age' ? 'stageAgeFigureTitle' : 'stageFigureTitle';
+    return `${viewSwitchBlock()}
+      <div data-compare-view-panel="chart">
+        <div id="${chartId}" class="compare-chart compare-stage-chart"></div>
+        <div class="compare-chart-caption">${t(figureKey, titleOptions)}</div>
+        <div class="annual-stage-chart-note small text-secondary mt-2 mb-0">${escapeHtml(stageNote(report))}</div>
+      </div>
+      <div data-compare-view-panel="table" class="d-none">${stageTableHtml(report, yearTitle, cancerTitle)}</div>`;
+  }
+
+
+
+  function renderStageChart(chartId, chartData, yearTitle, cancerTitle, item) {
+    if (!window.echarts) return;
+    const chartEl = document.getElementById(chartId);
+    const source = (chartData?.stageReports || []).find(report => report.option === item);
+    if (!chartEl || !source) return;
+    const report = normalizeStageReport(source);
+    const oldChart = echarts.getInstanceByDom(chartEl);
+    if (oldChart) oldChart.dispose();
+    const chart = echarts.init(chartEl);
+    const titleOptions = stageReportTitleOptions(report, yearTitle, cancerTitle);
+    const chartTitleKey = report.view === 'sex' ? 'stageSexChartTitle' : report.view === 'age' ? 'stageAgeChartTitle' : 'stageChartTitle';
+    const percentage = value => report.included_count ? Number(value || 0) / report.included_count * 100 : 0;
+    const common = {
+      animation: false,
+      title: { text: t(chartTitleKey, titleOptions), subtext: t('source'), left: 'center', textStyle: { fontSize: 18, fontWeight: 'bold' } },
+      toolbox: { right: 12, top: 0, feature: { dataView: { show: true, readOnly: false, title: t('dataView'), lang: [t('dataView'), t('close'), t('refresh')] }, saveAsImage: { show: true, title: t('downloadImage') } } }
+    };
+
+    if (report.view === 'sex') {
+      const sexLabel = sex => sex === '男性' ? t('male') : sex === '女性' ? t('female') : sex;
+      const rows = report.sex_rows;
+      const sexSeries = rows.map(row => {
+        const male = row.sex === '男性';
+        return {
+          name: sexLabel(row.sex),
+          type: 'bar',
+          stack: 'stage',
+          barWidth: 45,
+          data: row.values.map(value => Number(percentage(value).toFixed(1))),
+          itemStyle: {
+            color: male ? '#5470C6' : '#EE6666',
+            borderColor: male ? '#5470C6' : '#EE6666',
+            borderWidth: 1
+          },
+          label: { show: false }
+        };
+      });
+      const maleRow = rows.find(row => row.sex === '男性');
+      const femaleRow = rows.find(row => row.sex === '女性');
+      const topLabelSeries = {
+        name: '__stageSexLabels',
+        type: 'bar',
+        barWidth: 45,
+        barGap: '-100%',
+        silent: true,
+        z: 10,
+        tooltip: { show: false },
+        data: report.stage_labels.map((_, index) => {
+          const malePercent = percentage(maleRow?.values[index] || 0);
+          const femalePercent = percentage(femaleRow?.values[index] || 0);
+          return { value: Number((malePercent + femalePercent).toFixed(1)), malePercent, femalePercent };
+        }),
+        itemStyle: { color: 'transparent', borderColor: 'transparent' },
+        label: {
+          show: true,
+          position: 'top',
+          distance: 4,
+          align: 'center',
+          fontSize: 13,
+          fontWeight: 'bold',
+          formatter: params => {
+            return [
+              `{female|${Number(params.data.femalePercent || 0).toFixed(1)}%}`,
+              `{male|${Number(params.data.malePercent || 0).toFixed(1)}%}`
+            ].join('\n');
+          },
+          rich: {
+            male: { color: '#36558f', fontSize: 13, fontWeight: 'bold', lineHeight: 16, width: 45, align: 'center' },
+            female: { color: '#b54848', fontSize: 13, fontWeight: 'bold', lineHeight: 16, width: 45, align: 'center' }
+          }
+        }
+      };
+      chart.setOption({
+        ...common,
+        tooltip: {
+          trigger: 'axis',
+          axisPointer: { type: 'shadow' },
+          formatter: params => {
+            const lines = params.filter(entry => entry.seriesName !== '__stageSexLabels').map(entry => {
+              const row = rows.find(itemRow => sexLabel(itemRow.sex) === entry.seriesName);
+              const count = Number(row?.values[entry.dataIndex] || 0);
+              return `${entry.marker}${entry.seriesName}: ${Number(entry.value).toFixed(1)}% (${count})`;
+            });
+            return `${report.staging_system} ${params[0]?.name || ''}<br/>${lines.join('<br/>')}`;
+          }
+        },
+        legend: { top: 55, data: rows.map(row => sexLabel(row.sex)) },
+        grid: { left: 60, right: 30, top: 95, bottom: 55 },
+        xAxis: { type: 'category', data: report.stage_labels },
+        yAxis: { type: 'value', min: 0, max: 100, interval: 10, axisLabel: { formatter: '{value}%' } },
+        series: [...sexSeries, topLabelSeries]
+      });
+    } else if (report.view === 'age') {
+      const colors = ['#F3AE9F', '#E9CB92', '#C3E4C3', '#A7B9DF', '#C8B0DC'];
+      const labels = report.chart_stage_labels;
+      const ageStagePercentages = report.chart_age_rows.map(row => {
+        const total = (row.values || []).reduce((sumValue, value) => sumValue + Number(value || 0), 0);
+        return labels.map((_, index) => total
+          ? Number((Number(row.values?.[index] || 0) / total * 100).toFixed(1))
+          : 0);
+      });
+      const smallStageLabelData = [];
+      ageStagePercentages.forEach((values, rowIndex) => {
+        let cumulative = 0;
+        values.forEach((value, stageIndex) => {
+          if (value > 0 && value <= 3) {
+            smallStageLabelData.push([
+              cumulative + value / 2,
+              report.chart_age_rows[rowIndex].age,
+              value,
+              stageIndex
+            ]);
+          }
+          cumulative += value;
+        });
+      });
+      const smallStageLabelSeries = {
+        name: '__smallStageLabels',
+        type: 'custom',
+        silent: true,
+        tooltip: { show: false },
+        z: 20,
+        data: smallStageLabelData,
+        renderItem: (params, api) => {
+          const point = api.coord([api.value(0), api.value(1)]);
+          const stageIndex = Number(api.value(3) || 0);
+          const horizontalShift = 8;
+          const lineStartY = point[1] - 10;
+          const lineEnd = [point[0] + horizontalShift, point[1] - 18];
+          return { type: 'group', children: [
+            { type: 'line', shape: { x1: point[0], y1: lineStartY, x2: lineEnd[0], y2: lineEnd[1] }, style: { stroke: colors[stageIndex % colors.length], lineWidth: 1.5 } },
+            { type: 'text', style: { text: `${Number(api.value(2)).toFixed(1)}%`, x: lineEnd[0], y: lineEnd[1] - 2, fill: '#4b5563', font: '700 11px Arial, sans-serif', align: 'center', verticalAlign: 'bottom' } }
+          ] };
+        }
+      };
+      chartEl.style.height = '680px';
+      chart.setOption({ ...common, tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } }, legend: { top: 55, data: labels }, grid: { left: 62, right: 28, top: 95, bottom: 45 },
+        xAxis: { type: 'value', min: 0, max: 100, axisLabel: { formatter: '{value}%' } }, yAxis: { type: 'category', data: report.chart_age_rows.map(row => row.age) },
+        series: [...labels.map((label, index) => ({ name: label, type: 'bar', stack: 'age-stage', barMaxWidth: 22, data: ageStagePercentages.map(values => values[index]), itemStyle: { color: colors[index % colors.length] }, label: {
+          show: true,
+          position: 'inside',
+          align: 'center',
+          verticalAlign: 'middle',
+          offset: [0, 1],
+          color: '#4b5563',
+          fontSize: 11,
+          fontFamily: 'Arial, sans-serif',
+          fontStyle: 'normal',
+          fontWeight: 700,
+          lineHeight: 22,
+          textBorderWidth: 0,
+          textShadowBlur: 0,
+          formatter: params => Number(params.value || 0) > 3 ? `${Number(params.value).toFixed(1)}%` : ''
+        } })), smallStageLabelSeries] });
+    } else {
+      chart.setOption({ ...common, tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } }, grid: { left: 58, right: 28, top: 82, bottom: 55 },
+        xAxis: { type: 'category', data: report.stage_labels }, yAxis: { type: 'value', min: 0, max: 100, interval: 10, axisLabel: { formatter: '{value}%' } },
+        series: [{ type: 'bar', barWidth: 45, data: report.stage_totals.map(value => Number(percentage(value).toFixed(1))),
+          itemStyle: {
+            color: '#D4B2F6',
+            borderColor: '#D4B2F6',
+            borderWidth: 1
+          },
+          label: { show: true, position: 'top', fontSize: 13, fontWeight: 'bold', formatter: params => `${Number(params.value || 0).toFixed(1)}%` } }] });
+    }
+    setTimeout(() => chart.resize(), 50);
+  }
+
+
+
+  function reportBlock(item, chartData, meta, chartPrefix, activeStageSystem = '') {
+    const cancerTitle = selectedCancerTitle();
+    if (item === '性別年齡分佈') return sexAgeBlockV2(chartData, meta.year_label, cancerTitle, `${chartPrefix}SexAgeChart`);
+    if (item === '年齡中位數') return ageMedianBlock(chartData, meta.year_label, cancerTitle);
+    if (item === '可分析個案與確診個案') return analyzableBlock(chartData, meta.year_label, cancerTitle);
+    if (item === '組織型態') return histologyBlock(chartData, meta.year_label, cancerTitle, `${chartPrefix}HistologyChart`);
+    if (item === '個案分類') return classificationBlock(chartData, meta.year_label, cancerTitle, `${chartPrefix}ClassificationChart`);
+    if (item === '期別與首次療程') return treatmentFirstCourseBlock(chartData, meta.year_label, cancerTitle, activeStageSystem);
+    if (item === '期別與手術術式') return surgeryProcedureBlock(chartData, meta.year_label, cancerTitle, activeStageSystem);
+    if ((chartData?.stageReports || []).some(report => report.option === item)) {
+      return stageBlock(chartData, meta.year_label, cancerTitle, `${chartPrefix}StageChart`, item);
+    }
+    return `<div class="alert alert-light border mb-0">目前尚未接上：${item}</div>`;
+  }
+
+
+
+  function calculateSharedScale(data) {
+    const analyses = [data.analysis_data?.main || {}, data.analysis_data?.target || {}];
+    const genderAgeMax = Math.max(0, ...analyses.flatMap(analysis => {
+      const normalized = normalizeGenderAgeData(analysis.genderAgeData || {});
+      return [...normalized.male, ...normalized.female, ...normalized.total];
+    }));
+    const histologyMax = Math.max(0, ...analyses.flatMap(analysis => {
+      const valid = (analysis.histologyData || []).filter(item => item.name !== 'Unknown / 未對應組織型態');
+      const total = valid.reduce((sumValue, item) => sumValue + Number(item.count || 0), 0);
+      return valid.map(item => total ? Number(item.count || 0) / total * 100 : 0);
+    }));
+    const classificationMax = Math.max(0, ...analyses.flatMap(analysis => {
+      const item = analysis.diagnosisClassificationData || {};
+      const total = Number(item.total_count || 0);
+      return ['class0_total', 'class1_total', 'class2_total', 'class3_total'].map(key => total ? Number(item[key] || 0) / total * 100 : 0);
+    }));
+    const roundedMax = (value, minimum = 10) => Math.max(minimum, Math.ceil((value * 1.15) / 10) * 10);
+    return {
+      genderAgeMax: Math.max(10, Math.ceil((genderAgeMax * 1.15) / 5) * 5),
+      histologyMax: roundedMax(histologyMax),
+      classificationMax: roundedMax(classificationMax)
+    };
+  }
+
+
+
+  function changeNumberText(value, suffix = '') {
+    const number = Number(value || 0);
+    if (number === 0) return isEnglish() ? 'No change —' : '無變化 —';
+    const amount = Number.isInteger(Math.abs(number)) ? Math.abs(number) : Math.abs(number).toFixed(1);
+    if (isEnglish()) {
+      const englishSuffix = suffix === '人'
+        ? ` ${Number(amount) === 1 ? 'case' : 'cases'}`
+        : suffix === '人／年' ? ' cases/year' : suffix ? ` ${suffix}` : '';
+      return `${number > 0 ? 'Increase by' : 'Decrease by'} ${amount}${englishSuffix} ${number > 0 ? '▲' : '▼'}`;
+    }
+    return `${number > 0 ? '增加' : '減少'}${amount}${suffix} ${number > 0 ? '▲' : '▼'}`;
+  }
+
+
+
+  function signedPercentText(mainValue, targetValue) {
+    const main = Number(mainValue || 0);
+    const target = Number(targetValue || 0);
+    if (!main) return target ? (isEnglish() ? 'N/A' : '無法計算') : '0.0%';
+    const percentage = (target - main) / main * 100;
+    if (percentage === 0) return '0.0%';
+    return `${percentage > 0 ? '+' : '−'}${Math.abs(percentage).toFixed(1)}%`;
+  }
+
+
+
+  function summaryText(zhText, enText) {
+    return isEnglish() ? enText : zhText;
+  }
+
+
+
+  function summaryCount(value) {
+    const count = Number(value || 0);
+    return isEnglish() ? `${count} ${count === 1 ? 'case' : 'cases'}` : `${count}人`;
+  }
+
+
+
+  function summaryPeriod(label, zhFallback, enFallback) {
+    const text = String(label || (isEnglish() ? enFallback : zhFallback));
+    if (isEnglish()) return text.replace(/年/g, '');
+    return text.includes('年') ? text : `${text}年`;
+  }
+
+
+
+  function summaryParentheses(text) {
+    return isEnglish() ? ` (${text})` : `（${text}）`;
+  }
+
+  var dashboardV3SummaryTitleTranslations = {
+    '可分析個案差異': 'Analyzable Case Difference',
+    '顯微鏡檢確診個案差異': 'Microscopically Confirmed Case Difference',
+    '主要組織型態差異': 'Leading Histology Difference',
+    '個案分類最大差異': 'Largest Case Classification Difference',
+    '可分析期別個案數差異': 'Analyzable Staged Case Difference',
+    '主要期別差異': 'Leading Stage Difference',
+    '性別期別最大差異': 'Largest Stage Difference by Sex',
+    '年齡層期別最大差異': 'Largest Stage Difference by Age',
+    '整體主要療程': 'Overall Leading Treatment',
+    '整體主要療程差異': 'Overall Leading Treatment Difference',
+    '早期主要療程': 'Leading Treatment for Early Stage',
+    '早期主要療程（Stage I–II）': 'Leading Treatment for Early Stage (Stage I–II)',
+    '早期主要療程差異（Stage I–II）': 'Leading Treatment Difference for Early Stage (Stage I–II)',
+    '晚期主要療程': 'Leading Treatment for Late Stage',
+    '晚期主要療程（Stage III–IV）': 'Leading Treatment for Late Stage (Stage III–IV)',
+    '晚期主要療程差異（Stage III–IV）': 'Leading Treatment Difference for Late Stage (Stage III–IV)',
+    '手術治療概況': 'Surgical Treatment Overview',
+    '手術治療概況差異': 'Surgical Treatment Overview Difference'
+  };
+
+
+
+  function summaryTitle(title) {
+    return isEnglish() ? (summaryTitleTranslations[title] || title) : title;
+  }
+
+  var dashboardV3SummaryCardTitles = {
+    diagnosis: [
+      '可分析個案差異',
+      '顯微鏡檢確診個案差異',
+      '主要組織型態差異',
+      '個案分類最大差異'
+    ],
+    stage: [
+      '可分析期別個案數差異',
+      '主要期別差異',
+      '性別期別最大差異',
+      '年齡層期別最大差異'
+    ],
+    treatment: [
+      '整體主要療程',
+      '早期主要療程',
+      '晚期主要療程',
+      '手術治療概況'
+    ],
+    cross_year: [
+      '區間總個案數差異',
+      '年平均個案數差異',
+      '單年最高個案數差異',
+      '區間個案數趨勢差異'
+    ]
+  };
+
+
+
+  function summaryCategoryForItem(item) {
+    if (['性別年齡分佈', '年齡中位數'].includes(item)) return 'incidence';
+    if (['可分析個案與確診個案', '組織型態', '個案分類'].includes(item)) return 'diagnosis';
+    if (/期別$/.test(String(item || '')) || ['AJCC期別分佈', 'FIGO/MAC/BCLC/SCLC期別分佈'].includes(item)) return 'stage';
+    if (['期別與首次療程', '期別與手術術式'].includes(item)) return 'treatment';
+    if (['存活率', '歷年年齡中位數', '歷年期別分佈', '歷年新診斷件數', '本院常見癌症'].includes(item)) return 'cross_year';
+    return 'incidence';
+  }
+
+
+
+  function renderSummaryCardPlaceholders(category) {
+    const titles = summaryCardTitles[category] || [];
+    document.getElementById('compareResultSummary').innerHTML = titles.map(() => `
+      <div class="compare-summary-card">
+        <div class="compare-summary-placeholder-value">${summaryText('未設置', 'Not configured')}</div>
+      </div>
+    `).join('');
+  }
+
+
+
+  function renderDiagnosisDifferenceSummary(data) {
+    const mainAnalysis = data.analysis_data?.main || {};
+    const targetAnalysis = data.analysis_data?.target || {};
+    const mainCases = mainAnalysis.analyzableConfirmedData || {};
+    const targetCases = targetAnalysis.analyzableConfirmedData || {};
+    const numberValue = value => Number(value || 0);
+    const percentValue = value => {
+      const parsed = Number.parseFloat(String(value ?? '').replace('%', ''));
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+    const valueClass = value => numberValue(value) > 0 ? 'is-up' : numberValue(value) < 0 ? 'is-down' : 'is-flat';
+    const mainPeriod = escapeHtml(summaryPeriod(data.main?.year_label, '基準期', 'Baseline'));
+    const targetPeriod = escapeHtml(summaryPeriod(data.target?.year_label, '比較期', 'Comparison'));
+
+    const analyzableMain = numberValue(mainCases.analyzable_count);
+    const analyzableTarget = numberValue(targetCases.analyzable_count);
+    const analyzableDiff = analyzableTarget - analyzableMain;
+    const confirmedMain = numberValue(mainCases.confirmed_count);
+    const confirmedTarget = numberValue(targetCases.confirmed_count);
+    const confirmedDiff = confirmedTarget - confirmedMain;
+
+    const validHistology = analysis => (Array.isArray(analysis.histologyData) ? analysis.histologyData : [])
+      .filter(item => item?.name && item.name !== 'Unknown / 未對應組織型態')
+      .sort((a, b) => numberValue(b.count) - numberValue(a.count));
+    const mainHistology = validHistology(mainAnalysis)[0] || null;
+    const targetHistology = validHistology(targetAnalysis)[0] || null;
+    let histologyPrimary = `<span class="is-flat">${summaryText('無法判定 —', 'Unable to determine —')}</span>`;
+    let histologyDetail = summaryText('兩期皆無可比較的組織型態資料', 'No comparable histology data in either period');
+    if (mainHistology && targetHistology && mainHistology.name === targetHistology.name) {
+      const histologyDiff = numberValue(targetHistology.count) - numberValue(mainHistology.count);
+      const histologyShareDiff = percentValue(targetHistology.percentage) - percentValue(mainHistology.percentage);
+      const histologyShareDiffText = `${histologyShareDiff > 0 ? '+' : histologyShareDiff < 0 ? '−' : ''}${Math.abs(histologyShareDiff).toFixed(1)}%`;
+      const histologyCountChangeText = histologyDiff === 0
+        ? `${summaryText('無變化', 'No change')} <span class="compare-summary-flat-dash">—</span>`
+        : changeNumberText(histologyDiff, '人');
+      histologyPrimary = `<span>${escapeHtml(mainHistology.name)}</span><span class="compare-summary-histology-change ${valueClass(histologyDiff)}"><span class="compare-summary-histology-change-text">${histologyCountChangeText}${summaryParentheses(histologyShareDiffText)}</span></span>`;
+      histologyDetail = `${mainPeriod} ${summaryCount(mainHistology.count)}${summaryParentheses(escapeHtml(mainHistology.percentage || '0.0%'))} → ${targetPeriod} ${summaryCount(targetHistology.count)}${summaryParentheses(escapeHtml(targetHistology.percentage || '0.0%'))}`;
+    } else if (mainHistology && targetHistology) {
+      histologyPrimary = `<span class="is-flat">${summaryText('主要型態發生變化 ⇄', 'Leading histology changed ⇄')}</span>`;
+      histologyDetail = `<span class="compare-summary-diagnosis-period-line">${mainPeriod} ${escapeHtml(mainHistology.name)}${summaryParentheses(escapeHtml(mainHistology.percentage || '0.0%'))}</span><span class="compare-summary-diagnosis-period-line">→ ${targetPeriod} ${escapeHtml(targetHistology.name)}${summaryParentheses(escapeHtml(targetHistology.percentage || '0.0%'))}</span>`;
+    }
+
+    const mainClass = mainAnalysis.diagnosisClassificationData || {};
+    const targetClass = targetAnalysis.diagnosisClassificationData || {};
+    const classRows = [0, 1, 2, 3].map(classNumber => {
+      const mainCount = numberValue(mainClass[`class${classNumber}_total`]);
+      const targetCount = numberValue(targetClass[`class${classNumber}_total`]);
+      const mainTotal = numberValue(mainClass.total_count);
+      const targetTotal = numberValue(targetClass.total_count);
+      const mainShare = mainTotal ? mainCount / mainTotal * 100 : 0;
+      const targetShare = targetTotal ? targetCount / targetTotal * 100 : 0;
+      return {
+        label: `Class ${classNumber}`,
+        mainCount,
+        targetCount,
+        mainShare,
+        targetShare,
+        difference: targetShare - mainShare
+      };
+    });
+    const biggestClass = classRows.sort(
+      (a, b) => Math.abs(b.difference) - Math.abs(a.difference)
+        || (b.mainCount + b.targetCount) - (a.mainCount + a.targetCount)
+    )[0];
+
+    if (data.compare_mode === 'range') {
+      const periodYearCount = period => Number(period?.year_count || 0)
+        || Object.keys(period?.yearly_counts || {}).length
+        || 1;
+      const percentagePointText = difference => {
+        if (Math.abs(difference) < 0.05) return summaryText('無變化 —', 'No change —');
+        return difference > 0
+          ? summaryText(`上升${Math.abs(difference).toFixed(1)}個百分點 ▲`, `Increase by ${Math.abs(difference).toFixed(1)} percentage points ▲`)
+          : summaryText(`下降${Math.abs(difference).toFixed(1)}個百分點 ▼`, `Decrease by ${Math.abs(difference).toFixed(1)} percentage points ▼`);
+      };
+      const countRatioText = (numerator, denominator) => isEnglish()
+        ? `${numerator}/${denominator} cases`
+        : `${numerator}／${denominator}人`;
+
+      const mainTotal = numberValue(mainCases.total_count ?? data.main?.total_count);
+      const targetTotal = numberValue(targetCases.total_count ?? data.target?.total_count);
+      const mainAnalyzableShare = mainTotal ? analyzableMain / mainTotal * 100 : 0;
+      const targetAnalyzableShare = targetTotal ? analyzableTarget / targetTotal * 100 : 0;
+      const analyzableShareDiff = targetAnalyzableShare - mainAnalyzableShare;
+      const mainAnnualAverage = analyzableMain / periodYearCount(data.main);
+      const targetAnnualAverage = analyzableTarget / periodYearCount(data.target);
+      const annualAverageDiff = targetAnnualAverage - mainAnnualAverage;
+
+      const histologyRows = new Map();
+      const addHistologyRows = (items, side) => {
+        (Array.isArray(items) ? items : [])
+          .filter(item => item?.name && item.name !== 'Unknown / 未對應組織型態')
+          .forEach(item => {
+            const row = histologyRows.get(item.name) || {
+              name: item.name,
+              mainCount: 0,
+              targetCount: 0,
+              mainShare: 0,
+              targetShare: 0
+            };
+            row[`${side}Count`] = numberValue(item.count);
+            row[`${side}Share`] = percentValue(item.percentage);
+            histologyRows.set(item.name, row);
+          });
+      };
+      addHistologyRows(mainAnalysis.histologyData, 'main');
+      addHistologyRows(targetAnalysis.histologyData, 'target');
+      const biggestHistology = [...histologyRows.values()]
+        .map(row => ({ ...row, difference: row.targetShare - row.mainShare }))
+        .sort((a, b) => Math.abs(b.difference) - Math.abs(a.difference)
+          || (b.mainCount + b.targetCount) - (a.mainCount + a.targetCount))[0] || null;
+
+      const histologyPrimaryRange = biggestHistology
+        ? `<span>${escapeHtml(biggestHistology.name)}</span><span class="compare-summary-histology-change ${valueClass(biggestHistology.difference)}"><span class="compare-summary-histology-change-text">${percentagePointText(biggestHistology.difference)}</span></span>`
+        : `<span class="is-flat">${summaryText('無法判定 —', 'Unable to determine —')}</span>`;
+      const histologyDetailRange = biggestHistology
+        ? `${mainPeriod} ${summaryCount(biggestHistology.mainCount)}${summaryParentheses(`${biggestHistology.mainShare.toFixed(1)}%`)} → ${targetPeriod} ${summaryCount(biggestHistology.targetCount)}${summaryParentheses(`${biggestHistology.targetShare.toFixed(1)}%`)}`
+        : summaryText('兩個區間皆無可比較的組織型態資料', 'No comparable histology data in either interval');
+
+      document.getElementById('compareResultSummary').innerHTML = `
+        <div class="compare-summary-card">
+          <div class="compare-summary-label">${summaryText('年平均可分析個案數差異', 'Annual Average Analyzable Case Difference')}</div>
+          <div class="compare-summary-value ${valueClass(annualAverageDiff)}">${summaryText('年平均', 'Annual average ')}${changeNumberText(annualAverageDiff, '人／年')}${summaryParentheses(signedPercentText(mainAnnualAverage, targetAnnualAverage))}</div>
+          <div class="compare-summary-period-detail">${mainPeriod} ${mainAnnualAverage.toFixed(1)}${summaryText('人／年', ' cases/year')} → ${targetPeriod} ${targetAnnualAverage.toFixed(1)}${summaryText('人／年', ' cases/year')}</div>
+          <div class="compare-summary-period-detail compare-summary-period-detail-next">${summaryText('區間總數：', 'Interval total: ')}${summaryCount(analyzableMain)} → ${summaryCount(analyzableTarget)}</div>
+        </div>
+        <div class="compare-summary-card">
+          <div class="compare-summary-label">${summaryText('可分析個案差異（依區間內確診個案的可分析率判定）', 'Analyzable Case Difference (based on the analyzable rate among diagnosed cases in each interval)')}</div>
+          <div class="compare-summary-value ${valueClass(analyzableShareDiff)}">${percentagePointText(analyzableShareDiff)}</div>
+          <div class="compare-summary-period-detail compare-summary-period-comparison compare-summary-range-diagnosis-detail">
+            <span class="compare-summary-period-main">${mainPeriod} ${countRatioText(analyzableMain, mainTotal)}${summaryParentheses(`${mainAnalyzableShare.toFixed(1)}%`)}</span>
+            <span class="compare-summary-period-target"><span class="compare-summary-period-arrow">→</span>${targetPeriod} ${countRatioText(analyzableTarget, targetTotal)}${summaryParentheses(`${targetAnalyzableShare.toFixed(1)}%`)}</span>
+          </div>
+        </div>
+        <div class="compare-summary-card">
+          <div class="compare-summary-label">${summaryText('組織型態分布差異', 'Histology Distribution Difference')}</div>
+          <div class="compare-summary-diagnosis-primary">${histologyPrimaryRange}</div>
+          <div class="compare-summary-period-detail compare-summary-diagnosis-detail">${histologyDetailRange}</div>
+        </div>
+        <div class="compare-summary-card">
+          <div class="compare-summary-label">${summaryText('個案分類分布差異', 'Case Classification Distribution Difference')}</div>
+          <div class="compare-summary-age-row">
+            <span class="compare-summary-age-group">${escapeHtml(biggestClass?.label || '—')}</span>
+            <span class="compare-summary-age-change ${valueClass(biggestClass?.difference)}">${biggestClass ? percentagePointText(biggestClass.difference) : summaryText('無法判定', 'Unable to determine')}</span>
+          </div>
+          <div class="compare-summary-period-values compare-summary-range-classification-detail">${mainPeriod} ${summaryCount(biggestClass?.mainCount)}${summaryParentheses(`${numberValue(biggestClass?.mainShare).toFixed(1)}%`)} → ${targetPeriod} ${summaryCount(biggestClass?.targetCount)}${summaryParentheses(`${numberValue(biggestClass?.targetShare).toFixed(1)}%`)}</div>
+        </div>
+      `;
+      return;
+    }
+
+    const classChangeText = biggestClass
+      ? `${changeNumberText(biggestClass.targetCount - biggestClass.mainCount, '人')}${summaryParentheses(`${biggestClass.difference > 0 ? '+' : biggestClass.difference < 0 ? '−' : ''}${Math.abs(biggestClass.difference).toFixed(1)}%`)}`
+      : summaryText('無法判定', 'Unable to determine');
+
+    document.getElementById('compareResultSummary').innerHTML = `
+      <div class="compare-summary-card">
+        <div class="compare-summary-label">${summaryTitle('可分析個案差異')}</div>
+        <div class="compare-summary-value ${valueClass(analyzableDiff)}">${changeNumberText(analyzableDiff, '人')}${summaryParentheses(signedPercentText(analyzableMain, analyzableTarget))}</div>
+        <div class="compare-summary-period-detail">${mainPeriod} ${summaryCount(analyzableMain)}${summaryParentheses(escapeHtml(mainCases.analyzable_percent || '0.0%'))} → ${targetPeriod} ${summaryCount(analyzableTarget)}${summaryParentheses(escapeHtml(targetCases.analyzable_percent || '0.0%'))}</div>
+      </div>
+      <div class="compare-summary-card">
+        <div class="compare-summary-label">${summaryTitle('顯微鏡檢確診個案差異')}</div>
+        <div class="compare-summary-value ${valueClass(confirmedDiff)}">${changeNumberText(confirmedDiff, '人')}${summaryParentheses(signedPercentText(confirmedMain, confirmedTarget))}</div>
+        <div class="compare-summary-period-detail">${mainPeriod} ${summaryCount(confirmedMain)}${summaryParentheses(escapeHtml(mainCases.confirmed_percent || '0.0%'))} → ${targetPeriod} ${summaryCount(confirmedTarget)}${summaryParentheses(escapeHtml(targetCases.confirmed_percent || '0.0%'))}</div>
+      </div>
+      <div class="compare-summary-card">
+        <div class="compare-summary-label">${summaryTitle('主要組織型態差異')}</div>
+        <div class="compare-summary-diagnosis-primary">${histologyPrimary}</div>
+        <div class="compare-summary-period-detail compare-summary-diagnosis-detail">${histologyDetail}</div>
+      </div>
+      <div class="compare-summary-card">
+        <div class="compare-summary-label">${summaryTitle('個案分類最大差異')}</div>
+        <div class="compare-summary-age-row">
+          <span class="compare-summary-age-group">${escapeHtml(biggestClass?.label || '—')}</span>
+          <span class="compare-summary-age-change ${valueClass(biggestClass?.difference)}">${classChangeText}</span>
+        </div>
+        <div class="compare-summary-period-values">${mainPeriod} ${summaryCount(biggestClass?.mainCount)}${summaryParentheses(`${numberValue(biggestClass?.mainShare).toFixed(1)}%`)} → ${targetPeriod} ${summaryCount(biggestClass?.targetCount)}${summaryParentheses(`${numberValue(biggestClass?.targetShare).toFixed(1)}%`)}</div>
+      </div>
+    `;
+  }
+
+
+
+  function renderStageDifferenceSummary(data, item) {
+    const findReport = side => normalizeStageReport(
+      (data.analysis_data?.[side]?.stageReports || []).find(report => report.option === item) || {}
+    );
+    const main = findReport('main');
+    const target = findReport('target');
+    const signed = value => Number(value) > 0 ? `+${Number(value)}` : String(Number(value));
+    const valueClass = value => Number(value) > 0 ? 'is-up' : Number(value) < 0 ? 'is-down' : 'is-flat';
+    const shareMap = report => Object.fromEntries(report.stage_labels.map((label, index) => [
+      label,
+      report.included_count ? Number(report.stage_totals[index] || 0) / report.included_count * 100 : 0
+    ]));
+    const mainShares = shareMap(main);
+    const targetShares = shareMap(target);
+    const labels = [...new Set([...main.stage_labels, ...target.stage_labels])];
+    const largest = labels.map(label => ({
+      label,
+      difference: Number(targetShares[label] || 0) - Number(mainShares[label] || 0)
+    })).sort((a, b) => Math.abs(b.difference) - Math.abs(a.difference))[0]
+      || { label: '—', difference: 0 };
+    const includedDiff = target.included_count - main.included_count;
+    const unknownDiff = target.unknown_count - main.unknown_count;
+    const notApplicableDiff = target.not_applicable_count - main.not_applicable_count;
+    document.getElementById('compareResultSummary').innerHTML = `
+      <div class="compare-summary-card">
+        <div class="compare-summary-label">有效期別個案數差異</div>
+        <div class="compare-summary-value ${valueClass(includedDiff)}">${signed(includedDiff)}人</div>
+        <div class="compare-summary-period-detail">${main.included_count}人 → ${target.included_count}人</div>
+      </div>
+      <div class="compare-summary-card">
+        <div class="compare-summary-label">期別比例差異最大</div>
+        <div class="compare-summary-value ${valueClass(largest.difference)}">${escapeHtml(largest.label)} ${largest.difference > 0 ? '+' : largest.difference < 0 ? '−' : ''}${Math.abs(largest.difference).toFixed(1)}%</div>
+        <div class="compare-summary-period-detail">${Number(mainShares[largest.label] || 0).toFixed(1)}% → ${Number(targetShares[largest.label] || 0).toFixed(1)}%</div>
+      </div>
+      <div class="compare-summary-card">
+        <div class="compare-summary-label">分期不明個案差異</div>
+        <div class="compare-summary-value ${valueClass(unknownDiff)}">${signed(unknownDiff)}人</div>
+        <div class="compare-summary-period-detail">${main.unknown_count}人 → ${target.unknown_count}人</div>
+      </div>
+      <div class="compare-summary-card">
+        <div class="compare-summary-label">分期不適用個案差異</div>
+        <div class="compare-summary-value ${valueClass(notApplicableDiff)}">${signed(notApplicableDiff)}人</div>
+        <div class="compare-summary-period-detail">${main.not_applicable_count}人 → ${target.not_applicable_count}人</div>
+      </div>`;
+  }
+
+
+
+  function renderDifferenceSummary(data, analysisItem = '性別年齡分佈') {
+    const category = summaryCategoryForItem(analysisItem);
+    if (category === 'diagnosis') {
+      renderDiagnosisDifferenceSummary(data);
+      return;
+    }
+    if (category === 'stage') {
+      renderStageDifferenceSummary(data, analysisItem);
+      return;
+    }
+    if (category !== 'incidence') {
+      renderSummaryCardPlaceholders(category);
+      return;
+    }
+    const mainAnalysis = data.analysis_data?.main || {};
+    const targetAnalysis = data.analysis_data?.target || {};
+    const mainAge = mainAnalysis.ageMedianData || {};
+    const targetAge = targetAnalysis.ageMedianData || {};
+    const mainGender = normalizeGenderAgeData(mainAnalysis.genderAgeData || {});
+    const targetGender = normalizeGenderAgeData(targetAnalysis.genderAgeData || {});
+    const changes = targetGender.categories.map((label, index) => {
+      const mainCount = Number(mainGender.total[index] || 0);
+      const targetCount = Number(targetGender.total[index] || 0);
+      return { label, mainCount, targetCount, value: targetCount - mainCount };
+    });
+    const biggest = changes.sort((a, b) => Math.abs(b.value) - Math.abs(a.value))[0]
+      || { label: '—', mainCount: 0, targetCount: 0, value: 0 };
+    const mainAgeGroupTotal = mainGender.total.reduce((sum, value) => sum + Number(value || 0), 0);
+    const targetAgeGroupTotal = targetGender.total.reduce((sum, value) => sum + Number(value || 0), 0);
+    const mainAgeShare = mainAgeGroupTotal ? biggest.mainCount / mainAgeGroupTotal * 100 : 0;
+    const targetAgeShare = targetAgeGroupTotal ? biggest.targetCount / targetAgeGroupTotal * 100 : 0;
+    const ageShareDiff = targetAgeShare - mainAgeShare;
+    const ageShareDiffText = ageShareDiff > 0
+      ? `+${ageShareDiff.toFixed(1)}%`
+      : ageShareDiff < 0 ? `−${Math.abs(ageShareDiff).toFixed(1)}%` : '0.0%';
+    const formatAgeGroup = label => {
+      const text = String(label || '—').replace(/^(\d+)-(\d+)$/, '$1–$2');
+      if (text === '—') return text;
+      if (isEnglish()) return `${text.replace(/歲/g, '')} yrs`;
+      return `${text}${text.includes('歲') ? '' : '歲'}`;
+    };
+    const ageGroupLabel = formatAgeGroup(biggest.label);
+    const medianGroup = genderData => {
+      const counts = genderData.total.map(value => Number(value || 0));
+      const total = counts.reduce((sum, value) => sum + value, 0);
+      if (!total) return { index: -1, label: '—' };
+      const medianPosition = (total + 1) / 2;
+      let cumulative = 0;
+      const index = counts.findIndex(value => {
+        cumulative += value;
+        return cumulative >= medianPosition;
+      });
+      return {
+        index,
+        label: index >= 0 ? formatAgeGroup(genderData.categories[index]) : '—'
+      };
+    };
+    const mainMedianGroup = medianGroup(mainGender);
+    const targetMedianGroup = medianGroup(targetGender);
+    const medianGroupDiff = mainMedianGroup.index >= 0 && targetMedianGroup.index >= 0
+      ? targetMedianGroup.index - mainMedianGroup.index
+      : 0;
+    const medianGroupChangeText = mainMedianGroup.index < 0 || targetMedianGroup.index < 0
+      ? summaryText('無法判定', 'Unable to determine')
+      : medianGroupDiff > 0
+        ? summaryText(`上升${medianGroupDiff}個年齡級距 ▲`, `Increased by ${medianGroupDiff} age ${medianGroupDiff === 1 ? 'band' : 'bands'} ▲`)
+        : medianGroupDiff < 0
+          ? summaryText(`下降${Math.abs(medianGroupDiff)}個年齡級距 ▼`, `Decreased by ${Math.abs(medianGroupDiff)} age ${Math.abs(medianGroupDiff) === 1 ? 'band' : 'bands'} ▼`)
+          : summaryText('中位年齡層無變化 —', 'No change in median age group —');
+    const totalDiff = Number(data.target?.total_count || 0) - Number(data.main?.total_count || 0);
+    const maleCountDiff = Number(targetAge.male_count || 0) - Number(mainAge.male_count || 0);
+    const femaleCountDiff = Number(targetAge.female_count || 0) - Number(mainAge.female_count || 0);
+    const mainGenderTotal = Number(mainAge.male_count || 0) + Number(mainAge.female_count || 0);
+    const targetGenderTotal = Number(targetAge.male_count || 0) + Number(targetAge.female_count || 0);
+    const mainMaleShare = mainGenderTotal ? Number(mainAge.male_count || 0) / mainGenderTotal * 100 : 0;
+    const targetMaleShare = targetGenderTotal ? Number(targetAge.male_count || 0) / targetGenderTotal * 100 : 0;
+    const mainFemaleShare = mainGenderTotal ? Number(mainAge.female_count || 0) / mainGenderTotal * 100 : 0;
+    const targetFemaleShare = targetGenderTotal ? Number(targetAge.female_count || 0) / targetGenderTotal * 100 : 0;
+    const maleShareDiff = targetMaleShare - mainMaleShare;
+    const femaleShareDiff = targetFemaleShare - mainFemaleShare;
+    const shareChangeText = (mainShare, targetShare) => {
+      const difference = targetShare - mainShare;
+      if (Math.abs(difference) < 0.05) return '0.0%';
+      return `${difference > 0 ? '+' : '−'}${Math.abs(difference).toFixed(1)}%`;
+    };
+    const shareValueClass = difference => difference > 0 ? 'is-up' : difference < 0 ? 'is-down' : '';
+    const formatPeriod = (label, zhFallback, enFallback) => summaryPeriod(label, zhFallback, enFallback);
+    const mainPeriodLabel = escapeHtml(formatPeriod(data.main?.year_label, '基準期', 'Baseline'));
+    const targetPeriodLabel = escapeHtml(formatPeriod(data.target?.year_label, '比較期', 'Comparison'));
+    const rangePeriodComparison = (prefix, mainText, targetText) => `<span class="compare-summary-period-main">${prefix}${mainText}</span><span class="compare-summary-period-target"><span class="compare-summary-period-arrow">→</span>${targetText}</span>`;
+    const valueClass = value => Number(value) > 0 ? 'is-up' : Number(value) < 0 ? 'is-down' : 'is-flat';
+    if (data.compare_mode === 'range') {
+      const periodYearCount = period => Number(period?.year_count || 0)
+        || Object.keys(period?.yearly_counts || {}).length
+        || 1;
+      const mainAnnualAverage = Number(data.main?.total_count || 0) / periodYearCount(data.main);
+      const targetAnnualAverage = Number(data.target?.total_count || 0) / periodYearCount(data.target);
+      const annualAverageDiff = targetAnnualAverage - mainAnnualAverage;
+      const annualAveragePercent = mainAnnualAverage ? annualAverageDiff / mainAnnualAverage * 100 : 0;
+      const percentagePointChangeText = difference => {
+        if (Math.abs(difference) < 0.05) return summaryText('無變化 —', 'No change —');
+        return difference > 0
+          ? summaryText(`上升${Math.abs(difference).toFixed(1)}個百分點 ▲`, `Increase by ${Math.abs(difference).toFixed(1)} percentage points ▲`)
+          : summaryText(`下降${Math.abs(difference).toFixed(1)}個百分點 ▼`, `Decrease by ${Math.abs(difference).toFixed(1)} percentage points ▼`);
+      };
+      const mainRangeTotal = summaryCount(data.main?.total_count);
+      const targetRangeTotal = summaryCount(data.target?.total_count);
+      document.getElementById('compareResultSummary').innerHTML = `
+        <div class="compare-summary-card">
+          <div class="compare-summary-label">${summaryText('年平均個案數差異', 'Annual Average Case Difference')}</div>
+          <div class="compare-summary-value ${valueClass(annualAverageDiff)}">${changeNumberText(annualAverageDiff, '人／年')}${summaryParentheses(`${annualAveragePercent > 0 ? '+' : annualAveragePercent < 0 ? '−' : ''}${Math.abs(annualAveragePercent).toFixed(1)}%`)}</div>
+          <div class="compare-summary-period-detail">${mainPeriodLabel} ${mainAnnualAverage.toFixed(1)}${summaryText('人／年', ' cases/year')} → ${targetPeriodLabel} ${targetAnnualAverage.toFixed(1)}${summaryText('人／年', ' cases/year')}</div>
+          <div class="compare-summary-period-detail compare-summary-period-detail-next">${summaryText('區間總數：', 'Period total: ')}${mainRangeTotal} → ${targetRangeTotal}</div>
+        </div>
+        <div class="compare-summary-card">
+          <div class="compare-summary-label">${summaryText('年齡層分布差異', 'Age Distribution Difference')}</div>
+          <div class="compare-summary-age-row">
+            <span class="compare-summary-age-group">${escapeHtml(ageGroupLabel)}</span>
+            <span class="compare-summary-age-change ${valueClass(ageShareDiff)}">${percentagePointChangeText(ageShareDiff)}</span>
+          </div>
+          <div class="compare-summary-period-values">${mainPeriodLabel} ${summaryCount(biggest.mainCount)}${summaryParentheses(`${mainAgeShare.toFixed(1)}%`)} → ${targetPeriodLabel} ${summaryCount(biggest.targetCount)}${summaryParentheses(`${targetAgeShare.toFixed(1)}%`)}</div>
+        </div>
+        <div class="compare-summary-card">
+          <div class="compare-summary-label">${summaryText('性別分布差異', 'Sex Distribution Difference')}</div>
+          <div class="compare-summary-gender-primary compare-summary-range-gender-primary">
+            <span class="${shareValueClass(maleShareDiff)}">${summaryText('男', 'Male')} ${percentagePointChangeText(maleShareDiff)}</span>
+            <span class="compare-summary-divider">｜</span>
+            <span class="${shareValueClass(femaleShareDiff)}">${summaryText('女', 'Female')} ${percentagePointChangeText(femaleShareDiff)}</span>
+          </div>
+          <div class="compare-summary-period-detail compare-summary-period-comparison compare-summary-range-gender-detail">${rangePeriodComparison(summaryText('男：', 'Male: '), `${mainPeriodLabel} ${summaryCount(mainAge.male_count)}${summaryParentheses(`${mainMaleShare.toFixed(1)}%`)}`, `${targetPeriodLabel} ${summaryCount(targetAge.male_count)}${summaryParentheses(`${targetMaleShare.toFixed(1)}%`)}`)}</div>
+          <div class="compare-summary-period-detail compare-summary-period-detail-next compare-summary-period-comparison compare-summary-range-gender-detail">${rangePeriodComparison(summaryText('女：', 'Female: '), `${mainPeriodLabel} ${summaryCount(mainAge.female_count)}${summaryParentheses(`${mainFemaleShare.toFixed(1)}%`)}`, `${targetPeriodLabel} ${summaryCount(targetAge.female_count)}${summaryParentheses(`${targetFemaleShare.toFixed(1)}%`)}`)}</div>
+        </div>
+        <div class="compare-summary-card">
+          <div class="compare-summary-label">${summaryText('中位年齡層差異', 'Median Age Group Difference')}<span class="compare-summary-label-note">${summaryText('（依區間內全體個案的年齡層分布判定）', ' (based on the age distribution of all cases in each period)')}</span></div>
+          <div class="compare-summary-median-change ${valueClass(medianGroupDiff)}">${medianGroupChangeText}</div>
+          <div class="compare-summary-median-period">${mainPeriodLabel} ${escapeHtml(mainMedianGroup.label)} → ${targetPeriodLabel} ${escapeHtml(targetMedianGroup.label)}</div>
+        </div>
+      `;
+      return;
+    }
+    document.getElementById('compareResultSummary').innerHTML = `
+      <div class="compare-summary-card">
+        <div class="compare-summary-label">${summaryText('總個案數差異', 'Total Case Difference')}</div>
+        <div class="compare-summary-value ${valueClass(totalDiff)}">${changeNumberText(totalDiff, '人')}${summaryParentheses(signedPercentText(data.main?.total_count, data.target?.total_count))}</div>
+        <div class="compare-summary-period-detail">${mainPeriodLabel} ${summaryCount(data.main?.total_count)} → ${targetPeriodLabel} ${summaryCount(data.target?.total_count)}</div>
+      </div>
+      <div class="compare-summary-card">
+        <div class="compare-summary-label">${summaryText('年齡層個案數差異', 'Largest Case Difference by Age')}</div>
+        <div class="compare-summary-age-row">
+          <span class="compare-summary-age-group">${escapeHtml(ageGroupLabel)}</span>
+          <span class="compare-summary-age-change ${valueClass(biggest.value)}">${changeNumberText(biggest.value, '人')}${summaryParentheses(ageShareDiffText)}</span>
+        </div>
+        <div class="compare-summary-period-values">${escapeHtml(formatPeriod(data.main?.year_label, '基準期', 'Baseline'))} ${summaryCount(biggest.mainCount)}${summaryParentheses(`${mainAgeShare.toFixed(1)}%`)} → ${escapeHtml(formatPeriod(data.target?.year_label, '比較期', 'Comparison'))} ${summaryCount(biggest.targetCount)}${summaryParentheses(`${targetAgeShare.toFixed(1)}%`)}</div>
+      </div>
+      <div class="compare-summary-card">
+        <div class="compare-summary-label">${summaryText('性別個案數差異', 'Case Difference by Sex')}</div>
+        <div class="compare-summary-gender-primary"><span class="${valueClass(maleCountDiff)}">${summaryText('男', 'Male')} ${changeNumberText(maleCountDiff, '人')}</span> <span class="${shareValueClass(maleShareDiff)}">${summaryParentheses(shareChangeText(mainMaleShare, targetMaleShare))}</span><span class="compare-summary-divider">｜</span><span class="${valueClass(femaleCountDiff)}">${summaryText('女', 'Female')} ${changeNumberText(femaleCountDiff, '人')}</span> <span class="${shareValueClass(femaleShareDiff)}">${summaryParentheses(shareChangeText(mainFemaleShare, targetFemaleShare))}</span></div>
+        <div class="compare-summary-period-detail">${summaryText('男：', 'Male: ')}${mainPeriodLabel} ${summaryCount(mainAge.male_count)}${summaryParentheses(`${mainMaleShare.toFixed(1)}%`)} → ${targetPeriodLabel} ${summaryCount(targetAge.male_count)}${summaryParentheses(`${targetMaleShare.toFixed(1)}%`)}</div>
+        <div class="compare-summary-period-detail compare-summary-period-detail-next">${summaryText('女：', 'Female: ')}${mainPeriodLabel} ${summaryCount(mainAge.female_count)}${summaryParentheses(`${mainFemaleShare.toFixed(1)}%`)} → ${targetPeriodLabel} ${summaryCount(targetAge.female_count)}${summaryParentheses(`${targetFemaleShare.toFixed(1)}%`)}</div>
+      </div>
+      <div class="compare-summary-card">
+        <div class="compare-summary-label">${summaryText('中位年齡層差異', 'Median Age Group Difference')}<span class="compare-summary-label-note">${summaryText('（依全體個案的年齡層分布判定）', ' (based on the age distribution of all cases)')}</span></div>
+        <div class="compare-summary-median-change ${valueClass(medianGroupDiff)}">${medianGroupChangeText}</div>
+        <div class="compare-summary-median-period">${mainPeriodLabel} ${escapeHtml(mainMedianGroup.label)} → ${targetPeriodLabel} ${escapeHtml(targetMedianGroup.label)}</div>
+      </div>
+    `;
+  }
+
+
+
+  function renderAnnualReport(containerId, chartData, meta, chartPrefix, item, side, sharedScale, activeStageSystem = '') {
+    const container = document.getElementById(containerId);
+    container.innerHTML = reportBlock(item, chartData, meta, chartPrefix, activeStageSystem);
+    bindViewSwitch(container, side);
+    const viewSwitch = container.querySelector('.compare-view-switch');
+    const resultHeading = container.closest('.compare-result-item')?.querySelector('.compare-result-heading');
+    if (viewSwitch && resultHeading) resultHeading.appendChild(viewSwitch);
+    if (item === '性別年齡分佈') renderSexAgeChart(`${chartPrefix}SexAgeChart`, chartData, sharedScale, meta.year_label, selectedCancerTitle());
+    if (item === '組織型態') {
+      renderHistologyChart(`${chartPrefix}HistologyChart`, chartData, meta.year_label, selectedCancerTitle(), sharedScale);
+    }
+    if (item === '個案分類') renderClassificationChart(`${chartPrefix}ClassificationChart`, chartData, sharedScale, meta.year_label, selectedCancerTitle());
+    if ((chartData?.stageReports || []).some(report => report.option === item)) {
+      renderStageChart(`${chartPrefix}StageChart`, chartData, meta.year_label, selectedCancerTitle(), item);
+    }
+  }
+
+
 })();

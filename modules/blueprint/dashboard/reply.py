@@ -44,6 +44,10 @@ def _clean_insight_text(value):
     return text.replace(r'\ge', '>=').replace(r'\le', '<=').replace(r'\neq', '!=').replace('$', '')
 
 
+def _escape_invalid_json_backslashes(raw):
+    return re.sub(r'\\(?!["\\\\/bfnrtu])', r'\\\\', raw)
+
+
 def _parse_bilingual_insights(content):
     raw = str(content or '').strip()
     if raw.startswith('```'):
@@ -51,7 +55,13 @@ def _parse_bilingual_insights(content):
     start, end = raw.find('{'), raw.rfind('}')
     if start < 0 or end <= start:
         raise ValueError('AI response does not contain bilingual JSON')
-    payload = json.loads(raw[start:end + 1])
+    json_text = raw[start:end + 1]
+    try:
+        payload = json.loads(json_text)
+    except json.JSONDecodeError as exc:
+        if 'Invalid \\escape' not in str(exc):
+            raise
+        payload = json.loads(_escape_invalid_json_backslashes(json_text))
     insights = {language: _clean_insight_text(payload.get(language)) for language in INSIGHT_LANGUAGES}
     if not all(insights.values()):
         raise ValueError('AI response is missing a Chinese or English narrative')

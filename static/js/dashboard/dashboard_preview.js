@@ -92,7 +92,8 @@
     renderer.renderSexAgeTable?.(chartData.genderAgeData, year, cancer); renderer.renderAgeMedianTable?.(chartData.ageMedianData, year, cancer);
     renderer.renderAnalyzableConfirmedTable?.(chartData.analyzableConfirmedData, year, cancer); renderer.renderHistologyTable?.(chartData.histologyData, year, cancer, chartData.histologyNoDataReason);
     renderer.renderDiagnosisClassificationTable?.(chartData.diagnosisClassificationData, year, cancer); renderer.renderDiagnosisClassificationChart?.(chartData.diagnosisClassificationData, year, cancer);
-    renderer.renderStageReportTabs?.(chartData.stageReports || [], year, cancer); renderer.updateHistologyChart?.(chartData.histologyData, chartData.histologyNoDataReason);
+    renderer.renderStageReportTabs?.(chartData.stageReports || [], year, cancer); renderer.renderStageFirstCourseTables?.(chartData.stageFirstCourseData || [], year, cancer);
+    renderer.renderStageSurgeryTables?.(chartData.stageSurgeryData || [], year, cancer); renderer.updateHistologyChart?.(chartData.histologyData, chartData.histologyNoDataReason);
     document.querySelectorAll('button[id^="btnAi"]').forEach((button) => { button.style.display = 'none'; button.onclick = null; });
     window.dashboardChartInstance.setOption(renderer.getGenderAgeChartOption(chartData.genderAgeData || {}), true);
     document.querySelectorAll('.annual-data-content').forEach((content) => content.classList.remove('d-none'));
