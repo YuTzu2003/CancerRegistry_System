@@ -15,9 +15,14 @@
     <h1>年報分析</h1>
     <p class="lead">選擇癌別與年度，檢視存活率、期別分佈、治療方式等統計圖表。</p>
   </div>
+  {% if preview_task %}
+  <div class="d-flex align-items-center gap-2">
+    <button type="button" class="btn btn-outline-secondary" id="btnBackToQuery">回到上一頁查詢</button><button type="button" class="btn btn-success" id="btnPrepareExport">匯出圖表與 LLM 敘述</button>
+  </div>
+  {% endif %}
 </div>
 
-{% include "control.html" %}
+{% if not preview_task %}{% include "control.html" %}{% endif %}
 
 <!-- 圖表分頁按鈕區 -->
 <div id="chartTabsArea" class="row mb-1 mt-0 d-none">
@@ -331,9 +336,10 @@
     </div>
 
   </div>
+
 </div>
 
-<section id="annualLlmTaskPanel" style="margin-bottom: 22px;" data-llm-task-type="chart" data-llm-record-title="年報製作紀錄"></section>
+{% if not preview_task %}<section id="annualLlmTaskPanel" style="margin-bottom: 22px;" data-llm-task-type="chart" data-llm-record-title="年報製作紀錄"></section>{% endif %}
 <script id="dashboardCancerNameTranslationsData" type="application/json">
   {{ cancer_name_translations | tojson }}
 </script>
@@ -342,4 +348,8 @@
 <script src="{{ url_for('static', filename='js/dashboard/dashboard_i18n.js') }}?v=20260828-llm-retry-scope"></script>
 <script src="{{ url_for('static', filename='js/dashboard/annual_report_renderer.js') }}?v=20260729-common-cancers"></script>
 <script src="{{ url_for('static', filename='js/dashboard/dashboard.js') }}?v=20260828-llm-three-attempts"></script>
+{% if preview_task %}
+<script id="dashboardPreviewData" type="application/json">{{ {"task": preview_task, "payload": preview_payload} | tojson }}</script>
+<script src="{{ url_for('static', filename='js/dashboard/dashboard_preview.js') }}"></script>
+{% endif %}
 {% endblock %}

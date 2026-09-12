@@ -603,6 +603,13 @@ window.DashboardRenderer.configureStageInsight = function(stageReport, { generat
         };
 
         const reportChanged = button.dataset.insightFieldKey !== fieldKey;
+        if (window.dashboardPreviewMode) {
+            button.dataset.insightFieldKey = fieldKey;
+            button.style.display = 'block';
+            const insight = window.dashboardPreviewNarratives?.[fieldKey];
+            if (insight) response.textContent = insight;
+            return null;
+        }
         button.style.display = 'block';
         button.textContent = this.t('regenerateInsight');
         button.dataset.insightFieldKey = fieldKey;
@@ -1641,6 +1648,18 @@ window.DashboardRenderer.fetchLlmInsight = function(fieldKey, chartData, fields,
         const shouldManageButton = options.manageButton !== false;
         const yearStart = document.getElementById('filterYearStart')?.value.trim() || '';
         const yearEnd = document.getElementById('filterYearEnd')?.value.trim() || '';
+        if (Array.isArray(window.annualLlmJobItems)) {
+            window.annualLlmJobItems.push({
+                item_id: `${fieldKey}-${window.annualLlmJobItems.length + 1}`,
+                field_key: fieldKey, data: chartData, fields: fields, mode_ai: modeAi,
+                year_start: yearStart, year_end: yearEnd, language: language
+            });
+            return Promise.resolve({ success: true, collected: true });
+        }
+        if (window.dashboardPreviewMode) {
+            if (button) button.style.display = 'none';
+            return Promise.resolve({ success: true, preview: true });
+        }
         const sessionKey = this.getInsightSessionKey(fieldKey, chartData, fields, modeAi, yearStart, yearEnd);
         const cacheKey = `${language}|${modeAi}|${fieldKey}`;
         const storedInsights = options.forceRefresh === true ? null : this.getSessionInsights(sessionKey);
@@ -1656,10 +1675,19 @@ window.DashboardRenderer.fetchLlmInsight = function(fieldKey, chartData, fields,
             return Promise.resolve({ success: true, cached: true });
         }
 
+        const getChartPreview = () => {
+            const pane = document.getElementById(responseContainerId)?.closest('.chart-pane');
+            if (!pane || typeof echarts === 'undefined') return '';
+            const chartDom = [...pane.querySelectorAll('div')].find((element) => echarts.getInstanceByDom(element));
+            const chart = chartDom && echarts.getInstanceByDom(chartDom);
+            return chart ? chart.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#ffffff' }) : '';
+        };
         const showResult = (result) => {
             if (!shouldDisplay || (window.DashboardI18n?.getLanguage() || 'zh-TW') !== language) return;
             if (result.success) {
                 if (container) container.innerText = result.insights?.[language] || result.insight;
+            } else if (result.queued) {
+                if (container) container.innerText = '已加入 LLM 工作任務，完成後請在下方任務面板查看圖表與敘述。';
             } else if (container) {
                 container.innerText = this.t('insightFailed') + (result.error || 'error');
             }
@@ -1678,7 +1706,7 @@ window.DashboardRenderer.fetchLlmInsight = function(fieldKey, chartData, fields,
         if (shouldManageButton && button) button.disabled = true;
 
         const cacheGeneration = this.insightCacheGeneration;
-        const request = fetch('/api/chart_insight', {method: 'POST',headers: { 'Content-Type': 'application/json' },body: JSON.stringify({ field_key: fieldKey, data: chartData, fields: fields, mode_ai: modeAi, year_start: yearStart, year_end: yearEnd, language })})
+        const request = fetch('/api/chart_insight', {method: 'POST',headers: { 'Content-Type': 'application/json' },body: JSON.stringify({ field_key: fieldKey, data: chartData, fields: fields, mode_ai: modeAi, year_start: yearStart, year_end: yearEnd, language, chart_preview: getChartPreview() })})
         .then(async res => {
             try {
                 return await res.json();
@@ -2205,7 +2233,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             const stageChartCaption = section?.querySelector('.annual-chart-caption');
                             const stageChartNote = section?.querySelector('.annual-stage-chart-note');
                             const stageButton = document.getElementById('btnAiStageSummary');
-                            const stageFieldKey = stageButton?.dataset.insightFieldKey || '';
+                            const stageFieldKey = `${report.staging_system} ${view === 'sex' ? 'Stage Distribution by Sex' : view === 'age' ? 'Stage Distribution by Age Group' : 'Stage Distribution'}`;
                             const stageResponse = document.getElementById('llmResponseStageSummary');
                             const stageLlmText = stageFieldKey
                                 ? (window.DashboardRenderer?.insightCache?.get(`${exportLanguage}|${modeAi}|${stageFieldKey}`)
@@ -2445,12 +2473,13 @@ document.addEventListener('DOMContentLoaded', function() {
     if (btnPrepareExport) {
         btnPrepareExport.addEventListener('click', async function() {
             const originalLanguage = window.DashboardI18n?.getLanguage() || 'zh-TW';
+            const isPreviewExport = window.dashboardPreviewMode === true;
             const exportDataByLanguage = {};
             const sharedChartImages = {};
             let preparationError = null;
             btnPrepareExport.disabled = true;
             window.dashboardExportPreparing = true;
-            if (window.utils?.showLoading) {
+            if (!isPreviewExport && window.utils?.showLoading) {
                 window.utils.showLoading('資料分析中，請稍後...');
             }
             try {
@@ -2466,16 +2495,18 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (pane?.querySelector('[id^=llmResponse]') && pane.querySelector('[id^=btnAi]')) totalInsights += 1;
                 }
                 let completedInsights = 0;
-                const updateInsightProgress = () => window.utils?.showLoading?.('正在產生LLM敘述(' + completedInsights + '/' + Math.max(totalInsights, 1) + ')...');
+                const updateInsightProgress = () => { if (!isPreviewExport) window.utils?.showLoading?.('正在產生 LLM 敘述(' + completedInsights + '/' + Math.max(totalInsights, 1) + ')...'); };
                 updateInsightProgress();
                 const onInsightComplete = () => {
                     completedInsights += 1;
                     updateInsightProgress();
                 };
                 await window.DashboardI18n?.setLanguage('zh-TW');
-                exportDataByLanguage['zh-TW'] = await collectExportData(sharedChartImages, { generateInsights: true, onInsightComplete });
-                await window.DashboardI18n?.setLanguage('en');
-                exportDataByLanguage.en = await collectExportData(sharedChartImages);
+                exportDataByLanguage['zh-TW'] = await collectExportData(sharedChartImages, { generateInsights: !isPreviewExport, onInsightComplete });
+                if (!isPreviewExport) {
+                    await window.DashboardI18n?.setLanguage('en');
+                    exportDataByLanguage.en = await collectExportData(sharedChartImages);
+                }
             } catch (error) {
                 console.error('Export preparation failed:', error);
                 preparationError = error;
@@ -2568,3 +2599,10 @@ window.DashboardRenderer.renderStageSurgeryTables = function(tables, yearTitle, 
         document.getElementById('btnAiTreatmentSurgery')?.onclick?.();
     }));
 };
+
+window.addEventListener('pageshow', () => {
+    if (sessionStorage.getItem('dashboard_refresh_after_preview') === '1') {
+        sessionStorage.removeItem('dashboard_refresh_after_preview');
+        window.location.reload();
+    }
+});

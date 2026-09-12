@@ -1198,7 +1198,6 @@ function initDashboardControl() {
               utils.alert(`Power BI 發布失敗：${error.message}`, 'error');
           } finally {
               btnPublishPbi.disabled = false;
-              if (window.utils?.hideLoading) window.utils.hideLoading();
           }
       });
   }
@@ -1260,14 +1259,10 @@ function initDashboardControl() {
           }
 
            window.DashboardRenderer?.clearInsightCache?.();
+           btnRunQuery.dataset.defaultLabel = btnRunQuery.textContent;
+           btnRunQuery.textContent = '正在建立任務…';
            document.querySelectorAll('.chart-pane').forEach(pane => {pane.classList.add('d-none');});
            document.getElementById('chartTabsArea')?.classList.add('d-none');
-
-          if (window.utils && window.utils.showLoading) {
-              window.utils.showLoading('資料分析中，請稍候…');
-          } else if (window.dashboardChartInstance) {
-              window.dashboardChartInstance.showLoading({ text: '資料分析中，請稍候…', color: '#2563eb', textColor: '#212529', maskColor: 'rgba(255, 255, 255, 0.8)', zlevel: 0 });
-          }
 
           const dashboardAnalyzePayload = {
               file_id: selectedFileId,
@@ -1562,6 +1557,7 @@ function initDashboardControl() {
                       if (!result?.success) throw new Error(result?.error || 'LLM insight generation failed.');
                       return result;
                   };
+                  window.annualLlmJobItems = [];
                   const insightTasks = [...variantInsightTasks];
                   document.querySelectorAll('.item-checkbox').forEach(itemChk => {
                       if (itemChk.checked) {
@@ -1581,53 +1577,30 @@ function initDashboardControl() {
                       }
                   });
 
-                  let completedInsights = 0;
-                  const totalInsights = insightTasks.length;
-                  const updateInsightProgress = () => {
-                      if (window.utils?.showLoading) {
-                          window.utils.showLoading(`正在產生 LLM 敘述（${completedInsights}/${totalInsights}）…`);
-                      }
-                  };
-                  updateInsightProgress();
                   (async () => {
-                      let failedInsights = 0;
                       for (const task of insightTasks) {
                           try {
                               await completeInsight(task);
                           } catch (error) {
-                              failedInsights += 1;
                               console.error('LLM insight generation failed:', error);
-                          } finally {
-                              completedInsights += 1;
-                              updateInsightProgress();
                           }
                       }
-                      window.DashboardRenderer?.showAnnualDataContent();
-                      if (window.utils && window.utils.hideLoading) {
-                          window.utils.hideLoading();
-                      } else if (window.dashboardChartInstance) {
-                          window.dashboardChartInstance.hideLoading();
-                      }
-                      if (chartTabsArea) {
-                          if (anyChecked) {
-                              chartTabsArea.classList.remove('d-none');
-                              setTimeout(() => {
-                                  if (firstBtn) firstBtn.click();
-                                  else if (window.dashboardChartInstance) window.dashboardChartInstance.resize();
-                              }, 50);
-                          } else {
-                              chartTabsArea.classList.add('d-none');
-                              const emptyPane = document.getElementById('chartPane-Empty');
-                              if (emptyPane) emptyPane.classList.remove('d-none');
-                          }
-                      }
-                      if (failedInsights > 0) {
-                          utils.alert(`${failedInsights} 個語言模型敘述產生失敗，請在該圖表按「重新產生敘述」。`, 'warning');
-                      }
+                      const annualItems = window.annualLlmJobItems || [];
+                      window.annualLlmJobItems = null;
+                      const queued = await fetch('/api/dashboard/annual-report-job', {
+                          method: 'POST', headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ items: annualItems, file_id: selectedFileId, _document_label: '年報分析', chart_data: chartData })
+                      }).then(response => response.json());
+                      if (!queued.success) throw new Error(queued.error || '無法建立年報工作任務');
+                      window.dispatchEvent(new CustomEvent('llm-task-created'));
+                      const queryLabel = btnRunQuery.dataset.defaultLabel || btnRunQuery.textContent; delete btnRunQuery.dataset.defaultLabel; btnRunQuery.textContent = '已建立任務'; setTimeout(() => { btnRunQuery.textContent = queryLabel; }, 2500);
+                      document.querySelectorAll('.chart-pane').forEach(pane => pane.classList.add('d-none'));
+                      chartTabsArea?.classList.add('d-none');
+                      return;
                   })();
               } else {
                   if (window.utils && window.utils.hideLoading) window.utils.hideLoading();
-                  utils.alert('資料分析失敗: ' + data.error, 'error');
+                  btnRunQuery.textContent = btnRunQuery.dataset.defaultLabel || btnRunQuery.textContent; delete btnRunQuery.dataset.defaultLabel; utils.alert('資料分析失敗: ' + data.error, 'error');
               }
           })
           .catch(err => {
@@ -1636,7 +1609,7 @@ function initDashboardControl() {
               } else if (window.dashboardChartInstance) {
                   window.dashboardChartInstance.hideLoading();
               }
-              utils.alert('發生系統錯誤，請稍後再試。', 'error');
+              btnRunQuery.textContent = btnRunQuery.dataset.defaultLabel || btnRunQuery.textContent; delete btnRunQuery.dataset.defaultLabel; utils.alert('發生系統錯誤，請稍後再試。', 'error');
           });
       });
   }
@@ -1668,6 +1641,7 @@ function initDashboardControl() {
       if (previewInputBtn) previewInputBtn.disabled = !(hasSelectedFile && hasSelectedScheme && previewReady);
       if (uploadButton) uploadButton.disabled = !(hasSelectedFile && hasSelectedScheme && previewReady);
       inputSettings?.classList.toggle('is-disabled', !hasSelectedFile);
+      inputSettings?.classList.toggle('d-none', !hasSelectedFile);
       inputSettings?.setAttribute('aria-disabled', String(!hasSelectedFile));
   };
 
@@ -1746,7 +1720,10 @@ function initDashboardControl() {
             : '<span class="field-chip disabled"><i class="bi bi-asterisk"></i> 請先選擇檔案</span>';
       }
       syncDashboardInputFormat();
-      if (selectedFile) loadDashboardInputPreview();
+      if (selectedFile) {
+          inputSettings?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          loadDashboardInputPreview();
+      }
   });
 
   previewInputBtn?.addEventListener('click', () => {

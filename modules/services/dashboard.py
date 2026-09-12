@@ -4,7 +4,7 @@ from modules.services.db import get_conn
 from modules.blueprint.dashboard import load_user_favorites, save_user_favorites
 from modules.services.llm_tasks import create_llm_task, get_llm_task, list_llm_tasks
 from modules.blueprint.dashboard.definition.cancer_group_rules import CANCER_GROUP_RULES
-from flask import send_file
+from flask import send_file, send_from_directory
 from modules.blueprint.dashboard.export_report import generate_export_files
 from modules.blueprint.dashboard.pbi_settings import (get_pbi_publish_path,get_pbi_publish_settings,save_pbi_publish_path,)
 from modules.blueprint.dashboard.input_format import (preview_dashboard_upload,validate_and_normalize_dashboard_upload,)
@@ -82,6 +82,15 @@ def compare():
     uploaded_files = _get_uploaded_dashboard_files(session.get("id"))
     return render_template("compare.html",active="compare",uploaded_files=uploaded_files,cancer_name_translations=_get_cancer_name_translations(),)
 
+@dashboard_bp.route("/dashboard-preview/<task_id>")
+@login_required
+def dashboard_preview(task_id):
+    from modules.services.llm_tasks import get_llm_task_payload
+    task = get_llm_task(task_id, session.get("id"))
+    payload = get_llm_task_payload(task_id, session.get("id"))
+    if not task or not payload:
+        return jsonify({"success": False, "error": "找不到任務"}), 404
+    return render_template("dashboard.html", active="dashboard", uploaded_files=[], cancer_name_translations=_get_cancer_name_translations(), pbi_publish_path="", preview_task=task, preview_payload=payload)
 @dashboard_bp.route("/dashboard/upload", methods=["POST"])
 @login_required
 def dashboard_upload():
@@ -214,12 +223,27 @@ def chart_insight_route():
     try:
         data = request.json or {}
         owned_file = _get_owned_dashboard_file(data.get("file_id", ""), session.get("id"))
-        data["_document_label"] = owned_file["display_name"] if owned_file else "年報分析"
+        data["_document_label"] = owned_file["name"] if owned_file else "年報分析"
         return jsonify({"success": True, **create_llm_task(session.get("id"), "chart", data)}), 202
     except Exception as exc:
         logging.exception("Unable to queue chart insight")
         return jsonify({"success": False, "error": str(exc)}), 500
 
+@dashboard_bp.route("/api/dashboard/annual-report-job", methods=["POST"])
+@login_required
+def annual_report_job_route():
+    try:
+        data = request.json or {}
+        items = data.get("items", [])
+        if not isinstance(items, list) or not items:
+            return jsonify({"success": False, "error": "沒有可分析的圖表項目"}), 400
+        owned_file = _get_owned_dashboard_file(data.get('file_id', ''), session.get('id'))
+        data['_document_label'] = owned_file['name'] if owned_file else (data.get('_document_label') or '年報分析')
+        data['job_title'] = '年報分析'
+        return jsonify({"success": True, **create_llm_task(session.get("id"), "annual_report", data)}), 202
+    except Exception as exc:
+        logging.exception("Unable to queue annual report")
+        return jsonify({"success": False, "error": str(exc)}), 500
 @dashboard_bp.route("/api/dashboard/compare_insight", methods=["POST"])
 @login_required
 def compare_insight_route():
@@ -241,6 +265,22 @@ def llm_task_status(task_id):
     task = get_llm_task(task_id, session.get("id"))
     if not task: return jsonify({"success": False, "error": "找不到任務"}), 404
     return jsonify({"success": True, "task": task})
+
+@dashboard_bp.route("/api/llm-tasks/<task_id>/regenerate/<item_id>", methods=["POST"])
+@login_required
+def regenerate_annual_report_item(task_id, item_id):
+    from modules.services.llm_tasks import requeue_annual_report_item
+    if not requeue_annual_report_item(task_id, session.get("id"), item_id):
+        return jsonify({"success": False, "error": "圖表敘述尚未完成或不存在"}), 409
+    return jsonify({"success": True, "task": get_llm_task(task_id, session.get("id"))})
+@dashboard_bp.route("/api/llm-tasks/<task_id>/preview")
+@login_required
+def llm_task_preview(task_id):
+    task = get_llm_task(task_id, session.get("id"))
+    if not task or not task.get("preview_available"):
+        return jsonify({"success": False, "error": "找不到圖表預覽"}), 404
+    from modules.services.llm_tasks import TASK_ROOT
+    return send_from_directory(TASK_ROOT / str(task_id), "chart_preview.png", mimetype="image/png")
 
 @dashboard_bp.route("/api/llm-tasks")
 @login_required
