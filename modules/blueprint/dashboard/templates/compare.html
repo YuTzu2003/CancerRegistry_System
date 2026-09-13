@@ -4,9 +4,9 @@
 {% block extra_head %}
   <script src="/static/vendor/echarts/echarts.min.js"></script>
   <script src="/static/vendor/i18next/i18next.min.js"></script>
-  <link rel="stylesheet" href="/static/css/dashboard/dashboard.css?v=20260801-stage-card-compact">
-  <link rel="stylesheet" href="/static/css/dashboard/dashboard_compare.css?v=20260801-stage-card-compact">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/llm_task_panel.css') }}?v=13">
+  <link rel="stylesheet" href="/static/css/dashboard/dashboard.css">
+  <link rel="stylesheet" href="/static/css/dashboard/dashboard_compare.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/llm_task_panel.css') }}">
 {% if preview_task %}
   <style>
     .compare-mode-bar,
@@ -219,7 +219,7 @@
       </div>
       <div id="compareStageOptions" class="compare-stage-options mt-3 pt-3 border-top border-secondary-subtle">
         <p class="small text-secondary mb-3">選擇要套用於分期分析及治療方式表格的分期系統。</p>
-        {% include "_stage_system_cards.html" %}
+        {% include "stage_system_cards.html" %}
       </div>
     </div>
     <div class="compare-subitem-row d-none d-flex flex-wrap gap-3" data-compare-subitems="treatment">
@@ -341,7 +341,9 @@
 </section>
 
 {% if not preview_task %}
-<section id="annualLlmTaskPanel" style="margin-bottom: 22px;" data-llm-task-type="comparison_report" data-llm-record-title="年度比較工作任務"></section>
+{% set llm_task_type = 'comparison_report' %}
+{% set llm_record_title = '年度比較工作任務' %}
+{% include "_llm_task_panel.html" %}
 {% endif %}
 
 <div class="compare-cancer-source">
@@ -353,10 +355,10 @@
 <script id="comparisonPreviewData" type="application/json">{{ {"task": preview_task, "payload": preview_payload} | tojson }}</script>
 {% endif %}
 <script src="{{ url_for('static', filename='js/dashboard/compare_page.js') }}"></script>
-<script src="{{ url_for('static', filename='js/dashboard/dashboard_i18n.js') }}?v=20260802-unified-loading-copy"></script>
-<script src="{{ url_for('static', filename='js/dashboard/annual_report_renderer.js') }}?v=20260729-treatment-labels"></script>
-<script src="{{ url_for('static', filename='js/dashboard/dashboard_compare.js') }}?v=20260912-comparison-job"></script>
+<script src="{{ url_for('static', filename='js/dashboard/dashboard_i18n.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard/annual_report_renderer.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard/dashboard_compare.js') }}"></script>
 {% if not preview_task %}
-<script src="{{ url_for('static', filename='js/dashboard/llm_task_panel.js') }}?v=14"></script>
+<script src="{{ url_for('static', filename='js/dashboard/llm_task_panel.js') }}"></script>
 {% endif %}
 {% endblock %}

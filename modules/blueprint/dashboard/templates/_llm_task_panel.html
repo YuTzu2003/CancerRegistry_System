@@ -1,0 +1,23 @@
+<section id="annualLlmTaskPanel" style="margin-bottom: 22px;" data-llm-task-type="{{ llm_task_type }}" data-llm-record-title="{{ llm_record_title }}">
+  <section class="llm-task-panel">
+    <header class="llm-record-header">
+      <div>
+        <span class="llm-record-kicker">MANAGE</span>
+        <h2>LLM 工作任務</h2>
+        <p id="llmTaskCount" class="llm-record-count">顯示 0 / 0 筆任務</p>
+      </div>
+      <div class="llm-batch-actions">
+        <button id="btnSelectAllTasks" class="btn btn-outline-secondary" type="button">全部勾選</button>
+        <button id="btnClearTaskSelection" class="btn btn-outline-secondary" type="button">取消勾選</button>
+        <button id="btnBatchDelete" class="btn btn-danger" type="button">刪除勾選項目</button>
+        <button id="btnRefreshTasks" class="btn btn-outline-secondary" type="button">重新整理</button>
+      </div>
+    </header>
+    <div class="llm-task-filters">
+      <label class="llm-filter-field llm-filter-field--search"><span>搜尋</span><input id="llmTaskQuery" type="search" placeholder="年報檔名、分析項目、任務 ID"></label>
+      <label class="llm-filter-field"><span>狀態</span><select id="llmTaskStatus"><option value="">全部狀態</option><option value="queued">處理中</option><option value="running">處理中</option><option value="retrying">處理中</option><option value="completed">已完成</option><option value="partial_failed">部分完成</option><option value="failed">處理失敗</option><option value="cancelled">已取消</option></select></label>
+      <button id="btnResetTaskFilters" class="btn btn-outline-secondary" type="button">重設</button>
+    </div>
+    <div id="llmTaskList" class="llm-task-list"></div>
+  </section>
+</section>

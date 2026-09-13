@@ -18,6 +18,8 @@ TASK_ROOT = Path(__file__).resolve().parents[2] / 'tasks' / 'llm_tasks'
 SENSITIVE_KEYS = {'api_key', 'authorization', 'password', 'token', 'patient_name', 'patient_id', 'medical_record_number'}
 TASK_TYPES = {'chart', 'compare', 'annual_report', 'comparison_report'}
 COMPLETED_STATUSES = {'completed', 'partial_failed', 'failed'}
+MAX_BATCH_ITEM_ATTEMPTS = 3
+CANCELLED_TASK_ROOT = TASK_ROOT / '.cancelled'
 
 
 def _safe(value):
@@ -30,6 +32,34 @@ def _safe(value):
 
 def _dir(task_type, task_id):
     return TASK_ROOT / str(task_type) / str(task_id)
+
+
+def _cancel_marker(task_id):
+    return CANCELLED_TASK_ROOT / str(task_id)
+
+
+def _is_cancelled(task_id):
+    return _cancel_marker(task_id).exists()
+
+
+def _mark_cancelled(task_id):
+    marker = _cancel_marker(task_id)
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.touch()
+
+
+def _clear_cancellation(task_id):
+    _cancel_marker(task_id).unlink(missing_ok=True)
+
+
+def _remove_task_directory(task_type, task_id):
+    path = _dir(task_type, task_id)
+    for _ in range(3):
+        shutil.rmtree(path, ignore_errors=True)
+        if not path.exists():
+            return True
+        time.sleep(0.05)
+    return False
 
 
 def get_llm_task_directory(task_type, task_id):
@@ -77,8 +107,8 @@ def _rewrite(task_type, task_id, filename, rows):
     path.write_text(''.join(json.dumps(row, ensure_ascii=False, default=str) + '\n' for row in rows), encoding='utf-8')
 
 
-def _batched_task_status(inputs, outputs):
-    expected_ids = [entry.get('custom_id') for entry in inputs]
+def _batched_task_status(inputs, outputs, expected_ids=None):
+    expected_ids = expected_ids or [entry.get('custom_id') for entry in inputs]
     output_ids = [entry.get('custom_id') for entry in outputs]
     is_complete = (
         len(outputs) == len(inputs)
@@ -87,7 +117,40 @@ def _batched_task_status(inputs, outputs):
         and set(output_ids) == set(expected_ids)
         and all(entry.get('result', {}).get('success') for entry in outputs)
     )
-    return 'completed' if is_complete else 'partial_failed'
+    return 'completed' if is_complete else 'failed'
+
+
+def _resolved_task_status(task_type, status, inputs, outputs, payload=None):
+    if task_type in {'annual_report', 'comparison_report'} and status == 'completed':
+        expected_ids = [
+            item.get('item_id') for item in (payload or {}).get('items', [])
+            if item.get('item_id')
+        ]
+        return _batched_task_status(inputs, outputs, expected_ids)
+    return status
+
+
+def _run_batched_item(handler, item, is_cancelled=None):
+    errors = []
+    for attempt in range(1, MAX_BATCH_ITEM_ATTEMPTS + 1):
+        if is_cancelled and is_cancelled():
+            return {'success': False, 'cancelled': True}
+        try:
+            result = handler(item)
+        except Exception as exc:
+            result = {'success': False, 'error': str(exc)}
+        if is_cancelled and is_cancelled():
+            return {'success': False, 'cancelled': True}
+        if result.get('success'):
+            result['attempts'] = attempt
+            return result
+        errors.append(str(result.get('error') or 'LLM did not return a result'))
+    return {
+        'success': False,
+        'error': errors[-1],
+        'attempts': MAX_BATCH_ITEM_ATTEMPTS,
+        'attempt_errors': errors,
+    }
 
 
 def _row(cursor, row):
@@ -136,10 +199,13 @@ def _task(cursor, row):
     task = _row(cursor, row)
     task_data = _read_task_data(task['TaskType'], task['TaskID'])
     payload = task_data.get('PayloadJson') or {}
+    inputs = _rows(task['TaskType'], task['TaskID'], 'input.jsonl')
+    outputs = _rows(task['TaskType'], task['TaskID'], 'output.jsonl')
+    task['Status'] = _resolved_task_status(task['TaskType'], task['Status'], inputs, outputs, payload)
     task['ProgressCurrent'] = task_data.get('ProgressCurrent', 0)
     task['DocumentLabel'] = payload.get('_document_label', '')
     task['TaskTitle'] = payload.get('job_title') or payload.get('field_key') or payload.get('analysis_item') or 'LLM 分析'
-    task['result'] = _rows(task['TaskType'], task['TaskID'], 'output.jsonl')
+    task['result'] = outputs
     return task
 
 
@@ -232,15 +298,23 @@ def process_next_llm_task(worker_id):
         return None
     task_id, task_type = task['task_id'], task['task_type']
     try:
+        if _is_cancelled(task_id):
+            return {'task_id': task_id, 'status': 'cancelled'}
         if task_type in {'annual_report', 'comparison_report'}:
             retry_path = _dir(task_type, task_id) / 'retry.jsonl'
             retrying = retry_path.exists()
             requests = _rows(task_type, task_id, 'retry.jsonl' if retrying else 'input.jsonl')
             handler = get_chart_insight_logic if task_type == 'annual_report' else get_compare_insight_logic
             for request in requests:
+                if _is_cancelled(task_id):
+                    return {'task_id': task_id, 'status': 'cancelled'}
                 item = request['body']['payload']
-                result = handler(item)
+                result = _run_batched_item(handler, item, lambda: _is_cancelled(task_id))
+                if result.get('cancelled'):
+                    return {'task_id': task_id, 'status': 'cancelled'}
                 output = {'custom_id': request['custom_id'], 'field_key': item.get('field_key', ''), 'result': result}
+                if _is_cancelled(task_id):
+                    return {'task_id': task_id, 'status': 'cancelled'}
                 if retrying:
                     _rewrite(task_type, task_id, 'output.jsonl', [
                         row for row in _rows(task_type, task_id, 'output.jsonl') if row.get('custom_id') != request['custom_id']
@@ -253,12 +327,15 @@ def process_next_llm_task(worker_id):
                 retry_path.unlink(missing_ok=True)
             outputs = _rows(task_type, task_id, 'output.jsonl')
             inputs = _rows(task_type, task_id, 'input.jsonl')
-            status = _batched_task_status(inputs, outputs)
+            expected_ids = [item.get('item_id') for item in task['payload'].get('items', []) if item.get('item_id')]
+            status = _batched_task_status(inputs, outputs, expected_ids)
             _update(task_id, status=status)
             return {'task_id': task_id, 'status': status}
 
         handler = get_chart_insight_logic if task_type == 'chart' else get_compare_insight_logic
         result = handler(task['payload'])
+        if _is_cancelled(task_id):
+            return {'task_id': task_id, 'status': 'cancelled'}
         if not result.get('success'):
             raise RuntimeError(str(result.get('error') or 'LLM did not return a result'))
         _write(task_type, task_id, 'output.jsonl', {'item_id': task_id, 'result': result})
@@ -266,12 +343,18 @@ def process_next_llm_task(worker_id):
         _update(task_id, status='completed')
         return {'task_id': task_id, 'status': 'completed'}
     except Exception as exc:
+        if _is_cancelled(task_id):
+            return {'task_id': task_id, 'status': 'cancelled'}
         _write(task_type, task_id, 'error.jsonl', {
             'item_id': task_id, 'error_type': type(exc).__name__, 'error': str(exc),
             'traceback': traceback.format_exc(), 'failed_at': datetime.now(timezone.utc).isoformat(),
         })
         _update(task_id, status='failed')
         return {'task_id': task_id, 'status': 'failed'}
+    finally:
+        if _is_cancelled(task_id):
+            _remove_task_directory(task_type, task_id)
+            _clear_cancellation(task_id)
 
 
 def requeue_annual_report_item(task_id, owner_id, item_id):
@@ -324,16 +407,24 @@ def run_worker(worker_id=None, poll_seconds=2):
 
 
 def delete_llm_task(task_id, owner_id):
+    task_id = str(task_id)
+    _mark_cancelled(task_id)
     conn = get_conn()
     try:
         cursor = conn.cursor()
-        cursor.execute('SELECT TaskType FROM dbo.LLMTaskWorker WHERE TaskID=? AND OwnerID=?', (str(task_id), str(owner_id)))
+        cursor.execute(
+            'SELECT TaskType,Status FROM dbo.LLMTaskWorker WITH (UPDLOCK, HOLDLOCK) WHERE TaskID=? AND OwnerID=?',
+            (task_id, str(owner_id)),
+        )
         row = cursor.fetchone()
         if not row:
+            _clear_cancellation(task_id)
             return False
-        cursor.execute('DELETE FROM dbo.LLMTaskWorker WHERE TaskID=? AND OwnerID=?', (str(task_id), str(owner_id)))
+        cursor.execute('DELETE FROM dbo.LLMTaskWorker WHERE TaskID=? AND OwnerID=?', (task_id, str(owner_id)))
         conn.commit()
-        shutil.rmtree(_dir(row[0], task_id), ignore_errors=True)
-        return cursor.rowcount > 0
+        removed = _remove_task_directory(row[0], task_id)
+        if row[1] != 'running':
+            _clear_cancellation(task_id)
+        return cursor.rowcount > 0 and (removed or row[1] == 'running')
     finally:
         conn.close()

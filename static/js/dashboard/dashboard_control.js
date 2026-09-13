@@ -1589,7 +1589,14 @@ function initDashboardControl() {
                       window.annualLlmJobItems = null;
                       const queued = await fetch('/api/dashboard/annual-report-job', {
                           method: 'POST', headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ items: annualItems, file_id: selectedFileId, _document_label: '年報分析', chart_data: chartData })
+                          body: JSON.stringify({
+                              items: annualItems,
+                              file_id: selectedFileId,
+                              _document_label: '年報分析',
+                              chart_data: chartData,
+                              year_title: window.DashboardRenderer?.getSelectedYearTitle() || '',
+                              cancer_title: window.DashboardRenderer?.getSelectedCancerTitle() || ''
+                          })
                       }).then(response => response.json());
                       if (!queued.success) throw new Error(queued.error || '無法建立年報工作任務');
                       window.dispatchEvent(new CustomEvent('llm-task-created'));

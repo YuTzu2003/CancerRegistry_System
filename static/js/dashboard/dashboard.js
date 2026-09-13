@@ -1,3 +1,4 @@
+// 年報頁共用狀態：保存 ECharts 實例與圖表 renderer。
 window.dashboardChartInstance = null;
 window.dashboardHistologyChartInstance = null;
 window.dashboardSurvivalChartInstance = null;
@@ -5,181 +6,9 @@ window.dashboardStageDistributionChartInstance = null;
 window.dashboardStageSexChartInstance = null;
 window.dashboardStageAgeChartInstance = null;
 window.DashboardRenderer = {};
-window.DashboardRenderer.t = function(key, options) {
-    return window.DashboardI18n ? window.DashboardI18n.t(key, options) : key;
-};
-window.DashboardRenderer.sourceLine = function() {
-    return `<br><span class="text-muted fw-normal" style="font-size: 0.85em;">${this.t('source')}</span>`;
-};
-window.DashboardRenderer.axisLabelLines = function(value, maxLength = 68) {
-    const lines = [];
-    const segments = String(value ?? '')
-        .trim()
-        .replace(/\s*(?=[\[［])/g, '\n')
-        .split('\n')
-        .filter(Boolean);
-    segments.forEach(segment => {
-        let line = '';
-        const segmentMaxLength = /^[\[［]/.test(segment) ? 88 : 82;
-        segment.split(/\s+/).filter(Boolean).forEach(word => {
-            const candidate = line ? `${line} ${word}` : word;
-            if (line && candidate.length > segmentMaxLength) {
-                lines.push(line);
-                line = word;
-            } else {
-                line = candidate;
-            }
-        });
-        if (line) lines.push(line);
-    });
-    return lines.length ? lines : [''];
-};
-window.DashboardRenderer.rightAlignedAxisLabel = function(value, maxLength = 68) {
-    return this.axisLabelLines(value, maxLength)
-        .map(text => `{${/^[\[［]/.test(text) ? 'bracket' : 'right'}|${text}}`)
-        .join('\n');
-};
-window.DashboardRenderer.histologyRowHeight = function(names) {
-    const maxLines = Math.max(1, ...names.map(name => this.axisLabelLines(name).length));
-    return Math.max(40, maxLines * 18 + 8);
-};
-window.DashboardRenderer.reportCaption = function(kind, yearTitle, cancerTitle, description, options = {}) {
-    const isEnglish = window.DashboardI18n?.getLanguage() === 'en';
-    const prefix = kind === 'table' ? this.t('table') : this.t('chart');
-    const suffix = kind === 'table' ? this.t('table') : this.t('chart');
-    if (isEnglish) {
-        const subject = options.newDiagnosis
-            ? `Newly diagnosed ${cancerTitle} patients`
-            : cancerTitle;
-        return `${prefix} ${yearTitle} ${subject} ${description}${kind === 'table' ? ' table' : ''}${this.sourceLine()}`;
-    }
-    const subject = options.newDiagnosis
-        ? `年新診斷${cancerTitle}病患`
-        : `年${cancerTitle}`;
-    return `${prefix}、${yearTitle}${subject}${description}${suffix}${this.sourceLine()}`;
-};
-window.DashboardRenderer.getEnglishCancerPatientLabel = function(cancerTitle) {
-    if (!cancerTitle) return 'Cancer';
-    return /cancer|carcinoma|lymphoma|leukemia/i.test(cancerTitle)
-        ? cancerTitle
-        : `${cancerTitle} Cancer`;
-};
 
-window.DashboardRenderer.getGenderAgeChartOption = function(genderAgeData) {
-        const categories = (genderAgeData?.categories || ['≦19', '20-24', '25-29', '30-34', '35-39', '40-44', '45-49', '50-54', '55-59', '60-64', '65-69', '70-74', '75-79', '80-84', '≧85'])
-            .map(label => ['<=19', '≤19', '≦19'].includes(label) ? '≦19' : ['>=85', '≥85', '≧85'].includes(label) ? '≧85' : label);
-        const male = genderAgeData?.male || [];
-        const female = genderAgeData?.female || [];
-        const total = genderAgeData?.total || [];
-        const maxValue = Math.max(0, ...male, ...female, ...total);
-        const yMax = Math.max(10, Math.ceil((maxValue * 1.15) / 5) * 5);
-        const isEnglish = window.DashboardI18n?.getLanguage() === 'en';
-        const selectedCancer = this.getCancerTitleForSentence(this.getSelectedCancerTitle());
-        const titleText = isEnglish
-            ? `Age and Sex Distribution of Newly Diagnosed with ${this.getEnglishCancerPatientLabel(selectedCancer)} Patients, ${this.getSelectedYearTitle()}`
-            : `${this.getSelectedYearTitle()}年新診斷${selectedCancer}病患${this.t('sexAge')}${this.t('distribution')}${this.t('chart')}`;
 
-        return {
-          title: {
-            text: titleText,
-            subtext: this.t('source'),
-            left: 'center',
-            top: 0,
-            textStyle: { fontSize: 18, fontWeight: 'bold' },
-            subtextStyle: { fontSize: 12 }
-          },
-          tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-          grid: { left: 72, right: 72, top: 98, bottom: 74, containLabel: false },
-          legend: { data: [this.t('male'), this.t('female'), this.t('total')], top: 52, left: 'center', itemGap: 12 },
-          toolbox: {
-            right: 16,
-            top: 0,
-            feature: {
-              dataView: { show: true, readOnly: false, title: this.t('dataView'), lang: [this.t('dataView'), this.t('close'), this.t('refresh')] },
-              saveAsImage: { show: true, title: this.t('downloadImage') }
-            }
-          },
-          xAxis: [{
-            type: 'category',
-            data: categories,
-            name: this.t('age'),
-            nameLocation: 'middle',
-            nameGap: 30,
-            axisPointer: { type: 'shadow' },
-            axisTick: { alignWithLabel: true },
-            axisLabel: { interval: 0 }
-          }],
-          yAxis: [{
-            type: 'value',
-            min: 0,
-            max: yMax,
-            minInterval: 1,
-            splitNumber: 5,
-            axisLabel: { formatter: '{value}' },
-            splitLine: { lineStyle: { color: '#e5eaf3' } }
-          }],
-          series: [
-            {
-              name: this.t('male'),
-              type: 'bar',
-              data: male,
-              barWidth: 20,
-              barGap: '20%',
-              barCategoryGap: '42%',
-              itemStyle: { color: '#5470C6' }
-            },
-            {
-              name: this.t('female'),
-              type: 'bar',
-              data: female,
-              barWidth: 20,
-              itemStyle: { color: '#EE6666' }
-            },
-            {
-              name: this.t('total'),
-              type: 'bar',
-              data: total,
-              barWidth: 20,
-              z: 5,
-              itemStyle: { color: '#91CC75' }
-            }
-          ]
-        };
-    };
-
-// Shared annual-report rendering primitives used by both analysis and comparison pages.
-window.DashboardRenderer.axisLabelLines = function(value, maxLength = 68) {
-    return window.AnnualReportRenderer.axisLabelLines(value, maxLength);
-};
-window.DashboardRenderer.rightAlignedAxisLabel = function(value, maxLength = 68) {
-    return window.AnnualReportRenderer.rightAlignedAxisLabel(value, maxLength);
-};
-window.DashboardRenderer.histologyRowHeight = function(names) {
-    return window.AnnualReportRenderer.histologyRowHeight(names);
-};
-window.DashboardRenderer.getGenderAgeChartOption = function(genderAgeData) {
-    const isEnglish = window.DashboardI18n?.getLanguage() === 'en';
-    const selectedCancer = this.getCancerTitleForSentence(this.getSelectedCancerTitle());
-    const titleText = isEnglish
-        ? `Age and Sex Distribution of Newly Diagnosed with ${this.getEnglishCancerPatientLabel(selectedCancer)} Patients, ${this.getSelectedYearTitle()}`
-        : `${this.getSelectedYearTitle()}年新診斷${selectedCancer}病患${this.t('sexAge')}${this.t('distribution')}${this.t('chart')}`;
-
-    return window.AnnualReportRenderer.getGenderAgeChartOption(genderAgeData, {
-        title: titleText,
-        source: this.t('source'),
-        labels: {
-            male: this.t('male'),
-            female: this.t('female'),
-            total: this.t('total'),
-            age: this.t('age'),
-            dataView: this.t('dataView'),
-            close: this.t('close'),
-            refresh: this.t('refresh'),
-            downloadImage: this.t('downloadImage')
-        }
-    });
-};
-
+// 首次載入時建立性別年齡與組織型態的空白圖表。
 document.addEventListener('DOMContentLoaded', function() {
     /* ── 性別與年齡分佈圖表 ── */
     var chartDom = document.getElementById('main');
@@ -292,1351 +121,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 /* ── 個案分類分佈圖 ── */
-window.DashboardRenderer.renderDiagnosisClassificationChart = function(chartData, yearTitle, cancerTitle) {
-        let chartDom = document.getElementById('annualDiagnosisClassificationChart');
-        if (!chartDom) return;
-        
-        if (!this.classificationChartInst) {
-            this.classificationChartInst = echarts.init(chartDom);
-        }
-
-        const total = chartData.total_count || 1;
-        const calcPctNum = (val) => Number((val / total * 100).toFixed(1));
-        const colors = ['#5470C6','#91CC75','#FAC858','#EE6666','#73C0DE','#3BA272','#FC8452'];
-        const isEnglish = window.DashboardI18n?.getLanguage() === 'en';
-        const selectedCancer = this.getCancerTitleForSentence(cancerTitle);
-        const chartTitle = isEnglish
-            ? `${this.getEnglishCancerPatientLabel(selectedCancer)} Case Class Distribution, ${yearTitle}`
-            : `${yearTitle}年${selectedCancer}${this.t('classificationDistribution')}`;
-        chartDom.style.height = '450px';
-        this.classificationChartInst.resize();
-        const labels = [
-            this.t('class0'), this.t('class1'), this.t('class2'), this.t('class3')
-        ];
-
-        const option = {
-            animation: false,
-            title: {
-                text: chartTitle,
-                subtext: this.t('source'),
-                left: 'center',
-                textStyle: {fontSize: 18,fontWeight: 'bold',color: '#333'}
-            },
-            toolbox: {
-                show: true,
-                feature: {
-                    dataView: { show: true, readOnly: false, title: this.t('dataView'), lang: [this.t('dataView'), this.t('close'), this.t('refresh')] },
-                    saveAsImage: { show: true, title: this.t('downloadImage') }
-                }
-            },
-            legend: {
-                orient: 'vertical',
-                right: '2%',
-                top: 'middle',
-                itemWidth: 14,
-                itemHeight: 14,
-                data: labels,
-                textStyle: {
-                    fontSize: 14,
-                    lineHeight: 22,
-                    width: 450,
-                    overflow: 'break'
-                }
-            },
-            tooltip: {
-                trigger: 'axis',
-                axisPointer: {type: 'shadow'}
-            },
-            grid: {
-                left: '3%',
-                right: '32%',
-                top: '15%',
-                bottom: '3%',
-                containLabel: true
-            },
-            xAxis: [
-                {
-                    type: 'category',
-                    data: ['Class0', 'Class1', 'Class2', 'Class3'],
-                    axisTick: {alignWithLabel: true}
-                }
-            ],
-            yAxis: [
-                {
-                    type: 'value',
-                    axisLabel: { formatter: '{value}%' }
-                }
-            ],
-            series: [
-                {
-                    name: labels[0],
-                    type: 'bar',
-                    stack: 'total',
-                    barWidth: '60%',
-                    data: [calcPctNum(chartData.class0_total), '-', '-', '-'],
-                    itemStyle: { borderRadius: [6, 6, 0, 0], color: colors[0] },
-                    label: { show: true, position: 'top', color: '#333', fontSize: 14, fontWeight: 'bold', formatter: '{c}%' }
-                },
-                {
-                    name: labels[1],
-                    type: 'bar',
-                    stack: 'total',
-                    barWidth: '60%',
-                    data: ['-', calcPctNum(chartData.class1_total), '-', '-'],
-                    itemStyle: { borderRadius: [6, 6, 0, 0], color: colors[1] },
-                    label: { show: true, position: 'top', color: '#333', fontSize: 14, fontWeight: 'bold', formatter: '{c}%' }
-                },
-                {
-                    name: labels[2],
-                    type: 'bar',
-                    stack: 'total',
-                    barWidth: '60%',
-                    data: ['-', '-', calcPctNum(chartData.class2_total), '-'],
-                    itemStyle: { borderRadius: [6, 6, 0, 0], color: colors[2] },
-                    label: { show: true, position: 'top', color: '#333', fontSize: 14, fontWeight: 'bold', formatter: '{c}%' }
-                },
-                {
-                    name: labels[3],
-                    type: 'bar',
-                    stack: 'total',
-                    barWidth: '60%',
-                    data: ['-', '-', '-', calcPctNum(chartData.class3_total)],
-                    itemStyle: { borderRadius: [6, 6, 0, 0], color: colors[3] },
-                    label: { show: true, position: 'top', color: '#333', fontSize: 14, fontWeight: 'bold', formatter: '{c}%' }
-                }
-            ]
-        };
-        this.classificationChartInst.setOption(option, true);
-    };
-
-/* ── 性別與年齡分佈表 ── */
-window.DashboardRenderer.renderSexAgeTable = function(genderAgeData, yearTitle, cancerTitle) {
-        const head = document.getElementById('annualSexAgeTableHead');
-        const body = document.getElementById('annualSexAgeTableBody');
-        const caption = document.getElementById('annualSexAgeCaption');
-        if (!head || !body) return;
-
-        const ageLabels = (genderAgeData.categories || [])
-            .map(label => ['<=19', '≤19', '≦19'].includes(label) ? '≦19' : ['>=85', '≥85', '≧85'].includes(label) ? '≧85' : label);
-        if (caption) {
-            const selectedCancer = this.getCancerTitleForSentence(cancerTitle);
-            caption.innerHTML = window.DashboardI18n?.getLanguage() === 'en'
-                ? `Table . Age and Sex Distribution of Newly Diagnosed with ${this.getEnglishCancerPatientLabel(selectedCancer)} Patients,\u00a0${yearTitle}${this.sourceLine()}`
-                : this.reportCaption('table', yearTitle, selectedCancer, `${this.t('sexAge')}${this.t('distribution')}`, { newDiagnosis: true });
-        }
-
-        head.innerHTML = `<tr><th rowspan="2">${this.t('sex')}</th><th colspan="${ageLabels.length}">${this.t('ageGroup')}</th><th rowspan="2">${this.t('subtotal')}</th><th rowspan="2">${this.t('percent')}</th></tr><tr>${ageLabels.map(label => `<th>${label}</th>`).join('')}</tr>`;
-        const sumMale = genderAgeData.male.reduce((a, b) => a + b, 0);
-        const sumFemale = genderAgeData.female.reduce((a, b) => a + b, 0);
-        const sumTotal = genderAgeData.total.reduce((a, b) => a + b, 0);
-        const percentage = (value) => sumTotal ? `${((value / sumTotal) * 100).toFixed(1)}%` : '0.0%';
-        body.innerHTML = `<tr><td>${this.t('male')}</td>${genderAgeData.male.map(value => `<td>${value}</td>`).join('')}<td>${sumMale}</td><td>${percentage(sumMale)}</td></tr><tr><td>${this.t('female')}</td>${genderAgeData.female.map(value => `<td>${value}</td>`).join('')}<td>${sumFemale}</td><td>${percentage(sumFemale)}</td></tr><tr><td>${this.t('total')}</td>${genderAgeData.total.map(value => `<td>${value}</td>`).join('')}<td>${sumTotal}</td><td>${percentage(sumTotal)}</td></tr><tr><td>${this.t('percent')}</td>${genderAgeData.total.map(value => `<td>${percentage(value)}</td>`).join('')}<td>${percentage(sumTotal)}</td><td>-</td></tr>`;
-    };
-
-/* ── 期別分布介面預覽資料 ──
- * API 無正式 stageReports 時才使用，正式資料會由 2.4 period_rule.py 產生。
- * stage_labels 可放 I、II、III、IV，也可放 IA1、IA2 或其他分期系統的期別名稱。
- */
-window.DashboardRenderer.getStageDistributionPreviewData = function() {
-        return {
-            staging_system: 'AJCC',
-            stage_labels: ['I', 'II', 'III', 'IV'],
-            stage_totals: [37, 83, 80, 120],
-            sex_rows: [
-                { sex: '男性', values: [22, 45, 38, 56] },
-                { sex: '女性', values: [15, 38, 42, 64] }
-            ],
-            age_rows: [
-                { age: '≦19', values: [1, 0, 0, 3] },
-                { age: '20-24', values: [0, 3, 4, 0] },
-                { age: '25-29', values: [3, 5, 3, 5] },
-                { age: '30-34', values: [5, 7, 6, 6] },
-                { age: '35-39', values: [2, 9, 9, 11] },
-                { age: '40-44', values: [0, 12, 12, 12] },
-                { age: '45-49', values: [3, 5, 5, 5] },
-                { age: '50-54', values: [3, 8, 8, 13] },
-                { age: '55-59', values: [3, 15, 10, 10] },
-                { age: '60-64', values: [5, 8, 8, 9] },
-                { age: '65-69', values: [4, 10, 12, 11] },
-                { age: '70-74', values: [3, 0, 1, 0] },
-                { age: '75-79', values: [3, 0, 1, 18] },
-                { age: '80-84', values: [2, 1, 1, 14] },
-                { age: '≧85', values: [0, 0, 0, 3] }
-            ],
-            analyzable_count: 333,
-            unknown_count: 5,
-            not_applicable_count: 8,
-            included_count: 320,
-            is_preview: true
-        };
-    };
-
-/* ── 期別分布資料格式正規化 ── */
-window.DashboardRenderer.normalizeStageDistributionData = function(stageData) {
-        const source = stageData || this.getStageDistributionPreviewData();
-        const stageLabels = Array.isArray(source.stage_labels) && source.stage_labels.length
-            ? source.stage_labels.map(label => String(label))
-            : ['I', 'II', 'III', 'IV'];
-        const normalizeValues = values => stageLabels.map((_, index) => Number(values?.[index] || 0));
-        const stageTotals = normalizeValues(source.stage_totals);
-        const includedCount = Number(source.included_count ?? stageTotals.reduce((sum, value) => sum + value, 0));
-        const sexRows = (Array.isArray(source.sex_rows) ? source.sex_rows : [])
-            .map(row => ({
-                sex: String(row.sex || ''),
-                values: normalizeValues(row.values)
-            }))
-            // 2.4：性別期別表圖不顯示總數為 0 的性別。
-            .filter(row => row.values.some(value => value > 0));
-        const ageRows = (Array.isArray(source.age_rows) ? source.age_rows : []).map(row => ({
-            age: String(row.age || ''),
-            values: normalizeValues(row.values)
-        }));
-        const chartStageLabels = Array.isArray(source.chart_stage_labels) && source.chart_stage_labels.length
-            ? source.chart_stage_labels.map(label => String(label))
-            : stageLabels;
-        const normalizeChartValues = values => chartStageLabels.map((_, index) => Number(values?.[index] || 0));
-        const chartAgeRows = (Array.isArray(source.chart_age_rows) ? source.chart_age_rows : source.age_rows || [])
-            .map(row => ({
-                age: String(row.age || ''),
-                values: normalizeChartValues(row.values)
-            }));
-
-        return {
-            staging_system: String(source.staging_system || 'AJCC'),
-            stage_labels: stageLabels,
-            stage_totals: stageTotals,
-            sex_rows: sexRows,
-            age_rows: ageRows,
-            chart_stage_labels: chartStageLabels,
-            chart_age_rows: chartAgeRows,
-            analyzable_count: Number(source.analyzable_count ?? includedCount),
-            unknown_count: Number(source.unknown_count || 0),
-            not_applicable_count: Number(source.not_applicable_count || 0),
-            included_count: includedCount,
-            is_preview: source.is_preview === true
-        };
-    };
-
-/* 英文模板本身會補上 Stage，避免 Breast Cancer Prognostic Stage 變成 Stage Stage。 */
-window.DashboardRenderer.getStageSystemTitle = function(systemName) {
-        const name = String(systemName || '').trim();
-        return window.DashboardI18n?.getLanguage() === 'en'
-            ? name.replace(/\s+Stage$/i, '')
-            : name;
-    };
-
-/* ── 分期不呈現最細碼：依勾選項目切換昨天建立的三種表圖 ── */
-window.DashboardRenderer.renderStageReportTabs = function(stageReports, yearTitle, cancerTitle) {
-        const tabs = document.getElementById('annualStageReportTabs');
-        const reports = Array.isArray(stageReports) ? stageReports : [];
-        if (!tabs) return;
-        tabs.replaceChildren();
-
-        const sections = {
-            stage: document.getElementById('annualStageDistributionSection'),
-            sex: document.getElementById('annualStageSexSection'),
-            age: document.getElementById('annualStageAgeSection')
-        };
-        const showReport = (report, button, { generateInsight = false } = {}) => {
-            Object.values(sections).forEach(section => section?.classList.add('d-none'));
-            tabs.querySelectorAll('button').forEach(item => item.classList.remove('active'));
-            button?.classList.add('active');
-            const view = report.view || 'stage';
-            sections[view]?.classList.remove('d-none');
-            const previewNotice = document.getElementById('annualStagePreviewNotice');
-            previewNotice?.classList.toggle('d-none', report.is_preview !== true);
-            if (previewNotice) previewNotice.textContent = this.t('stagePreview');
-
-            if (view === 'sex') this.renderStageSexReport(report, yearTitle, cancerTitle);
-            else if (view === 'age') this.renderStageAgeReport(report, yearTitle, cancerTitle);
-            else this.renderStageDistributionReport(report, yearTitle, cancerTitle);
-            this.configureStageInsight(report, { generate: generateInsight });
-
-            requestAnimationFrame(() => {
-                if (view === 'sex') window.dashboardStageSexChartInstance?.resize();
-                else if (view === 'age') window.dashboardStageAgeChartInstance?.resize();
-                else window.dashboardStageDistributionChartInstance?.resize();
-            });
-        };
-
-        reports.forEach((report, index) => {
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.className = 'btn btn-outline-dark btn-sm';
-            const tabKey = report.view === 'sex' ? 'stageSexTab' : report.view === 'age' ? 'stageAgeTab' : 'stageTab';
-            button.textContent = window.DashboardI18n?.getLanguage() === 'en'
-                ? this.t(tabKey, { system: this.getStageSystemTitle(report.staging_system) })
-                : (report.option || this.t(tabKey, { system: report.staging_system }));
-            button.addEventListener('click', () => showReport(report, button, { generateInsight: true }));
-            tabs.appendChild(button);
-            if (index === 0) showReport(report, button);
-        });
-    };
-
-/* 目前顯示的期別分頁共用同一個敘述區塊；切換分頁時改用該報表資料產生敘述。 */
-window.DashboardRenderer.configureStageInsight = function(stageReport, { generate = true } = {}) {
-        const button = document.getElementById('btnAiStageSummary');
-        const response = document.getElementById('llmResponseStageSummary');
-        if (!button || !response || !stageReport) return;
-
-        const data = this.normalizeStageDistributionData(stageReport);
-        const view = stageReport.view || 'stage';
-        const viewLabel = view === 'sex' ? 'Stage Distribution by Sex'
-            : view === 'age' ? 'Stage Distribution by Age Group'
-            : 'Stage Distribution';
-        const fieldKey = `${data.staging_system} ${viewLabel}`;
-        const fields = view === 'sex'
-            ? ['期別', '性別', '個案數', '百分比']
-            : view === 'age'
-                ? ['期別', '年齡層', '個案數', '百分比']
-                : ['期別', '個案數', '百分比'];
-        const insightData = {
-            staging_system: data.staging_system,
-            stage_labels: data.stage_labels,
-            stage_totals: data.stage_totals,
-            sex_rows: view === 'sex' ? data.sex_rows : undefined,
-            age_rows: view === 'age' ? data.age_rows : undefined,
-            analyzable_count: data.analyzable_count,
-            unknown_count: data.unknown_count,
-            not_applicable_count: data.not_applicable_count,
-            included_count: data.included_count
-        };
-
-        const reportChanged = button.dataset.insightFieldKey !== fieldKey;
-        if (window.dashboardPreviewMode) {
-            button.dataset.insightFieldKey = fieldKey;
-            button.style.display = 'block';
-            const insight = window.dashboardPreviewNarratives?.[fieldKey];
-            if (insight) response.textContent = insight;
-            return null;
-        }
-        button.style.display = 'block';
-        button.textContent = this.t('regenerateInsight');
-        button.dataset.insightFieldKey = fieldKey;
-        button.onclick = event => this.fetchLlmInsightWithRetry(
-            fieldKey,
-            insightData,
-            fields,
-            'llmResponseStageSummary',
-            'btnAiStageSummary',
-            { forceRefresh: event?.isTrusted === true }
-        );
-        if (reportChanged) response.textContent = this.t('autoInsight');
-        return generate ? button.onclick() : null;
-    };
-
-/* ── 表一、圖一：期別分布 ── */
-window.DashboardRenderer.renderStageDistributionReport = function(stageData, yearTitle, cancerTitle) {
-        const data = this.normalizeStageDistributionData(stageData);
-        const selectedCancer = this.getCancerTitleForSentence(cancerTitle);
-        const isEnglish = window.DashboardI18n?.getLanguage() === 'en';
-        const titleCancer = isEnglish ? this.getEnglishCancerPatientLabel(cancerTitle) : selectedCancer;
-        const systemName = data.staging_system;
-        const percentage = value => data.included_count > 0 ? Number(value) / data.included_count * 100 : 0;
-        const tableCaption = document.getElementById('annualStageDistributionCaption');
-        const chartCaption = document.getElementById('annualStageDistributionChartCaption');
-        const tableHead = document.getElementById('annualStageDistributionTableHead');
-        const tableBody = document.getElementById('annualStageDistributionTableBody');
-        const note = document.getElementById('annualStageDistributionNote');
-        const chartNote = document.getElementById('annualStageDistributionChartNote');
-        const previewNotice = document.getElementById('annualStagePreviewNotice');
-
-        if (previewNotice) previewNotice.classList.toggle('d-none', !data.is_preview);
-        const titleOptions = { year: yearTitle, cancer: titleCancer, system: this.getStageSystemTitle(systemName) };
-        const noteText = this.t('stageStatisticsNote', {
-            analyzable: data.analyzable_count, unknown: data.unknown_count,
-            notApplicable: data.not_applicable_count, included: data.included_count
-        });
-        if (tableCaption) tableCaption.innerHTML = `${this.t('stageTableTitle', titleOptions)}${this.sourceLine()}`;
-        if (chartCaption) chartCaption.textContent = this.t('stageFigureTitle', titleOptions);
-        if (tableHead) {
-            tableHead.innerHTML = `<tr><th>${this.t('stage')}</th>${data.stage_labels.map(label => `<th>${this.escapeHtml(label)}</th>`).join('')}<th>${this.t('subtotal')}</th></tr>`;
-        }
-        if (tableBody) {
-            tableBody.innerHTML = `
-                <tr><th>${this.t('total')}</th>${data.stage_totals.map(value => `<td>${value}</td>`).join('')}<td>${data.included_count}</td></tr>
-                <tr><th>%</th>${data.stage_totals.map(value => `<td>${percentage(value).toFixed(1)}%</td>`).join('')}<td>${data.included_count > 0 ? '100.0%' : '0.0%'}</td></tr>`;
-        }
-        if (note) note.textContent = noteText;
-        if (chartNote) chartNote.textContent = note?.textContent || '';
-
-        /* 圖一：期別分布圖 */
-        const chartDom = document.getElementById('annualStageDistributionChart');
-        if (chartDom && typeof echarts !== 'undefined') {
-            window.dashboardStageDistributionChartInstance?.dispose();
-            window.dashboardStageDistributionChartInstance = echarts.init(chartDom);
-            window.dashboardStageDistributionChartInstance.setOption({
-                animation: false,
-                title: {
-                    text: this.t('stageChartTitle', titleOptions),
-                    subtext: data.is_preview ? this.t('stagePreview') : this.t('source'),
-                    left: 'center',
-                    textStyle: { fontSize: 18, fontWeight: 'bold' }
-                },
-                tooltip: {
-                    trigger: 'axis',
-                    axisPointer: { type: 'shadow' },
-                    formatter: params => {
-                        const item = params[0];
-                        const count = data.stage_totals[item.dataIndex] || 0;
-                        return `${systemName} ${item.name}<br/>${item.marker}${this.t('stageTooltipCount', { percent: percentage(count).toFixed(1), count })}`;
-                    }
-                },
-                toolbox: {
-                    right: 16,
-                    feature: {
-                        dataView: { show: true, readOnly: true, title: this.t('dataView') },
-                        saveAsImage: { show: true, title: this.t('downloadImage') }
-                    }
-                },
-                grid: { left: 70, right: 50, top: 60, bottom: 40, containLabel: true },
-                xAxis: {
-                    type: 'category',
-                    data: data.stage_labels
-                },
-                yAxis: {
-                    type: 'value',
-                    min: 0,
-                    max: 100,
-                    interval: 10,
-                    axisLabel: { formatter: '{value}%' }
-                },
-                series: [{
-                    name: this.t('caseRatio'),
-                    type: 'bar',
-                    barWidth: 45,
-                    data: data.stage_totals.map(value => Number(percentage(value).toFixed(1))),
-                    itemStyle: {
-                        color: '#D4B2F6',
-                        borderColor: '#D4B2F6',
-                        borderWidth: 1
-                    },
-                    label: {
-                        show: true,
-                        position: 'top',
-                        distance: 4,
-                        color: '#4b5563',
-                        fontSize: 14,
-                        fontWeight: 'bold',
-                        formatter: params => `${Number(params.value || 0).toFixed(1)}%`
-                    }
-                }]
-            });
-        }
-
-        return data;
-    };
-
-/* ── 表二、圖二：性別及期別分布 ── */
-window.DashboardRenderer.renderStageSexReport = function(stageData, yearTitle, cancerTitle) {
-        const data = this.normalizeStageDistributionData(stageData);
-        const isEnglish = window.DashboardI18n?.getLanguage() === 'en';
-        const titleCancer = isEnglish ? this.getEnglishCancerPatientLabel(cancerTitle) : cancerTitle;
-        const systemName = data.staging_system;
-        const tableCaption = document.getElementById('annualStageSexCaption');
-        const chartCaption = document.getElementById('annualStageSexChartCaption');
-        const tableHead = document.getElementById('annualStageSexTableHead');
-        const tableBody = document.getElementById('annualStageSexTableBody');
-        const note = document.getElementById('annualStageSexNote');
-        const chartNote = document.getElementById('annualStageSexChartNote');
-        const rowTotal = row => row.values.reduce((sum, value) => sum + value, 0);
-        const percentage = value => data.included_count > 0 ? Number(value) / data.included_count * 100 : 0;
-
-        const titleOptions = { year: yearTitle, cancer: titleCancer, system: this.getStageSystemTitle(systemName) };
-        const sexLabel = sex => sex === '男性' ? this.t('male') : sex === '女性' ? this.t('female') : sex;
-        const noteText = this.t('stageStatisticsNote', {
-            analyzable: data.analyzable_count, unknown: data.unknown_count,
-            notApplicable: data.not_applicable_count, included: data.included_count
-        });
-        if (tableCaption) tableCaption.innerHTML = `${this.t('stageSexTableTitle', titleOptions)}${this.sourceLine()}`;
-        if (chartCaption) chartCaption.textContent = this.t('stageSexFigureTitle', titleOptions);
-        if (tableHead) {
-            tableHead.innerHTML = `<tr><th>${this.t('sex')}</th>${data.stage_labels.map(label => `<th>${this.escapeHtml(label)}</th>`).join('')}<th>${this.t('subtotal')}</th><th>%</th></tr>`;
-        }
-        if (tableBody) {
-            const sexRowsHtml = data.sex_rows.map(row => {
-                const total = rowTotal(row);
-                return `<tr><th>${this.escapeHtml(sexLabel(row.sex))}</th>${row.values.map(value => `<td>${value}</td>`).join('')}<td>${total}</td><td>${percentage(total).toFixed(1)}%</td></tr>`;
-            }).join('');
-            tableBody.innerHTML = `${sexRowsHtml}
-                <tr><th>${this.t('total')}</th>${data.stage_totals.map(value => `<td>${value}</td>`).join('')}<td>${data.included_count}</td><td>${data.included_count > 0 ? '100.0%' : '0.0%'}</td></tr>
-                <tr><th>%</th>${data.stage_totals.map(value => `<td>${percentage(value).toFixed(1)}%</td>`).join('')}<td>${data.included_count > 0 ? '100.0%' : '0.0%'}</td><td>-</td></tr>`;
-        }
-        if (note) note.textContent = noteText;
-        if (chartNote) chartNote.textContent = note?.textContent || '';
-
-        /* 圖二：性別及期別分布圖 */
-        const chartDom = document.getElementById('annualStageSexChart');
-        if (chartDom && typeof echarts !== 'undefined') {
-            window.dashboardStageSexChartInstance?.dispose();
-            window.dashboardStageSexChartInstance = echarts.init(chartDom);
-            const sexSeries = data.sex_rows.map(row => {
-                const isMale = row.sex === '男性';
-                return {
-                    name: sexLabel(row.sex),
-                    type: 'bar',
-                    stack: 'stage-total',
-                    barWidth: 45,
-                    data: row.values.map(value => Number(percentage(value).toFixed(1))),
-                    itemStyle: {
-                        color: isMale ? '#5470C6' : '#EE6666',
-                        borderColor: isMale ? '#5470C6' : '#EE6666',
-                        borderWidth: 1
-                    },
-                    label: { show: false }
-                };
-            });
-            const maleRow = data.sex_rows.find(row => row.sex === '男性');
-            const femaleRow = data.sex_rows.find(row => row.sex === '女性');
-            const topLabelData = data.stage_labels.map((_, index) => {
-                const malePercent = percentage(maleRow?.values[index] || 0);
-                const femalePercent = percentage(femaleRow?.values[index] || 0);
-                return {
-                    value: Number((malePercent + femalePercent).toFixed(1)),
-                    malePercent,
-                    femalePercent
-                };
-            });
-            const topLabelSeries = {
-                name: '__stageSexLabels',
-                type: 'bar',
-                barWidth: 45,
-                barGap: '-100%',
-                silent: true,
-                z: 10,
-                tooltip: { show: false },
-                data: topLabelData,
-                itemStyle: { color: 'transparent', borderColor: 'transparent' },
-                label: {
-                    show: true,
-                    position: 'top',
-                    distance: 4,
-                    align: 'center',
-                    fontSize: 14,
-                    fontWeight: 'bold',
-                    formatter: params => {
-                        return [
-                            `{female|${Number(params.data.femalePercent || 0).toFixed(1)}%}`,
-                            `{male|${Number(params.data.malePercent || 0).toFixed(1)}%}`
-                        ].join('\n');
-                    },
-                    rich: {
-                        male: { color: '#36558f', fontSize: 14, fontWeight: 'bold', lineHeight: 17, width: 45, align: 'center' },
-                        female: { color: '#b54848', fontSize: 14, fontWeight: 'bold', lineHeight: 17, width: 45, align: 'center' }
-                    }
-                }
-            };
-            window.dashboardStageSexChartInstance.setOption({
-                animation: false,
-                title: {
-                    text: this.t('stageSexChartTitle', titleOptions),
-                    subtext: data.is_preview ? this.t('stagePreview') : this.t('source'),
-                    left: 'center',
-                    textStyle: { fontSize: 18, fontWeight: 'bold' }
-                },
-                tooltip: {
-                    trigger: 'axis',
-                    axisPointer: { type: 'shadow' },
-                    formatter: params => {
-                        const lines = params
-                            .filter(item => item.seriesName !== '__stageSexLabels')
-                            .map(item => {
-                            const sexRow = data.sex_rows.find(row => sexLabel(row.sex) === item.seriesName);
-                            const count = sexRow?.values[item.dataIndex] || 0;
-                            return `${item.marker}${item.seriesName}: ${this.t('stageTooltipCount', { percent: Number(item.value).toFixed(1), count })}`;
-                        });
-                        return `${systemName} ${params[0]?.name || ''}<br/>${lines.join('<br/>')}`;
-                    }
-                },
-                legend: {
-                    show: true,
-                    data: data.sex_rows.map(row => sexLabel(row.sex)),
-                    top: 52,
-                    left: 'center',
-                    itemGap: 12
-                },
-                toolbox: {
-                    right: 16,
-                    feature: {
-                        dataView: { show: true, readOnly: true, title: this.t('dataView') },
-                        saveAsImage: { show: true, title: this.t('downloadImage') }
-                    }
-                },
-                grid: { left: 70, right: 50, top: 95, bottom: 40, containLabel: true },
-                xAxis: {
-                    type: 'category',
-                    data: data.stage_labels
-                },
-                yAxis: {
-                    type: 'value',
-                    min: 0,
-                    max: 100,
-                    interval: 10,
-                    axisLabel: { formatter: '{value}%' }
-                },
-                series: [...sexSeries, topLabelSeries]
-            });
-        }
-    };
-
-/* ── 表三、圖三：年齡層及期別分布 ── */
-window.DashboardRenderer.renderStageAgeReport = function(stageData, yearTitle, cancerTitle) {
-        const data = this.normalizeStageDistributionData(stageData);
-        const isEnglish = window.DashboardI18n?.getLanguage() === 'en';
-        const titleCancer = isEnglish ? this.getEnglishCancerPatientLabel(cancerTitle) : cancerTitle;
-        const chartStageLabels = data.chart_stage_labels;
-        const chartAgeRows = data.chart_age_rows;
-        const systemName = data.staging_system;
-        const tableCaption = document.getElementById('annualStageAgeCaption');
-        const chartCaption = document.getElementById('annualStageAgeChartCaption');
-        const tableHead = document.getElementById('annualStageAgeTableHead');
-        const tableBody = document.getElementById('annualStageAgeTableBody');
-        const note = document.getElementById('annualStageAgeNote');
-        const chartNote = document.getElementById('annualStageAgeChartNote');
-        const rowTotal = row => row.values.reduce((sum, value) => sum + value, 0);
-        const percentage = value => data.included_count > 0 ? Number(value) / data.included_count * 100 : 0;
-        const titleOptions = { year: yearTitle, cancer: titleCancer, system: this.getStageSystemTitle(systemName) };
-        const noteText = this.t('stageStatisticsNote', {
-            analyzable: data.analyzable_count, unknown: data.unknown_count,
-            notApplicable: data.not_applicable_count, included: data.included_count
-        });
-
-        if (tableCaption) tableCaption.innerHTML = `${this.t('stageAgeTableTitle', titleOptions)}${this.sourceLine()}`;
-        if (chartCaption) chartCaption.textContent = this.t('stageAgeFigureTitle', titleOptions);
-        if (tableHead) {
-            tableHead.innerHTML = `<tr><th>${this.t('ageGroup')}</th>${data.stage_labels.map(label => `<th>${this.escapeHtml(label)}</th>`).join('')}<th>${this.t('subtotal')}</th><th>%</th></tr>`;
-        }
-        if (tableBody) {
-            const ageRowsHtml = data.age_rows.map(row => {
-                const total = rowTotal(row);
-                return `<tr><th>${this.escapeHtml(row.age)}</th>${row.values.map(value => `<td>${value}</td>`).join('')}<td>${total}</td><td>${percentage(total).toFixed(1)}%</td></tr>`;
-            }).join('');
-            tableBody.innerHTML = `${ageRowsHtml}
-                <tr><th>${this.t('total')}</th>${data.stage_totals.map(value => `<td>${value}</td>`).join('')}<td>${data.included_count}</td><td>${data.included_count > 0 ? '100.0%' : '0.0%'}</td></tr>
-                <tr><th>%</th>${data.stage_totals.map(value => `<td>${percentage(value).toFixed(1)}%</td>`).join('')}<td>${data.included_count > 0 ? '100.0%' : '0.0%'}</td><td>-</td></tr>`;
-        }
-        if (note) note.textContent = noteText;
-        if (chartNote) chartNote.textContent = noteText;
-
-        /* 圖三：年齡層及期別分布圖 */
-        const chartDom = document.getElementById('annualStageAgeChart');
-        if (chartDom && typeof echarts !== 'undefined') {
-            const stageColors = ['#F3AE9F', '#E9CB92', '#C3E4C3', '#A7B9DF', '#C8B0DC'];
-            const ageStagePercentages = chartAgeRows.map(row => {
-                const total = rowTotal(row);
-                return chartStageLabels.map((_, stageIndex) => total > 0
-                    ? Number((row.values[stageIndex] / total * 100).toFixed(1))
-                    : 0);
-            });
-            const smallStageLabelData = [];
-            ageStagePercentages.forEach((values, rowIndex) => {
-                let cumulative = 0;
-                values.forEach((value, stageIndex) => {
-                    if (value > 0 && value <= 3) {
-                        smallStageLabelData.push([
-                            cumulative + value / 2,
-                            chartAgeRows[rowIndex].age,
-                            value,
-                            stageIndex
-                        ]);
-                    }
-                    cumulative += value;
-                });
-            });
-            const smallStageLabelSeries = {
-                name: '__smallStageLabels',
-                type: 'custom',
-                silent: true,
-                tooltip: { show: false },
-                z: 20,
-                data: smallStageLabelData,
-                renderItem: (params, api) => {
-                    const point = api.coord([api.value(0), api.value(1)]);
-                    const stageIndex = Number(api.value(3) || 0);
-                    const horizontalShift = 8;
-                    const lineStartY = point[1] - 10;
-                    const lineEnd = [point[0] + horizontalShift, point[1] - 18];
-                    return {
-                        type: 'group',
-                        children: [
-                            {
-                                type: 'line',
-                                shape: { x1: point[0], y1: lineStartY, x2: lineEnd[0], y2: lineEnd[1] },
-                                style: { stroke: stageColors[stageIndex % stageColors.length], lineWidth: 1.5 }
-                            },
-                            {
-                                type: 'text',
-                                style: {
-                                    text: `${Number(api.value(2)).toFixed(1)}%`,
-                                    x: lineEnd[0],
-                                    y: lineEnd[1] - 2,
-                                    fill: '#4b5563',
-                                    font: '700 11px Arial, sans-serif',
-                                    align: 'center',
-                                    verticalAlign: 'bottom'
-                                }
-                            }
-                        ]
-                    };
-                }
-            };
-            window.dashboardStageAgeChartInstance?.dispose();
-            window.dashboardStageAgeChartInstance = echarts.init(chartDom);
-            window.dashboardStageAgeChartInstance.setOption({
-                animation: false,
-                title: {
-                    text: this.t('stageAgeChartTitle', titleOptions),
-                    subtext: data.is_preview ? this.t('stagePreview') : this.t('source'),
-                    left: 'center',
-                    textStyle: { fontSize: 18, fontWeight: 'bold' }
-                },
-                tooltip: {
-                    trigger: 'axis',
-                    axisPointer: { type: 'shadow' },
-                    formatter: params => {
-                        const stageParams = params.filter(item => item.seriesName !== '__smallStageLabels');
-                        const rowIndex = stageParams[0]?.dataIndex ?? 0;
-                        const row = chartAgeRows[rowIndex];
-                        const total = row ? rowTotal(row) : 0;
-                        const lines = stageParams.map(item => {
-                            const count = row?.values[item.seriesIndex] || 0;
-                            return `${item.marker}${item.seriesName}: ${this.t('stageTooltipCount', { percent: Number(item.value).toFixed(1), count })}`;
-                        });
-                        return `${this.t('stageAgeTooltipTotal', { age: row?.age || '', total })}<br/>${lines.join('<br/>')}`;
-                    }
-                },
-                legend: {
-                    top: 52,
-                    left: 'center',
-                    data: chartStageLabels
-                },
-                toolbox: {
-                    right: 16,
-                    feature: {
-                        dataView: { show: true, readOnly: true, title: this.t('dataView') },
-                        saveAsImage: { show: true, title: this.t('downloadImage') }
-                    }
-                },
-                grid: { left: 75, right: 45, top: 88, bottom: 45, containLabel: true },
-                xAxis: {
-                    type: 'value',
-                    min: 0,
-                    max: 100,
-                    interval: 10,
-                    axisLabel: { formatter: '{value}%' }
-                },
-                yAxis: {
-                    type: 'category',
-                    data: chartAgeRows.map(row => row.age),
-                    axisTick: { show: false }
-                },
-                series: [...chartStageLabels.map((label, stageIndex) => ({
-                    name: label,
-                    type: 'bar',
-                    stack: 'age-stage-total',
-                    barMaxWidth: 22,
-                    itemStyle: { color: stageColors[stageIndex % stageColors.length] },
-                    label: {
-                        show: true,
-                        position: 'inside',
-                        align: 'center',
-                        verticalAlign: 'middle',
-                        offset: [0, 1],
-                        color: '#4b5563',
-                        fontSize: 11,
-                        fontFamily: 'Arial, sans-serif',
-                        fontStyle: 'normal',
-                        fontWeight: 700,
-                        lineHeight: 22,
-                        textBorderWidth: 0,
-                        textShadowBlur: 0,
-                        formatter: params => Number(params.value || 0) > 3
-                            ? `${Number(params.value).toFixed(1)}%`
-                            : ''
-                    },
-                    data: ageStagePercentages.map(values => values[stageIndex])
-                })), smallStageLabelSeries]
-            });
-        }
-    };
-
-/* ── 期別與首次療程表 ── */
-window.DashboardRenderer.renderStageFirstCourseTables = function(tables, yearTitle, cancerTitle) {
-        const container = document.getElementById('annualStageFirstCourseTables');
-        if (!container) return;
-        if (!Array.isArray(tables) || !tables.length) {
-            container.innerHTML = '<div class="text-secondary">目前沒有符合所選分期系統的首次療程資料。</div>';
-            return;
-        }
-        const isEnglish = window.DashboardI18n?.getLanguage() === 'en';
-        const selectedCancer = this.getCancerTitleForSentence(cancerTitle);
-        const systems = tables.map(item => item.system);
-        const activeSystem = systems.includes(window.stageFirstCourseActiveSystem)
-            ? window.stageFirstCourseActiveSystem
-            : systems[0];
-        const tabs = tables.length > 1
-            ? `<div class="d-flex flex-wrap gap-2 mb-3" role="tablist">${tables.map(item => `<button type="button" class="btn btn-outline-dark btn-sm stage-first-course-tab${item.system === activeSystem ? ' active' : ''}" data-stage-system="${this.escapeHtml(item.system)}">${this.escapeHtml(item.system)}${isEnglish ? ' Stage' : '期別'}</button>`).join('')}</div>`
-            : '';
-        const panels = tables.map(item => {
-            const stages = item.stage_columns || [];
-            const rows = item.rows || [];
-            const displayStage = (stage) => String(stage || '')
-                .replace(/^Stage\s+/i, '')
-                .trim();
-            const treatmentEnglish = {
-                '手術': 'Surgery',
-                '放療': 'Radiotherapy',
-                '化療': 'Chemotherapy',
-                '標靶': 'Targeted Therapy',
-                '荷爾蒙': 'Hormone Therapy',
-                '類固醇治療': 'Steroid Therapy',
-                '免疫': 'Immunotherapy',
-                '骨髓/幹細胞移植': 'Hematopoietic Stem Cell Transplantation (HSCT)',
-                '血液幹細胞移植': 'Hematopoietic Stem Cell Transplantation (HSCT)',
-                '內分泌處置': 'Endocrine Procedure',
-                '其他治療': 'Other Treatment',
-                '密切觀察或不予治療': 'No Treatment',
-                '待確認': 'Pending Confirmation',
-                'RFA/TAE/PEI混合治療': 'RFA/TAE/PEI Combined Treatment',
-            };
-            const displayTreatment = (treatment) => isEnglish
-                ? String(treatment || '').split('、').map(item => treatmentEnglish[item] || item).join('、')
-                : treatment;
-        const title = isEnglish
-                ? `Table . ${this.escapeHtml(item.system)} Stage and First Course Treatment Distribution of Newly Diagnosed ${this.getEnglishCancerPatientLabel(selectedCancer)} Cases,\u00a0${yearTitle}${this.sourceLine()}`
-                : this.reportCaption('table', yearTitle, selectedCancer, `${item.system}期別與首次療程`);
-            const rowPercentage = row => item.total_count
-                ? `${(Number(row.subtotal || 0) / Number(item.total_count) * 100).toFixed(1)}%`
-                : '0.0%';
-            const bodyRows = rows.map(row => `<tr><td class="text-start ps-3">${this.escapeHtml(displayTreatment(row.treatment))}</td>${row.values.map(value => `<td>${value}</td>`).join('')}<td>${row.subtotal}</td><td>${rowPercentage(row)}</td></tr>`).join('');
-            const totals = (item.totals || []).map(value => `<td>${value}</td>`).join('');
-            const percentages = (item.percentages || []).map(value => `<td>${value}%</td>`).join('');
-            const analyzableCount = Number(item.analyzable_count || 0);
-            const includedCount = Number(item.included_count ?? item.total_count ?? 0);
-            const excludedUnclassifiedTreatment = Number(item.excluded_unclassified_treatment || 0);
-            const excludedCount = Number(item.excluded_unknown || 0)
-                + Number(item.excluded_not_applicable || 0)
-                + excludedUnclassifiedTreatment;
-            const unclassifiedTreatmentClause = excludedUnclassifiedTreatment
-                ? `; ${excludedUnclassifiedTreatment} case(s) had treatment data that could not be classified using the defined treatment codes`
-                : '';
-            const stageNote = isEnglish
-                ? `Note: Of ${analyzableCount} analyzable cases (Class 1-2), ${Number(item.excluded_unknown || 0)} had unknown stage and ${Number(item.excluded_not_applicable || 0)} had non-applicable stage${unclassifiedTreatmentClause}. A total of ${excludedCount} case(s) were excluded from the stage and first-course treatment distribution (percentage denominator = ${includedCount}).`
-                : `\u8a3b\uff1a\u53ef\u5206\u6790\u500b\u6848\u6578\uff08Class 1\u20132\uff09\u5171\u8a08 ${analyzableCount} \u4f8b\uff0c\u5176\u4e2d\u5206\u671f\u4e0d\u660e ${Number(item.excluded_unknown || 0)} \u4f8b\u3001\u5206\u671f\u4e0d\u9069\u7528 ${Number(item.excluded_not_applicable || 0)} \u4f8b${excludedUnclassifiedTreatment ? `\uff1b\u53e6\u6709 ${excludedUnclassifiedTreatment} \u4f8b\u6cbb\u7642\u65b9\u5f0f\u7121\u6cd5\u4f9d\u65e2\u5b9a\u6cbb\u7642\u4ee3\u78bc\u5224\u5b9a` : ''}\u3002\u4e0a\u8ff0\u5171 ${excludedCount} \u4f8b\u672a\u7d0d\u5165\u671f\u5225\u8207\u9996\u6b21\u7642\u7a0b\u5206\u4f48\u767e\u5206\u6bd4\u8a08\u7b97\uff08\u767e\u5206\u6bd4\u5206\u6bcd\uff1d${includedCount}\uff09\u3002`;
-            const definitionNote = isEnglish
-                ? 'Note: First course treatment refers to all treatments administered before disease progression or recurrence.'
-                : '註：首次療程的定義係指在癌病惡化或復發之前所執行的治療方法。';
-            return `<div class="stage-first-course-panel${item.system === activeSystem ? '' : ' d-none'}" data-stage-system="${this.escapeHtml(item.system)}"><table class="annual-report-table"><caption class="surgery-table-caption">${title}</caption><thead><tr><th rowspan="2">${isEnglish ? 'First Course of Treatment' : '首次療程'}</th><th colspan="${Math.max(stages.length, 1)}">${this.escapeHtml(item.system)}${isEnglish ? ' Stage' : '期別'}</th><th rowspan="2">${isEnglish ? 'Total' : '小計'}</th><th rowspan="2">%</th></tr><tr>${stages.map(stage => `<th>${this.escapeHtml(displayStage(stage))}</th>`).join('')}</tr></thead><tbody>${bodyRows}<tr class="fw-bold"><td>${this.t('total')}</td>${totals}<td>${Number(item.total_count || 0)}</td><td>${item.total_count ? '100.0%' : '0.0%'}</td></tr><tr><td>%</td>${percentages}<td>${item.total_count ? '100.0%' : '0.0%'}</td><td>-</td></tr></tbody></table><div class="small text-secondary mt-2 mb-0">${definitionNote}</div><div class="small text-secondary mt-0 mb-0">${stageNote}</div></div>`;
-        }).join('');
-        container.innerHTML = `${tabs}${panels}`;
-        container.querySelectorAll('.stage-first-course-tab').forEach(button => {
-            button.addEventListener('click', () => {
-                const system = button.dataset.stageSystem;
-                window.stageFirstCourseActiveSystem = system;
-                container.querySelectorAll('.stage-first-course-tab').forEach(tab => tab.classList.toggle('active', tab === button));
-                container.querySelectorAll('.stage-first-course-panel').forEach(panel => {
-                    panel.classList.toggle('d-none', panel.dataset.stageSystem !== system);
-                });
-                const insightButton = document.getElementById('btnAiTreatmentFirstCourse');
-                if (insightButton && window.lastChartData && typeof insightButton.onclick === 'function') {
-                    insightButton.onclick();
-                }
-            });
-        });
-    };
-
-/* ── 組織型態不適用個案說明按鈕 ── */
+// 組織型態資料警示：用於顯示 ICD-O 對照或資料品質提醒。
 window.DashboardRenderer.currentHistologyWarnings = [];
 
-window.DashboardRenderer.decodeHtmlEntities = function(value) {
-        const textarea = document.createElement('textarea');
-        textarea.innerHTML = String(value ?? '');
-        return textarea.value;
-    };
 
-window.DashboardRenderer.escapeHtml = function(value) {
-        return this.decodeHtmlEntities(value)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;');
-    };
 
-window.DashboardRenderer.showHistologyWarningDetails = function(histologyWarnings) {
-        const warnings = Array.isArray(histologyWarnings) ? histologyWarnings : [];
-        if (warnings.length === 0) return;
 
-        const warningLines = warnings.map(item => {
-            const user = this.escapeHtml(item.user || '未知個案');
-            const warningText = this.getHistologyWarningText(item);
-            const message = this.escapeHtml(warningText.message);
-            const rawWarningText = this.getHistologyRawWarningText(item);
-            const rawDataMessage = rawWarningText
-                ? `<span class="fw-bold text-danger ms-1">${this.escapeHtml(rawWarningText)}</span>`
-                : '';
-            const detail = this.escapeHtml(warningText.detail);
-            return `
-                <div class="mb-3 text-start histology-warning-item">
-                    <div class="text-nowrap">${user}：${message}${rawDataMessage}</div>
-                    <div class="text-nowrap">${this.t('details')}：${detail}</div>
-                </div>
-            `;
-        }).join('');
-        const warningHtml = `
-            <div class="text-center histology-warning-dialog">
-                <div class="mb-3 text-nowrap">${this.t('warningDetails')}</div>
-                <div class="mx-auto text-start" style="display: inline-block; min-width: max-content; max-width: none; overflow-x: visible; padding: 0 4px;">${warningLines}</div>
-            </div>
-        `;
 
-        if (typeof Swal !== 'undefined') {
-            Swal.fire({
-                icon: 'warning',
-                html: warningHtml,
-                confirmButtonText: this.t('confirm'),
-                confirmButtonColor: '#dc3545',
-                width: 'auto',
-                allowOutsideClick: false,
-                customClass: { popup: 'histology-warning-popup' }
-            });
-        } else {
-            const alertLines = warnings.map(item => {
-                const user = item.user || '未知個案';
-                const warningText = this.getHistologyWarningText(item);
-                const message = warningText.message;
-                const rawWarningText = this.getHistologyRawWarningText(item);
-                const rawDataMessage = rawWarningText ? ` ${rawWarningText}` : '';
-                const detail = warningText.detail;
-                return `${user}：${message}${rawDataMessage}\n${this.t('details')}：${detail}`;
-            }).join('\n\n');
-            window.utils?.alert(`${this.t('warningDetails')}\n\n${alertLines}`, 'warning');
-        }
-    };
 
-window.DashboardRenderer.renderHistologyWarningButton = function(histologyWarnings) {
-        const button = document.getElementById('histologyWarningButton');
-        if (!button) return;
 
-        const warnings = Array.isArray(histologyWarnings) ? histologyWarnings : [];
-        this.currentHistologyWarnings = warnings;
 
-        if (warnings.length === 0) {
-            button.classList.add('d-none');
-            button.textContent = this.t('ineligibleCases');
-            return;
-        }
 
-        button.classList.remove('d-none');
-        button.textContent = `${this.t('ineligibleCases')} (${warnings.length})`;
-        if (button.dataset.boundHistologyWarning !== '1') {
-            button.addEventListener('click', () => {
-                this.showHistologyWarningDetails(this.currentHistologyWarnings);
-            });
-            button.dataset.boundHistologyWarning = '1';
-        }
-    };
-
-/* ── 結腸癌組織型態表格註記 ── */
-window.DashboardRenderer.renderColonHistologyTableNote = function(histologyWarnings) {
-        const tableNote = document.getElementById('annualHistologyTableNote');
-        if (!tableNote) return;
-
-        const warnings = Array.isArray(histologyWarnings) ? histologyWarnings : [];
-        const colonNotes = warnings.filter(item => {
-            const code = String(item.icdo_code || '');
-            const site = String(item.site || '').toUpperCase();
-            return code === '8211/2' && site.startsWith('C18');
-        });
-
-        if (colonNotes.length === 0) {
-            tableNote.classList.add('d-none');
-            tableNote.innerHTML = '';
-            return;
-        }
-
-        tableNote.classList.remove('d-none');
-        tableNote.innerHTML = colonNotes.map(item => {
-            const user = item.user || '未知個案';
-            return this.t('colonHistologyNote', { user });
-        }).join('<br>');
-    };
-
-/* ── 組織型態分佈表 ── */
-window.DashboardRenderer.histologyDisplayName = function(item) {
-        const isEnglish = window.DashboardI18n?.getLanguage() === 'en';
-        return isEnglish
-            ? (item?.name_en || item?.name || '')
-            : (item?.name_zh || item?.name || '');
-    };
-
-window.DashboardRenderer.histologyAxisLabel = function(value) {
-        const text = String(value ?? '').replace(/\s*\n\s*/g, ' ').trim();
-        // 原位癌後綴屬於名稱的一部分，中文與英文皆固定同一列。
-        return /[\u3400-\u9fff]/.test(text) || /\(in situ\)$/i.test(text)
-            ? `{right|${text}}`
-            : this.rightAlignedAxisLabel(text);
-    };
-
-window.DashboardRenderer.renderHistologyTable = function(histologyData, yearTitle, cancerTitle, noDataReason = '') {
-        const body = document.getElementById('annualHistologyTableBody');
-        const caption = document.getElementById('annualHistologyCaption');
-        if (!body) return;
-        const isEnglish = window.DashboardI18n?.getLanguage() === 'en';
-        const selectedCancer = this.getCancerTitleForSentence(cancerTitle);
-        if (caption) {
-            caption.innerHTML = isEnglish
-                ? `Table. Histological Distribution of ${this.getEnglishCancerPatientLabel(selectedCancer)},\u00a0${yearTitle}${this.sourceLine()}`
-                : this.reportCaption('table', yearTitle, selectedCancer, `${this.t('histology')}${this.t('distribution')}`);
-        }
-        if (!histologyData || histologyData.length === 0) {
-            const reason = this.escapeHtml(noDataReason || '查無符合條件的組織型態資料。');
-            body.innerHTML = `<tr><td colspan="3" class="text-center py-4">${this.t('noData')}<br><span class="text-muted small">${reason}</span></td></tr>`;
-            this.renderColonHistologyTableNote([]);
-            return;}
-
-        const validData = histologyData.filter(item => item.name !== 'Unknown / 未對應組織型態');
-        const totalCount = validData.reduce((sum, item) => sum + item.count, 0);
-        const rowsHtml = validData.map(item => {
-            const pct = totalCount > 0 ? ((item.count / totalCount) * 100).toFixed(1) : '0.0';
-            return `
-                <tr>
-                    <td class="text-start">${this.escapeHtml(this.histologyDisplayName(item))}</td>
-                    <td>${item.count}</td>
-                    <td>${pct}%</td>
-                </tr>
-            `;
-        }).join('');
-
-        const totalRowHtml = `
-            <tr class="fw-bold" style="background-color: var(--gray-50);">
-                <td>${this.t('total')}</td>
-                <td>${totalCount}</td>
-                <td>100.0%</td>
-            </tr>`;
-        body.innerHTML = rowsHtml + totalRowHtml;
-    };
-
-/* ── 年齡中位數表 ── */
-window.DashboardRenderer.renderAgeMedianTable = function(medianData, yearTitle, cancerTitle) {
-        const head = document.getElementById('annualAgeMedianTableHead');
-        const body = document.getElementById('annualAgeMedianTableBody');
-        const caption = document.getElementById('annualAgeMedianCaption');
-        if (!head || !body || !medianData) return;
-
-        const columns = [this.t('male'), this.t('female')];
-        const selectedCancer = this.getCancerTitleForSentence(cancerTitle);
-        if (caption) {
-            caption.innerHTML = window.DashboardI18n?.getLanguage() === 'en'
-                ? `Table . Median Age of Patients Newly Diagnosed with ${this.getEnglishCancerPatientLabel(selectedCancer)},\u00a0${yearTitle}${this.sourceLine()}`
-                : this.reportCaption('table', yearTitle, selectedCancer, this.t('ageMedian'), { newDiagnosis: true });
-        }
-
-        head.innerHTML = `<tr><th rowspan="2" style="vertical-align: middle;">${this.t('medianCharacteristic')}</th><th colspan="${columns.length}">${this.t('medianSex')}</th></tr><tr>${columns.map(label => `<th>${label}</th>`).join('')}</tr>`;
-        body.innerHTML = `<tr><td>${this.t('medianN')}</td><td>${medianData.male_count}</td><td>${medianData.female_count}</td></tr><tr><td>${this.t('medianAgeYears')}</td><td>${medianData.male}</td><td>${medianData.female}</td></tr><tr><td>${this.t('medianMaleToFemaleRatio')}</td><td>${medianData.male_ratio}</td><td>${medianData.female_ratio}</td></tr>`;
-    };
-
-/* ── 存活觀察值摘要表 ── */
-window.DashboardRenderer.renderSurvivalExclusionButton = function(summary) {
-        const button = document.getElementById('survivalExclusionButton');
-        if (!button) return;
-        const isEnglish = window.DashboardI18n?.getLanguage() === 'en';
-        button.textContent = isEnglish ? 'Excluded data details' : '排除資料說明';
-        this.currentSurvivalExclusionSummary = summary || {};
-
-        button.onclick = () => {
-            const isEnglish = window.DashboardI18n?.getLanguage() === 'en';
-            const item = this.currentSurvivalExclusionSummary || {};
-            const reasons = isEnglish ? [
-                ['Class0 excluded', item.class0], ['Class3 excluded', item.class3], ['Other case classes excluded', item.other_class],
-                ['Invalid diagnosis date', item.invalid_diagnosis_date], ['Invalid last-contact/death date', item.invalid_last_contact_date],
-                ['Invalid vital status', item.invalid_vital_status], ['Last-contact date earlier than diagnosis', item.last_contact_before_diagnosis],
-                ['Stage 0 not shown in this table', item.stage0], ['No usable pathological or clinical stage', item.no_usable_stage],
-                ['Stage IV without usable M0/M1', item.stage4_missing_m]
-            ] : [
-                ['排除 Class0', item.class0], ['排除 Class3', item.class3], ['排除其他個案分類', item.other_class],
-                ['診斷日期無效或不完整', item.invalid_diagnosis_date], ['最後聯絡或死亡日期無效或不完整', item.invalid_last_contact_date],
-                ['生存狀態不是 0 或 1', item.invalid_vital_status], ['最後聯絡或死亡日期早於診斷日期', item.last_contact_before_diagnosis],
-                ['Stage 0 未列入本表', item.stage0], ['病理與臨床期別皆無法使用', item.no_usable_stage],
-                ['Stage IV 無法判斷 M0／M1', item.stage4_missing_m]
-            ];
-            const reasonRows = reasons.filter(([, count]) => Number(count || 0) > 0)
-                .map(([label, count]) => `<tr><td class="text-start">${this.escapeHtml(label)}</td><td class="text-end">${Number(count)} 筆</td></tr>`).join('');
-            const html = `
-                <div class="table-responsive">
-                  <table class="table table-bordered table-sm align-middle mb-2">
-                    <tbody>
-                      <tr class="table-light fw-bold"><td class="text-start">${isEnglish ? 'Records after selected filters' : '符合查詢條件的原始資料'}</td><td class="text-end">${Number(item.source_count || 0)} ${isEnglish ? 'records' : '筆'}</td></tr>
-                      ${reasonRows || `<tr><td colspan="2">${isEnglish ? 'No records were excluded.' : '沒有資料被排除。'}</td></tr>`}
-                      <tr class="table-light fw-bold"><td class="text-start">${isEnglish ? 'Total excluded' : '排除合計'}</td><td class="text-end">${Number(item.excluded_count || 0)} ${isEnglish ? 'records' : '筆'}</td></tr>
-                      <tr class="table-success fw-bold"><td class="text-start">${isEnglish ? 'Included in table' : '最後納入表格'}</td><td class="text-end">${Number(item.included_count || 0)} ${isEnglish ? 'records' : '筆'}</td></tr>
-                    </tbody>
-                  </table>
-                </div>
-                <div class="small text-muted text-start">${isEnglish
-                    ? 'Current rule: Class1/2 only; pathological stage is used first, with clinical stage as fallback.'
-                    : '目前規則：僅納入 Class1、Class2；病理期別優先，無可用病理期別時改採臨床期別。'}</div>`;
-            if (typeof Swal !== 'undefined') {
-                Swal.fire({
-                    title: isEnglish ? 'Excluded data details' : '排除資料說明',
-                    html,
-                    width: 720,
-                    confirmButtonText: isEnglish ? 'OK' : '確定',
-                    confirmButtonColor: '#212529'
-                });
-            } else {
-                const text = reasons.filter(([, count]) => Number(count || 0) > 0).map(([label, count]) => `${label}：${count} 筆`).join('\n');
-                window.utils?.alert(`${isEnglish ? 'Excluded data details' : '排除資料說明'}\n\n${text}`, 'warning');
-            }
-        };
-    };
-
-window.DashboardRenderer.renderSurvivalChart = function(survivalData, yearTitle, cancerTitle) {
-        const chartDom = document.getElementById('annualSurvivalChart');
-        const caption = document.getElementById('annualSurvivalChartCaption');
-        if (!chartDom || typeof echarts === 'undefined') return;
-        if (window.dashboardSurvivalChartInstance) window.dashboardSurvivalChartInstance.dispose();
-        window.dashboardSurvivalChartInstance = echarts.init(chartDom);
-
-        const isEnglish = window.DashboardI18n?.getLanguage() === 'en';
-        const selectedCancer = this.getCancerTitleForSentence(cancerTitle);
-        const seriesData = Array.isArray(survivalData?.chart_series) ? survivalData.chart_series : [];
-        const includedCount = Number(survivalData?.exclusion_summary?.included_count || 0);
-        const colors = ['#5470c6', '#2fb344', '#d6c66b', '#7030a0', '#f59f00'];
-        const plusSymbol = 'path://M-6,-1 L-1,-1 L-1,-6 L1,-6 L1,-1 L6,-1 L6,1 L1,1 L1,6 L-1,6 L-1,1 L-6,1 Z';
-        const visibleContainerWidth = document.querySelector('#chartsArea > .col-12')?.clientWidth || window.innerWidth;
-        const initialChartWidth = chartDom.clientWidth || Math.max(320, visibleContainerWidth - 50);
-        const legendLeft = Math.max(0, initialChartWidth - 260);
-        const chartSeries = [];
-        seriesData.forEach((item, index) => {
-            const color = colors[index % colors.length];
-            chartSeries.push({
-                name: item.stage,
-                type: 'line',
-                step: 'end',
-                showSymbol: false,
-                symbol: 'none',
-                animation: false,
-                data: item.curve || [],
-                lineStyle: { width: 3, color },
-                itemStyle: { color },
-                emphasis: { focus: 'series' }
-            });
-            chartSeries.push({
-                name: `${item.stage}-${isEnglish ? 'censored' : '設限'}`,
-                type: 'scatter',
-                symbol: plusSymbol,
-                symbolSize: 9,
-                data: item.censored || [],
-                itemStyle: { color },
-                tooltip: {
-                    valueFormatter: value => String(value)
-                }
-            });
-        });
-        const title = isEnglish
-            ? `Kaplan–Meier Survival Curve (N=${includedCount})`
-            : `Kaplan–Meier存活曲線圖 (N=${includedCount})`;
-        window.dashboardSurvivalChartInstance.setOption({
-            animation: false,
-            color: colors,
-            title: { text: title, subtext: this.t('source'), left: 'center', textStyle: { fontSize: 18, fontWeight: 'bold' } },
-            tooltip: {
-                trigger: 'item',
-                formatter: params => {
-                    const value = params.value?.value || params.value;
-                    const months = Number(value?.[0] || 0).toFixed(1);
-                    const survival = (Number(value?.[1] || 0) * 100).toFixed(1);
-                    const count = Number(params.data?.count || 0);
-                    return `${params.seriesName}<br>${isEnglish ? 'Months' : '存活月數'}：${months}<br>${isEnglish ? 'Survival' : '累積存活率'}：${survival}%${count ? `<br>${isEnglish ? 'Censored' : '設限數'}：${count}` : ''}`;
-                }
-            },
-            legend: {
-                type: 'scroll', orient: 'vertical', left: legendLeft, top: 116, bottom: 38,
-                itemWidth: 18, itemHeight: 8, itemGap: 4,
-                textStyle: { fontSize: 11, lineHeight: 14 }
-            },
-            toolbox: {
-                right: 12,
-                feature: {
-                    dataView: { show: true, readOnly: true, title: this.t('dataView'), lang: [this.t('dataView'), this.t('close'), this.t('refresh')] },
-                    saveAsImage: { show: true, title: this.t('downloadImage') }
-                }
-            },
-            grid: { left: 78, right: 280, top: 70, bottom: 70 },
-            xAxis: {
-                type: 'value', min: 0, name: isEnglish ? 'Surv_Months' : '存活月數',
-                nameLocation: 'middle', nameGap: 38,
-                splitLine: { lineStyle: { color: '#e5e7eb' } }
-            },
-            yAxis: {
-                type: 'value', min: 0, max: 1, interval: 0.2,
-                name: isEnglish ? 'Cum Survival' : '累積存活率',
-                nameLocation: 'middle', nameGap: 52,
-                axisLabel: { formatter: value => Number(value).toFixed(1) },
-                splitLine: { lineStyle: { color: '#e5e7eb' } }
-            },
-            series: chartSeries,
-            graphic: [{
-                id: 'survivalLegendTitle', type: 'group', left: legendLeft, top: 92,
-                children: [
-                    { type: 'rect', shape: { x: 0, y: 0, width: 190, height: 18 }, style: { fill: 'transparent' }, silent: true },
-                    { type: 'text', x: 0, y: 0, style: { text: 'AJCC 8th', fill: '#4b5563', fontSize: 12, fontWeight: 600 } }
-                ]
-            }, ...(seriesData.length ? [] : [{
-                type: 'text', left: 'center', top: 'middle',
-                style: { text: this.t('noData'), fill: '#6b7280', fontSize: 14 }
-            }])]
-        }, true);
-        if (caption) {
-            caption.innerHTML = isEnglish
-                ? `Figure. Kaplan–Meier Survival Curves of ${this.getEnglishCancerPatientLabel(selectedCancer)}, ${yearTitle}${this.sourceLine()}`
-                : this.reportCaption('chart', yearTitle, selectedCancer, 'Kaplan–Meier存活曲線');
-        }
-    };
-
-window.DashboardRenderer.updateSurvivalChartLayout = function() {
-        const chart = window.dashboardSurvivalChartInstance;
-        if (!chart) return;
-        chart.resize();
-        const legendLeft = Math.max(0, chart.getWidth() - 260);
-        chart.setOption({
-            legend: { left: legendLeft },
-            graphic: [{ id: 'survivalLegendTitle', left: legendLeft }]
-        });
-    };
-
-window.DashboardRenderer.renderSurvivalTable = function(survivalData, yearTitle, cancerTitle) {
-        const head = document.getElementById('annualSurvivalTableHead');
-        const body = document.getElementById('annualSurvivalTableBody');
-        const caption = document.getElementById('annualSurvivalCaption');
-        if (!head || !body) return;
-
-        const isEnglish = window.DashboardI18n?.getLanguage() === 'en';
-        const selectedCancer = this.getCancerTitleForSentence(cancerTitle);
-        if (caption) {
-            caption.innerHTML = isEnglish
-                ? `Table. Kaplan–Meier Survival of ${this.getEnglishCancerPatientLabel(selectedCancer)},\u00a0${yearTitle}${this.sourceLine()}`
-                : this.reportCaption('table', yearTitle, selectedCancer, 'Kaplan–Meier存活率');
-        }
-        head.innerHTML = isEnglish
-            ? '<tr><th rowspan="2">AJCC8th</th><th rowspan="2">Total</th><th rowspan="2">Events</th><th colspan="2">Censored</th></tr><tr><th>Count</th><th>Percentage</th></tr>'
-            : '<tr><th rowspan="2">AJCC8th</th><th rowspan="2">總數</th><th rowspan="2">事件<br>數目</th><th colspan="2">設限</th></tr><tr><th>數目</th><th>百分比</th></tr>';
-
-        const rows = Array.isArray(survivalData?.rows) ? survivalData.rows : [];
-        body.innerHTML = rows.length
-            ? rows.map(item => `
-                <tr class="${item.stage === 'Overall' ? 'fw-bold table-light' : ''}">
-                  <td>${this.escapeHtml(item.stage)}</td><td>${Number(item.total || 0)}</td>
-                  <td>${Number(item.events || 0)}</td><td>${Number(item.censored || 0)}</td>
-                  <td>${Number(item.percentage || 0).toFixed(1)}%</td>
-                </tr>`).join('')
-            : `<tr><td colspan="5" class="text-center py-4">${this.t('noData')}<br><span class="text-muted small">${this.escapeHtml(survivalData?.no_data_reason || '查無符合條件的存活資料。')}</span></td></tr>`;
-        this.renderSurvivalExclusionButton(survivalData?.exclusion_summary || {});
-        this.renderSurvivalChart(survivalData, yearTitle, cancerTitle);
-    };
-
-/* ── 癌症登記可分析個案與確診個案表 ── */
-window.DashboardRenderer.renderAnalyzableConfirmedTable = function(tableData, yearTitle, cancerTitle) {
-        const head = document.getElementById('annualAnalyzableConfirmedTableHead');
-        const body = document.getElementById('annualAnalyzableConfirmedTableBody');
-        const caption = document.getElementById('annualAnalyzableConfirmedCaption');
-        const note = document.getElementById('annualAnalyzableConfirmedNote');
-        if (!head || !body || !tableData) return;
-
-        const isEnglish = window.DashboardI18n?.getLanguage() === 'en';
-        const selectedCancer = this.getCancerTitleForSentence(cancerTitle);
-        if (caption) {
-            caption.innerHTML = isEnglish
-                ? `Table . Analysis-Eligible and Confirmed Cases of ${this.getEnglishCancerPatientLabel(selectedCancer)} in the Cancer Registry,\u00a0${yearTitle}${this.sourceLine()}`
-                : this.reportCaption('table', yearTitle, selectedCancer, this.t('analyzableConfirmed'));
-        }
-
-        const totalCasesHeader = isEnglish ? `${this.t('cancerTotal')}, ${yearTitle}` : `${yearTitle} ${this.t('cancerTotal')}`;
-        head.innerHTML = `<tr><th>${totalCasesHeader}<br>(A)</th><th>${this.t('analysisEligibleCases')}<br>(B)</th><th>${this.t('analysisEligiblePercent')}<br>(B/A)</th><th>${this.t('microscopicallyConfirmedCases')}<br>(C)</th><th>${this.t('microscopicallyConfirmedPercent')}<br>(C/B)</th></tr>`;
-        body.innerHTML = `<tr><td>${tableData.total_count}</td><td>${tableData.analyzable_count}</td><td>${tableData.analyzable_percent}</td><td>${tableData.confirmed_count}</td><td>${tableData.confirmed_percent}</td></tr>`;
-
-        if (note) {
-            note.innerHTML = `<div>${this.t('analysisEligibleNote')}</div><div class="annual-analyzable-note-item">${this.t('analysisEligibleClass1')}</div><div class="annual-analyzable-note-item">${this.t('analysisEligibleClass2')}</div>`;
-        }
-    };
-
-/* ── 個案分類分佈表 ── */
-window.DashboardRenderer.renderDiagnosisClassificationTable = function(tableData, yearTitle, cancerTitle) {
-        const head = document.getElementById('annualDiagnosisClassificationTableHead');
-        const body = document.getElementById('annualDiagnosisClassificationTableBody');
-        const caption = document.getElementById('annualDiagnosisClassificationCaption');
-        if (!head || !body || !tableData) return;
-
-        if (caption) {
-            const selectedCancer = this.getCancerTitleForSentence(cancerTitle);
-            caption.innerHTML = window.DashboardI18n?.getLanguage() === 'en'
-                ? `Table . ${this.getEnglishCancerPatientLabel(selectedCancer)} Case Class Distribution,\u00a0${yearTitle}${this.sourceLine()}`
-                : this.reportCaption('table', yearTitle, selectedCancer, `${this.t('classification')}${this.t('distribution')}`);
-        }
-
-        const isEnglish = window.DashboardI18n?.getLanguage() === 'en';
-        const percentageHeader = isEnglish ? '%' : `${this.t('percentage')}%`;
-        const classificationHeader = isEnglish ? 'Class' : this.t('classification');
-        head.innerHTML = `<tr><th class="text-center">${classificationHeader}</th><th class="text-center">${this.t('people')}</th><th class="text-center">${percentageHeader}</th></tr>`;
-        
-        const total = tableData.total_count || 1;
-        const calcPct = (val) => (val / total * 100).toFixed(1) + '%';
-        
-        const classMappings = [
-            {
-                title: this.t('class0'),
-                totalKey: 'class0_total',
-                subClasses: [
-                    { key: '0_1_0', label: this.t('class010') },
-                    { key: '0_1_2', label: this.t('class012') }
-                ]
-            },
-            {
-                title: this.t('class1'),
-                totalKey: 'class1_total',
-                subClasses: [
-                    { key: '1_1_1', label: this.t('class111') },
-                    { key: '1_1_3', label: this.t('class113') },
-                    { key: '1_1_4', label: this.t('class114') }
-                ]
-            },
-            {
-                title: this.t('class2'),
-                totalKey: 'class2_total',
-                subClasses: [
-                    { key: '2_2_1', label: this.t('class221') },
-                    { key: '2_2_3', label: this.t('class223') }
-                ]
-            },
-            {
-                title: this.t('class3'),
-                totalKey: 'class3_total',
-                subClasses: [
-                    { key: '3_2_0', label: this.t('class320') },
-                    { key: '3_3_2', label: this.t('class332') }
-                ]
-            }
-        ];
-        
-        let html = '';
-        classMappings.forEach(cls => {
-            const clsTotal = tableData[cls.totalKey] || 0;
-            if (clsTotal > 0) {
-                html += `<tr class="table-light" style="border-top: 2px solid #6c757d;"><td style="font-size: 1.1em; font-weight: 900;">${cls.title}</td><td class="text-center fw-bold" style="font-weight: bold;">${clsTotal}</td><td class="text-center fw-bold" style="font-weight: bold;">${calcPct(clsTotal)}</td></tr>`;
-                cls.subClasses.forEach(sub => {
-                    const count = tableData[sub.key] || 0;
-                    if (count > 0) {
-                        html += `<tr><td class="ps-4">${sub.label}</td><td class="text-end">${count}</td><td class="text-end">${calcPct(count)}</td></tr>`;
-                    }
-                });
-            }
-        });    
-        html += `<tr class="table-secondary fw-bold" style="font-weight: bold; border-top: 2px solid #6c757d;"><td class="text-center">${this.t('total')}</td><td class="text-center">${tableData.total_count}</td><td class="text-center">100.0%</td></tr>`;
-        body.innerHTML = html;
-    };
-
-/* ── LLM敘述分析 ── */
+// LLM 敘述：請求、重試、快取與語言切換。
 window.DashboardRenderer.fetchLlmInsight = function(fieldKey, chartData, fields, responseContainerId, buttonId, options = {}) {
         const container = document.getElementById(responseContainerId);
         const button = document.getElementById(buttonId);
@@ -1756,6 +252,9 @@ window.DashboardRenderer.fetchLlmInsightWithRetry = async function(fieldKey, cha
 
 // 取得年度字串
 window.DashboardRenderer.getSelectedYearTitle = function() {
+        if (window.dashboardPreviewMode && window.dashboardPreviewYearTitle) {
+            return window.dashboardPreviewYearTitle;
+        }
         const startYear = document.getElementById('filterYearStart')?.value.trim();
         const endYear = document.getElementById('filterYearEnd')?.value.trim();
         if (startYear && endYear && startYear !== endYear) return `${startYear}-${endYear}`;
@@ -1764,6 +263,9 @@ window.DashboardRenderer.getSelectedYearTitle = function() {
 
 // 取得癌症標題
 window.DashboardRenderer.getSelectedCancerTitle = function() {
+        if (window.dashboardPreviewMode && window.dashboardPreviewCancerTitle) {
+            return window.dashboardPreviewCancerTitle;
+        }
         const language = window.DashboardI18n?.getLanguage();
         const cancerNameMap = window.dashboardCancerNameTranslations || {};
         const selectedKeys = window.dashboardSelectedCancerDisplayKeys || [];
@@ -1923,75 +425,8 @@ window.DashboardRenderer.ensureInsightsForLanguage = async function({ retry = tr
         }
         return results;
     };
-window.DashboardRenderer.updateHistologyChart = function(histologyData, noDataReason = '') {
-        if (!window.dashboardHistologyChartInstance || !histologyData) return;
-        const yearTitle = this.getSelectedYearTitle();
-        const cancerTitle = this.getCancerTitleForSentence(this.getSelectedCancerTitle());
-        const isEnglish = window.DashboardI18n?.getLanguage() === 'en';
-        const validData = histologyData.filter(item => item.name !== 'Unknown / 未對應組織型態');
-        const totalValid = validData.reduce((sum, item) => sum + item.count, 0);
-        const topData = [...validData].reverse();
-        const categories = topData.map(item => this.histologyDisplayName(item));
-        const chartSeriesData = topData.map(item => ({
-            value: totalValid > 0 ? Number(((item.count / totalValid) * 100).toFixed(1)) : 0,
-            count: item.count
-        }));
-        const chartDom = document.getElementById('histologyChart');
-        const chartTitle = isEnglish
-            ? `Histological Distribution of ${this.getEnglishCancerPatientLabel(cancerTitle)}, ${yearTitle}`
-            : `${yearTitle}年${cancerTitle}${this.t('histologyDistribution')}`;
-        if (chartDom) {
-            chartDom.style.height = `${Math.max(450, categories.length * this.histologyRowHeight(categories))}px`;
-            window.dashboardHistologyChartInstance.resize();
-        }
-        if (categories.length === 0) {
-            if (chartDom) chartDom.style.height = '450px';
-            window.dashboardHistologyChartInstance.setOption({
-                title: { text: chartTitle, subtext: this.t('source'), left: 'center', textStyle: { fontSize: 18, fontWeight: 'bold' } },
-                tooltip: { show: false },
-                toolbox: { show: false },
-                xAxis: { show: false, data: [] },
-                yAxis: { show: false, data: [] },
-                series: [{ data: [] }],
-                graphic: [{
-                    type: 'text',
-                    left: 'center',
-                    top: 'middle',
-                    style: {
-                        text: `${this.t('noData')}\n${noDataReason || '查無符合條件的組織型態資料。'}`,
-                        fill: '#6b7280',
-                        fontSize: 14,
-                        fontWeight: 500,
-                        lineHeight: 24,
-                        textAlign: 'center'
-                    }
-                }]
-            }, { replaceMerge: ['graphic'] });
-            window.dashboardHistologyChartInstance.resize();
-            return;
-        }
-        window.dashboardHistologyChartInstance.setOption({
-            title: {
-                text: chartTitle,
-                subtext: this.t('source'),
-                left: 'center',
-                textStyle: { fontSize: 18, fontWeight: 'bold' }
-            },
-            tooltip: { show: true },
-            graphic: [],
-            xAxis: { show: true, name: `${this.t('percentage')} (%)` },
-            yAxis: { show: true, data: categories },
-            toolbox: {
-                show: true,
-                feature: {
-                    dataView: { show: true, readOnly: false, title: this.t('dataView'), lang: [this.t('dataView'), this.t('close'), this.t('refresh')] },
-                    saveAsImage: { show: true, title: this.t('downloadImage') }
-                }
-            },
-            series: [{ name: this.t('caseRatio'), data: chartSeriesData }]
-        }, { replaceMerge: ['graphic'] });
-    };
 
+// 年報語言切換後，更新所有標題、圖表、表格與既有 LLM 敘述。
 window.DashboardRenderer.rerenderDashboardLanguage = function(options = {}) {
         const selector = document.getElementById('dashboardLanguageSelect');
         if (selector && window.DashboardI18n) selector.value = window.DashboardI18n.getLanguage();
@@ -2037,6 +472,7 @@ window.DashboardRenderer.showAnnualDataContent = function() {
         });
     };
 
+// 年報資料載入、頁籤切換、匯出與 LLM 任務事件。
 document.addEventListener('DOMContentLoaded', function() {
     const languageSelect = document.getElementById('dashboardLanguageSelect');
     if (languageSelect && window.DashboardI18n) {
@@ -2538,6 +974,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 /* ── 期別與手術術式表（附錄 B） ── */
+// AJCC 期別 × 手術術式統計表與系統切換頁籤。
 window.DashboardRenderer.renderStageSurgeryTables = function(tables, yearTitle, cancerTitle) {
     const container = document.getElementById('annualStageSurgeryTables');
     if (!container) return;
@@ -2598,13 +1035,16 @@ window.DashboardRenderer.renderStageSurgeryTables = function(tables, yearTitle, 
     }));
 };
 
+// 從 LLM 預覽頁返回時，依旗標重新載入年報。
 window.addEventListener('pageshow', () => {
     if (sessionStorage.getItem('dashboard_refresh_after_preview') === '1') {
         sessionStorage.removeItem('dashboard_refresh_after_preview');
         window.location.reload();
     }
 });
-// Dashboard-v3 chart and statistics renderers.
+// 圖表與統計 renderer。
+// 範圍：性別年齡、可分析個案、組織型態、診斷分類、期別、療程與存活。
+// 共用文字、標題與座標軸格式化。
 window.DashboardRenderer.t = function(key, options) {
     return window.DashboardI18n ? window.DashboardI18n.t(key, options) : key;
 };
@@ -2764,6 +1204,7 @@ window.DashboardRenderer.getGenderAgeChartOption = function(genderAgeData) {
 // Shared annual-report rendering primitives used by both analysis and comparison pages.
 
 
+// 診斷與人口學統計：性別年齡圖與診斷分類圖表／表格。
 window.DashboardRenderer.renderDiagnosisClassificationChart = function(chartData, yearTitle, cancerTitle) {
         let chartDom = document.getElementById('annualDiagnosisClassificationChart');
         if (!chartDom) return;
@@ -2913,6 +1354,7 @@ window.DashboardRenderer.renderSexAgeTable = function(genderAgeData, yearTitle, 
  */
 
 
+// AJCC 期別分布、性別、年齡與首次療程統計。
 window.DashboardRenderer.getStageDistributionPreviewData = function() {
         return {
             staging_system: 'AJCC',
@@ -3098,6 +1540,10 @@ window.DashboardRenderer.configureStageInsight = function(stageReport, { generat
             'btnAiStageSummary',
             { forceRefresh: event?.isTrusted === true }
         );
+        if (window.dashboardPreviewMode) {
+            window.showDashboardPreviewNarrative?.(fieldKey);
+            return null;
+        }
         if (reportChanged) response.textContent = this.t('autoInsight');
         return generate ? button.onclick() : null;
     };
@@ -3633,6 +2079,7 @@ window.DashboardRenderer.renderStageFirstCourseTables = function(tables, yearTit
 /* ── 組織型態不適用個案說明按鈕 ── */
 
 
+// 組織型態統計、資料警示與 ICD-O 名稱顯示。
 window.DashboardRenderer.decodeHtmlEntities = function(value) {
         const textarea = document.createElement('textarea');
         textarea.innerHTML = String(value ?? '');
@@ -3758,15 +2205,6 @@ window.DashboardRenderer.renderColonHistologyTableNote = function(histologyWarni
 /* ── 組織型態分佈表 ── */
 
 
-window.DashboardRenderer.histologyDisplayName = function(item) {
-        const isEnglish = window.DashboardI18n?.getLanguage() === 'en';
-        return isEnglish
-            ? (item?.name_en || item?.name || '')
-            : (item?.name_zh || item?.name || '');
-    };
-
-
-
 window.DashboardRenderer.histologyAxisLabel = function(value) {
         const text = String(value ?? '').replace(/\s*\n\s*/g, ' ').trim();
         // 原位癌後綴屬於名稱的一部分，中文與英文皆固定同一列。
@@ -3819,6 +2257,7 @@ window.DashboardRenderer.renderHistologyTable = function(histologyData, yearTitl
 /* ── 年齡中位數表 ── */
 
 
+// 年齡中位數、存活分析與可分析／確診個案統計。
 window.DashboardRenderer.renderAgeMedianTable = function(medianData, yearTitle, cancerTitle) {
         const head = document.getElementById('annualAgeMedianTableHead');
         const body = document.getElementById('annualAgeMedianTableBody');
@@ -4221,3 +2660,59 @@ window.DashboardRenderer.updateHistologyChart = function(histologyData, noDataRe
         }, { replaceMerge: ['graphic'] });
     };
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+window.DashboardRenderer.histologyDisplayName = function(item) {
+        const isEnglish = window.DashboardI18n?.getLanguage() === 'en';
+        return isEnglish
+            ? (item?.name_en || item?.name || '')
+            : (item?.name_zh || item?.name || '');
+    };
