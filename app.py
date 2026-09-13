@@ -1,12 +1,45 @@
 import atexit
+from datetime import datetime
 import os
-from pathlib import Path
+import subprocess
+import sys
+from apscheduler.schedulers.background import BackgroundScheduler
 from flask import session
 from modules.application import create_app
+from modules.config import get_int_env
+from modules.services.database_backup import run_database_backup
+from modules.services.home import refresh_twcr_updates
 from modules.server import run_server
-from modules.worker_process import start_llm_worker, stop_llm_worker
 
 app, APP_ENV, APP_DEBUG = create_app()
+
+def start_dashboard_llm_worker():
+    project_root = os.path.dirname(__file__)
+    worker_script = os.path.join(project_root, "llm_worker.py")
+    return subprocess.Popen([sys.executable, worker_script], cwd=project_root)
+
+def stop_dashboard_llm_worker(worker):
+    if worker is None or worker.poll() is not None:
+        return
+    worker.terminate()
+    try:
+        worker.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        worker.kill()
+
+def is_scheduler_leader():
+    if APP_DEBUG:
+        return os.environ.get("WERKZEUG_RUN_MAIN") == "true"
+    return str(os.environ.get("WAITRESS_PORT", "")) == str(get_int_env("BACKEND_BASE_PORT"))
+
+def start_system_scheduler():
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(refresh_twcr_updates, "cron", hour=3, minute=0, id="home_updates", replace_existing=True)
+    scheduler.add_job(refresh_twcr_updates, "date", run_date=datetime.now(), id="home_updates_startup", replace_existing=True)
+    scheduler.add_job(run_database_backup, "cron", hour=2, minute=0, id="database_backup", replace_existing=True)
+    scheduler.start()
+    atexit.register(lambda: scheduler.shutdown(wait=False))
+    return scheduler
 
 @app.context_processor
 def inject_nav():
@@ -36,11 +69,16 @@ def inject_nav():
 
 if __name__ == "__main__":
     worker = None
+    scheduler = None
     should_start_worker = not APP_DEBUG or os.environ.get("WERKZEUG_RUN_MAIN") == "true"
     if should_start_worker:
-        worker = start_llm_worker(Path(__file__).resolve().parent)
-        atexit.register(stop_llm_worker, worker)
+        worker = start_dashboard_llm_worker()
+        atexit.register(stop_dashboard_llm_worker, worker)
+    if is_scheduler_leader():
+        scheduler = start_system_scheduler()
     try:
         run_server(app, APP_ENV, APP_DEBUG)
     finally:
-        stop_llm_worker(worker)
+        if scheduler:
+            scheduler.shutdown(wait=False)
+        stop_dashboard_llm_worker(worker)

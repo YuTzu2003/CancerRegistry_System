@@ -342,8 +342,7 @@
 
 {% if not preview_task %}
 {% set llm_task_type = 'comparison_report' %}
-{% set llm_record_title = '年度比較工作任務' %}
-{% include "_llm_task_panel.html" %}
+{% include "report_task_panel.html" %}
 {% endif %}
 
 <div class="compare-cancer-source">

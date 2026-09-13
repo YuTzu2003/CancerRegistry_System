@@ -26,6 +26,7 @@ $backendBasePort = [int](Get-EnvironmentValue "BACKEND_BASE_PORT")
 if ($workerCount -lt 1 -or $workerCount -gt 8) { throw "APP_WORKERS must be between 1 and 8." }
 
 Get-ScheduledTask -TaskName "CancerRegistrySystem-??" -ErrorAction SilentlyContinue | Unregister-ScheduledTask -Confirm:$false
+Get-ScheduledTask -TaskName "CancerRegistrySystem-HomeUpdates" -ErrorAction SilentlyContinue | Unregister-ScheduledTask -Confirm:$false
 $trigger = New-ScheduledTaskTrigger -AtStartup
 $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
 $settings.ExecutionTimeLimit = "PT0S"

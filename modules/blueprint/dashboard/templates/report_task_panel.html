@@ -1,9 +1,9 @@
-<section id="annualLlmTaskPanel" style="margin-bottom: 22px;" data-llm-task-type="{{ llm_task_type }}" data-llm-record-title="{{ llm_record_title }}">
+<section id="annualLlmTaskPanel" style="margin-bottom: 22px;" data-llm-task-type="{{ llm_task_type }}">
   <section class="llm-task-panel">
     <header class="llm-record-header">
       <div>
         <span class="llm-record-kicker">MANAGE</span>
-        <h2>LLM 工作任務</h2>
+        <h2>{% if llm_task_type == 'comparison_report' %}比較紀錄{% else %}年報紀錄{% endif %}</h2>
         <p id="llmTaskCount" class="llm-record-count">顯示 0 / 0 筆任務</p>
       </div>
       <div class="llm-batch-actions">

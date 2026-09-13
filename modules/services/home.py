@@ -1,14 +1,14 @@
-from datetime import datetime, timedelta
-from threading import Lock
-from pathlib import PurePosixPath
+import json
+from pathlib import Path, PurePosixPath
 from urllib.parse import unquote, urljoin, urlparse
 from urllib.request import Request, urlopen
 from bs4 import BeautifulSoup
 from flask import jsonify, render_template, session
+from modules.services.audit import write_audit_log
 from modules.services.db import get_conn
 
 TWCR_SOURCES = (("latest", "最新公告", "https://twcr.tw/?page_id=1314"), ("downloads", "最新下載", "https://twcr.tw/?page_id=1809"))
-cache = {"expires_at": datetime.min, "updates": {"latest": [], "downloads": []}}
+TWCR_UPDATES_FILE = Path(__file__).resolve().parents[2] / "tasks" / "home" / "twcr_updates.json"
 DOWNLOAD_FILE_TYPES = {
     ".csv": ("CSV", "bi-filetype-csv"),
     ".pdf": ("PDF", "bi-filetype-pdf"),
@@ -27,10 +27,8 @@ def _get_download_file_type(url):
     return {"file_type": label, "file_icon": icon, "file_type_class": label.lower()}
 
 
-def fetch_twcr_updates():
-    with Lock():
-        if datetime.now() < cache["expires_at"]:
-            return cache["updates"]
+def refresh_twcr_updates():
+    """Fetch current announcements and save them for the homepage to read."""
     updates = {}
     for key, source, url in TWCR_SOURCES:
         try:
@@ -38,9 +36,32 @@ def fetch_twcr_updates():
             updates[key] = items[2:7] if key == "latest" else items
         except Exception:
             updates[key] = []
-    with Lock():
-        cache.update(updates=updates, expires_at=datetime.now() + timedelta(minutes=30))
+    TWCR_UPDATES_FILE.parent.mkdir(parents=True, exist_ok=True)
+    temporary_file = TWCR_UPDATES_FILE.with_suffix(".tmp")
+    temporary_file.write_text(json.dumps(updates, ensure_ascii=False), encoding="utf-8")
+    temporary_file.replace(TWCR_UPDATES_FILE)
+    write_audit_log(
+        "system_home_updates_auto",
+        {
+            "execution_mode": "system_automatic",
+            "latest_count": len(updates["latest"]),
+            "downloads_count": len(updates["downloads"]),
+        },
+        user_id="SYSTEM",
+    )
     return updates
+
+
+def fetch_twcr_updates():
+    """Read the most recent daily announcement snapshot without a network request."""
+    try:
+        updates = json.loads(TWCR_UPDATES_FILE.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {"latest": [], "downloads": []}
+    return {
+        "latest": updates.get("latest", []) if isinstance(updates.get("latest"), list) else [],
+        "downloads": updates.get("downloads", []) if isinstance(updates.get("downloads"), list) else [],
+    }
 
 
 def _fetch_twcr_source(source, source_url):

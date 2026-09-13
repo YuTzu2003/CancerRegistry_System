@@ -2,7 +2,7 @@ from flask import Blueprint, request, session, jsonify
 from modules.services.auth import login_required, admin_required
 from modules.services.db import get_conn
 from modules.blueprint.dashboard import load_user_favorites, save_user_favorites
-from modules.services.llm_tasks import create_llm_task, get_llm_task, list_llm_tasks
+from modules.blueprint.dashboard.llm_tasks import create_llm_task, get_llm_task, list_llm_tasks
 from modules.blueprint.dashboard.definition.cancer_group_rules import CANCER_GROUP_RULES
 from flask import send_file, send_from_directory
 from modules.blueprint.dashboard.export_report import generate_export_files
@@ -18,17 +18,26 @@ from flask import render_template
 
 dashboard_bp = Blueprint('dashboard', __name__, template_folder='../blueprint/dashboard/templates')
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-DASHBOARD_DATA = os.path.join(BASE_DIR, 'tasks', 'data')
+DASHBOARD_DATA = os.path.join(BASE_DIR, 'tasks', 'dashboard')
+LEGACY_DASHBOARD_DATA = os.path.join(BASE_DIR, 'tasks', 'data', 'dashboard')
 os.makedirs(DASHBOARD_DATA, exist_ok=True)
 
 def _dashboard_storage_path(file_id, stored_name):
-    return os.path.join('dashboard', str(file_id), str(stored_name))
+    return os.path.join(str(file_id), str(stored_name))
 
 def _absolute_dashboard_path(storage_path):
+    relative_path = str(storage_path or '').replace('\\', '/')
+    if relative_path.startswith('dashboard/'):
+        relative_path = relative_path[len('dashboard/'):]
     data_dir = os.path.abspath(DASHBOARD_DATA)
-    file_path = os.path.abspath(os.path.join(data_dir, storage_path or ''))
+    file_path = os.path.abspath(os.path.join(data_dir, relative_path))
     if os.path.commonpath([data_dir, file_path]) != data_dir:
         raise ValueError('Invalid dashboard file path')
+    if not os.path.exists(file_path):
+        legacy_path = os.path.abspath(os.path.join(LEGACY_DASHBOARD_DATA, relative_path))
+        legacy_dir = os.path.abspath(LEGACY_DASHBOARD_DATA)
+        if os.path.commonpath([legacy_dir, legacy_path]) == legacy_dir and os.path.exists(legacy_path):
+            return legacy_path
     return file_path
 
 def _get_uploaded_dashboard_files(user_id):
@@ -85,7 +94,7 @@ def compare():
 @dashboard_bp.route("/dashboard-preview/<task_id>")
 @login_required
 def dashboard_preview(task_id):
-    from modules.services.llm_tasks import get_llm_task_payload
+    from modules.blueprint.dashboard.llm_tasks import get_llm_task_payload
     task = get_llm_task(task_id, session.get("id"))
     payload = get_llm_task_payload(task_id, session.get("id"))
     if not task or not payload:
@@ -94,7 +103,7 @@ def dashboard_preview(task_id):
 @dashboard_bp.route("/comparison-preview/<task_id>")
 @login_required
 def comparison_preview(task_id):
-    from modules.services.llm_tasks import get_llm_task_payload
+    from modules.blueprint.dashboard.llm_tasks import get_llm_task_payload
     task = get_llm_task(task_id, session.get("id"))
     payload = get_llm_task_payload(task_id, session.get("id"))
     if not task or not payload or task.get("TaskType") != "comparison_report":
@@ -285,7 +294,7 @@ def compare_insight_route():
 @login_required
 def llm_task_status(task_id):
     if request.method == "DELETE":
-        from modules.services.llm_tasks import delete_llm_task
+        from modules.blueprint.dashboard.llm_tasks import delete_llm_task
         deleted = delete_llm_task(task_id, session.get("id"))
         return jsonify({"success": deleted})
 
@@ -296,7 +305,7 @@ def llm_task_status(task_id):
 @dashboard_bp.route("/api/llm-tasks/<task_id>/regenerate/<item_id>", methods=["POST"])
 @login_required
 def regenerate_annual_report_item(task_id, item_id):
-    from modules.services.llm_tasks import requeue_annual_report_item
+    from modules.blueprint.dashboard.llm_tasks import requeue_annual_report_item
     if not requeue_annual_report_item(task_id, session.get("id"), item_id):
         return jsonify({"success": False, "error": "圖表敘述尚未完成或不存在"}), 409
     return jsonify({"success": True, "task": get_llm_task(task_id, session.get("id"))})
@@ -306,7 +315,7 @@ def llm_task_preview(task_id):
     task = get_llm_task(task_id, session.get("id"))
     if not task or not task.get("preview_available"):
         return jsonify({"success": False, "error": "找不到圖表預覽"}), 404
-    from modules.services.llm_tasks import get_llm_task_directory
+    from modules.blueprint.dashboard.llm_tasks import get_llm_task_directory
     return send_from_directory(get_llm_task_directory(task['TaskType'], task_id), "chart_preview.png", mimetype="image/png")
 
 @dashboard_bp.route("/api/llm-tasks")

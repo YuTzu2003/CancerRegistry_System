@@ -1,6 +1,6 @@
-"""Background queue and JSONL history for dashboard LLM tasks."""
-from __future__ import annotations
+"""Dashboard annual-report and comparison LLM task workflow."""
 
+from __future__ import annotations
 import json
 import os
 import shutil
@@ -10,16 +10,20 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from modules.blueprint.dashboard.reply import get_chart_insight_logic, get_compare_insight_logic
-from modules.services.db import get_conn
-
-
-TASK_ROOT = Path(__file__).resolve().parents[2] / 'tasks' / 'llm_tasks'
+# ── LLM 任務佇列、JSONL 保存、取消與重試 ────────────────────────────
+TASK_ROOT = Path(__file__).resolve().parents[3] / 'tasks' / 'dashboard'
+LEGACY_TASK_ROOT = Path(__file__).resolve().parents[3] / 'tasks' / 'llm_tasks'
 SENSITIVE_KEYS = {'api_key', 'authorization', 'password', 'token', 'patient_name', 'patient_id', 'medical_record_number'}
 TASK_TYPES = {'chart', 'compare', 'annual_report', 'comparison_report'}
 COMPLETED_STATUSES = {'completed', 'partial_failed', 'failed'}
 MAX_BATCH_ITEM_ATTEMPTS = 3
 CANCELLED_TASK_ROOT = TASK_ROOT / '.cancelled'
+
+
+def get_conn():
+    """Load the database connection after Dashboard modules finish importing."""
+    from modules.services.db import get_conn as database_get_conn
+    return database_get_conn()
 
 
 def _safe(value):
@@ -151,6 +155,12 @@ def _run_batched_item(handler, item, is_cancelled=None):
         'attempts': MAX_BATCH_ITEM_ATTEMPTS,
         'attempt_errors': errors,
     }
+
+
+def _insight_handler(task_type):
+    """Load prompt handlers only after the Dashboard task module is initialized."""
+    from modules.blueprint.dashboard.reply import get_chart_insight_logic, get_compare_insight_logic
+    return get_chart_insight_logic if task_type in {'chart', 'annual_report'} else get_compare_insight_logic
 
 
 def _row(cursor, row):
@@ -304,7 +314,7 @@ def process_next_llm_task(worker_id):
             retry_path = _dir(task_type, task_id) / 'retry.jsonl'
             retrying = retry_path.exists()
             requests = _rows(task_type, task_id, 'retry.jsonl' if retrying else 'input.jsonl')
-            handler = get_chart_insight_logic if task_type == 'annual_report' else get_compare_insight_logic
+            handler = _insight_handler(task_type)
             for request in requests:
                 if _is_cancelled(task_id):
                     return {'task_id': task_id, 'status': 'cancelled'}
@@ -332,7 +342,7 @@ def process_next_llm_task(worker_id):
             _update(task_id, status=status)
             return {'task_id': task_id, 'status': status}
 
-        handler = get_chart_insight_logic if task_type == 'chart' else get_compare_insight_logic
+        handler = _insight_handler(task_type)
         result = handler(task['payload'])
         if _is_cancelled(task_id):
             return {'task_id': task_id, 'status': 'cancelled'}
@@ -428,3 +438,34 @@ def delete_llm_task(task_id, owner_id):
         return cursor.rowcount > 0 and (removed or row[1] == 'running')
     finally:
         conn.close()
+
+
+# ── 舊版 LLM 任務檔案遷移 ────────────────────────────────────────────
+def migrate_llm_task_files():
+    """Move legacy LLM task folders and SQL payloads into Dashboard storage."""
+    conn = get_conn()
+    try:
+        cursor = conn.cursor()
+        cursor.execute('SELECT TaskID,TaskType,ProgressCurrent,PayloadJson FROM dbo.LLMTaskWorker')
+        tasks = cursor.fetchall()
+    finally:
+        conn.close()
+
+    for task_id, task_type, progress_current, payload_json in tasks:
+        task_id = str(task_id)
+        task_directory = _dir(task_type, task_id)
+        legacy_directories = (
+            LEGACY_TASK_ROOT / str(task_type) / task_id,
+            LEGACY_TASK_ROOT / task_id,
+            TASK_ROOT / task_id,
+        )
+        if not task_directory.exists():
+            old_directory = next((path for path in legacy_directories if path.exists()), None)
+            if old_directory:
+                task_directory.parent.mkdir(parents=True, exist_ok=True)
+                shutil.move(str(old_directory), str(task_directory))
+        _write_task_data(task_type, task_id, {
+            'PayloadJson': json.loads(payload_json or '{}'),
+            'ProgressCurrent': progress_current,
+        })
+    return len(tasks)

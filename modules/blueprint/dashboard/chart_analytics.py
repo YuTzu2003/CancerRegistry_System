@@ -13,11 +13,20 @@ from modules.blueprint.dashboard.definition.histology_code_mapping import (
 )
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-DASHBOARD_DATA = f"{BASE_DIR}/tasks/data"
+DASHBOARD_DATA = f"{BASE_DIR}/tasks/dashboard"
+LEGACY_DASHBOARD_DATA = f"{BASE_DIR}/tasks/data/dashboard"
 def _safe_dashboard_path(filename):
-    relative_path = str(filename or "")
+    relative_path = str(filename or "").replace("\\", "/")
+    if relative_path.startswith("dashboard/"):
+        relative_path = relative_path[len("dashboard/"):]
     fpath = os.path.abspath(os.path.join(DASHBOARD_DATA, relative_path))
     data_dir = os.path.abspath(DASHBOARD_DATA)
+    legacy_dir = os.path.abspath(LEGACY_DASHBOARD_DATA)
+    legacy_path = os.path.abspath(os.path.join(legacy_dir, relative_path))
+    if (relative_path and os.path.commonpath([data_dir, fpath]) == data_dir
+            and not os.path.isfile(fpath) and os.path.commonpath([legacy_dir, legacy_path]) == legacy_dir
+            and os.path.isfile(legacy_path)):
+        return legacy_path
     if (not relative_path or os.path.commonpath([data_dir, fpath]) != data_dir
             or not os.path.isfile(fpath)):
         raise FileNotFoundError("找不到指定的 Excel 檔案")

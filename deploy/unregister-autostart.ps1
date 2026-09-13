@@ -6,4 +6,5 @@ if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administra
 }
 
 Get-ScheduledTask -TaskName "CancerRegistrySystem-??" -ErrorAction SilentlyContinue | Unregister-ScheduledTask -Confirm:$false
+Get-ScheduledTask -TaskName "CancerRegistrySystem-HomeUpdates" -ErrorAction SilentlyContinue | Unregister-ScheduledTask -Confirm:$false
 Write-Host "CancerRegistrySystem startup tasks were removed. IIS and database were not changed."

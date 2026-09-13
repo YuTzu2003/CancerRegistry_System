@@ -1,7 +1,7 @@
 import re
 import json
 import logging
-from modules.services.api import get_llm_client
+from modules.services.llm_service import request_llm_chat
 from modules.services.db import get_conn
 
 STYLE_PROMPTS = {
@@ -149,16 +149,13 @@ def get_chart_insight_logic(data):
         """
 
     try:
-        client, model_name = get_llm_client()
-        response = client.chat.completions.create(
-            model=model_name, 
-            messages=[
+        content = request_llm_chat(
+            [
                 {"role": "system", "content": "You are a professional cancer-registry data analyst. Return valid bilingual JSON only."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.5
+            temperature=0.5,
         )
-        content = response.choices[0].message.content
         insights = _parse_bilingual_insights(content)
         return {"success": True, "insight": insights[insight_language], "insights": insights}
     
@@ -228,17 +225,13 @@ def get_compare_insight_logic(data):
             """
 
     try:
-        client, model_name = get_llm_client()
-        response = client.chat.completions.create(
-            model=model_name,
-            messages=[
+        content = request_llm_chat(
+            [
                 {"role": "system", "content": "You are a professional cancer registry data comparison expert. Return professional Traditional Chinese and English narratives as valid JSON."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.3,
-            timeout=180.0
         )
-        content = response.choices[0].message.content
         insights = _parse_bilingual_insights(content)
         return {"success": True, "insight": insights[insight_language], "insights": insights}
     except Exception as e:

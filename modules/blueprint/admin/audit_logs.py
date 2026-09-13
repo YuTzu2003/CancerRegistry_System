@@ -42,7 +42,7 @@ def audit_logs():
     cursor = conn.cursor()
     cursor.execute("SELECT DISTINCT [Action] FROM dbo.Audit_logs ORDER BY [Action]")
     actions = [row[0] for row in cursor.fetchall()]
-    cursor.execute("SELECT a.[LogID], a.[Action], a.[CreatedAt], a.[User_id], a.[detail_json], a.[Remote_addr], COALESCE(NULLIF(u.[Name], ''), a.[User_id]) AS UserName FROM dbo.Audit_logs AS a LEFT JOIN dbo.Users AS u ON a.[User_id] = u.UserID " + where_clause + f" ORDER BY a.[{order_column}] {order_direction}, a.[LogID] DESC OFFSET 0 ROWS FETCH NEXT 500 ROWS ONLY", parameters)
+    cursor.execute("SELECT a.[LogID], a.[Action], a.[CreatedAt], a.[User_id], a.[detail_json], a.[Remote_addr], COALESCE(NULLIF(u.[Name], ''), a.[User_id]) AS UserName FROM dbo.Audit_logs AS a LEFT JOIN dbo.Users AS u ON a.[User_id] = CONVERT(nvarchar(36), u.[ID]) OR a.[User_id] = u.[UserID] " + where_clause + f" ORDER BY a.[{order_column}] {order_direction}, a.[LogID] DESC OFFSET 0 ROWS FETCH NEXT 500 ROWS ONLY", parameters)
     columns = [column[0] for column in cursor.description]
     logs = [dict(zip(columns, row)) for row in cursor.fetchall()]
     conn.close()

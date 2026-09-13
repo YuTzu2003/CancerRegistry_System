@@ -1,4 +1,4 @@
--- For an existing table, run `uv run python -m modules.services.migrate_llm_task_files`
+-- For an existing table, run `uv run python -c "from modules.blueprint.dashboard.llm_tasks import migrate_llm_task_files; print(migrate_llm_task_files())"`
 -- before this script so existing payloads and progress are preserved in task.json.
 IF OBJECT_ID(N'dbo.LLMTaskWorker', N'U') IS NULL
 BEGIN
