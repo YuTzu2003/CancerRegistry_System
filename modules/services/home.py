@@ -20,15 +20,12 @@ DOWNLOAD_FILE_TYPES = {
     ".zip": ("ZIP", "bi-file-earmark-zip"),
 }
 
-
 def _get_download_file_type(url):
     extension = PurePosixPath(unquote(urlparse(url).path)).suffix.lower()
     label, icon = DOWNLOAD_FILE_TYPES.get(extension, (chr(0x6a94) + chr(0x6848), "bi-file-earmark-arrow-down"))
     return {"file_type": label, "file_icon": icon, "file_type_class": label.lower()}
 
-
 def refresh_twcr_updates():
-    """Fetch current announcements and save them for the homepage to read."""
     updates = {}
     for key, source, url in TWCR_SOURCES:
         try:
@@ -51,9 +48,7 @@ def refresh_twcr_updates():
     )
     return updates
 
-
 def fetch_twcr_updates():
-    """Read the most recent daily announcement snapshot without a network request."""
     try:
         updates = json.loads(TWCR_UPDATES_FILE.read_text(encoding="utf-8"))
     except (FileNotFoundError, json.JSONDecodeError):

@@ -1,12 +1,12 @@
-import os
 from sqlalchemy import create_engine
+from modules.config import BaseConfig
 
 _engine = None
 
 def get_engine():
     global _engine
     if _engine is None:
-        db_uri = os.environ.get("SQLALCHEMY_DATABASE_URI")
+        db_uri = BaseConfig.SQLALCHEMY_DATABASE_URI
         if not db_uri:
             raise ValueError("環境變數 SQLALCHEMY_DATABASE_URI 未設定")
         _engine = create_engine(db_uri, pool_pre_ping=True)
