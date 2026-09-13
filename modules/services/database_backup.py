@@ -1,17 +1,11 @@
-"""Scheduled SQL Server database backup job."""
-
 from __future__ import annotations
-
 from datetime import datetime, timedelta
 import logging
 from pathlib import Path
-
 from modules.services.audit import write_audit_log
 from modules.services.db import get_conn
 
-
 BACKUP_DIRECTORY = Path(__file__).resolve().parents[2] / "tasks" / "backups"
-
 
 def _remove_expired_backups(now):
     cutoff = now - timedelta(days=3)
@@ -22,9 +16,7 @@ def _remove_expired_backups(now):
             removed.append(backup_path.name)
     return removed
 
-
 def run_database_backup():
-    """Create one timestamped SQL Server backup in the project backup directory."""
     connection = None
     try:
         BACKUP_DIRECTORY.mkdir(parents=True, exist_ok=True)

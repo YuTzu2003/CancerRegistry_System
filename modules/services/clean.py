@@ -4,10 +4,9 @@ import os
 import shutil
 import stat
 import zipfile
-
 from flask import Blueprint, flash, jsonify, redirect, render_template, request, send_file, session, url_for
 from modules.services.auth import login_required, admin_required
-from modules.blueprint.clean import categorize_fields_logic,export_logic,preview_logic,get_formats_logic,add_format_logic,manage_format_logic,clean_job_logic,get_date_errors_logic,update_date_error_logic,download_temp_file_logic,download_file_logic
+from modules.blueprint.clean import categorize_fields_logic,export_logic,preview_logic,get_formats_logic,add_format_logic,manage_format_logic,clean_job_logic,get_date_errors_logic,update_date_error_logic,download_file_logic
 from modules.services.db import get_conn
 
 clean_bp = Blueprint('clean', __name__, template_folder='../blueprint/clean/templates')
@@ -83,14 +82,6 @@ def api_date_errors():
 def api_update_date_error():
     data = request.get_json(silent=True) or {}
     res, status = update_date_error_logic(data.get("job_id"), session.get("id"), data.get("row_index"), data.get("updates"))
-    return jsonify(res), status
-
-@clean_bp.route("/api/download_temp/<file_type>/<temp_id>/<filename>")
-@login_required
-def download_temp_file(file_type, temp_id, filename):
-    res, status = download_temp_file_logic(file_type, temp_id, filename)
-    if res.get("send_file"):
-        return send_file(res["path"], as_attachment=True, download_name=res["download_name"])
     return jsonify(res), status
 
 @clean_bp.route("/api/download/<file_type>/<job_id>")

@@ -3,6 +3,7 @@ from functools import wraps
 from flask import Blueprint, request, session, redirect, url_for, render_template, flash, jsonify
 from modules.services.db import get_conn
 from modules.services.audit import write_audit_log
+from modules.config import BaseConfig
 from werkzeug.security import check_password_hash, generate_password_hash
 
 auth_bp = Blueprint('auth', __name__, template_folder='../blueprint/auth/templates')
@@ -10,11 +11,25 @@ auth_bp = Blueprint('auth', __name__, template_folder='../blueprint/auth/templat
 def password_matches(stored_password, password):
     return check_password_hash(stored_password, password)
 
+
+def _login_rate_limited(remote_addr):
+    conn = None
+    try:
+        conn = get_conn()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM dbo.Audit_logs WHERE [Action] = ? AND [Remote_addr] = ? AND [CreatedAt] >= DATEADD(second, ?, SYSDATETIMEOFFSET())", ("auth_login_failed", remote_addr or "", -BaseConfig.LOGIN_ATTEMPT_WINDOW_SECONDS))
+        row = cursor.fetchone()
+        return bool(row and int(row[0]) >= BaseConfig.LOGIN_MAX_ATTEMPTS)
+    except Exception:
+        logging.exception("Unable to check login rate limit")
+        return False
+    finally:
+        conn.close()
+
 def current_session_user():
     user_id = session.get("id")
     if not user_id:
         return None
-
     conn = get_conn()
     cursor = conn.cursor()
     cursor.execute("SELECT [ID], [UserID], [Name], [Position], [Location] FROM [dbo].[Users] WHERE [ID] = ?",(user_id,),)
@@ -28,7 +43,6 @@ def current_session_user():
     session["position"] = user.Position
     session["location"] = user.Location
     return user
-
 
 # ---- 登入驗證 ----
 def login_required(f):
@@ -62,7 +76,6 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-
 @auth_bp.route("/login", methods=["GET", "POST"])
 def login():
     if "id" in session: 
@@ -70,6 +83,8 @@ def login():
     if request.method == "POST":
         user_id = request.form["userid"]
         password = request.form["password"]
+        if _login_rate_limited(request.remote_addr):
+            return render_template("login.html", error="登入嘗試次數過多，請稍後再試。"), 429
         conn = get_conn()
         cursor = conn.cursor()
         cursor.execute("SELECT [ID], [UserID], [Password], [Name], [Position], [Location] FROM [dbo].[Users] WHERE UserID = ?", (user_id,))
@@ -104,7 +119,6 @@ def logout():
     write_audit_log("auth_logout_success", {"result": "success"})
     session.clear()
     return redirect("/")
-
 
 @auth_bp.route("/profile", methods=["GET", "POST"])
 @login_required
@@ -141,5 +155,4 @@ def profile():
             else:
                 flash("目前密碼不正確", "danger")
             conn.close()
-
     return render_template("profile.html", active="auth.profile", user=user)

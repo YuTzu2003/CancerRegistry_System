@@ -34,7 +34,6 @@ def get_llm_client(settings: LLMSettings | None = None):
 
 
 def request_llm_chat(messages: Sequence[Mapping[str, str]], *, temperature: float) -> str:
-
     settings = get_llm_settings()
     client, model = get_llm_client(settings)
     response = client.chat.completions.create(model=model,messages=list(messages),temperature=temperature,timeout=settings.timeout_seconds,)

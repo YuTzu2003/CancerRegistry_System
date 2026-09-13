@@ -3,7 +3,7 @@ import logging
 import os
 import sys
 import jinja2
-from flask import Flask
+from flask import Flask, jsonify, request
 from werkzeug.middleware.proxy_fix import ProxyFix
 from modules.blueprint.admin.audit_logs import audit_logs_bp
 from modules.blueprint.admin.key_approval import key_approval_bp
@@ -34,7 +34,15 @@ def create_app():
     if app_env == "production" and (len(BaseConfig.SECRET_KEY) < 32 or BaseConfig.SECRET_KEY == "development-only-change-before-production"):
         raise RuntimeError("Production SECRET_KEY must contain at least 32 characters")
     flask_app.secret_key = BaseConfig.SECRET_KEY
-    flask_app.config.update(PERMANENT_SESSION_LIFETIME=timedelta(seconds=runtime_config.SESSION_LIFETIME_SECONDS), SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE=runtime_config.SESSION_COOKIE_SAMESITE, SESSION_COOKIE_SECURE=runtime_config.SESSION_COOKIE_SECURE, TESTING=runtime_config.TESTING)
+    flask_app.config.update(PERMANENT_SESSION_LIFETIME=timedelta(seconds=runtime_config.SESSION_LIFETIME_SECONDS), SESSION_REFRESH_EACH_REQUEST=True, SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE=runtime_config.SESSION_COOKIE_SAMESITE, SESSION_COOKIE_SECURE=runtime_config.SESSION_COOKIE_SECURE, MAX_CONTENT_LENGTH=runtime_config.MAX_CONTENT_LENGTH, TESTING=runtime_config.TESTING)
+
+    @flask_app.errorhandler(413)
+    def request_too_large(_error):
+        message = f"上傳檔案不可超過 {runtime_config.MAX_UPLOAD_MB} MB。"
+        if request.path.startswith("/api/"):
+            return jsonify({"ok": False, "error": message}), 413
+        return message, 413
+    
     if app_env == "production":
         if BaseConfig.PROXY_COUNT != 1:
             raise RuntimeError("PROXY_COUNT must be 1 in production")

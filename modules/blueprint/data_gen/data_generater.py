@@ -488,7 +488,7 @@ def process_file_logic(file_path, format_id, selected_date_cols_raw, extra_cols,
         fmt_prefix = f"fmt{fmt_name}_" if (format_id and 'fmt_name' in locals() and fmt_name) else ""
         
         out_filename = f"Gen_{fmt_prefix}{orig_base}_{scheme_display}{orig_ext}"
-        out_path = os.path.join('data/temp', out_filename)
+        out_path = os.path.join(os.path.dirname(file_path), out_filename)
         
         if ext == ".xlsx": df.to_excel(out_path, index=False)
         else: df.to_csv(out_path, index=False, encoding="utf-8-sig")

@@ -1,33 +1,24 @@
 import os
 import re
 import uuid
-
 import pandas as pd
 from flask import Blueprint, jsonify, redirect, render_template, request, session, url_for
 from werkzeug.utils import secure_filename
-
 from modules.services.auth import login_required
 from modules.blueprint.indicators.analysis import run_indicators_analysis
 
-
-indicators_bp = Blueprint(
-    "indicators",
-    __name__,
-    template_folder="../blueprint/indicators/templates",
-)
+indicators_bp = Blueprint("indicators",__name__,template_folder="../blueprint/indicators/templates",)
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 INDICATORS_DATA_DIR = os.path.join(BASE_DIR, "tasks", "data", "indicators")
 ALLOWED_EXTENSIONS = {".xlsx", ".xls", ".csv"}
 YEAR_COLUMN_HINTS = ("didiag", "診斷日期", "診斷年度", "diagnosis date", "diagnosis year")
 
-
 def _read_uploaded_file(path, extension, nrows=5000):
     options = {"nrows": nrows} if nrows is not None else {}
     if extension == ".csv":
         return pd.read_csv(path, **options)
     return pd.read_excel(path, **options)
-
 
 def _find_diagnosis_year_column(columns):
     normalized = {str(column).strip().lower(): column for column in columns}
@@ -40,7 +31,6 @@ def _find_diagnosis_year_column(columns):
             return column
     return None
 
-
 def _extract_years(values):
     years = []
     for value in values.dropna():
@@ -49,18 +39,15 @@ def _extract_years(values):
             years.append(int(match.group(1)))
     return sorted(set(years))
 
-
 @indicators_bp.route("/indicators")
 @login_required
 def indicators():
     return render_template("indicators.html", active="indicators")
 
-
 @indicators_bp.route("/monitoring")
 @login_required
 def monitoring_legacy():
     return redirect(url_for("indicators.indicators"))
-
 
 @indicators_bp.route("/api/monitoring/upload", methods=["POST"])
 @indicators_bp.route("/api/indicators/upload", methods=["POST"])
