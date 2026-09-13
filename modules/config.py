@@ -58,6 +58,7 @@ class BaseConfig:
     LLM_API_KEY = os.getenv("LLM_API_KEY")
     LLM_MODEL = os.getenv("LLM_MODEL", "").strip()
     LLM_TIMEOUT_SECONDS = float(os.getenv("LLM_TIMEOUT_SECONDS", "180"))
+    LLM_WORKERS = _optional_int("LLM_WORKERS")
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
     OPENAI_MODEL = os.getenv("OPENAI_MODEL", "").strip()
     WERKZEUG_RUN_MAIN = os.getenv("WERKZEUG_RUN_MAIN") == "true"
@@ -73,6 +74,8 @@ class BaseConfig:
         missing = [name for name in required if getattr(cls, name) is None]
         if missing:
             raise RuntimeError(f"Missing required production environment settings: {', '.join(missing)}")
+        if cls.LLM_WORKERS != 1:
+            raise RuntimeError("LLM_WORKERS must be 1 until the LLM task schema migration is applied")
 
 class TestingConfig(BaseConfig):
     APP_ENV = "testing"

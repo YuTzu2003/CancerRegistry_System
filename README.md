@@ -1,71 +1,38 @@
-# 癌症登記資料管理平台
+# CancerRegistry_System 癌症登記資料管理平台
 
-以 Flask 與 SQL Server 建置的癌症登記資料處理、資料清洗與分析系統。
+專為醫院癌症防治中心與登記團隊設計的整合型資料管理與決策分析平台，主要服務癌症登錄人員、資料管理師、研究分析人員與系統管理者。
 
-## 系統需求
+串聯癌症登記全生命週期的作業需求，涵蓋**標準化格式定義、欄位對照維護、資料清洗、邏輯規則校驗與資料品質指標產製**；同時提供**圖表分析、跨年度趨勢比對、報表自動產出及Power BI匯出**功能，並使用 LLM 提供圖表敘述與數據解讀輔助，並具備嚴密的權限角色控管、作業歷程留存與資安稽核機制，協助院內團隊在安全合規的前提下，簡化繁瑣的登錄流程、確保資料高度精確，並加速癌症臨床研究與品質監測應用。
 
-- Python 3.12 以上
-- [uv](https://docs.astral.sh/uv/)
-- SQL Server 與 ODBC Driver 17 或 18
-- 正式環境另需 IIS、IIS URL Rewrite 2.1 與 IIS ARR 3.0
+## 主要提供內容
 
-## 本機開發
+- 帳號、權限申請、管理與稽核。
+- 癌症登記資料格式、欄位對照、組織學代碼與全國資料管理。
+- 登錄資料清洗、日期錯誤修正、品質指標與作業歷程下載。
+- 資料產製、指標監測、儀表板分析、年度與比較報告。
+- Ollama 或 OpenAI 的 LLM 輔助圖表敘述與比較分析。
+- Power BI 發布資料匯出及首頁資訊更新。
 
-```powershell
-git clone https://github.com/YuTzu2003/CancerRegistry_System.git
-Set-Location CancerRegistry_System
-uv sync
-Copy-Item .env.example .env
-```
+完整功能、角色使用方式與系統範圍請見 [系統介紹.md](系統介紹.md)。
 
-設定 `.env` 的 `SQLALCHEMY_DATABASE_URI` 與 `SECRET_KEY` 後，以 Flask 開發模式啟動：
 
-```powershell
-uv run app.py
-```
+## 系統部署需求
 
-或使用不改寫 `.env` 的 debug 指令：
+- **作業系統**：Windows Server 或 Windows 10/11 (64-bit)
+- **核心環境**：Python >= 3.12、[uv](https://github.com/astral-sh/uv) 套件管理器
+- **網頁伺服器**：IIS (搭配 URL Rewrite 2.1 與 ARR 3.0) + Waitress
+- **資料庫**：Microsoft SQL Server (搭配 ODBC Driver 17 或 18)
+- **LLM 服務**：Ollama 或 OpenAI API
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\deploy\start-development.ps1
-```
+---
 
-## 正式部署
+### 系統部署與架設教學
+本專案的完整架設步驟、Windows 多人正式環境、IIS + ARR 設定、自動開機、Debug／正式模式切換、資料庫連線與備份還原流程，皆已整理至專屬手冊：
+👉 **[請參閱：架設步驟.md](架設步驟.md)**
 
-正式架構為：
+---
 
-```text
-使用者 → IIS + ARR → Waitress → Flask → SQL Server
-```
-
-完整的 Windows IIS 架設、SQL Server 初始化、首次一鍵部署、後續更新、開機自啟、健康檢查、停止與 debug／production 模式切換，請參閱：[架設步驟](架設步驟.md)。
-
-首次正式部署需以系統管理員 PowerShell 執行：
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\deploy\setup-and-deploy.ps1
-```
-
-後續程式更新不重跑 schema SQL：
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\deploy\deploy-production.ps1
-```
-
-## 重要設定
-
-- 資料庫由 `.env` 的 `SQLALCHEMY_DATABASE_URI` 決定；schema SQL 不固定資料庫名稱。
-- 首次正式部署的目標必須是空白資料庫。
-- `.env` 含有密鑰與資料庫連線資訊，禁止提交到 Git。
-- 只有 IIS 已完成 HTTPS binding 時，才將 `SESSION_COOKIE_SECURE=true`。
-
-## 主要目錄
-
-| 目錄／檔案 | 說明 |
-| --- | --- |
-| `app.py` | Flask 與 Waitress 啟動入口 |
-| `modules/` | 系統功能模組與 Blueprint |
-| `static/` | CSS、JavaScript 與靜態資源 |
-| `deploy/` | IIS、ARR、Waitress 與 SQL Server 部署腳本 |
-| `deploy/database/CancerRegistry_System.sql` | 首次部署使用的 schema SQL |
-| `架設步驟.md` | 完整 Windows 架設與維運手冊 |
+### 商業導入與授權聲明
+本專案為專有軟體，著作權歸 **[YuTzu2003](https://github.com/YuTzu2003)和[ZXC0428](https://github.com/ZXC0428)、[fish0805-cpu](https://github.com/fish0805-cpu)**所有，不屬於開源軟體。
+本系統僅限經授權之合作醫院及合作單位內部導入使用。未經書面同意，不得拷貝、修改、散布或將原始碼提供予任何第三方。若合作關係結束，應依法刪除所有持有之系統原始碼及安裝檔副本。
+> ⚠️ 詳細的授權條款與法律限制，請詳閱 **[LICENSE](LICENSE)** 檔案。

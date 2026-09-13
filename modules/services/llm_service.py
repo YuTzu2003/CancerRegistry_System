@@ -4,6 +4,9 @@ from typing import Mapping, Sequence
 from openai import OpenAI
 from modules.config import BaseConfig
 
+_client_cache = None
+_client_settings = None
+
 @dataclass(frozen=True)
 class LLMSettings:
     provider: str
@@ -27,10 +30,34 @@ def get_llm_settings() -> LLMSettings:
 
 
 def get_llm_client(settings: LLMSettings | None = None):
+    global _client_cache, _client_settings
     settings = settings or get_llm_settings()
+    if _client_cache is not None and _client_settings == settings:
+        return _client_cache, settings.model
     if settings.provider == "openai":
-        return OpenAI(api_key=settings.api_key), settings.model
-    return OpenAI(base_url=settings.base_url, api_key=settings.api_key), settings.model
+        _client_cache = OpenAI(api_key=settings.api_key)
+    else:
+        _client_cache = OpenAI(base_url=settings.base_url, api_key=settings.api_key)
+    _client_settings = settings
+    return _client_cache, settings.model
+
+
+def check_llm_readiness() -> None:
+    settings = get_llm_settings()
+    client, model = get_llm_client(settings)
+    available_models = {item.id for item in client.models.list().data}
+    if model not in available_models:
+        raise ValueError(f"Configured LLM model is unavailable: {model}")
+    if settings.provider == "ollama":
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": "health check"}],
+            temperature=0,
+            max_tokens=1,
+            timeout=min(settings.timeout_seconds, 30),
+        )
+        if not response.choices or not response.choices[0].message.content:
+            raise ValueError("Ollama readiness response is empty")
 
 
 def request_llm_chat(messages: Sequence[Mapping[str, str]], *, temperature: float) -> str:

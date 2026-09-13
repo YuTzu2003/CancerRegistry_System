@@ -77,6 +77,10 @@ if (-not (Test-Path -LiteralPath $sitePath)) {
     New-Website -Name $siteName -PhysicalPath $siteRoot -Port $PublicPort | Out-Null
 }
 else {
+    $existingPath = (Get-ItemProperty -LiteralPath $sitePath -Name physicalPath).physicalPath
+    if ($existingPath -and ([IO.Path]::GetFullPath($existingPath) -ne [IO.Path]::GetFullPath($siteRoot))) {
+        throw "IIS site $siteName already exists with a different physical path. Review the conflict manually."
+    }
     Set-ItemProperty -LiteralPath $sitePath -Name physicalPath -Value $siteRoot
     if (-not (Get-WebBinding -Name $siteName -Protocol "http" | Where-Object { $_.bindingInformation.Split(":")[1] -eq "$PublicPort" })) {
         New-WebBinding -Name $siteName -Protocol "http" -Port $PublicPort
@@ -92,6 +96,12 @@ else {
 }
 
 $appCmd = Join-Path $env:windir "System32\inetsrv\appcmd.exe"
+if (-not (Test-Path -LiteralPath $appCmd)) { throw "IIS appcmd.exe was not found." }
+$farmConfig = & $appCmd list config /section:webFarms /config:* 2>$null
+if ($LASTEXITCODE -ne 0) { throw "Could not inspect ARR Server Farm configuration." }
+if ($farmConfig -match ("<webFarm name=\"{0}\"" -f [regex]::Escape($farmName))) {
+    Write-Host "Updating existing ARR Server Farm $farmName."
+}
 & $appCmd set config -section:webFarms ("/-`"[name='{0}']`"" -f $farmName) /commit:apphost 2>$null | Out-Null
 & $appCmd set config -section:webFarms ("/+`"[name='{0}']`"" -f $farmName) /commit:apphost
 if ($LASTEXITCODE -ne 0) { throw "Could not create ARR Server Farm $farmName." }
