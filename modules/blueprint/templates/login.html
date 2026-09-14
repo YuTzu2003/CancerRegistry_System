@@ -75,9 +75,11 @@
         <button type="submit" class="btn btn-dark btn-block login-btn">登入系統</button>
       </form>
 
-      <div class="login-footer">
-        &copy; 2026 NFU. All rights reserved.
+      <div class="login-assist">
+        <span>無法登入？</span>
+        <a href="{{ url_for('auth.forgot_password') }}"><i class="bi bi-key me-1"></i>忘記密碼</a>
       </div>
+      <div class="login-footer">&copy; 2026 NFU. All rights reserved.</div>
 
     </div>
   </div>

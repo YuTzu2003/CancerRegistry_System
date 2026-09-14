@@ -115,3 +115,25 @@
   color: var(--blue-700);
   text-decoration: underline;
 }
+.login-assist {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  margin-top: 20px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--gray-50);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.login-assist a {
+  color: var(--text);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.login-assist a:hover {
+  color: var(--blue-600);
+}

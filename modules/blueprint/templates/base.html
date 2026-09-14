@@ -95,6 +95,7 @@
 
       <div class="sidebar-footer">
         {%if session.get('name')%}
+        <a href="{{ url_for('auth.account_email') }}" class="nav-link" style="margin:0 10px 8px; width:auto;"><span class="nav-icon"><i class="bi bi-envelope-at"></i></span><span class="nav-text">帳號 Email 設定</span></a>
         <a href="/logout" class="user-chip logout-action">
           <div class="user-avatar">{{session.get('name')[0]}}</div>
           <div class="user-meta">
