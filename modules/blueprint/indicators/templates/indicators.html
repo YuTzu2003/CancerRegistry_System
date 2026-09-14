@@ -59,6 +59,13 @@
   .indicators-cancer-option small { color: var(--gray-500); }
   .indicators-result-empty { border: 1px dashed var(--gray-300); border-radius: 8px; color: var(--gray-600); padding: 28px 18px; text-align: center; }
   .indicators-result { background: transparent; border: 0; padding: 0; }
+  .indicators-cancer-tabs { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 10px; }
+  .indicators-cancer-tab { background: #f8f9fa; border: 1px solid #ced4da; border-radius: 6px; color: #495057; font-size: 15px; font-weight: 500; letter-spacing: .5px; padding: 8px 24px; transition: background-color .2s ease, border-color .2s ease, color .2s ease; }
+  .indicators-cancer-tab:hover { background: #e9ecef; border-color: #adb5bd; color: #212529; }
+  .indicators-cancer-tab.active { background: #212529; border-color: #212529; color: #fff; }
+  [data-theme="dark"] .indicators-cancer-tab { background: var(--gray-50); border-color: var(--border); color: var(--text); }
+  [data-theme="dark"] .indicators-cancer-tab:hover { background: #1f1f23; border-color: var(--blue-600); color: #bfdbfe; }
+  [data-theme="dark"] .indicators-cancer-tab.active { background: var(--blue-600); border-color: var(--blue-600); color: #fff; }
   .indicators-report-card { background: var(--white); border: 1px solid var(--gray-300); border-radius: 8px; box-shadow: 0 .125rem .25rem rgba(0, 0, 0, .075); margin-top: 8px; padding: 24px; }
   .indicators-report-table-wrap { margin-bottom: 4px; overflow-x: auto; }
   .indicators-result-table { background: var(--white); border-collapse: collapse; min-width: 1180px; text-align: center; width: 100%; }
@@ -81,8 +88,15 @@
   .indicator-kpi-status.is-warning { background: #fcebec; color: #a7373d; }
   .indicator-kpi-body { padding: 5px 12px 3px; }
   .indicator-kpi-gauge { height: 76px; width: 100%; }
+  .indicators-chart-heading { color: #111827; margin: 16px 0 6px; text-align: center; }
+  .indicators-chart-title { font-size: 18px; font-weight: 700; }
+  .indicators-chart-source { color: var(--gray-500); font-size: 12px; font-weight: 400; }
   .indicators-chart-caption { color: #111827; font-weight: 500; margin-top: 8px; text-align: center; }
   .indicators-export-option { border: 1px solid var(--gray-200); border-radius: 8px; padding: 12px; }
+  .indicators-export-option .form-check { align-items: baseline; display: flex; gap: 8px; margin: 0; padding-left: 0; }
+  .indicators-export-option .form-check-input { flex: 0 0 auto; margin: 0; }
+  .indicators-export-option .form-check-label { display: grid; gap: 1px; }
+  .indicators-export-hint { color: var(--muted); display: block; font-size: 13px; font-weight: 400; line-height: 1.35; }
   @media (max-width: 991.98px) {
     .indicators-upload-layout { grid-template-columns: 1fr; }
     .indicators-upload-pane + .indicators-upload-pane { border-left: 0; border-top: 1px solid var(--gray-200); padding-left: 0; padding-top: 20px; }
@@ -161,9 +175,9 @@
   <div class="indicators-step-title"><span class="indicators-step-marker" aria-hidden="true"></span>指標合併檔下載</div>
   <div class="indicators-step-body">
     <div class="row g-3">
-      <div class="col-md-4"><div class="indicators-export-option"><div class="form-check"><input class="form-check-input" type="checkbox" id="exportWithNarrative" disabled><label class="form-check-label" for="exportWithNarrative">產生文字分析並下載</label></div><div class="indicators-help mt-2">可選 Word、PDF 或兩者；包含監測表、圖表與 AI 文字分析。</div></div></div>
-      <div class="col-md-4"><div class="indicators-export-option"><div class="form-check"><input class="form-check-input" type="checkbox" id="exportWithoutNarrative" disabled><label class="form-check-label" for="exportWithoutNarrative">不產生文字分析，直接下載</label></div><div class="indicators-help mt-2">僅包含監測表與圖表。</div></div></div>
-      <div class="col-md-4"><div class="indicators-export-option"><div class="form-check"><input class="form-check-input" type="checkbox" id="exportIndicatorsExcel" disabled><label class="form-check-label" for="exportIndicatorsExcel">匯出資料（Excel）</label></div><div class="indicators-help mt-2">保留原始資料，並在右側加入每項指標的分子／分母判定欄位。</div></div></div>
+      <div class="col-md-4"><div class="indicators-export-option"><div class="form-check"><input class="form-check-input" type="checkbox" id="exportWithNarrative" disabled><label class="form-check-label" for="exportWithNarrative"><span>產生文字分析並下載</span><span class="indicators-export-hint">可選 Word、PDF 或兩者；包含監測表、圖表與 AI 文字分析</span></label></div></div></div>
+      <div class="col-md-4"><div class="indicators-export-option"><div class="form-check"><input class="form-check-input" type="checkbox" id="exportWithoutNarrative" disabled><label class="form-check-label" for="exportWithoutNarrative"><span>不產生文字分析，直接下載</span><span class="indicators-export-hint">僅包含監測表與圖表</span></label></div></div></div>
+      <div class="col-md-4"><div class="indicators-export-option"><div class="form-check"><input class="form-check-input" type="checkbox" id="exportIndicatorsExcel" disabled><label class="form-check-label" for="exportIndicatorsExcel"><span>匯出資料（Excel）</span><span class="indicators-export-hint">保留原始資料，並在右側加入每項指標的分子／分母判定欄位</span></label></div></div></div>
     </div>
     <div class="mt-3 text-end"><button id="downloadIndicators" class="btn btn-outline-dark" type="button" disabled><i class="bi bi-download me-1"></i>下載指標合併檔</button></div>
   </div>
@@ -196,6 +210,7 @@
   let nextFileId = 1;
   let uploadInProgress = false;
   let indicatorChartInstances = [];
+  let activePreviewCancerKey = null;
   let previewRequestId = 0;
   let previewRequestTimer = null;
   const customYearControls = new Map();
@@ -299,6 +314,7 @@
       previewRequestTimer = null;
     }
     disposeIndicatorCharts();
+    activePreviewCancerKey = null;
     previewGenerated = false;
     exportInputs.forEach((input) => { input.checked = false; });
     preview.className = 'indicators-result-empty';
@@ -706,8 +722,10 @@
             backgroundStyle: { color: '#e5e7eb' },
             data: [{ value: item.safePercentage, itemStyle: { color: barColor } }],
             label: {
-              show: true,
+              show: item.percentage != null,
               position: 'top',
+              align: item.safePercentage === 0 ? 'left' : 'center',
+              offset: item.safePercentage === 0 ? [3, 0] : [0, 0],
               color: '#374151',
               fontSize: 11,
               fontWeight: 700,
@@ -742,10 +760,21 @@
       input.value, input.parentElement.querySelector('span').childNodes[0].textContent.trim()
     ]));
     const reports = result.reports || [];
-    const content = reports.map((report, reportIndex) => {
+    const availableKeys = reports.map(report => String(report.cancer_key || ''));
+    if (!availableKeys.includes(activePreviewCancerKey)) activePreviewCancerKey = availableKeys[0] || null;
+    const tabs = reports.length ? `<div class="indicators-cancer-tabs" role="tablist" aria-label="癌別切換">
+      ${reports.map(report => {
+        const cancerKey = String(report.cancer_key || '');
+        const cancerName = cancerLabels[cancerKey] || cancerKey;
+        const active = cancerKey === activePreviewCancerKey;
+        return `<button class="indicators-cancer-tab${active ? ' active' : ''}" type="button" role="tab" data-indicators-cancer-tab="${escapeHtml(cancerKey)}" aria-selected="${active ? 'true' : 'false'}">${escapeHtml(cancerName)}</button>`;
+      }).join('')}
+    </div>` : '';
+    const panels = reports.map((report, reportIndex) => {
+      const cancerKey = String(report.cancer_key || '');
       const cancerName = cancerLabels[report.cancer_key] || report.cancer_key;
       if (!report.indicators || !report.indicators.length) {
-        return `<div class="alert alert-warning mb-3"><strong>${escapeHtml(cancerName)}</strong><div>${escapeHtml(report.message || '尚未設定監測指標定義。')}</div></div>`;
+        return `<div class="indicators-cancer-panel" data-indicators-cancer-panel="${escapeHtml(cancerKey)}"><div class="alert alert-warning mb-3"><strong>${escapeHtml(cancerName)}</strong><div>${escapeHtml(report.message || '尚未設定監測指標定義。')}</div></div></div>`;
       }
       const exclusion = report.global_exclusions || {};
       const excludedReasons = exclusion.excluded_by_reason || {};
@@ -766,17 +795,40 @@
         <td>${Number(indicator.denominator || 0).toLocaleString()}</td>
         <td>${indicator.percentage == null ? '-' : `${escapeHtml(indicator.percentage)}%`}</td>
       </tr>`).join('');
-      return `<div class="indicators-report-card mb-4">
+      return `<div class="indicators-cancer-panel" data-indicators-cancer-panel="${escapeHtml(cancerKey)}"><div class="indicators-report-card mb-4">
         ${warnings}
-        <div class="indicators-report-table-wrap"><table class="indicators-result-table"><caption>表、${escapeHtml(startSelect.value)}–${escapeHtml(endSelect.value)} 年${escapeHtml(cancerName)}監測指標表</caption><thead><tr><th>癌別</th><th>指標編號</th><th>指標名稱</th><th>分子定義</th><th>分母定義</th><th>分子件數</th><th>分母件數</th><th>監測結果(%)</th></tr></thead><tbody>${rows}</tbody></table></div>
+        <div class="indicators-report-table-wrap"><table class="indicators-result-table"><caption>表、${escapeHtml(startSelect.value)}–${escapeHtml(endSelect.value)}年${escapeHtml(cancerName)}監測指標表<br><span class="text-muted fw-normal" style="font-size: 0.85em;">資料來源：癌症登記資料庫</span></caption><thead><tr><th>癌別</th><th>指標編號</th><th>指標名稱</th><th>分子定義</th><th>分母定義</th><th>分子件數</th><th>分母件數</th><th>監測結果(%)</th></tr></thead><tbody>${rows}</tbody></table></div>
         <div class="small text-secondary mb-3">符合年度與癌別 共 ${Number(report.input_count || 0).toLocaleString()} 筆；排除 Class 0 或 Class 3 共 ${classExclusionCount.toLocaleString()} 筆、跨院治療個案 ${crossHospitalCount.toLocaleString()} 筆、${duplicateSummary}；最終納入 ${Number(report.included_count || 0).toLocaleString()} 筆</div>
-        <div class="indicators-chart" data-indicators-chart="${reportIndex}" role="img" aria-label="${escapeHtml(cancerName)}監測指標圖"></div>
-        <div class="indicators-chart-caption">圖、${escapeHtml(startSelect.value)}–${escapeHtml(endSelect.value)} 年${escapeHtml(cancerName)}監測指標</div>
-      </div>`;
+        <div class="indicators-chart-heading">
+          <div class="indicators-chart-title">${escapeHtml(startSelect.value)}–${escapeHtml(endSelect.value)}年${escapeHtml(cancerName)}監測指標分析圖</div>
+          <div class="indicators-chart-source">資料來源：癌症登記資料庫</div>
+        </div>
+        <div class="indicators-chart" data-indicators-chart="${reportIndex}" role="img" aria-label="${escapeHtml(cancerName)}監測指標分析圖"></div>
+        <div class="indicators-chart-caption">
+          <div>圖、${escapeHtml(startSelect.value)}–${escapeHtml(endSelect.value)}年${escapeHtml(cancerName)}監測指標分析圖</div>
+          <div class="text-muted fw-normal" style="font-size: 0.85em;">資料來源：癌症登記資料庫</div>
+        </div>
+      </div></div>`;
     }).join('');
     preview.className = 'indicators-result';
-    preview.innerHTML = content;
+    preview.innerHTML = `${tabs}${panels}`;
     renderIndicatorCharts(reports);
+    const activateCancer = (cancerKey) => {
+      activePreviewCancerKey = cancerKey;
+      preview.querySelectorAll('[data-indicators-cancer-tab]').forEach((button) => {
+        const active = button.dataset.indicatorsCancerTab === cancerKey;
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-selected', active ? 'true' : 'false');
+      });
+      preview.querySelectorAll('[data-indicators-cancer-panel]').forEach((panel) => {
+        panel.classList.toggle('d-none', panel.dataset.indicatorsCancerPanel !== cancerKey);
+      });
+      window.requestAnimationFrame(() => indicatorChartInstances.forEach(chart => chart.resize()));
+    };
+    preview.querySelectorAll('[data-indicators-cancer-tab]').forEach((button) => {
+      button.addEventListener('click', () => activateCancer(button.dataset.indicatorsCancerTab));
+    });
+    if (activePreviewCancerKey) activateCancer(activePreviewCancerKey);
   };
 
   const generateIndicatorsPreview = async () => {
