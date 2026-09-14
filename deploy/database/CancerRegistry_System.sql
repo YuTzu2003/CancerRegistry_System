@@ -16990,3 +16990,90 @@ ALTER TABLE [dbo].[LLMTaskWorker]  WITH CHECK ADD  CONSTRAINT [CK_LLMTaskWorker_
 GO
 ALTER TABLE [dbo].[LLMTaskWorker] CHECK CONSTRAINT [CK_LLMTaskWorker_TaskType]
 GO
+
+/* Email binding, password recovery, and audit-log schema supplement (2026-09-15). */
+/* This section is idempotent and may be run after restoring an older backup. */
+GO
+
+IF COL_LENGTH('dbo.Users', 'Email') IS NULL
+    ALTER TABLE dbo.Users ADD Email NVARCHAR(254) NULL;
+GO
+IF COL_LENGTH('dbo.Users', 'EmailVerifiedAt') IS NULL
+    ALTER TABLE dbo.Users ADD EmailVerifiedAt DATETIME2 NULL;
+GO
+IF COL_LENGTH('dbo.Users', 'EmailPromptDismissedAt') IS NULL
+    ALTER TABLE dbo.Users ADD EmailPromptDismissedAt DATETIME2 NULL;
+GO
+UPDATE dbo.Users SET Email = NULL WHERE LTRIM(RTRIM(ISNULL(Email, ''))) = '';
+GO
+IF NOT EXISTS (
+    SELECT 1 FROM sys.indexes
+    WHERE object_id = OBJECT_ID('dbo.Users') AND name = 'UX_Users_Email_NotNull'
+)
+    CREATE UNIQUE INDEX UX_Users_Email_NotNull
+    ON dbo.Users (Email)
+    WHERE Email IS NOT NULL;
+GO
+IF NOT EXISTS (
+    SELECT 1 FROM sys.indexes
+    WHERE object_id = OBJECT_ID('dbo.Users') AND name = 'UQ_Users_ID'
+)
+    CREATE UNIQUE INDEX UQ_Users_ID ON dbo.Users (ID);
+GO
+
+IF OBJECT_ID('dbo.AccountVerificationCodes', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.AccountVerificationCodes (
+        VerificationCodeID UNIQUEIDENTIFIER NOT NULL
+            CONSTRAINT PK_AccountVerificationCodes PRIMARY KEY DEFAULT NEWID(),
+        UserID UNIQUEIDENTIFIER NOT NULL,
+        Email NVARCHAR(254) NOT NULL,
+        Purpose NVARCHAR(32) NOT NULL,
+        CodeSalt CHAR(32) NOT NULL,
+        CodeHash CHAR(64) NOT NULL,
+        CreatedAt DATETIME2 NOT NULL
+            CONSTRAINT DF_AccountVerificationCodes_CreatedAt DEFAULT GETDATE(),
+        ExpiresAt DATETIME2 NOT NULL,
+        ConsumedAt DATETIME2 NULL,
+        InvalidatedAt DATETIME2 NULL,
+        AttemptCount INT NOT NULL
+            CONSTRAINT DF_AccountVerificationCodes_AttemptCount DEFAULT 0,
+        CONSTRAINT FK_AccountVerificationCodes_Users
+            FOREIGN KEY (UserID) REFERENCES dbo.Users(ID),
+        CONSTRAINT CK_AccountVerificationCodes_Purpose
+            CHECK (Purpose IN ('EMAIL_BIND', 'PASSWORD_RESET')),
+        CONSTRAINT CK_AccountVerificationCodes_AttemptCount CHECK (AttemptCount >= 0)
+    );
+END;
+GO
+IF NOT EXISTS (
+    SELECT 1 FROM sys.indexes
+    WHERE object_id = OBJECT_ID('dbo.AccountVerificationCodes')
+      AND name = 'IX_AccountVerificationCodes_Active'
+)
+    CREATE INDEX IX_AccountVerificationCodes_Active
+    ON dbo.AccountVerificationCodes (UserID, Purpose, CreatedAt DESC)
+    INCLUDE (Email, ExpiresAt, ConsumedAt, InvalidatedAt, AttemptCount);
+GO
+
+/* Audit_logs is used for login-rate protection and the administrator activity history. */
+IF NOT EXISTS (
+    SELECT 1 FROM sys.key_constraints
+    WHERE parent_object_id = OBJECT_ID('dbo.Audit_logs') AND type = 'PK'
+)
+    ALTER TABLE dbo.Audit_logs ADD CONSTRAINT PK_Audit_logs PRIMARY KEY (LogID);
+GO
+IF NOT EXISTS (
+    SELECT 1 FROM sys.indexes
+    WHERE object_id = OBJECT_ID('dbo.Audit_logs') AND name = 'IX_Audit_logs_LoginRate'
+)
+    CREATE INDEX IX_Audit_logs_LoginRate
+    ON dbo.Audit_logs ([Action], Remote_addr, CreatedAt);
+GO
+IF NOT EXISTS (
+    SELECT 1 FROM sys.indexes
+    WHERE object_id = OBJECT_ID('dbo.Audit_logs') AND name = 'IX_Audit_logs_Recent'
+)
+    CREATE INDEX IX_Audit_logs_Recent
+    ON dbo.Audit_logs (CreatedAt DESC);
+GO

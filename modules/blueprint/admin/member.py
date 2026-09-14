@@ -1,5 +1,6 @@
 import datetime
 import json
+import logging
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from modules.services.db import get_conn
 from modules.services.audit import write_audit_log
@@ -82,13 +83,28 @@ def admin_save_user():
 @login_required
 @admin_required
 def admin_delete_user(user_id):
+    """Delete a user and their one-time verification codes as one transaction."""
     conn = get_conn()
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM [dbo].[Users] WHERE [ID]=?", (user_id,))
-    deleted = cursor.rowcount
-    conn.commit()
-    conn.close()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            IF OBJECT_ID(N'dbo.AccountVerificationCodes', N'U') IS NOT NULL
+                DELETE FROM dbo.AccountVerificationCodes WHERE UserID = ?
+        """, (user_id,))
+        cursor.execute("DELETE FROM [dbo].[Users] WHERE [ID] = ?", (user_id,))
+        deleted = cursor.rowcount
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        logging.exception("Unable to delete user %s", user_id)
+        flash("使用者刪除失敗，請確認此帳號是否仍被其他資料使用。", "danger")
+        return redirect(url_for("member.member"))
+    finally:
+        conn.close()
+
     if deleted:
         write_audit_log("member_member_delete", {"target_user_id": user_id})
-    flash("使用者已成功刪除", "success")
+        flash("使用者已成功刪除", "success")
+    else:
+        flash("查無指定使用者，未進行刪除。", "warning")
     return redirect(url_for("member.member"))
