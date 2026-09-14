@@ -56,8 +56,8 @@ def check_llm_readiness() -> None:
             max_tokens=1,
             timeout=min(settings.timeout_seconds, 30),
         )
-        if not response.choices or not response.choices[0].message.content:
-            raise ValueError("Ollama readiness response is empty")
+        if not response.choices:
+            raise ValueError("Ollama readiness response has no completion choices")
 
 
 def request_llm_chat(messages: Sequence[Mapping[str, str]], *, temperature: float) -> str:
