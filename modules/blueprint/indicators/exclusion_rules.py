@@ -146,7 +146,7 @@ def apply_global_indicators_exclusions(dataframe: pd.DataFrame, *, is_hospital_s
         "case_class": _find_column(audit.columns, "2.3", ("class", "個案分類")),
         "diagnosis_status": _find_column(audit.columns, "2.3.1", ("診斷狀態分類",)),
         "treatment_status": _find_column(audit.columns, "2.3.2", ("治療狀態分類",)),
-        "hospital": _find_column(audit.columns, None, ("醫院代碼", "hospital code")),
+        "hospital": _find_column(audit.columns, "1.1", ("申報醫院代碼", "醫院代碼", "hospital code")),
         "identity": _find_column(audit.columns, "1.4", ("身分證", "身分證字號", "identity")),
         "medical_record": _find_column(audit.columns, "1.2", ("病歷號", "medical record")),
         "diagnosis_date": _find_column(audit.columns, "2.5", ("最初診斷日期", "didiag")),
@@ -167,6 +167,33 @@ def apply_global_indicators_exclusions(dataframe: pd.DataFrame, *, is_hospital_s
         eligible = audit[class_col].map(_clean_code).isin(ELIGIBLE_CASE_CLASSES)
         audit.loc[~eligible, "監測模組納入統計"] = False
         audit.loc[~eligible, "監測模組排除原因"] = "個案分類非 class 1、2"
+
+    # 同院、同癌別、同身分證只保留一筆。此函式每次只處理單一癌別，
+    # 因此群組鍵只需要醫院代碼與身分證；缺少必要欄位時不推測結果。
+    duplicate_exclusion_count = None
+    hospital_col = columns["hospital"]
+    identity_col = columns["identity"]
+    if hospital_col and identity_col:
+        eligible_indexes = audit.index[audit["監測模組納入統計"]]
+        duplicate_keys = pd.DataFrame({
+            "hospital": audit.loc[eligible_indexes, hospital_col].map(_clean_code),
+            "identity": audit.loc[eligible_indexes, identity_col].map(_clean_code),
+        }, index=eligible_indexes)
+        complete_keys = duplicate_keys["hospital"].ne("") & duplicate_keys["identity"].ne("")
+        duplicate_indexes = []
+        for _, group in duplicate_keys.loc[complete_keys].groupby(["hospital", "identity"], sort=False):
+            row_indexes = list(group.index)
+            if len(row_indexes) < 2:
+                continue
+            ordered = sorted(row_indexes, key=lambda index: _duplicate_sort_key(audit.loc[index], columns))
+            duplicate_indexes.extend(ordered[1:])
+
+        duplicate_exclusion_count = len(duplicate_indexes)
+        if duplicate_indexes:
+            audit.loc[duplicate_indexes, "監測模組納入統計"] = False
+            audit.loc[duplicate_indexes, "監測模組排除原因"] = "同院重複個案"
+        if not complete_keys.all():
+            warnings.append("部分個案缺少申報醫院代碼或身分證，未納入同院重複個案判定。")
 
     # Cross-hospital treatment exclusions are applied after class filtering.
     diagnosis_col = columns["diagnosis_status"]
@@ -190,6 +217,7 @@ def apply_global_indicators_exclusions(dataframe: pd.DataFrame, *, is_hospital_s
         "included_count": int(len(included)),
         "excluded_count": int(len(audit) - len(included)),
         "excluded_by_reason": dict(excluded_counts),
+        "duplicate_exclusion_count": duplicate_exclusion_count,
         "warnings": warnings,
     }
     return included, audit, summary

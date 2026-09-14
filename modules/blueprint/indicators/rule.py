@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any
 
-from indicators import INDICATOR_RULES
+from modules.blueprint.indicators.cancer_indicator import CANCER_BASE_RULES, INDICATOR_RULES
 
 Record = dict[str, Any]
 RuleConfig = dict[str, Any]
@@ -56,6 +56,15 @@ def normalize_text(value: Any) -> str | None:
     return text or None
 
 
+def normalize_code(value: Any) -> str | None:
+    """統一癌登代碼格式，例如 C54.1、C541 皆轉成 C541。"""
+    text = normalize_text(value)
+    if text is None:
+        return None
+    normalized = "".join(character for character in text if character.isalnum())
+    return normalized or None
+
+
 # ---------------------------------------------------------------------------
 # 通用規則引擎：一般新增指標不需要修改這一段
 # ---------------------------------------------------------------------------
@@ -69,6 +78,9 @@ def evaluate_rule(record: Record, rule: RuleConfig) -> bool:
 
     if operation == "any":
         return any(evaluate_rule(record, item) for item in rule["rules"])
+
+    if operation == "not":
+        return not evaluate_rule(record, rule["rule"])
 
     if operation == "equals":
         return to_int(record.get(rule["field"])) == to_int(rule["value"])
@@ -86,6 +98,28 @@ def evaluate_rule(record: Record, rule: RuleConfig) -> bool:
         excluded = {normalize_text(item) for item in rule["values"]}
         return value is not None and value not in excluded
 
+    if operation == "code_in":
+        value = normalize_code(record.get(rule["field"]))
+        allowed = {normalize_code(item) for item in rule["values"]}
+        return value is not None and value in allowed
+
+    if operation == "code_prefix_in":
+        value = normalize_code(record.get(rule["field"]))
+        prefixes = [normalize_code(item) for item in rule["values"]]
+        return value is not None and any(
+            prefix is not None and value.startswith(prefix) for prefix in prefixes
+        )
+
+    if operation == "fields_equal":
+        left = normalize_text(record.get(rule["left_field"]))
+        right = normalize_text(record.get(rule["right_field"]))
+        return left is not None and right is not None and left == right
+
+    if operation == "dates_equal":
+        left = parse_date(record.get(rule["left_field"]))
+        right = parse_date(record.get(rule["right_field"]))
+        return left is not None and right is not None and left == right
+
     if operation == "first_char_in":
         value = normalize_text(record.get(rule["field"]))
         allowed = {normalize_text(item) for item in rule["values"]}
@@ -99,6 +133,14 @@ def evaluate_rule(record: Record, rule: RuleConfig) -> bool:
         value = to_int(record.get(rule["field"]))
         return value is not None and value > rule["value"]
 
+    if operation == "greater_than_or_equal":
+        value = to_int(record.get(rule["field"]))
+        return value is not None and value >= rule["value"]
+
+    if operation == "less_than_or_equal":
+        value = to_int(record.get(rule["field"]))
+        return value is not None and value <= rule["value"]
+
     if operation == "not_in":
         value = to_int(record.get(rule["field"]))
         excluded = {to_int(item) for item in rule["values"]}
@@ -111,6 +153,15 @@ def evaluate_rule(record: Record, rule: RuleConfig) -> bool:
         start_date = parse_date(record.get(rule["start_field"]))
         end_date = parse_date(record.get(rule["end_field"]))
         return start_date is not None and end_date is not None and end_date > start_date
+
+    if operation == "date_on_or_after":
+        start_date = parse_date(record.get(rule["start_field"]))
+        end_date = parse_date(record.get(rule["end_field"]))
+        return start_date is not None and end_date is not None and end_date >= start_date
+
+    if operation == "date_year_between":
+        value = parse_date(record.get(rule["field"]))
+        return value is not None and rule["min"] <= value.year <= rule["max"]
 
     if operation == "date_interval":
         start_date = parse_date(record.get(rule["start_field"]))
@@ -153,6 +204,31 @@ def evaluate_rule(record: Record, rule: RuleConfig) -> bool:
     raise ValueError(f"不支援的規則運算子：{operation!r}")
 
 
+def is_cancer_eligible(record: Record, cancer_type: str) -> bool:
+    """先套用癌別層級收案規則；未設定基礎規則的既有癌別維持原行為。"""
+    base_rule = CANCER_BASE_RULES.get(cancer_type)
+    return base_rule is None or evaluate_rule(record, base_rule)
+
+
+def is_cancer_candidate(record: Record, cancer_type: str) -> bool:
+    """判斷年度內的癌別母體，個案分類留給共用排除流程統計。"""
+    base_rule = CANCER_BASE_RULES.get(cancer_type)
+    if base_rule is None:
+        return True
+    if base_rule.get("op") != "all":
+        return evaluate_rule(record, base_rule)
+
+    candidate_rule = {
+        **base_rule,
+        "rules": [
+            rule
+            for rule in base_rule.get("rules", [])
+            if rule.get("field") != "case_classification"
+        ],
+    }
+    return evaluate_rule(record, candidate_rule)
+
+
 def evaluate_record(record: Record, cancer_type: str) -> dict[int, dict[str, Any]]:
     """依指定癌別，判斷單筆資料是否符合各指標的分母及分子。"""
     if cancer_type not in INDICATOR_RULES:
@@ -161,9 +237,10 @@ def evaluate_record(record: Record, cancer_type: str) -> dict[int, dict[str, Any
 
     results: dict[int, dict[str, Any]] = {}
     cancer_rules = INDICATOR_RULES[cancer_type]
+    base_eligible = is_cancer_eligible(record, cancer_type)
 
     for indicator_number, indicator in cancer_rules.items():
-        denominator = evaluate_rule(record, indicator["denominator"])
+        denominator = base_eligible and evaluate_rule(record, indicator["denominator"])
         numerator_rule = indicator.get("numerator")
 
         # None 表示目前規格尚未提供分子，不能擅自判定為 False。
@@ -173,7 +250,9 @@ def evaluate_record(record: Record, cancer_type: str) -> dict[int, dict[str, Any
             else denominator and evaluate_rule(record, numerator_rule)
         )
 
-        if numerator is None:
+        if not base_eligible:
+            status = "不符合癌別收案條件"
+        elif numerator is None:
             status = "分子規則尚未定義"
         elif numerator:
             status = "符合分子"
