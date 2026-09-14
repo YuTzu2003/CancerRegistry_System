@@ -23,7 +23,7 @@ LEGACY_DASHBOARD_DATA = os.path.join(BASE_DIR, 'tasks', 'data', 'dashboard')
 os.makedirs(DASHBOARD_DATA, exist_ok=True)
 
 def _dashboard_storage_path(file_id, stored_name):
-    return os.path.join(str(file_id), str(stored_name))
+    return os.path.join('file', str(stored_name))
 
 def _absolute_dashboard_path(storage_path):
     relative_path = str(storage_path or '').replace('\\', '/')
