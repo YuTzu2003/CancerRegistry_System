@@ -99,7 +99,8 @@ $appCmd = Join-Path $env:windir "System32\inetsrv\appcmd.exe"
 if (-not (Test-Path -LiteralPath $appCmd)) { throw "IIS appcmd.exe was not found." }
 $farmConfig = & $appCmd list config /section:webFarms /config:* 2>$null
 if ($LASTEXITCODE -ne 0) { throw "Could not inspect ARR Server Farm configuration." }
-if ($farmConfig -match ("<webFarm name=\"{0}\"" -f [regex]::Escape($farmName))) {
+$farmMarker = '<webFarm name="' + $farmName + '"'
+if ($farmConfig -like "*$farmMarker*") {
     Write-Host "Updating existing ARR Server Farm $farmName."
 }
 & $appCmd set config -section:webFarms ("/-`"[name='{0}']`"" -f $farmName) /commit:apphost 2>$null | Out-Null
