@@ -10,6 +10,11 @@ from docx.enum.section import WD_ORIENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from playwright.sync_api import sync_playwright
 
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+os.environ["PLAYWRIGHT_BROWSERS_PATH"] = os.path.join(
+    PROJECT_ROOT, "tasks", "playwright-browsers"
+)
+
 def _split_tall_chart_at_blank_rows(image_bytes, max_height_ratio=0.62):
     image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
     max_chunk_height = max(1, int(image.width * max_height_ratio))
