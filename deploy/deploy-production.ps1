@@ -1,3 +1,7 @@
+param(
+    [switch]$InitializeDatabase
+)
+
 $ErrorActionPreference = "Stop"
 $firewallRuleName = "Cancer Registry System HTTP"
 $projectRoot = Split-Path -Parent $PSScriptRoot
@@ -80,10 +84,19 @@ if ($databaseUri -match 'ODBC\+Driver\+18' -and -not $driver18) { throw "SQLALCH
 if ($databaseUri -match 'ODBC\+Driver\+17' -and -not $driver17) { throw "SQLALCHEMY_DATABASE_URI requires ODBC Driver 17, but it is not installed." }
 
 Set-Location -LiteralPath $projectRoot
+Write-Host "Phase: synchronizing Python dependencies."
 & uv sync
 if ($LASTEXITCODE -ne 0) { throw "uv sync failed." }
 Test-DatabaseConnection
+if ($InitializeDatabase) {
+    Write-Host "Phase: stopping any existing Cancer Registry worker tasks before database initialization."
+    & (Join-Path $PSScriptRoot "stop-production.ps1")
+    Write-Host "Phase: initializing the empty SQL Server database."
+    & (Join-Path $projectRoot ".venv\Scripts\python.exe") .\deploy\init_database.py
+    if ($LASTEXITCODE -ne 0) { throw "Database initialization failed. IIS has not been changed." }
+}
 
+Write-Host "Phase: configuring IIS, ARR, static files, and the firewall rule."
 & (Join-Path $PSScriptRoot "prepare-iis.ps1")
 & (Join-Path $PSScriptRoot "configure-iis.ps1") -PublicPort $publicPort
 
@@ -98,6 +111,7 @@ else {
     New-NetFirewallRule -DisplayName $firewallRuleName -Direction Inbound -Protocol TCP -LocalPort $publicPort -Action Allow | Out-Null
 }
 
+Write-Host "Phase: registering and starting Web and LLM worker tasks."
 & (Join-Path $PSScriptRoot "stop-production.ps1")
 & (Join-Path $PSScriptRoot "register-autostart.ps1")
 Get-ScheduledTask -TaskName "CancerRegistrySystem-??" -ErrorAction Stop | ForEach-Object { Start-ScheduledTask -TaskName $_.TaskName }
@@ -121,6 +135,7 @@ if (-not $allHealthy) { throw "One or more Waitress workers did not become ready
 if (-not (Test-Health "http://127.0.0.1:${publicPort}/health")) { throw "IIS + ARR did not become ready on public port $publicPort." }
 if (@(Get-ScheduledTask -TaskName "CancerRegistrySystem-LLM-??" -ErrorAction Stop).Count -ne $llmWorkerCount) { throw "Not every LLM worker scheduled task was registered." }
 Test-DatabaseConnection
+Write-Host "Phase: checking the LLM provider."
 & (Join-Path $projectRoot ".venv\Scripts\python.exe") .\deploy\check_llm_readiness.py
 if ($LASTEXITCODE -ne 0) { throw "LLM provider readiness failed. Read tasks\\logs\\cancer-registry-llm-*.log" }
 
