@@ -1,7 +1,9 @@
+"""Authentication, account email binding, and password recovery routes."""
+from __future__ import annotations
+
 import datetime
 import hashlib
 import hmac
-import json
 import logging
 import os
 import re
@@ -9,7 +11,10 @@ import secrets
 from functools import wraps
 
 from flask import Blueprint, flash, jsonify, redirect, render_template, request, session, url_for
+from werkzeug.security import check_password_hash, generate_password_hash
 
+from modules.config import BaseConfig
+from modules.services.audit import write_audit_log
 from modules.services.db import get_conn
 from .email_verification import email_verification_enabled, send_verification_code
 
@@ -38,26 +43,22 @@ def _normalize_email(value):
     return email if EMAIL_PATTERN.fullmatch(email) else ''
 
 
-def login_log(user_id, ip, success, reason=''):
-    log_dir = 'tasks/cache'
-    os.makedirs(log_dir, exist_ok=True)
-    log_entry = {
-        'userid': user_id,
-        'ip': ip,
-        'login_time': datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S'),
-        'success': success,
-        'reason': reason,
-    }
-    with open(f'{log_dir}/login_logs.json', 'a', encoding='utf-8') as handle:
-        handle.write(json.dumps(log_entry, ensure_ascii=False) + '\n')
-from modules.services.audit import write_audit_log
-from modules.config import BaseConfig
-from werkzeug.security import check_password_hash, generate_password_hash
-
-auth_bp = Blueprint('auth', __name__, template_folder='../blueprint/auth/templates')
-
 def password_matches(stored_password, password):
-    return check_password_hash(stored_password, password)
+    """Compare a submitted password to the application's stored password hash."""
+    try:
+        return check_password_hash(str(stored_password or ''), str(password or ''))
+    except (TypeError, ValueError):
+        return False
+
+
+def _wants_json_response():
+    return (
+        request.path.startswith('/api/')
+        or request.path.startswith('/dashboard/upload')
+        or request.path.startswith('/dashboard/delete')
+        or request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+        or 'application/json' in request.headers.get('Accept', '')
+    )
 
 
 def _login_rate_limited(remote_addr):
@@ -65,39 +66,53 @@ def _login_rate_limited(remote_addr):
     try:
         conn = get_conn()
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM dbo.Audit_logs WHERE [Action] = ? AND [Remote_addr] = ? AND [CreatedAt] >= DATEADD(second, ?, SYSDATETIMEOFFSET())", ("auth_login_failed", remote_addr or "", -BaseConfig.LOGIN_ATTEMPT_WINDOW_SECONDS))
+        cursor.execute(
+            "SELECT COUNT(*) FROM dbo.Audit_logs "
+            "WHERE [Action] = ? AND [Remote_addr] = ? "
+            "AND [CreatedAt] >= DATEADD(second, ?, SYSDATETIMEOFFSET())",
+            ('auth_login_failed', remote_addr or '', -BaseConfig.LOGIN_ATTEMPT_WINDOW_SECONDS),
+        )
         row = cursor.fetchone()
         return bool(row and int(row[0]) >= BaseConfig.LOGIN_MAX_ATTEMPTS)
     except Exception:
-        logging.exception("Unable to check login rate limit")
+        logging.exception('Unable to check login rate limit')
         return False
     finally:
-        conn.close()
+        if conn is not None:
+            conn.close()
+
 
 def current_session_user():
-    user_id = session.get("id")
+    """Refresh the session user from the database and invalidate stale sessions."""
+    user_id = session.get('id')
     if not user_id:
         return None
     conn = get_conn()
-    cursor = conn.cursor()
-    cursor.execute("SELECT [ID], [UserID], [Name], [Position], [Location] FROM [dbo].[Users] WHERE [ID] = ?",(user_id,),)
-    user = cursor.fetchone()
-    conn.close()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            'SELECT [ID], [UserID], [Name], [Position], [Location] '
+            'FROM [dbo].[Users] WHERE [ID] = ?',
+            (user_id,),
+        )
+        user = cursor.fetchone()
+    finally:
+        conn.close()
     if not user:
         session.clear()
         return None
-    session["userid"] = user.UserID
-    session["name"] = user.Name
-    session["position"] = user.Position
-    session["location"] = user.Location
+    session['userid'] = user.UserID
+    session['name'] = user.Name
+    session['position'] = user.Position
+    session['location'] = user.Location
     return user
+
 
 def login_required(func):
     @wraps(func)
     def decorated_function(*args, **kwargs):
-        if 'id' not in session:
-            if (request.path.startswith('/api/') or request.headers.get('X-Requested-With') == 'XMLHttpRequest'
-                    or 'application/json' in request.headers.get('Accept', '')):
+        if not current_session_user():
+            if _wants_json_response():
                 return jsonify({'ok': False, 'error': '請先登入系統'}), 401
             return redirect(url_for('auth.login'))
         return func(*args, **kwargs)
@@ -107,8 +122,9 @@ def login_required(func):
 def admin_required(func):
     @wraps(func)
     def decorated_function(*args, **kwargs):
-        if session.get('position') != 'Admin':
-            if request.path.startswith('/api/') or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        user = current_session_user()
+        if not user or user.Position != 'Admin':
+            if _wants_json_response():
                 return jsonify({'ok': False, 'error': '權限不足，需要管理員權限'}), 403
             flash('權限不足，無法存取此頁面', 'danger')
             return redirect(url_for('index'))
@@ -119,10 +135,12 @@ def admin_required(func):
 def _fetch_user(*, user_id=None, db_id=None):
     if not user_id and not db_id:
         return None
-    query = '''
+    where_clause = '[UserID] = ?' if user_id else '[ID] = ?'
+    query = f'''
         SELECT [ID], [UserID], [Password], [Name], [Position], [Location],
                [Email], [EmailVerifiedAt], [EmailPromptDismissedAt]
-        FROM dbo.Users WHERE ''' + ('[UserID] = ?' if user_id else '[ID] = ?')
+        FROM dbo.Users WHERE {where_clause}
+    '''
     conn = get_conn()
     try:
         cursor = conn.cursor()
@@ -130,75 +148,9 @@ def _fetch_user(*, user_id=None, db_id=None):
         row = cursor.fetchone()
         if not row:
             return None
-        columns = [column[0] for column in cursor.description]
-        return dict(zip(columns, row))
+        return dict(zip([column[0] for column in cursor.description], row))
     finally:
         conn.close()
-        if not current_session_user():
-            if (request.path.startswith('/api/') or 
-                request.path.startswith('/dashboard/upload') or 
-                request.path.startswith('/dashboard/delete') or
-                request.headers.get('X-Requested-With') == 'XMLHttpRequest' or
-                'application/json' in request.headers.get('Accept', '')):
-                return jsonify({"ok": False, "error": "請先登入系統"}), 401
-            return redirect(url_for("auth.login"))
-        return f(*args, **kwargs)
-    return decorated_function
-
-# ---- 管理員權限驗證 ----
-def admin_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        user = current_session_user()
-        if not user or user.Position != "Admin":
-            if (request.path.startswith('/api/') or 
-                request.path.startswith('/dashboard/upload') or 
-                request.path.startswith('/dashboard/delete') or
-                request.headers.get('X-Requested-With') == 'XMLHttpRequest' or
-                'application/json' in request.headers.get('Accept', '')):
-                return jsonify({"ok": False, "error": "權限不足，需要管理員權限"}), 403
-            flash("權限不足，無法存取此頁面", "danger")
-            return redirect(url_for("index"))
-        return f(*args, **kwargs)
-    return decorated_function
-
-@auth_bp.route("/login", methods=["GET", "POST"])
-def login():
-    if "id" in session: 
-        return redirect(url_for("index"))    
-    if request.method == "POST":
-        user_id = request.form["userid"]
-        password = request.form["password"]
-        if _login_rate_limited(request.remote_addr):
-            return render_template("login.html", error="登入嘗試次數過多，請稍後再試。"), 429
-        conn = get_conn()
-        cursor = conn.cursor()
-        cursor.execute("SELECT [ID], [UserID], [Password], [Name], [Position], [Location] FROM [dbo].[Users] WHERE UserID = ?", (user_id,))
-        user = cursor.fetchone()
-        
-        if user:
-            password_valid = password_matches(user.Password, password)
-        else:
-            password_valid = False
-
-        if password_valid:
-            logging.info(f"使用者 {user_id} 登入成功")
-            session.clear()
-            session.permanent = True
-            session["id"] = str(user.ID)
-            session["userid"] = user.UserID
-            session["name"] = user.Name
-            session["position"] = user.Position
-            session["location"] = user.Location
-            cursor.execute("UPDATE [dbo].[Users] SET Last_login = GETDATE() WHERE ID = ?", (user.ID,))
-            conn.commit()
-            conn.close()
-            write_audit_log("auth_login_success", {"login_id": user.UserID, "status": "success"}, user_id=str(user.ID), remote_addr=request.remote_addr)
-            return redirect("/")          
-        conn.close()
-        write_audit_log("auth_login_failed", {"login_id": user_id, "status": "failed", "reason": "password_or_account_incorrect"}, remote_addr=request.remote_addr)
-        return render_template("login.html", error="帳號或密碼錯誤")
-    return render_template("login.html")
 
 
 def _hash_code(code, salt, user_db_id, purpose):
@@ -255,7 +207,7 @@ def _issue_code(user, email, purpose):
     if delivered:
         return True, message
 
-    # The code must not remain usable when delivery failed.
+    # A code is never usable if the message could not be delivered.
     conn = get_conn()
     try:
         cursor = conn.cursor()
@@ -343,39 +295,51 @@ def _set_email(user_id, email=None, *, dismissed=False):
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
-    if 'id' in session:
+    if current_session_user():
         return redirect(url_for('index'))
     if request.method == 'POST':
         user_id = request.form.get('userid', '').strip()
         password = request.form.get('password', '')
+        if _login_rate_limited(request.remote_addr):
+            return render_template('login.html', error='登入嘗試次數過多，請稍後再試。'), 429
+
         user = _fetch_user(user_id=user_id)
-        if user and hmac.compare_digest(str(user['Password'] or ''), password):
-            logging.info('User %s logged in.', user_id)
-            login_log(user_id, request.remote_addr, True, '登入成功')
-            session['id'] = str(user['ID'])
-            session['userid'] = user['UserID']
-            session['name'] = user['Name']
-            session['position'] = user['Position']
-            session['location'] = user['Location']
-            conn = get_conn()
-            try:
-                cursor = conn.cursor()
-                cursor.execute('UPDATE dbo.Users SET Last_login = GETDATE() WHERE ID = ?', (str(user['ID']),))
-                conn.commit()
-            finally:
-                conn.close()
-            if (_feature_enabled() and user['Position'] != 'Admin' and not user['Email']
-                    and not user['EmailPromptDismissedAt']):
-                return redirect(url_for('auth.email_binding_prompt'))
-            return redirect(url_for('index'))
-        login_log(user_id, request.remote_addr, False, '帳號或密碼錯誤')
-        return render_template('login.html', error='帳號或密碼錯誤')
+        if not user or not password_matches(user['Password'], password):
+            write_audit_log(
+                'auth_login_failed',
+                {'login_id': user_id, 'status': 'failed', 'reason': 'password_or_account_incorrect'},
+                remote_addr=request.remote_addr,
+            )
+            return render_template('login.html', error='帳號或密碼錯誤')
+
+        session.clear()
+        session.permanent = True
+        session['id'] = str(user['ID'])
+        session['userid'] = user['UserID']
+        session['name'] = user['Name']
+        session['position'] = user['Position']
+        session['location'] = user['Location']
+        conn = get_conn()
+        try:
+            cursor = conn.cursor()
+            cursor.execute('UPDATE dbo.Users SET Last_login = GETDATE() WHERE ID = ?', (str(user['ID']),))
+            conn.commit()
+        finally:
+            conn.close()
+        write_audit_log(
+            'auth_login_success', {'login_id': user['UserID'], 'status': 'success'},
+            user_id=str(user['ID']), remote_addr=request.remote_addr,
+        )
+        if (_feature_enabled() and user['Position'] != 'Admin' and not user['Email']
+                and not user['EmailPromptDismissedAt']):
+            return redirect(url_for('auth.email_binding_prompt'))
+        return redirect(url_for('index'))
     return render_template('login.html')
 
 
 @auth_bp.route('/logout')
 def logout():
-    write_audit_log("auth_logout_success", {"result": "success"})
+    write_audit_log('auth_logout_success', {'result': 'success'}, user_id=session.get('id'), remote_addr=request.remote_addr)
     session.clear()
     return redirect(url_for('auth.login'))
 
@@ -403,7 +367,7 @@ def account_email():
                     flash(message, 'success')
                 else:
                     flash(message, 'danger')
-            return redirect(url_for('auth.account_email'))
+            return redirect(url_for('auth.profile'))
 
         if action == 'verify_bind':
             email = session.get('pending_bind_email', '')
@@ -416,22 +380,19 @@ def account_email():
                 if valid:
                     _set_email(user['ID'], email)
                     session.pop('pending_bind_email', None)
-                    flash('Email 已完成綁定。', 'success')
+                    session['email_binding_complete'] = True
                 else:
                     flash(message, 'danger')
-            return redirect(url_for('auth.account_email'))
+            return redirect(url_for('auth.profile'))
 
         if action == 'cancel_bind':
             _set_email(user['ID'], dismissed=True)
             session.pop('pending_bind_email', None)
             flash('已取消 Email 綁定。', 'success')
-            return redirect(url_for('auth.account_email'))
+            return redirect(url_for('auth.profile'))
 
-    return render_template(
-        'account_email.html', active='account_email', user=user,
-        pending_email=session.get('pending_bind_email', ''),
-        email_enabled=email_verification_enabled(),
-    )
+    return redirect(url_for('auth.profile'))
+
 
 
 @auth_bp.route('/account/email/prompt', methods=['GET', 'POST'])
@@ -444,9 +405,11 @@ def email_binding_prompt():
         action = request.form.get('action')
         if action == 'dismiss':
             _set_email(user['ID'], dismissed=True)
-            flash('已記錄設定；之後仍可從帳號 Email 設定頁綁定。', 'info')
+            flash('已記錄設定；之後仍可從「我的資訊」頁綁定。', 'info')
             return redirect(url_for('index'))
-        return redirect(url_for('auth.account_email'))
+        if action == 'later':
+            return redirect(url_for('index'))
+        return redirect(url_for('auth.profile'))
     return render_template('email_binding_prompt.html', active='account_email', email_enabled=email_verification_enabled())
 
 
@@ -483,8 +446,8 @@ def reset_password():
     if request.method == 'POST':
         password = request.form.get('password', '')
         confirm_password = request.form.get('confirm_password', '')
-        if len(password) < 8:
-            flash('新密碼至少需 8 個字元。', 'danger')
+        if not password:
+            flash('請輸入新密碼。', 'danger')
         elif password != confirm_password:
             flash('兩次輸入的新密碼不一致。', 'danger')
         else:
@@ -493,50 +456,53 @@ def reset_password():
                 conn = get_conn()
                 try:
                     cursor = conn.cursor()
-                    cursor.execute('UPDATE dbo.Users SET Password = ? WHERE ID = ?', (password, str(user['ID'])))
+                    cursor.execute(
+                        'UPDATE dbo.Users SET Password = ? WHERE ID = ?',
+                        (generate_password_hash(password), str(user['ID'])),
+                    )
                     conn.commit()
                 finally:
                     conn.close()
                 session.pop('password_reset_user_id', None)
+                write_audit_log('auth_password_reset', {'login_id': user['UserID']}, user_id=str(user['ID']), remote_addr=request.remote_addr)
                 flash('密碼已重設，請使用新密碼登入。', 'success')
                 return redirect(url_for('auth.login'))
             flash(message, 'danger')
     return render_template('reset_password.html', userid=user['UserID'])
-    return redirect("/")
 
-@auth_bp.route("/profile", methods=["GET", "POST"])
+
+@auth_bp.route('/profile', methods=['GET', 'POST'])
 @login_required
 def profile():
-    user = {
-        "ID": session["id"],
-        "UserID": session["userid"],
-        "Name": session["name"],
-        "Position": session["position"],
-        "Location": session["location"],
-    }
-    if request.method == "POST":
-        current_password = request.form.get("current_password", "")
-        new_password = request.form.get("new_password", "")
-        confirm_password = request.form.get("confirm_password", "")
-
+    user = _fetch_user(db_id=session['id'])
+    if not user:
+        session.clear()
+        return redirect(url_for('auth.login'))
+    if request.method == 'POST':
+        current_password = request.form.get('current_password', '')
+        new_password = request.form.get('new_password', '')
+        confirm_password = request.form.get('confirm_password', '')
         if not current_password or not new_password:
-            flash("請輸入目前密碼與新密碼", "danger")
+            flash('請輸入目前密碼與新密碼', 'danger')
         elif new_password != confirm_password:
-            flash("新密碼與確認密碼不一致", "danger")
-        elif len(new_password) < 8:
-            flash("新密碼至少需要 8 個字元", "danger")
+            flash('新密碼與確認密碼不一致', 'danger')
         else:
             conn = get_conn()
-            cursor = conn.cursor()
-            cursor.execute("SELECT [Password] FROM [dbo].[Users] WHERE [ID] = ?", (user["ID"],))
-            password_row = cursor.fetchone()
-            password_valid = password_matches(password_row.Password, current_password) if password_row else False
-            if password_valid:
-                cursor.execute("UPDATE [dbo].[Users] SET [Password] = ? WHERE [ID] = ?", (generate_password_hash(new_password), user["ID"]))
-                conn.commit()
-                write_audit_log("auth_profile_password_changed", {"target_user": user["UserID"]})
-                flash("密碼已更新", "success")
-            else:
-                flash("目前密碼不正確", "danger")
-            conn.close()
-    return render_template("profile.html", active="auth.profile", user=user)
+            try:
+                cursor = conn.cursor()
+                cursor.execute('SELECT [Password] FROM [dbo].[Users] WHERE [ID] = ?', (user['ID'],))
+                password_row = cursor.fetchone()
+                password_valid = password_matches(password_row.Password, current_password) if password_row else False
+                if password_valid:
+                    cursor.execute(
+                        'UPDATE [dbo].[Users] SET [Password] = ? WHERE [ID] = ?',
+                        (generate_password_hash(new_password), user['ID']),
+                    )
+                    conn.commit()
+                    write_audit_log('auth_profile_password_changed', {'target_user': user['UserID']}, user_id=str(user['ID']), remote_addr=request.remote_addr)
+                    flash('密碼已更新', 'success')
+                else:
+                    flash('目前密碼不正確', 'danger')
+            finally:
+                conn.close()
+    return render_template('profile.html', active='auth.profile', user=user, pending_email=session.get('pending_bind_email', ''), email_enabled=email_verification_enabled(), email_binding_complete=session.pop('email_binding_complete', False))

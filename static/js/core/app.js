@@ -18,7 +18,7 @@
 
   // Auto-hide alerts after 2 seconds
   function autoHideAlerts() {
-    const alerts = document.querySelectorAll(".alert");
+    const alerts = document.querySelectorAll(".alert:not(.alert-persistent)");
     alerts.forEach((alert) => {
       setTimeout(() => {
         alert.style.transition = "opacity 0.5s ease";

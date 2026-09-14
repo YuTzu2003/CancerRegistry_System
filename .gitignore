@@ -10,7 +10,7 @@ Jobs/
 .agents
 .hallmark/
 *.egg-info
-
+*.bak
 # Virtual environments
 .venv
 *.lock
