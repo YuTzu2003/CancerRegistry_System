@@ -300,7 +300,7 @@
       el.checked = false;
       el.dispatchEvent(new Event('change'));
     });
-    document.querySelectorAll('.item-checkbox:checked').forEach(el => {
+    document.querySelectorAll('.item-checkbox:checked, .stage-summary-option:checked').forEach(el => {
       el.checked = false;
       el.dispatchEvent(new Event('change'));
     });
@@ -315,17 +315,16 @@
         }
       });
     }
+    const deferredTreatmentIds = [];
     if (preset.sub_category) {
       const subCatIds = preset.sub_category.split(',');
       subCatIds.forEach(id => {
         if (id === 'chkTreatmentStats') {
-          ['chkTreatmentFirstCourse', 'chkTreatmentSurgery'].forEach(treatmentId => {
-            const treatmentItem = document.getElementById(treatmentId);
-            if (treatmentItem) {
-              treatmentItem.checked = true;
-              treatmentItem.dispatchEvent(new Event('change'));
-            }
-          });
+          deferredTreatmentIds.push('chkTreatmentFirstCourse', 'chkTreatmentSurgery');
+          return;
+        }
+        if (id === 'chkTreatmentFirstCourse' || id === 'chkTreatmentSurgery') {
+          deferredTreatmentIds.push(id);
           return;
         }
         const subCat = document.getElementById(id);
@@ -350,6 +349,16 @@
       });
       updateSummary();
     }
+    const treatmentIds = Array.isArray(preset.treatment_options) && preset.treatment_options.length
+      ? preset.treatment_options
+      : deferredTreatmentIds;
+    treatmentIds.forEach(id => {
+      const treatmentItem = document.getElementById(id);
+      if (treatmentItem && !treatmentItem.disabled) {
+        treatmentItem.checked = true;
+        treatmentItem.dispatchEvent(new Event('change'));
+      }
+    });
   });
 
   document.getElementById('btnSavePreset')?.addEventListener('click', function() {
@@ -386,6 +395,10 @@
     }
     const stage_options = Array.from(document.querySelectorAll('.stage-summary-option:checked'))
       .map(input => input.value);
+    const stage_mode = Array.from(document.querySelectorAll('.annual-stage-system-checkbox:checked'))
+      .map(input => input.id);
+    const treatment_options = Array.from(document.querySelectorAll('#subItems-treatment .item-checkbox:checked'))
+      .map(input => input.id);
 
     if (cancers.length === 0) {
       Swal.fire({ icon: 'warning', title: '請先選擇癌別', text: '最愛範本必須包含至少一項癌別設定。', confirmButtonColor: '#2563eb' });
@@ -414,7 +427,7 @@
         fetch('/api/favorites', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, behavior, cancers, main_category, sub_category, stage_options })
+          body: JSON.stringify({ name, behavior, cancers, main_category, sub_category, stage_options, stage_mode, treatment_options })
         })
         .then(r => r.json())
         .then(data => {

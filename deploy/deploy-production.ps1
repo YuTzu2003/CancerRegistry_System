@@ -87,6 +87,13 @@ Set-Location -LiteralPath $projectRoot
 Write-Host "Phase: synchronizing Python dependencies."
 & uv sync
 if ($LASTEXITCODE -ne 0) { throw "uv sync failed." }
+
+$playwrightBrowsersPath = Join-Path $projectRoot "tasks\playwright-browsers"
+$env:PLAYWRIGHT_BROWSERS_PATH = $playwrightBrowsersPath
+Write-Host "Phase: installing the shared Playwright Chromium browser."
+& (Join-Path $projectRoot ".venv\Scripts\python.exe") -m playwright install chromium
+if ($LASTEXITCODE -ne 0) { throw "Playwright Chromium installation failed. Check the server internet connection or proxy settings." }
+
 Test-DatabaseConnection
 if ($InitializeDatabase) {
     Write-Host "Phase: stopping any existing Cancer Registry worker tasks before database initialization."

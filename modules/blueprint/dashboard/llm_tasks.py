@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 import json
+import logging
 import os
 import shutil
 import time
@@ -53,7 +54,12 @@ def _mark_cancelled(task_id):
 
 
 def _clear_cancellation(task_id):
-    _cancel_marker(task_id).unlink(missing_ok=True)
+    marker = _cancel_marker(task_id)
+    marker.unlink(missing_ok=True)
+    try:
+        marker.parent.rmdir()
+    except OSError:
+        pass
 
 
 def _remove_task_directory(task_type, task_id):
@@ -281,6 +287,7 @@ def claim_next_llm_task(worker_id):
         if not row:
             return None
         task_id, task_type = str(row[0]), row[1]
+        logging.info("LLM worker %s claimed %s task %s", worker_id, task_type, task_id)
         return {'task_id': task_id, 'task_type': task_type, 'payload': _read_task_data(task_type, task_id).get('PayloadJson') or {}}
     finally:
         conn.close()
@@ -355,6 +362,7 @@ def process_next_llm_task(worker_id):
     except Exception as exc:
         if _is_cancelled(task_id):
             return {'task_id': task_id, 'status': 'cancelled'}
+        logging.exception("LLM task %s failed", task_id)
         _write(task_type, task_id, 'error.jsonl', {
             'item_id': task_id, 'error_type': type(exc).__name__, 'error': str(exc),
             'traceback': traceback.format_exc(), 'failed_at': datetime.now(timezone.utc).isoformat(),
@@ -410,9 +418,12 @@ def recover_running_llm_tasks():
 
 def run_worker(worker_id=None, poll_seconds=2):
     worker_id = worker_id or f"{os.environ.get('COMPUTERNAME', 'worker')}-{os.getpid()}"
-    recover_running_llm_tasks()
+    recovered = recover_running_llm_tasks()
+    logging.info("LLM worker %s is ready; recovered %s running task(s)", worker_id, recovered)
     while True:
-        process_next_llm_task(worker_id)
+        result = process_next_llm_task(worker_id)
+        if result:
+            logging.info("LLM task %s finished with status %s", result['task_id'], result['status'])
         time.sleep(poll_seconds)
 
 
