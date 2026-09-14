@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}帳戶設定｜癌症資料登記{% endblock %}
+{% block page_title %}帳戶設定{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/auth/profile.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="page-head mb-4">
+  <div>
+    <h1>帳戶設定</h1>
+    <p class="lead">檢視個人資料與管理系統安全性設定</p>
+  </div>
+</div>
+
+<div class="profile-layout-grid">
+  
+  <!-- 左側：個人資料 -->
+  <div class="refined-card">
+    <div class="refined-card-header">
+      <span class="dot" style="background: var(--blue-500); width: 10px; height: 10px; border-radius: 50%; display: inline-block;"></span>
+      <h2>帳號資訊</h2>
+    </div>
+    
+    <div class="profile-hero">
+      <div class="profile-hero-avatar">
+        {{ user.Name[0] if user.Name else 'U' }}
+      </div>
+      <div class="profile-hero-text">
+        <h3>{{ user.Name }}</h3>
+        <p>系統使用者</p>
+      </div>
+    </div>
+
+    <div>
+      <div class="refined-row">
+        <div class="refined-row-label">員工帳號 (ID)</div>
+        <div class="refined-row-value">{{ user.UserID }}</div>
+      </div>
+      <div class="refined-row">
+        <div class="refined-row-label">所屬位置</div>
+        <div class="refined-row-value">{{ user.Location or '未設定' }}</div>
+      </div>
+      <div class="refined-row">
+        <div class="refined-row-label">系統權限</div>
+        <div class="refined-row-value">{{ user.Position }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 右側：登入與安全性 -->
+  <div class="refined-card">
+    <div class="refined-card-header">
+      <span class="dot" style="background: var(--warning); width: 10px; height: 10px; border-radius: 50%; display: inline-block;"></span>
+      <h2>登入與安全性</h2>
+    </div>
+    
+    <form method="post" style="display: flex; flex-direction: column; flex: 1;">
+      <div>
+        <div class="refined-form-row">
+          <label class="refined-form-label" for="current_password">目前密碼</label>
+          <input type="password" id="current_password" name="current_password" class="refined-input" required placeholder="請輸入原密碼" autocomplete="current-password">
+        </div>
+        <div class="refined-form-row">
+          <label class="refined-form-label" for="new_password">新密碼</label>
+          <input type="password" id="new_password" name="new_password" class="refined-input" required minlength="8" placeholder="最少 8 個字元" autocomplete="new-password">
+        </div>
+        <div class="refined-form-row">
+          <label class="refined-form-label" for="confirm_password">確認新密碼</label>
+          <input type="password" id="confirm_password" name="confirm_password" class="refined-input" required minlength="8" placeholder="再次輸入新密碼" autocomplete="new-password">
+        </div>
+      </div>
+      
+      <div class="refined-footer">
+        <button type="submit" class="refined-btn">更新密碼</button>
+      </div>
+    </form>
+  </div>
+
+</div>
+{% endblock %}

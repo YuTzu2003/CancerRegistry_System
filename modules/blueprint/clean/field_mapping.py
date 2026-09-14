@@ -8,7 +8,7 @@ def detect_system(excel_columns):
     systems = ['中文欄位名稱','英文欄位名稱','台大雲林欄位名稱','台大體系醫整庫欄位名稱','台灣癌症登記中心','雲醫癌AI模組']
     columns_sql = ', '.join(f'[{s}]' for s in systems)
 
-    query = f"SELECT [序號], {columns_sql} FROM [Hospital_data].[dbo].[CancerRegistry_FieldMap]"
+    query = f"SELECT [序號], {columns_sql} FROM [CancerRegistry_FieldMap]"
     cursor = conn.cursor()
     cursor.execute(query)
     rows = cursor.fetchall()
@@ -51,7 +51,7 @@ def detect_system(excel_columns):
 
 def field_mapping(target_col):
     conn = get_conn()
-    query = """SELECT * FROM [Hospital_data].[dbo].[CancerRegistry_FieldMap]"""
+    query = """SELECT * FROM [CancerRegistry_FieldMap]"""
     cursor = conn.cursor()
     cursor.execute(query)
     rows = cursor.fetchall()
@@ -114,7 +114,7 @@ def get_field_map(target_scheme_key, fmt_name):
     conn = get_conn()
     clean_fmt = str(fmt_name).replace("fmt_", "")
     query = f"""SELECT [序號],[中文欄位名稱],[英文欄位名稱],[台大雲林欄位名稱],[台大體系醫整庫欄位名稱],[台灣癌症登記中心],[雲醫癌AI模組]
-                FROM [Hospital_data].[dbo].[v_FieldMap_WithFmt]
+                FROM [v_FieldMap_WithFmt]
                 WHERE [{clean_fmt}欄位] = 1"""
     cursor = conn.cursor()
     cursor.execute(query)
@@ -195,7 +195,7 @@ def validate_and_rename_headers(headers, fmt_name):
     clean_fmt = str(fmt_name).replace("fmt_", "")
     query = f"""
         SELECT [序號], [中文欄位名稱], [英文欄位名稱], [台大雲林欄位名稱], [台大體系醫整庫欄位名稱], [台灣癌症登記中心], [雲醫癌AI模組]
-        FROM [Hospital_data].[dbo].[v_FieldMap_WithFmt]
+        FROM [v_FieldMap_WithFmt]
         WHERE [{clean_fmt}欄位] = 1
     """
     cursor = conn.cursor()

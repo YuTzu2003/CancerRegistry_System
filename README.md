@@ -1,55 +1,38 @@
-## 癌症登記資料管理平台
-是一個專為醫療機構設計的癌症登記資料管理系統，透過自動化的資料清洗、年報分析與版本控制，提升申報品質與效率。
+## CancerRegistry_System 癌症登記資料管理平台
+
+專為醫院癌症防治中心與登記團隊設計的整合型資料管理與決策分析平台，主要服務癌症登錄人員、資料管理師、研究分析人員與系統管理者。
+
+串聯癌症登記的作業需求，涵蓋**標準化格式定義、欄位對照維護、資料清洗、邏輯規則校驗與資料品質指標產製**；同時提供**圖表分析、跨年度趨勢比對、報表自動產出及Power BI匯出**功能，並使用 LLM 提供圖表敘述與數據解讀輔助，並具備嚴密的權限角色控管、作業歷程留存與資安稽核機制，協助院內團隊在安全合規的前提下，簡化繁瑣的登錄流程、確保資料高度精確，並加速癌症臨床研究與品質監測應用。
+
+### 主要提供內容
+
+- 帳號、權限申請、管理與稽核。
+- 癌症登記資料格式、欄位對照、組織學代碼與全國資料管理。
+- 登錄資料清洗、日期錯誤修正、品質指標與作業歷程下載。
+- 資料產製、指標監測、儀表板分析、年度與比較報告。
+- Ollama 或 OpenAI 的 LLM 輔助圖表敘述與比較分析。
+- Power BI 發布資料匯出及首頁資訊更新。
+
+完整功能、角色使用方式與系統範圍請見 [系統介紹.md](系統介紹.md)。
+
+
+### 系統部署需求
+
+- **作業系統**：Windows Server 或 Windows 10/11 (64-bit)
+- **核心環境**：Python >= 3.12、[uv](https://github.com/astral-sh/uv) 套件管理器
+- **網頁伺服器**：IIS (搭配 URL Rewrite 2.1 與 ARR 3.0) + Waitress
+- **資料庫**：Microsoft SQL Server (搭配 ODBC Driver 17 或 18)
+- **LLM 服務**：Ollama 或 OpenAI API
 
 ---
 
-### 1. 環境建置與安裝指南
+#### 系統部署與架設教學
+本專案的完整架設步驟、Windows 多人正式環境、IIS + ARR 設定、自動開機、Debug／正式模式切換、資料庫連線與備份還原流程，皆已整理至專屬手冊：
+👉 **[請參閱：架設步驟.md](架設步驟.md)**
 
-請開啟終端機 (Terminal / PowerShell) 並執行以下指令：
-```bash
-git clone https://github.com/YuTzu2003/CancerRegistry_System.git
-cd CancerRegistry_System
+---
 
-# 使用uv建立虛擬環境
-uv sync
-playwright install chromium
-```
-
-### 2. 資料庫還原配置
-系統預設資料需透過還原備份檔來建立：
-1. 開啟 **SQL Server Management Studio (SSMS)**。
-2. 找到本專案資料夾下的 `data/Hospital_data.bak` 備份檔。
-3. 確認登入的 SQL 使用者帳號擁有讀寫該資料庫的完整權限。
-
-### 3. 環境變數設定 (`.env`)
-請在專案根目錄下建立一個名為 `.env` 的純文字檔案，並填入以下系統設定（請依據您的實際MSSQL帳密與語言模型選擇進行修改）：
-
-```env
-# Flask設定
-FLASK_PORT=5000
-
-# SQL Server 資料庫連接設定
-DB_SERVER=127.0.0.1
-DB_PORT=1433
-DB_NAME=Hospital_data
-DB_USER=您的資料庫帳號 (例如: YLH)
-DB_PASSWORD=您的資料庫密碼
-
-# Ollama:
-LLM_PROVIDER=ollama
-LLM_BASE_URL=http://localhost:11434
-LLM_API_KEY=ollama
-LLM_MODEL=gemma4:26b  # 替換為您實際下載的本地模型名稱
-
-# OpenAI:
-# LLM_PROVIDER=openai
-# OPENAI_API_KEY=您的_OPENAI_API_KEY
-# OPENAI_MODEL=gpt-4o-mini
-```
-
-### 4. 啟動系統
-當上述環境變數與資料庫皆設定完成後，於終端機輸入以下指令啟動系統：
-
-```bash
-uv run app.py
-```
+#### 商業導入與授權聲明
+本專案為專有軟體，著作權歸 [**YuTzu2003**](https://github.com/YuTzu2003)、[**ZXC0428**](https://github.com/ZXC0428)與[**fish0805-cpu**](https://github.com/fish0805-cpu)所有，不屬於開源軟體。
+本系統僅限經授權之合作醫院及合作單位內部導入使用。未經書面同意，不得拷貝、修改、散布或將原始碼提供予任何第三方。若合作關係結束，應依法刪除所有持有之系統原始碼及安裝檔副本。
+> ⚠️ 詳細的授權條款與法律限制，請詳閱 **[LICENSE](LICENSE)** 檔案。

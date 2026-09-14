@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}系統操作日誌｜癌症登記系統{% endblock %}
+{% block page_title %}系統操作日誌{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/admin/audit_logs.css') }}">{% endblock %}
+{% block content %}
+<section class="audit-page">
+  <div class="page-head mb-4">
+    <div>
+      <h2 class="h4 mb-1">系統操作日誌</h2>
+      <p class="text-secondary mb-0">查看重要資料異動、登入與權限審核紀錄；單次最多顯示 500 筆。</p>
+    </div>
+  </div>
+
+  <form class="audit-filter card-flat mb-4" method="get">
+    <div class="section-body row g-3 align-items-end">
+      <div class="col-12 col-lg-4">
+        <label class="form-label" for="auditQuery">搜尋</label>
+        <input id="auditQuery" class="form-control" name="q" value="{{ filters.q }}" placeholder="帳號、動作或異動內容">
+      </div>
+      <div class="col-12 col-sm-6 col-lg-2">
+        <label class="form-label" for="auditAction">動作類型</label>
+        <select id="auditAction" class="form-select" name="action">
+          <option value="">全部動作</option>
+          {% for action in actions %}<option value="{{ action }}" {% if filters.action == action %}selected{% endif %}>{{ action }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-lg-2">
+        <label class="form-label" for="auditStart">開始日期</label>
+        <input id="auditStart" class="form-control" type="date" name="start" value="{{ filters.start }}">
+      </div>
+      <div class="col-6 col-lg-2">
+        <label class="form-label" for="auditEnd">結束日期</label>
+        <input id="auditEnd" class="form-control" type="date" name="end" value="{{ filters.end }}">
+      </div>
+      <div class="col-6 col-lg-1">
+        <label class="form-label" for="auditSort">排序</label>
+        <select id="auditSort" class="form-select" name="sort">
+          <option value="created_at" {% if filters.sort == 'created_at' %}selected{% endif %}>時間</option>
+          <option value="user_id" {% if filters.sort == 'user_id' %}selected{% endif %}>帳號</option>
+          <option value="action" {% if filters.sort == 'action' %}selected{% endif %}>動作</option>
+        </select>
+      </div>
+      <div class="col-6 col-lg-1">
+        <label class="form-label" for="auditOrder">方向</label>
+        <select id="auditOrder" class="form-select" name="order">
+          <option value="desc" {% if filters.order == 'desc' %}selected{% endif %}>新到舊</option>
+          <option value="asc" {% if filters.order == 'asc' %}selected{% endif %}>舊到新</option>
+        </select>
+      </div>
+      <div class="col-12 d-flex gap-2">
+        <button class="btn btn-dark" type="submit"><i class="bi bi-search me-1"></i>查詢</button>
+        <a class="btn btn-outline-secondary" href="{{ url_for('audit_logs.audit_logs') }}">清除條件</a>
+      </div>
+    </div>
+  </form>
+
+  <section class="card-flat audit-results">
+    <div class="section-head d-flex justify-content-between align-items-center">
+      <h3 class="h6 mb-0">查詢結果</h3><span class="text-secondary small">{{ logs|length }} 筆</span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0 audit-table">
+        <thead><tr><th>時間</th><th>使用者</th><th>動作</th><th>IP 位址</th><th>異動內容</th></tr></thead>
+        <tbody>
+          {% for log in logs %}
+          <tr>
+            <td class="text-nowrap">{{ log.CreatedAt.strftime('%Y-%m-%d %H:%M:%S') if log.CreatedAt else '-' }}</td>
+            <td>{{ log.UserName or '-' }}</td><td><span class="badge text-bg-light border">{{ log.Action }}</span></td>
+            <td class="text-nowrap">{{ log.Remote_addr or '-' }}</td>
+            <td><button class="btn btn-sm btn-outline-secondary audit-detail" type="button" data-detail="{{ log.detail|e }}">查看</button></td>
+          </tr>
+          {% else %}<tr><td class="text-center text-secondary py-5" colspan="5">找不到符合條件的操作日誌。</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</section>
+<script src="{{ url_for('static', filename='js/admin/audit_logs.js') }}"></script>
+{% endblock %}
