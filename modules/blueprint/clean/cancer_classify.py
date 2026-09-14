@@ -275,8 +275,8 @@ def rule_table_classify(df, OUTPUT_DIR):
                 continue
 
             mapping_col = f"[{rid}欄位]"
-            query = f"""SELECT FieldName.[{system_name}] FROM [Hospital_data].[dbo].[CancerRegistry_FmtField]
-                        INNER JOIN [Hospital_data].[dbo].[CancerRegistry_FieldMap] ON CancerRegistry_FmtField.序號 = CancerRegistry_FieldMap.序號
+            query = f"""SELECT FieldName.[{system_name}] FROM [CancerRegistry_FmtField]
+                        INNER JOIN [CancerRegistry_FieldMap] ON CancerRegistry_FmtField.序號 = CancerRegistry_FieldMap.序號
                         WHERE CancerRegistry_FmtField.{mapping_col} = 1
                     """
             cursor = conn.cursor()

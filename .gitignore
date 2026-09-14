@@ -6,6 +6,9 @@ dist/
 wheels/
 other/
 Jobs/
+.codex/
+.agents
+.hallmark/
 *.egg-info
 
 # Virtual environments
@@ -24,6 +27,5 @@ Jobs/
 AGENTS.md
 CLAUDE.md
 GEMINI.md
-
+tasks
 node_modules/
-.codex/

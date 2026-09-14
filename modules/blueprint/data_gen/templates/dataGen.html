@@ -3,74 +3,7 @@
 {% block page_title %}虛擬資料生成{% endblock %}
 {% block extra_head %}
 
-<style>
-  .config-section {
-    display: none;
-    animation: fadeIn 0.4s ease-out;
-  }
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  .field-scroll-container {
-    max-height: 250px;
-    overflow-y: auto;
-    padding: 12px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--gray-50);
-  }
-  .column-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 10px;
-  }
-  .result-section {
-    margin-top: 24px;
-    display: none;
-  }
-  .table-preview-container {
-    max-height: 500px;
-    overflow: auto;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--white);
-  }
-  .table-flat {
-    min-width: 1300px;
-    table-layout: auto;
-  }
-  .table-flat th, .table-flat td {
-    white-space: nowrap;
-    padding: 10px 18px;
-  }
-  .download-actions {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 15px;
-  }
-  
-  #loadingOverlay {
-    display: none; 
-    position: fixed; 
-    top: 0; left: 0; 
-    width: 100%; height: 100%; 
-    background: rgba(255,255,255,0.85); 
-    z-index: 9999; 
-    flex-direction: column; 
-    align-items: center; 
-    justify-content: center;
-    backdrop-filter: blur(2px);
-  }
-
-  .header-actions {
-    display: flex;
-    gap: 8px;
-  }
-
-</style>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/data_gen/data_gen.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -293,5 +226,5 @@
   <div class="text-muted small mt-1">這可能需要幾秒鐘的時間</div>
 </div>
 
-<script src="/static/js/dataGen.js"></script>
+<script src="/static/js/data_gen/data_gen.js"></script>
 {% endblock %}

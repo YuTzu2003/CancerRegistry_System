@@ -30,7 +30,7 @@ def get_surgery_code_rules(manual_key):
         cursor.execute(
             "SELECT [SurgeryManualKey], [RowKey], [ParentRowKey], [CodeShort], "
             "[CodeLong], [DisplayText_en], [RowType], [DisplayOrder], [SurgeryRank], [DisplayLevel] "
-            "FROM dbo.surgery_code_mapping WHERE [SurgeryManualKey] = ? "
+            "FROM dbo.Surgery_code_mapping WHERE [SurgeryManualKey] = ? "
             "ORDER BY [DisplayOrder]",
             manual_key,
         )

@@ -1,0 +1,835 @@
+/* =========================================================================
+   control.html - 資料上傳、篩選條件、按鈕、Modal 等樣式
+   ========================================================================= */
+
+/* --- 上傳區塊與檔案清單 --- */
+.upload-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px;
+}
+
+.upload-container-box {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  background: var(--white);
+  height: 100%;
+}
+
+.upload-input-zone {
+  border: 1.5px dashed var(--border) !important;
+  background: var(--gray-50);
+  transition: all 0.2s ease-in-out;
+}
+
+.upload-input-zone:hover {
+  border-color: var(--blue-500) !important;
+  background: #f5f9ff;
+}
+
+.file-list-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--white);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  height: 100%;
+}
+
+.file-list-header {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  background: var(--gray-50);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.file-list-container {
+  padding: 0;
+  overflow-y: auto;
+  max-height: 250px;
+}
+
+.file-list-empty {
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.file-list-empty i {
+  font-size: 24px;
+  display: block;
+  margin-bottom: 6px;
+  color: var(--gray-300);
+}
+
+#dashFileListBody tr {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+#dashFileListBody tr:hover {
+  background-color: var(--gray-50);
+}
+
+#dashFileListBody tr.table-active {
+  background-color: #f0f7ff !important;
+}
+
+#dashFileListBody tr .file-display-name {
+  font-weight: normal;
+}
+
+#dashFileListBody tr.table-active .file-display-name {
+  color: var(--blue-700) !important;
+  font-weight: bold !important;
+}
+
+#dashFileListBody tr.table-active .status-badge-selected {
+  display: inline-block !important;
+}
+
+[data-theme="dark"] .file-list-card {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+[data-theme="dark"] .file-list-header {
+  background: var(--gray-50);
+  border-color: var(--border);
+}
+
+[data-theme="dark"] .file-list-header .text-dark,
+[data-theme="dark"] #dashFileList .text-dark {
+  color: var(--text) !important;
+}
+
+[data-theme="dark"] #dashFileList {
+  --bs-table-bg: var(--surface);
+  --bs-table-color: var(--text);
+  --bs-table-border-color: var(--border);
+  --bs-table-hover-bg: #1f1f23;
+  --bs-table-hover-color: var(--text);
+  --bs-table-active-bg: rgba(59, 130, 246, 0.18);
+  --bs-table-active-color: #dbeafe;
+}
+
+[data-theme="dark"] #dashFileList thead,
+[data-theme="dark"] #dashFileList thead th {
+  background: #18181b !important;
+  color: var(--muted) !important;
+  border-color: var(--border) !important;
+}
+
+[data-theme="dark"] #dashFileListBody tr {
+  background: var(--surface);
+  color: var(--text);
+}
+
+[data-theme="dark"] #dashFileListBody tr:hover {
+  background-color: #1f1f23 !important;
+}
+
+[data-theme="dark"] #dashFileListBody tr.table-active {
+  background-color: rgba(59, 130, 246, 0.18) !important;
+}
+
+[data-theme="dark"] #dashFileListBody tr.table-active .file-display-name {
+  color: #bfdbfe !important;
+}
+
+[data-theme="dark"] #dashFileListBody .text-secondary {
+  color: var(--muted) !important;
+}
+
+[data-theme="dark"] #dashFileListBody .status-badge-selected {
+  background: rgba(59, 130, 246, 0.22) !important;
+  color: #bfdbfe !important;
+  border: 1px solid rgba(96, 165, 250, 0.35);
+}
+
+/* --- 篩選條件設定 --- */
+.filter-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 18px 20px;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 180px;
+}
+
+.filter-bar > .filter-group:last-child {
+  flex: 0 0 243px;
+  max-width: 243px;
+}
+
+.filter-group label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gray-600);
+  letter-spacing: 0.3px;
+}
+
+.filter-group select {
+  width: 100%;
+  padding: 8px 32px 8px 12px;
+  font-size: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  color: var(--text);
+  cursor: pointer;
+  appearance: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M2.5 4.5L6 8l3.5-3.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+}
+
+.filter-group select.year-select {
+  width: 100px;
+  min-width: 0;
+  padding: 8px 22px 8px 8px;
+  text-align: center;
+  text-align-last: center;
+  background-position: right 7px center;
+}
+
+.filter-group select.year-select option {
+  text-align: center;
+}
+
+.filter-group select.year-select.year-select-native {
+  display: none;
+}
+
+.year-select-ui {
+  position: relative;
+  width: 100px;
+}
+
+.card-flat:has(.year-select-ui),
+.card-flat:has(.year-select-ui) .section-body {
+  overflow: visible;
+}
+
+.year-select-ui.is-open {
+  z-index: 2147483647;
+}
+
+.year-select-trigger {
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 38px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.2;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.year-select-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: translateX(-6px);
+  pointer-events: none;
+}
+
+.year-select-ui.is-start.is-placeholder .year-select-label {
+  transform: translateX(-5.5px);
+}
+
+.year-select-ui.is-end.is-placeholder .year-select-label {
+  transform: translateX(-5px);
+}
+
+.year-select-trigger::after {
+  content: "";
+  position: absolute;
+  right: 7px;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  transform: translateY(-50%);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M2.5 4.5L6 8l3.5-3.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.year-select-trigger:focus,
+.year-select-ui.is-open .year-select-trigger {
+  outline: none;
+  border-color: var(--blue-500);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.year-select-ui.is-disabled .year-select-trigger {
+  color: var(--muted);
+  background-color: var(--gray-100);
+  cursor: not-allowed;
+}
+
+.year-select-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 2147483647;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 1px solid #8a8a8a;
+  background: var(--white);
+  box-shadow: none;
+}
+
+.year-select-menu::after {
+  content: "";
+  position: absolute;
+  left: -1px;
+  right: -1px;
+  bottom: -1px;
+  height: 1px;
+  background: #8a8a8a;
+  pointer-events: none;
+}
+
+.year-select-ui:not(.is-open) .year-select-menu {
+  display: none;
+}
+
+.year-select-option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 5px 8px;
+  border: 0;
+  background: var(--white);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.2;
+  text-align: center;
+  cursor: pointer;
+}
+
+.year-select-option-label {
+  transform: translateX(-3.8px);
+}
+
+.year-select-option:hover,
+.year-select-option.is-selected {
+  background: #0d6efd;
+  color: #fff;
+}
+
+.year-select-option.is-placeholder {
+  background: #bfbfbf;
+  color: #fff;
+  cursor: default;
+}
+
+.filter-group select:focus {
+  outline: none;
+  border-color: var(--blue-500);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.filter-actions {
+  display: flex;
+  gap: 8px;
+  padding-bottom: 1px;
+}
+
+/* 篩選條件未啟用（年度未填寫）時的灰階樣式 */
+#filterBehavior:disabled,
+#btnCancerPicker:disabled,
+#favPresetSelect:disabled,
+#btnSavePreset:disabled,
+.btn-check:disabled + .cat-btn-label,
+.btn-check:disabled + .btn-outline-secondary {
+  opacity: 0.5;
+  background-color: var(--gray-100) !important;
+  border-color: var(--border) !important;
+  color: var(--muted) !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+  box-shadow: none !important;
+}
+
+/* --- 按鈕樣式 --- */
+/* 分期系統不適用時，沿用頁面既有 disabled 反灰樣式。 */
+#stageSummaryOptions section:has(.stage-summary-option:disabled) {
+  opacity: 0.5;
+  background-color: var(--gray-100);
+  border-color: var(--border) !important;
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+#stageSummaryOptions .stage-summary-option:disabled,
+#stageSummaryOptions label:has(.stage-summary-option:disabled) {
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.btn-black, #btnDashUpload {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--white) !important;
+  background-color: #212529 !important;
+  border: 1px solid #212529 !important;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-black:hover, #btnDashUpload:hover { 
+  background-color: #000 !important; 
+  border-color: #000 !important;
+  color: #fff !important; 
+}
+
+.btn-black-outline {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #212529;
+  background: transparent;
+  border: 1px solid #212529;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-black-outline:hover { 
+  background: #212529; 
+  color: #fff; 
+}
+
+.cat-btn-label {
+  background-color: #f8f9fa;
+  color: #495057;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 8px 20px;
+  font-size: 14.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+  margin-bottom: 0;
+}
+
+.cat-btn-label:hover { 
+  background-color: #e9ecef; 
+  color: #212529; 
+}
+
+.btn-check.group-checkbox:checked + .cat-btn-label {
+  background-color: #ebf3ff;
+  color: #0d6efd;
+  border-color: #0d6efd;
+  box-shadow: 0 2px 6px rgba(13, 110, 253, 0.15);
+  font-weight: 600;
+}
+
+/* --- Cancer Picker Modal --- */
+#cancerPickerModal .form-check-input:checked {
+  background-color: #212529;
+  border-color: #212529;
+}
+
+#cancerPickerModal .form-check-input:focus {
+  border-color: #212529;
+  box-shadow: 0 0 0 0.25rem rgba(33, 37, 41, 0.25);
+}
+
+.naming-chip.checkbox-chip { 
+  align-items: center; 
+}
+
+.naming-chip.checkbox-chip .nc-mark { 
+  border-radius: 4px; 
+  top: auto; 
+  margin-top: 0; 
+}
+
+.naming-chip.checkbox-chip .nc-body { 
+  margin-top: 0; 
+}
+
+.naming-chip.checkbox-chip .nc-title { 
+  font-weight: normal; 
+}
+
+.naming-chip.checkbox-chip.selected .nc-mark::after {
+  content: '';
+  width: 5px; height: 10px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  background: transparent;
+  border-radius: 0;
+  margin-top: -2px;
+}
+
+/* =========================================================================
+   dashboard.html - 圖表區塊、報表表格、圖表分頁按鈕
+   ========================================================================= */
+
+/* --- 表格區塊 --- */
+.annual-report-table-wrap {
+  overflow-x: auto;
+  margin-bottom: 26px;
+}
+
+.annual-report-table {
+  min-width: 980px;
+  width: 100%;
+  border-collapse: collapse;
+  text-align: center;
+  background: #fff;
+}
+
+/* 組織型態表在中英文切換時維持相同欄寬，避免依文字長度跳動。 */
+.annual-histology-table {
+  table-layout: fixed;
+}
+
+.annual-histology-name-col { width: 70%; }
+.annual-histology-count-col { width: 15%; }
+.annual-histology-percent-col { width: 15%; }
+
+.annual-histology-table td:nth-child(1) {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.annual-report-table th,
+.annual-report-table td {
+  border: 1px solid #111827;
+  padding: 4px 8px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.annual-report-table caption {
+  caption-side: top;
+  color: #111827;
+  font-size: 18px;
+  font-weight: 500;
+  padding-bottom: 4px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* 年報分析期別：與其他分析細項相同的勾選框格式 */
+.annual-stage-system-row,
+.annual-stage-class-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.annual-stage-class-row {
+  margin-top: 12px;
+  padding-left: 24px;
+}
+
+/* 期別分布報表：沿用年度報表的表格及圖說版型 */
+.annual-stage-chart {
+  width: 100%;
+  height: 380px;
+  margin-top: 8px;
+}
+
+/* 期別表格註解保留在表格區塊內，避免與下一張圖的標題重疊 */
+#chartPane-StageSummary .annual-report-table-wrap {
+  margin-bottom: 0;
+  padding-bottom: 18px;
+}
+
+/* 將期別圖說拉進 ECharts 畫布底部的預留空間，避免圖與圖說之間留白過大 */
+.annual-stage-chart + .annual-chart-caption {
+  margin-top: -20px;
+}
+
+/* 年齡層共 15 列，增加高度以避免水平堆疊長條過度擁擠 */
+.annual-stage-age-chart {
+  height: 680px;
+}
+
+.annual-stage-section {
+  margin-top: 48px;
+}
+
+.annual-stage-report-note {
+  margin-top: 6px;
+}
+
+/* 期別圖表下方顯示的統計口徑註解 */
+.annual-stage-chart-note {
+  margin-top: 6px;
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  .annual-stage-class-row {
+    padding-left: 20px;
+  }
+}
+
+.annual-analyzable-note {
+  margin-top: 6px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #111827;
+}
+
+.annual-analyzable-note-item {
+  margin-left: 12px;
+}
+
+.annual-median-table {
+  width: auto;
+  min-width: 320px;
+  margin: 0 auto;
+}
+
+.annual-chart-caption {
+  color: #111827;
+  font-weight: 500;
+  text-align: center;
+  margin-top: 8px;
+}
+
+.annual-data-content.d-none {
+  display: none !important;
+}
+
+/* --- 現代化圖表分頁按鈕 --- */
+#chartTabsArea {
+  text-align: left;
+  margin-bottom: -10px !important; /* 縮小與下方圖表的間距 */
+}
+
+#chartTabsContainer {
+  background-color: transparent !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 10px !important;
+  box-shadow: none !important;
+  border: none !important;
+  margin: 0;
+  justify-content: flex-start !important; /* 蓋掉 html 中的 justify-content-center */
+}
+
+.chart-tab-btn {
+  border-radius: 6px !important;
+  padding: 8px 24px !important;
+  font-weight: 500 !important;
+  font-size: 15px !important;
+  letter-spacing: 0.5px !important;
+  transition: all 0.2s ease-in-out !important;
+  border: 1px solid #ced4da !important;
+  color: #495057 !important;
+  background-color: #f8f9fa !important;
+  box-shadow: none !important;
+  position: relative;
+}
+
+.chart-tab-btn:hover {
+  color: #212529 !important;
+  background-color: #e9ecef !important;
+  border-color: #adb5bd !important;
+}
+
+.chart-tab-btn.active {
+  background: #212529 !important; /* 深灰色，較為穩重，不使用漸層 */
+  color: #ffffff !important;
+  border-color: #212529 !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+[data-theme="dark"] .upload-container-box,
+[data-theme="dark"] .upload-input-zone,
+[data-theme="dark"] .chart-pane > .bg-white,
+[data-theme="dark"] #chartPane-Empty > .bg-white {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+[data-theme="dark"] .upload-input-zone:hover {
+  background: #1f1f23 !important;
+  border-color: var(--blue-500) !important;
+}
+
+[data-theme="dark"] .filter-group label,
+[data-theme="dark"] .text-dark,
+[data-theme="dark"] .form-check-label.text-dark {
+  color: var(--text) !important;
+}
+
+[data-theme="dark"] .text-secondary,
+[data-theme="dark"] .form-check-label.text-secondary {
+  color: var(--muted) !important;
+}
+
+[data-theme="dark"] .cat-btn-label {
+  background-color: var(--gray-50);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+[data-theme="dark"] .cat-btn-label:hover {
+  background-color: #1f1f23;
+  color: #bfdbfe;
+  border-color: var(--blue-600);
+}
+
+[data-theme="dark"] .btn-check.group-checkbox:checked + .cat-btn-label {
+  background-color: rgba(59, 130, 246, 0.18);
+  color: #bfdbfe;
+  border-color: var(--blue-600);
+  box-shadow: none;
+}
+
+[data-theme="dark"] .btn-black,
+[data-theme="dark"] #btnDashUpload,
+[data-theme="dark"] .chart-tab-btn.active {
+  background-color: var(--blue-600) !important;
+  border-color: var(--blue-600) !important;
+  color: #ffffff !important;
+}
+
+[data-theme="dark"] .btn-black:hover,
+[data-theme="dark"] #btnDashUpload:hover {
+  background-color: #2563eb !important;
+  border-color: #2563eb !important;
+}
+
+[data-theme="dark"] .btn-black-outline,
+[data-theme="dark"] .chart-tab-btn {
+  background-color: var(--gray-50) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+[data-theme="dark"] .btn-black-outline:hover,
+[data-theme="dark"] .chart-tab-btn:hover {
+  background-color: #1f1f23 !important;
+  border-color: var(--blue-600) !important;
+  color: #bfdbfe !important;
+}
+
+[data-theme="dark"] #cancerPickerModal .modal-header,
+[data-theme="dark"] #cancerPickerModal .modal-footer,
+[data-theme="dark"] #cancerPickerModal .bg-light,
+[data-theme="dark"] #cancerPickerModal .bg-white {
+  background-color: var(--surface) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+[data-theme="dark"] #cancerPickerModal .list-group-item.bg-light {
+  background-color: var(--gray-50) !important;
+  color: var(--muted) !important;
+}
+
+[data-theme="dark"] #cancerPickerModal .cat-nav-btn.active {
+  background-color: rgba(59, 130, 246, 0.14) !important;
+  color: #bfdbfe !important;
+}
+
+[data-theme="dark"] .annual-report-table {
+  background: #0b0b0c;
+  color: var(--text);
+}
+
+[data-theme="dark"] .annual-report-table th,
+[data-theme="dark"] .annual-report-table td {
+  border-color: var(--gray-300);
+}
+
+[data-theme="dark"] .annual-report-table caption,
+[data-theme="dark"] .annual-analyzable-note,
+[data-theme="dark"] .annual-chart-caption {
+  color: var(--text);
+}
+
+[data-theme="dark"] .chart-pane .mt-4.p-3.rounded {
+  background-color: #18181b !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+[data-theme="dark"] .chart-pane .mt-4.p-3.rounded .btn-sm {
+  color: #bfdbfe !important;
+  border-color: var(--blue-500) !important;
+}
+
+/* =========================================================================
+   響應式設計 (RWD)
+   ========================================================================= */
+@media (max-width: 900px) {
+  .upload-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+  .filter-bar { flex-direction: column; align-items: stretch; }
+  .filter-group { min-width: 0; }
+}
+#stageSummaryOptions .col > section {
+    display: flex;
+    flex-direction: column;
+}
+
+#stageSummaryOptions .col > section > .d-flex {
+    margin-top: auto;
+}
+
+/* 附錄 B 手術術式表：標題與分類依據分兩列置中呈現。 */
+.stage-surgery-panel .surgery-table-caption {
+  text-align: center;
+}
+.stage-surgery-panel .surgery-table-caption-note {
+  display: inline-block;
+  margin-top: 2px;
+  font-size: 14px;
+  font-weight: 400;
+}

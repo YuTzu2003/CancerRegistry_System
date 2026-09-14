@@ -2,6 +2,7 @@ import secrets
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from modules.services.auth import admin_required, login_required
 from modules.services.db import get_conn
+from modules.services.audit import write_audit_log
 
 key_approval_bp = Blueprint("key_approval", __name__, template_folder="templates")
 
@@ -14,13 +15,7 @@ def _return_to_approval():
 def key_approval():
     conn = get_conn()
     cursor = conn.cursor()
-    cursor.execute(
-        "SELECT application.Application_id, application.UserID, application.Content, application.Usage_days, "
-        "application.CreatedAt, COALESCE(NULLIF([user].[Name], ''), N'未設定姓名') AS UserName "
-        "FROM dbo.User_applications AS application "
-        "LEFT JOIN dbo.Users AS [user] ON application.UserID = [user].UserID "
-        "WHERE application.Status = 'Pending' ORDER BY application.CreatedAt ASC"
-    )
+    cursor.execute("SELECT application.Application_id, application.UserID, application.Content, application.Usage_days, application.CreatedAt, COALESCE(NULLIF([user].[Name], ''), N'未設定姓名') AS UserName FROM dbo.User_applications AS application LEFT JOIN dbo.Users AS [user] ON application.UserID = [user].UserID WHERE application.Status = 'Pending' ORDER BY application.CreatedAt ASC")
     columns = [column[0] for column in cursor.description]
     pending_applications = [dict(zip(columns, row)) for row in cursor.fetchall()]
     conn.close()
@@ -33,8 +28,11 @@ def approve(application_id):
     conn = get_conn()
     cursor = conn.cursor()
     cursor.execute("UPDATE dbo.User_applications SET Status = 'Approved', API_key = ?, RejectionReason = NULL WHERE Application_id = ? AND Status = 'Pending'", secrets.token_urlsafe(32), application_id)
+    updated = cursor.rowcount
     conn.commit()
     conn.close()
+    if updated:
+        write_audit_log("key_approval_key_approval_approve", {"application_id": application_id})
     flash("申請已核准，等待使用者啟用。", "success")
     return _return_to_approval()
 
@@ -51,9 +49,12 @@ def reject(application_id):
     try:
         cursor = conn.cursor()
         cursor.execute("UPDATE dbo.User_applications SET Status = 'Rejected', RejectionReason = ?, API_key = NULL, Start_time = NULL, End_time = NULL WHERE Application_id = ? AND Status = 'Pending'", reason, application_id)
+        updated = cursor.rowcount
         conn.commit()
     finally:
         conn.close()
+    if updated:
+        write_audit_log("key_approval_key_approval_reject", {"application_id": application_id, "reason": reason})
     flash("申請已拒絕，原因已通知使用者。", "success")
     return _return_to_approval()
 
@@ -71,8 +72,11 @@ def reactivate(application_id):
             "WHERE Application_id = ? AND Status IN ('Rejected', 'Expired')",
             secrets.token_urlsafe(32), application_id,
         )
+        updated = cursor.rowcount
         conn.commit()
     finally:
         conn.close()
+    if updated:
+        write_audit_log("key_approval_key_approval_reactivate", {"application_id": application_id})
     flash("Key 已重新啟用，等待使用者啟用。", "success")
     return _return_to_approval()

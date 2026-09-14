@@ -2,42 +2,7 @@
 {% block title %}組織型態｜癌症資料登記{% endblock %}
 {% block page_title %}組織型態{% endblock %}
 {% block extra_head %}
-<style>
-  .histology-summary { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow-sm); }
-  .histology-summary-icon { width: 42px; height: 42px; border-radius: var(--radius-sm); background: var(--warning-soft); color: var(--warning); }
-  .histology-search-card, .histology-editor-card { border-color: var(--border); border-radius: var(--radius); box-shadow: var(--shadow-sm); }
-  .histology-search-card { background: var(--gray-50); }
-  .histology-entry-pane { border: 1px solid var(--border); background: var(--gray-50); }
-  .histology-entry-pane .form-label { font-size: 0.8rem; margin-bottom: 0.25rem; }
-  .histology-entry-tabs .nav-link { height: auto; color: var(--text); border: 1px solid var(--border); background: var(--surface); }
-  .histology-entry-tabs .nav-link.active { color: var(--white); background: var(--gray-800); border-color: var(--gray-800); box-shadow: none; }
-  .histology-year-count { background: var(--gray-100); color: var(--text); border: 1px solid var(--border); }
-  .histology-year-tabs { overflow-x: auto; }
-  .histology-year-tabs .nav { flex-wrap: nowrap; min-width: max-content; }
-  .histology-year-tabs .nav-link { height: auto; color: var(--text); border: 1px solid var(--border); background: var(--surface); }
-  .histology-year-tabs .nav-link:hover { background: var(--gray-100); color: var(--text); }
-  .histology-year-tabs .nav-link.active { background: var(--gray-800); border-color: var(--gray-800); color: var(--white); box-shadow: none; }
-  .histology-table-wrap { border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: auto; }
-  .histology-table { margin: 0; min-width: 1080px; table-layout: fixed; }
-  .histology-table th { background: var(--gray-100); color: var(--text); font-size: 13px; font-weight: 700; white-space: nowrap; }
-  .histology-table td { color: var(--text); font-size: 14px; vertical-align: middle; overflow-wrap: anywhere; }
-  .histology-table .histology-inline-input { min-width: 100%; }
-  .histology-table .histology-inline-edit td { background: var(--warning-soft); }
-  .histology-table th:nth-child(1), .histology-table th:nth-child(4), .histology-table th:nth-child(5),
-  .histology-table td:nth-child(1), .histology-table td:nth-child(4), .histology-table td:nth-child(5) { text-align: center; }
-  .histology-table th:last-child, .histology-table td:last-child { text-align: right; }
-  .histology-actions { display: flex; justify-content: flex-end; gap: 6px; }
-  .histology-actions form { margin: 0; }
-  .histology-empty { color: var(--muted); padding: 48px 24px; text-align: center; }
-  [data-theme="dark"] .histology-summary, [data-theme="dark"] .histology-search-card, [data-theme="dark"] .histology-editor-card { background: var(--surface); color: var(--text); border-color: var(--border); }
-  [data-theme="dark"] .histology-year-count { background: var(--surface); color: var(--text); }
-  [data-theme="dark"] .histology-entry-tabs .nav-link { background: var(--surface); color: var(--text); border-color: var(--border); }
-  [data-theme="dark"] .histology-entry-tabs .nav-link.active { background: var(--gray-800); color: var(--white); }
-  [data-theme="dark"] .histology-year-tabs .nav-link { background: var(--surface); color: var(--text); border-color: var(--border); }
-  [data-theme="dark"] .histology-year-tabs .nav-link.active { background: var(--gray-800); color: var(--white); }
-  [data-theme="dark"] .histology-table { --bs-table-bg: var(--surface); --bs-table-color: var(--text); --bs-table-striped-bg: #151518; --bs-table-hover-bg: #1f1f23; --bs-table-border-color: var(--border); }
-  [data-theme="dark"] .histology-table th { background: var(--gray-100); color: var(--text); }
-</style>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/auth/histology_code_preview.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -45,7 +10,7 @@
 <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2 mb-2">
   <span class="text-secondary fw-medium">正在預覽版本 <code>{{ preview_commit_id }}</code>；此頁為唯讀，不會修改資料。</span>
 </div>
-<style>form[action*="/versions/save"] { display: none; }</style>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/auth/histology_code_preview.css') }}">
 {% endif %}
 <div class="page-head d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
   <div>
@@ -289,91 +254,5 @@
   </div>
 </section>
 
-<script>
-  document.addEventListener("DOMContentLoaded", function() {
-    const successAlert = document.querySelector(".alert-success");
-    if (successAlert && window.Swal) {
-      const message = successAlert.textContent.trim();
-      successAlert.remove();
-      Swal.fire({ icon: "success", title: "儲存成功", text: message, confirmButtonColor: "#2563eb" });
-    }
-    const dangerAlert = document.querySelector(".alert-danger");
-    if (dangerAlert && window.Swal) {
-      const message = dangerAlert.textContent.trim();
-      dangerAlert.remove();
-      Swal.fire({ icon: "error", title: "發生錯誤", text: message, confirmButtonColor: "#2563eb" });
-    }
-  });
-
-  const selectAll = document.getElementById("histologySelectAll");
-  const rowSelections = document.querySelectorAll(".histology-row-select");
-
-  if (selectAll) {
-    selectAll.addEventListener("change", () => {
-      rowSelections.forEach((checkbox) => {
-        checkbox.checked = selectAll.checked;
-      });
-    });
-
-    rowSelections.forEach((checkbox) => {
-      checkbox.addEventListener("change", () => {
-        selectAll.checked = rowSelections.length > 0 && [...rowSelections].every((item) => item.checked);
-      });
-    });
-  }
-
-  // Table Sorting Logic
-  const histologyTable = document.querySelector(".histology-table");
-  if (histologyTable) {
-    const headers = histologyTable.querySelectorAll("th.sortable-header");
-    headers.forEach(header => {
-      header.addEventListener("click", () => {
-        const tbody = histologyTable.querySelector("tbody");
-        const rows = Array.from(tbody.querySelectorAll("tr:not(.histology-empty-row)"));
-        if (rows.length === 0) return;
-        
-        const idx = parseInt(header.getAttribute("data-sort-idx"));
-        const isAsc = header.classList.contains("sort-asc");
-        
-        // Reset all headers
-        headers.forEach(h => {
-          h.classList.remove("sort-asc", "sort-desc");
-          const icon = h.querySelector("i.bi");
-          if (icon) icon.className = "bi bi-caret-down text-muted ms-1";
-        });
-        
-        // Set current header state
-        header.classList.add(isAsc ? "sort-desc" : "sort-asc");
-        const currIcon = header.querySelector("i.bi");
-        if (currIcon) {
-          currIcon.className = isAsc ? "bi bi-caret-down-fill text-dark ms-1" : "bi bi-caret-up-fill text-dark ms-1";
-        }
-        
-        // Sort rows
-        rows.sort((a, b) => {
-          const getVal = (row) => {
-            const cell = row.children[idx];
-            if (!cell) return "";
-            const input = cell.querySelector("input:not([type='hidden']):not([type='checkbox'])");
-            return input ? input.value.trim() : cell.innerText.trim();
-          };
-          
-          const aCol = getVal(a);
-          const bCol = getVal(b);
-          
-          const aNum = parseFloat(aCol);
-          const bNum = parseFloat(bCol);
-          
-          if (!isNaN(aNum) && !isNaN(bNum)) {
-            return isAsc ? bNum - aNum : aNum - bNum;
-          }
-          return isAsc ? bCol.localeCompare(aCol, "zh-TW") : aCol.localeCompare(bCol, "zh-TW");
-        });
-        
-        // Append sorted rows
-        rows.forEach(row => tbody.appendChild(row));
-      });
-    });
-  }
-</script>
+<script src="{{ url_for('static', filename='js/auth/histology_code_preview.js') }}"></script>
 {% endblock %}

@@ -2,10 +2,19 @@
 {% block title %}年度比較｜癌症資料登記{% endblock %}
 {% block page_title %}年度比較{% endblock %}
 {% block extra_head %}
-  <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/i18next@25.3.2/dist/umd/i18next.min.js"></script>
-  <link rel="stylesheet" href="/static/css/dashboard.css?v=20260801-stage-card-compact">
-  <link rel="stylesheet" href="/static/css/dashboard_compare.css?v=20260801-stage-card-compact">
+  <script src="/static/vendor/echarts/echarts.min.js"></script>
+  <script src="/static/vendor/i18next/i18next.min.js"></script>
+  <link rel="stylesheet" href="/static/css/dashboard/dashboard.css">
+  <link rel="stylesheet" href="/static/css/dashboard/dashboard_compare.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/llm_task_panel.css') }}">
+{% if preview_task %}
+  <style>
+    .compare-mode-bar,
+    #compareDataGrid,
+    .card-flat.compare-settings,
+    .compare-cancer-source { display: none !important; }
+  </style>
+{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -15,6 +24,11 @@
     <p class="lead">選擇基準期資料與比較期資料，檢視不同年度間的癌別統計分析結果。</p>
   </div>
 </div>
+{% if preview_task %}
+<div class="d-flex justify-content-end mb-4">
+  <button type="button" class="btn btn-outline-secondary" onclick="window.location.assign('/dashboard/compare')">返回上一頁</button>
+</div>
+{% endif %}
 
 <div class="compare-mode-bar" aria-label="比較模式">
   <span class="compare-label">比較模式</span>
@@ -205,7 +219,7 @@
       </div>
       <div id="compareStageOptions" class="compare-stage-options mt-3 pt-3 border-top border-secondary-subtle">
         <p class="small text-secondary mb-3">選擇要套用於分期分析及治療方式表格的分期系統。</p>
-        {% include "_stage_system_cards.html" %}
+        {% include "stage_system_cards.html" %}
       </div>
     </div>
     <div class="compare-subitem-row d-none d-flex flex-wrap gap-3" data-compare-subitems="treatment">
@@ -326,19 +340,24 @@
   </section>
 </section>
 
+{% if not preview_task %}
+{% set llm_task_type = 'comparison_report' %}
+{% include "report_task_panel.html" %}
+{% endif %}
+
 <div class="compare-cancer-source">
   {% include "control.html" %}
 </div>
 
 <script id="dashboardCancerNameTranslationsData" type="application/json">{{ cancer_name_translations | tojson }}</script>
-<script>
-  try {
-    window.dashboardCancerNameTranslations = JSON.parse(document.getElementById('dashboardCancerNameTranslationsData')?.textContent || '{}');
-  } catch (error) {
-    window.dashboardCancerNameTranslations = {};
-  }
-</script>
-<script src="{{ url_for('static', filename='js/dashboard_i18n.js') }}?v=20260802-unified-loading-copy"></script>
-<script src="{{ url_for('static', filename='js/annual_report_renderer.js') }}?v=20260729-treatment-labels"></script>
-<script src="{{ url_for('static', filename='js/dashboard_compare.js') }}?v=20260902-histology-title-center"></script>
+{% if preview_task %}
+<script id="comparisonPreviewData" type="application/json">{{ {"task": preview_task, "payload": preview_payload} | tojson }}</script>
+{% endif %}
+<script src="{{ url_for('static', filename='js/dashboard/compare_page.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard/dashboard_i18n.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard/annual_report_renderer.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard/dashboard_compare.js') }}"></script>
+{% if not preview_task %}
+<script src="{{ url_for('static', filename='js/dashboard/llm_task_panel.js') }}"></script>
+{% endif %}
 {% endblock %}

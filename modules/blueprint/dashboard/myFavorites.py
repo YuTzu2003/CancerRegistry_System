@@ -1,7 +1,7 @@
 import os
 import json
 
-FAVORITES_DIR = 'tasks/cache/favorites'
+FAVORITES_DIR = 'tasks/dashboard/favorites'
 
 def get_user_fav_file(db_id):
     return f"{FAVORITES_DIR}/{db_id}_favorites.json"
