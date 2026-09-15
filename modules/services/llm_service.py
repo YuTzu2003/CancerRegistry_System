@@ -20,7 +20,7 @@ def get_llm_settings() -> LLMSettings:
     is_openai = provider == "openai"
     model = BaseConfig.OPENAI_MODEL if is_openai else BaseConfig.LLM_MODEL
     api_key = BaseConfig.OPENAI_API_KEY if is_openai else BaseConfig.LLM_API_KEY
-    base_url = None if is_openai else BaseConfig.LLM_BASE_URL
+    base_url = BaseConfig.LLM_BASE_URL
     timeout_seconds = BaseConfig.LLM_TIMEOUT_SECONDS
     if not model.strip():
         raise ValueError("LLM model is not configured")
@@ -34,7 +34,7 @@ def get_llm_client(settings: LLMSettings | None = None):
     settings = settings or get_llm_settings()
     if _client_cache is not None and _client_settings == settings:
         return _client_cache, settings.model
-    if settings.provider == "openai":
+    if settings.provider == "openai" and not settings.base_url:
         _client_cache = OpenAI(api_key=settings.api_key)
     else:
         _client_cache = OpenAI(base_url=settings.base_url, api_key=settings.api_key)
