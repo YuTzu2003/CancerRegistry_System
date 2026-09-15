@@ -1,5 +1,5 @@
 from flask import Blueprint, request, session, jsonify
-from modules.services.auth import login_required, admin_required
+from modules.services.auth import login_required
 from modules.services.db import get_conn
 from modules.blueprint.dashboard import load_user_favorites, save_user_favorites
 from modules.blueprint.dashboard.llm_tasks import create_llm_task, get_llm_task, list_llm_tasks
@@ -397,6 +397,13 @@ def analyze_dashboard_file_route():
     behavior = data.get("behavior", "")
     analysis_items = data.get("analysis_items", [])
     stage_options = data.get("stage_options", [])
+
+    if not isinstance(cancers, list) or not cancers:
+        return jsonify({"ok": False, "error": "請先選擇癌別"}), 400
+    if not isinstance(analysis_items, list) or not analysis_items:
+        return jsonify({"ok": False, "error": "請至少選擇一個分析項目"}), 400
+    if not str(year_start).strip() or not str(year_end).strip() or not str(behavior).strip():
+        return jsonify({"ok": False, "error": "請先完成年度與性態碼設定"}), 400
     
     owned_file = _get_owned_dashboard_file(file_id, session.get("id"))
     if not owned_file:
@@ -416,7 +423,7 @@ def analyze_dashboard_file_route():
 
 
 @dashboard_bp.route('/api/dashboard/publish_pbi', methods=['POST'])
-@admin_required
+@login_required
 def publish_dashboard_selection_to_pbi():
     data = request.json or {}
     file_id = data.get("file_id", "")
@@ -432,7 +439,7 @@ def publish_dashboard_selection_to_pbi():
 
     publish_path = get_pbi_publish_path()
     if not publish_path:
-        return jsonify({"ok": False, "error": "尚未設定 Power BI 發布路徑，請先由管理者完成設定"}), 400
+        return jsonify({"ok": False, "error": "尚未設定 Power BI 發布路徑，請先完成設定"}), 400
 
     try:
         from modules.blueprint.dashboard.pbi_export import export_pbi_dataset
@@ -452,14 +459,14 @@ def publish_dashboard_selection_to_pbi():
 
 
 @dashboard_bp.route('/api/dashboard/pbi_settings', methods=['GET'])
-@admin_required
+@login_required
 def get_pbi_settings_route():
     settings = get_pbi_publish_settings()
     return jsonify({"ok": True, "settings": settings})
 
 
 @dashboard_bp.route('/api/dashboard/pbi_settings', methods=['PUT'])
-@admin_required
+@login_required
 def save_pbi_settings_route():
     path = (request.json or {}).get("publish_path", "")
     try:

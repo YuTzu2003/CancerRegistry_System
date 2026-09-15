@@ -1197,7 +1197,6 @@ function initDashboardControl() {
           }
 
           btnPublishPbi.disabled = true;
-          if (window.utils?.showLoading) window.utils.showLoading('正在產生 Power BI 發布資料，請稍候…');
           try {
               const response = await fetch('/api/dashboard/publish_pbi', {
                   method: 'POST',
@@ -1252,6 +1251,16 @@ function initDashboardControl() {
               return;
           }
           window.dashboardAnalysisFileId = selectedFileId;
+
+          if (!(window.selectedCancers instanceof Set) || window.selectedCancers.size === 0) {
+              utils.alert('請先選擇癌別！', 'warning');
+              return;
+          }
+
+          if (document.querySelectorAll('.item-checkbox:checked').length === 0) {
+              utils.alert('請至少選擇一個分析項目！', 'warning');
+              return;
+          }
 
           const isStageAnalysis = document.getElementById('chkGroupStage')?.checked === true;
           if (isStageAnalysis) {
