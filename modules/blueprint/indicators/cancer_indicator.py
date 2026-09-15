@@ -44,7 +44,7 @@ ORAL_CANCER_RULES: dict[int, dict[str, Any]] = {
         },
     },
     2: {
-        "name": "口腔癌病人手術後30天內死亡的比率",
+        "name": "口腔癌病人手術後30天內死亡的比率。",
         "type": "negative",
         "denominator": {
             "op": "all",
@@ -69,7 +69,7 @@ ORAL_CANCER_RULES: dict[int, dict[str, Any]] = {
         },
     },
     3: {
-        "name": "口腔癌病人接受放射治療（不含化療）後90天內死亡的比率",
+        "name": "口腔癌病人開始接受放射治療(不含化療)後90天內死亡的比率。",
         "type": "negative",
         "denominator": {
             "op": "all",
@@ -95,7 +95,7 @@ ORAL_CANCER_RULES: dict[int, dict[str, Any]] = {
         },
     },
     4: {
-        "name": "口腔癌病人同步化學及放射治療後90天內死亡的比率",
+        "name": "口腔癌病人開始接受同步化學治療及放射治療後 90 天內死亡的比率。",
         "type": "negative",
         "denominator": {
             "op": "all",
@@ -126,8 +126,9 @@ ORAL_CANCER_RULES: dict[int, dict[str, Any]] = {
             ],
         },
     },
+    #看到這-----
     5: {
-        "name": "第一個口腔癌淋巴結病理檢查15顆以上的比率",
+        "name": "第一個口腔癌淋巴結病理檢查 15 顆(含)以上的比率。",
         "type": "positive",
         "denominator": {
             "op": "all",
@@ -144,7 +145,7 @@ ORAL_CANCER_RULES: dict[int, dict[str, Any]] = {
         },
     },
     6: {
-        "name": "口腔癌根除性手術病理切緣小於4mm的比率",
+        "name": "病理切片證實為口腔鱗狀細胞癌並施行口腔根除性手術，其病理切緣(pathological margins)小於 4mm 的比例",
         "type": "negative",
         "denominator": {
             "op": "all",

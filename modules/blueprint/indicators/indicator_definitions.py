@@ -11,7 +11,7 @@ RULES_BY_CANCER = {"Oral_Cavity": ORAL_CANCER_RULES}
 
 FIELD_SPECS = {
     "surgery_code": ("4.1.4", ("申報醫院原發部位手術方式",)),
-    "surgery_date": ("4.1.2", ("最確切的手術切除日期",)),
+    "surgery_date": ("4.1.2", ("原發部位最確切的手術切除日期",)),
     "radiation_date": ("4.2.1.3", ("放射治療開始日期",)),
     "radiation_dose": ("4.2.2.2.2", ("最高放射劑量臨床標靶體積劑量",)),
     "chemotherapy_code": ("4.3.3", ("申報醫院化學治療",)),
@@ -20,7 +20,7 @@ FIELD_SPECS = {
     "survival_status": ("5.4", ("生存狀態",)),
     "last_contact_date": ("5.3", ("最後聯絡或死亡日期",)),
     "lymph_nodes_examined": ("2.14", ("區域淋巴結檢查數目",)),
-    "sequence_number": ("2.2", ("癌症發生順序",)),
+    "sequence_number": ("2.2", ("癌症發生順序號碼",)),
     "histology": ("2.8", ("組織型態",)),
     "margin_distance": ("4.1.5.1", ("原發部位手術切緣距離",)),
 }
