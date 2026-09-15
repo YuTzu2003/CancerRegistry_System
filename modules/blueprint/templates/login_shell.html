@@ -36,13 +36,15 @@
       </div>
       <div class="account-card-body">
         {% with messages=get_flashed_messages(with_categories=true) %}
-          {% for category,msg in messages %}
-            <div class="alert alert-{{ 'danger' if category == 'danger' else category }} small">{{ msg }}</div>
-          {% endfor %}
+          {% if messages %}
+            <script id="loginFlashMessagesData" type="application/json">{{ messages | tojson }}</script>
+          {% endif %}
         {% endwith %}
         {% block auth_form %}{% endblock %}
       </div>
     </div>
   </div>
+  <script src="/static/vendor/sweetalert2/sweetalert2.all.min.js"></script>
+  <script src="{{ url_for('static', filename='js/auth/login.js') }}"></script>
 </body>
 </html>
