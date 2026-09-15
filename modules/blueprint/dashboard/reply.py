@@ -1,7 +1,7 @@
 import re
 import json
 import logging
-from modules.services.api import get_llm_client
+from modules.services.llm_service import request_llm_chat
 from modules.services.db import get_conn
 
 STYLE_PROMPTS = {
@@ -44,6 +44,10 @@ def _clean_insight_text(value):
     return text.replace(r'\ge', '>=').replace(r'\le', '<=').replace(r'\neq', '!=').replace('$', '')
 
 
+def _escape_invalid_json_backslashes(raw):
+    return re.sub(r'\\(?!["\\\\/bfnrtu])', r'\\\\', raw)
+
+
 def _parse_bilingual_insights(content):
     raw = str(content or '').strip()
     if raw.startswith('```'):
@@ -51,7 +55,13 @@ def _parse_bilingual_insights(content):
     start, end = raw.find('{'), raw.rfind('}')
     if start < 0 or end <= start:
         raise ValueError('AI response does not contain bilingual JSON')
-    payload = json.loads(raw[start:end + 1])
+    json_text = raw[start:end + 1]
+    try:
+        payload = json.loads(json_text)
+    except json.JSONDecodeError as exc:
+        if 'Invalid \\escape' not in str(exc):
+            raise
+        payload = json.loads(_escape_invalid_json_backslashes(json_text))
     insights = {language: _clean_insight_text(payload.get(language)) for language in INSIGHT_LANGUAGES}
     if not all(insights.values()):
         raise ValueError('AI response is missing a Chinese or English narrative')
@@ -76,7 +86,7 @@ def get_chart_insight_logic(data):
             conn = get_conn()
             cursor = conn.cursor()
             placeholders = ','.join(['?'] * len(fields))
-            query = f"""SELECT [中文欄位名稱], [define] FROM [Hospital_data].[dbo].[CancerRegistry_FieldMap] WHERE [中文欄位名稱] IN ({placeholders})"""
+            query = f"""SELECT [中文欄位名稱], [define] FROM [CancerRegistry_FieldMap] WHERE [中文欄位名稱] IN ({placeholders})"""
             cursor.execute(query, fields)
             rows = cursor.fetchall()
             for row in rows:
@@ -139,16 +149,13 @@ def get_chart_insight_logic(data):
         """
 
     try:
-        client, model_name = get_llm_client()
-        response = client.chat.completions.create(
-            model=model_name, 
-            messages=[
+        content = request_llm_chat(
+            [
                 {"role": "system", "content": "You are a professional cancer-registry data analyst. Return valid bilingual JSON only."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.5
+            temperature=0.5,
         )
-        content = response.choices[0].message.content
         insights = _parse_bilingual_insights(content)
         return {"success": True, "insight": insights[insight_language], "insights": insights}
     
@@ -218,17 +225,13 @@ def get_compare_insight_logic(data):
             """
 
     try:
-        client, model_name = get_llm_client()
-        response = client.chat.completions.create(
-            model=model_name,
-            messages=[
+        content = request_llm_chat(
+            [
                 {"role": "system", "content": "You are a professional cancer registry data comparison expert. Return professional Traditional Chinese and English narratives as valid JSON."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.3,
-            timeout=180.0
         )
-        content = response.choices[0].message.content
         insights = _parse_bilingual_insights(content)
         return {"success": True, "insight": insights[insight_language], "insights": insights}
     except Exception as e:

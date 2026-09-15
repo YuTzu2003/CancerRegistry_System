@@ -4,36 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}癌症資料登記{% endblock %}</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css"/>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
-  <link rel="stylesheet" href="/static/css/style.css" />
-  <script>
-    if (localStorage.getItem('theme') === 'dark') {
-      document.documentElement.setAttribute('data-theme', 'dark');
-    }
-  </script>
+  <link href="/static/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet"/>
+  <link rel="stylesheet" href="/static/vendor/bootstrap-icons/font/bootstrap-icons.min.css"/>
+  <link rel="stylesheet" href="/static/vendor/noto-sans-tc/noto-sans-tc.css"/>
+  <link rel="stylesheet" href="/static/vendor/sweetalert2/sweetalert2.min.css">
+  <link rel="stylesheet" href="/static/css/core/style.css" />
+  <script src="{{ url_for('static', filename='js/core/base.js') }}"></script>
 
-<style>
-  .nav-link.submenu-active {
-    background: var(--gray-200) !important;
-    color: var(--gray-900) !important;
-    font-weight: 600;
-  }
-  .nav-link.submenu-active .nav-icon {
-    color: var(--gray-800) !important;
-  }
-  [data-theme="dark"] .nav-link.submenu-active {
-    background: rgba(255, 255, 255, 0.2) !important;
-    color: #ffffff !important;
-  }
-  [data-theme="dark"] .nav-link.submenu-active .nav-icon {
-    color: #e2e8f0 !important;
-  }
-  .nav-link[aria-expanded="true"] .submenu-icon {
-    transform: rotate(180deg);
-  }
-</style>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/core/base.css') }}">
 {% block extra_head %}{% endblock %}
 </head>
 <body>
@@ -55,6 +33,27 @@
       </div>
 
       <nav class="sidebar-nav">
+        {% set nav_items = [
+          {"title": "資料審核", "icon": "bi-funnel", "subitems": [
+            {"endpoint": "clean.clean", "title": "資料清洗", "icon": "bi-play-circle"},
+            {"endpoint": "clean.history", "title": "資料審核紀錄", "icon": "bi-file-earmark-text"},
+          ]},
+          {"title": "報表分析", "icon": "bi-bar-chart", "subitems": [
+            {"endpoint": "dashboard.dashboard", "title": "年報分析", "icon": "bi-bar-chart"},
+            {"endpoint": "dashboard.compare", "title": "年度比較", "icon": "bi-columns-gap"},
+            {"endpoint": "auth.data_update_access", "title": "資料維護", "icon": "bi-database-gear"},
+          ]},
+          {"endpoint": "data_gen.dataGen", "title": "虛擬資料生成", "icon": "bi-database-add"},
+          {"endpoint": "indicators.indicators", "title": "監測指標", "icon": "bi-clipboard2-pulse"},
+          {"endpoint": "key_application.application", "title": "權限申請", "icon": "bi-key"},
+        ] %}
+        {% if session.get('position') == 'Admin' %}
+          {% set nav_items = nav_items + [{"title": "權限管理", "icon": "bi-shield-lock", "subitems": [
+            {"endpoint": "member.member", "title": "使用者管理", "icon": "bi-people"},
+            {"endpoint": "key_approval.key_approval", "title": "金鑰申請審核", "icon": "bi-key-fill"},
+            {"endpoint": "audit_logs.audit_logs", "title": "系統操作日誌", "icon": "bi-journal-text"},
+          ]}] %}
+        {% endif %}
         <ul>
           {% for item in nav_items %}
           {% if item.subitems %}
@@ -95,22 +94,38 @@
 
       <div class="sidebar-footer">
         {%if session.get('name')%}
-        <a href="/logout" class="user-chip logout-action">
-          <div class="user-avatar">{{session.get('name')[0]}}</div>
-          <div class="user-meta">
-            <div class="user-name">{{session.get('name')}}</div>
-            <div class="user-role">{{session.get('position')}} · 點擊登出</div>
-          </div>
-          <i class="bi bi-box-arrow-right logout-icon"></i>
-        </a>
+        <div class="dropdown dropup w-100">
+          <a href="#" class="user-chip text-decoration-none" data-bs-toggle="dropdown" aria-expanded="false" style="cursor: pointer; width: 100%; display: flex; align-items: center;">
+            <div class="user-avatar">{{session.get('name')[0]}}</div>
+            <div class="user-meta">
+              <div class="user-name">{{session.get('name')}}</div>
+              <div class="user-role">{{session.get('position')}}</div>
+            </div>
+            <i class="bi bi-three-dots ms-auto text-secondary" style="font-size: 1.2rem;"></i>
+          </a>
+          <ul class="dropdown-menu shadow-sm" style="width: 100%; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px;">
+            <li>
+              <a class="dropdown-item py-2" href="{{ url_for('auth.profile') }}" style="font-size: 13px; font-weight: 500;">
+                <i class="bi bi-person-gear me-2" style="color: var(--blue-600);"></i>我的資訊
+              </a>
+            </li>
+
+            <li><hr class="dropdown-divider"></li>
+            <li>
+              <a class="dropdown-item py-2 text-danger" href="/logout" style="font-size: 13px; font-weight: 500;">
+                <i class="bi bi-box-arrow-right me-2"></i>登出系統
+              </a>
+            </li>
+          </ul>
+        </div>
         {% else %}
-        <a href="/login" class="user-chip">
+        <a href="/login" class="user-chip text-decoration-none">
           <div class="user-avatar">U</div>
           <div class="user-meta">
             <div class="user-name">訪客</div>
             <div class="user-role">請登入系統</div>
           </div>
-          <i class="bi bi-box-arrow-in-right"></i>
+          <i class="bi bi-box-arrow-in-right ms-auto"></i>
         </a>
         {% endif %}
       </div>
@@ -132,20 +147,7 @@
       <main class="content">
         {% with messages = get_flashed_messages(with_categories=true) %}
           {% if messages %}
-            <script>
-              document.addEventListener("DOMContentLoaded", function() {
-                {% for category, msg in messages %}
-                  {% set icon = 'success' if category == 'success' else ('error' if category == 'danger' else ('warning' if category == 'warning' else 'info')) %}
-                  {% set title = '成功' if category == 'success' else ('錯誤' if category == 'danger' else ('警告' if category == 'warning' else '提示')) %}
-                  Swal.fire({
-                    icon: '{{ icon }}',
-                    title: '{{ title }}',
-                    text: {{ msg|tojson|safe }},
-                    confirmButtonColor: '#2563eb'
-                  });
-                {% endfor %}
-              });
-            </script>
+            <script id="flashMessagesData" type="application/json">{{ messages | tojson }}</script>
           {% endif %}
         {% endwith %}
         {% block content %}{% endblock %}
@@ -160,9 +162,10 @@
       <h5 class="mt-3 fw-bold" id="globalLoadingText" style="letter-spacing: 1px;">正在處理中，請稍候...</h5>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <script src="/static/js/app.js"></script>
+  <script src="/static/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+  <script src="/static/vendor/sweetalert2/sweetalert2.all.min.js"></script>
+  <script src="{{ url_for('static', filename='js/core/app.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/core/flash_messages.js') }}"></script>
   {% block extra_scripts %}{% endblock %}
 </body>
 </html>

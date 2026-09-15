@@ -97,7 +97,7 @@ def analyze_file_logic(file_path, filename):
 
         conn = get_conn()
         cursor = conn.cursor()
-        cursor.execute("SELECT [序號], [中文欄位名稱], [英文欄位名稱], [台大雲林欄位名稱], [台大體系醫整庫欄位名稱], [台灣癌症登記中心], [雲醫癌AI模組] FROM [Hospital_data].[dbo].[CancerRegistry_FieldMap]")
+        cursor.execute("SELECT [序號], [中文欄位名稱], [英文欄位名稱], [台大雲林欄位名稱], [台大體系醫整庫欄位名稱], [台灣癌症登記中心], [雲醫癌AI模組] FROM [CancerRegistry_FieldMap]")
         rows = cursor.fetchall()
         conn.close()
 
@@ -211,7 +211,7 @@ def process_file_logic(file_path, format_id, selected_date_cols_raw, extra_cols,
 
         conn = get_conn()
         cursor = conn.cursor()
-        cursor.execute("SELECT [序號], [中文欄位名稱], [英文欄位名稱], [台大雲林欄位名稱], [台大體系醫整庫欄位名稱], [台灣癌症登記中心], [雲醫癌AI模組] FROM [Hospital_data].[dbo].[CancerRegistry_FieldMap]")
+        cursor.execute("SELECT [序號], [中文欄位名稱], [英文欄位名稱], [台大雲林欄位名稱], [台大體系醫整庫欄位名稱], [台灣癌症登記中心], [雲醫癌AI模組] FROM [CancerRegistry_FieldMap]")
         rows = cursor.fetchall()
         conn.close()
 
@@ -220,7 +220,7 @@ def process_file_logic(file_path, format_id, selected_date_cols_raw, extra_cols,
              # 透過資料庫查詢 FmtID 對應的 FmtName (如 50, 115, 129)
              conn_gen = get_conn()
              cursor_gen = conn_gen.cursor()
-             cursor_gen.execute("SELECT FmtName FROM [Hospital_data].[dbo].[DataFormat] WHERE FmtID = ?", (str(format_id).strip(),))
+             cursor_gen.execute("SELECT FmtName FROM [DataFormat] WHERE FmtID = ?", (str(format_id).strip(),))
              row_gen = cursor_gen.fetchone()
              conn_gen.close()
              
@@ -488,7 +488,7 @@ def process_file_logic(file_path, format_id, selected_date_cols_raw, extra_cols,
         fmt_prefix = f"fmt{fmt_name}_" if (format_id and 'fmt_name' in locals() and fmt_name) else ""
         
         out_filename = f"Gen_{fmt_prefix}{orig_base}_{scheme_display}{orig_ext}"
-        out_path = os.path.join('data/temp', out_filename)
+        out_path = os.path.join(os.path.dirname(file_path), out_filename)
         
         if ext == ".xlsx": df.to_excel(out_path, index=False)
         else: df.to_csv(out_path, index=False, encoding="utf-8-sig")

@@ -1,0 +1,96 @@
+(() => {
+  const labels = { queued: '處理中', running: '處理中', retrying: '處理中', completed: '已完成', partial_failed: '部分完成', failed: '處理失敗', cancelled: '已取消' };
+  const value = (task, key) => task[key] ?? task[key[0].toLowerCase() + key.slice(1)];
+  const esc = (text) => String(text ?? '').replace(/[&<>'"`]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;', '`': '&#x60;' }[char]));
+  const filters = { query: '', status: '' };
+  let tasks = [];
+  const selectedTaskIds = new Set();
+  const taskPanel = document.querySelector('#annualLlmTaskPanel');
+  const taskTypes = taskPanel?.dataset.llmTaskType === 'comparison_report' ? ['comparison_report'] : ['chart', 'annual_report'];
+  const taskList = taskPanel?.querySelector('#llmTaskList');
+
+  const formatDate = (text) => {
+    if (!text) return '尚未開始';
+    const date = new Date(text);
+    if (Number.isNaN(date.getTime())) return text;
+    const pad = (number) => String(number).padStart(2, '0');
+    return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  };
+  const duration = (startText, endText) => {
+    if (!startText) return '0 秒';
+    const start = new Date(startText); const end = endText ? new Date(endText) : new Date();
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return '0 秒';
+    const seconds = Math.max(0, Math.floor((end - start) / 1000));
+    return seconds >= 60 ? `${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒` : `${seconds} 秒`;
+  };
+  const visibleTasks = () => tasks.filter((task) => {
+    const status = String(value(task, 'Status') || '');
+    const text = [value(task, 'DocumentLabel'), value(task, 'TaskTitle'), value(task, 'TaskID'), labels[status]].join(' ').toLocaleLowerCase();
+    return (!filters.query || text.includes(filters.query.toLocaleLowerCase())) && (!filters.status || status === filters.status);
+  });
+  const render = () => {
+    if (!taskPanel || !taskList) return;
+    taskPanel.classList.remove('d-none');
+    const displayed = visibleTasks();
+    taskPanel.querySelector('#llmTaskCount').textContent = `顯示 ${displayed.length} / ${tasks.length} 筆任務`;
+    taskList.innerHTML = displayed.length ? displayed.map((task) => {
+      const status = String(value(task, 'Status') || 'queued'); const id = String(value(task, 'TaskID') || '');
+      const elapsed = duration(value(task, 'CreatedAt'), ['completed', 'partial_failed', 'failed', 'cancelled'].includes(status) ? value(task, 'CompletedAt') : null);
+      return `<article class="llm-task-row"><label class="llm-task-select" aria-label="選取任務 ${esc(id)}"><input class="task-cb" type="checkbox" value="${esc(id)}"${selectedTaskIds.has(id) ? ' checked' : ''}></label><div class="llm-task-row__content"><div class="llm-task-row__heading"><h3>${esc(value(task, 'DocumentLabel') || '年報分析')}</h3></div><div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; font-size:12px; margin-top:6px; color:var(--muted,#6b7280);"><span>建立時間：${esc(formatDate(value(task, 'CreatedAt')))}</span><span style="width:4px;height:4px;border-radius:50%;background:#d1d5db;flex-shrink:0;"></span><span>處理時間：${esc(elapsed)}</span><span style="width:4px;height:4px;border-radius:50%;background:#d1d5db;flex-shrink:0;"></span><span class="llm-task-status is-${esc(status)}">狀態：${esc(labels[status] || status)}</span></div></div><div class="llm-task-side"><span class="llm-task-id">${esc(id.slice(-5))}</span><div class="llm-task-side__bottom"><div class="llm-task-row__actions"><button class="btn btn-sm btn-outline-dark llm-preview" type="button" data-id="${esc(id)}" data-type="${esc(value(task, 'TaskType'))}">預覽</button>${value(task, 'TaskType') === 'annual_report' && status === 'completed' ? `<button class="btn btn-sm btn-success llm-export" type="button" data-id="${esc(id)}">匯出</button>` : ''}<button class="btn btn-sm btn-danger llm-row-delete" type="button" data-id="${esc(id)}">刪除</button></div></div></div></article>`;
+    }).join('') : `<div class="llm-task-empty">${tasks.length ? '找不到符合搜尋或狀態條件的任務。' : '目前尚無工作任務。'}</div>`;
+  };
+  const preview = (id, taskType) => { window.location.assign((taskType === 'comparison_report' ? '/comparison-preview/' : '/dashboard-preview/') + encodeURIComponent(id)); };
+  const load = async () => {
+    try {
+      const response = await fetch('/api/llm-tasks?limit=50');
+      const payload = await response.json();
+      if (response.ok && payload.success) {
+        tasks = (payload.tasks || []).filter((task) => taskTypes.includes(value(task, 'TaskType')));
+      }
+    } catch (e) {}
+    render();
+    if (tasks.some((task) => ['queued', 'running', 'retrying'].includes(value(task, 'Status')))) {
+      setTimeout(() => load().catch(() => {}), 3000);
+    }
+  };
+  const bindPanelEvents = () => {
+    if (!taskPanel || !taskList) return;
+    taskPanel.querySelector('#llmTaskQuery').addEventListener('input', (event) => { filters.query = event.target.value; render(); });
+    taskPanel.querySelector('#llmTaskStatus').addEventListener('change', (event) => { filters.status = event.target.value; render(); });
+    taskPanel.querySelector('#btnResetTaskFilters').addEventListener('click', () => {
+      filters.query = ''; filters.status = '';
+      taskPanel.querySelector('#llmTaskQuery').value = '';
+      taskPanel.querySelector('#llmTaskStatus').value = '';
+      render();
+    });
+    taskPanel.querySelector('#btnRefreshTasks').addEventListener('click', () => load());
+    taskPanel.querySelector('#btnSelectAllTasks').addEventListener('click', () => {
+      taskList.querySelectorAll('.task-cb').forEach((item) => { item.checked = true; selectedTaskIds.add(item.value); });
+    });
+    taskPanel.querySelector('#btnClearTaskSelection').addEventListener('click', () => {
+      selectedTaskIds.clear(); taskList.querySelectorAll('.task-cb').forEach((item) => { item.checked = false; });
+    });
+    taskPanel.querySelector('#btnBatchDelete').addEventListener('click', async () => {
+      const ids = [...taskList.querySelectorAll('.task-cb:checked')].map((item) => item.value);
+      if (!ids.length || !confirm(`確定要刪除 ${ids.length} 筆工作任務嗎？`)) return;
+      await Promise.all(ids.map((id) => fetch(`/api/llm-tasks/${encodeURIComponent(id)}`, { method: 'DELETE' })));
+      await load();
+    });
+    taskList.addEventListener('change', (event) => {
+      if (!event.target.matches('.task-cb')) return;
+      if (event.target.checked) selectedTaskIds.add(event.target.value); else selectedTaskIds.delete(event.target.value);
+    });
+    taskList.addEventListener('click', async (event) => {
+      const button = event.target.closest('button');
+      if (!button) return;
+      if (button.matches('.llm-preview')) preview(button.dataset.id, button.dataset.type);
+      if (button.matches('.llm-export')) window.location.assign('/dashboard-preview/' + encodeURIComponent(button.dataset.id) + '?export=1');
+      if (button.matches('.llm-row-delete') && confirm('確定要刪除此工作任務嗎？')) {
+        await fetch(`/api/llm-tasks/${encodeURIComponent(button.dataset.id)}`, { method: 'DELETE' });
+        await load();
+      }
+    });
+  };
+  document.addEventListener('DOMContentLoaded', () => { bindPanelEvents(); load().catch(() => {}); });
+  window.addEventListener('llm-task-created', () => load().catch(() => {}));
+})();

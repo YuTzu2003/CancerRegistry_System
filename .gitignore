@@ -6,8 +6,11 @@ dist/
 wheels/
 other/
 Jobs/
+.codex/
+.agents
+.hallmark/
 *.egg-info
-
+*.bak
 # Virtual environments
 .venv
 *.lock
@@ -24,6 +27,5 @@ Jobs/
 AGENTS.md
 CLAUDE.md
 GEMINI.md
-
+tasks
 node_modules/
-.codex/

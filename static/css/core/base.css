@@ -1,0 +1,18 @@
+.nav-link.submenu-active {
+    background: var(--gray-200) !important;
+    color: var(--gray-900) !important;
+    font-weight: 600;
+  }
+  .nav-link.submenu-active .nav-icon {
+    color: var(--gray-800) !important;
+  }
+  [data-theme="dark"] .nav-link.submenu-active {
+    background: rgba(255, 255, 255, 0.2) !important;
+    color: #ffffff !important;
+  }
+  [data-theme="dark"] .nav-link.submenu-active .nav-icon {
+    color: #e2e8f0 !important;
+  }
+  .nav-link[aria-expanded="true"] .submenu-icon {
+    transform: rotate(180deg);
+  }

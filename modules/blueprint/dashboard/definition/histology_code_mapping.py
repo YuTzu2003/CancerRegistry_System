@@ -1,11 +1,4 @@
-"""年度組織型態代碼表的讀取與判定。
-
-``histology_code_mapping`` 保留國健署各年度的原始對照資料；報表分析時，
-會在分析年度起始年前兩年到結束年間，採用最新年度的對照名稱。
-"""
-
 from modules.services.db import get_conn
-
 
 _COLUMN_ALIASES = {
     "code_year": ("CodeYear", "code_year", "年度"),
@@ -39,7 +32,7 @@ def normalize_code(value, width=0):
 def _available_columns(cursor):
     cursor.execute(
         "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS "
-        "WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'histology_code_mapping'"
+        "WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'Histology_code_mapping'"
     )
     return {str(row[0]).lower(): str(row[0]) for row in cursor.fetchall()}
 
@@ -77,7 +70,7 @@ def get_histology_code_rules():
                 select_fields.append(f"[{column}] AS [{field}]")
             else:
                 select_fields.append(f"NULL AS [{field}]")
-        cursor.execute(f"SELECT {', '.join(select_fields)} FROM dbo.histology_code_mapping")
+        cursor.execute(f"SELECT {', '.join(select_fields)} FROM dbo.Histology_code_mapping")
         columns = [item[0] for item in cursor.description]
         return [dict(zip(columns, row)) for row in cursor.fetchall()]
     except Exception as exc:

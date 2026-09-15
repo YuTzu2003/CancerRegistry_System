@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>帳號驗證｜癌症資料登記</title>
+  <link rel="stylesheet" href="/static/vendor/noto-sans-tc/noto-sans-tc.css">
+  <link href="/static/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/static/vendor/bootstrap-icons/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="/static/css/core/style.css">
+  <link rel="stylesheet" href="/static/css/auth/login.css">
+  <style>
+    .account-card { max-width: 420px; padding: 0; overflow: hidden; }
+    .account-card-head { padding: 30px 40px 22px; text-align: center; border-bottom: 1px solid var(--border); }
+    .account-card-brand { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 20px; color: var(--muted); font-size: 13px; font-weight: 600; }
+    .account-card-brand img { width: 28px; height: 28px; object-fit: contain; }
+    .account-card-icon { width: 46px; height: 46px; border-radius: 14px; display: inline-flex; align-items: center; justify-content: center; background: #eff6ff; color: #2563eb; font-size: 22px; margin-bottom: 14px; }
+    .account-card-body { padding: 26px 40px 30px; }
+    .account-card .form-field { margin-bottom: 18px; }
+    .account-card label { display: block; font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+    .account-help { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; color: var(--muted); font-size: 13px; line-height: 1.6; margin: 2px 0 22px; }
+    .account-help i { color: #2563eb; margin-top: 2px; }
+    .account-card .login-btn { width: 100%; margin-top: 6px; }
+    .account-back { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; text-decoration: none; margin-top: 22px; }
+    .account-back:hover { color: #2563eb; }
+  </style>
+</head>
+<body>
+  <div class="login-wrapper">
+    <div class="login-card account-card">
+      <div class="account-card-head">
+        <div class="account-card-brand"><img src="/static/NTUH.png" alt="臺大醫院">癌症登記資料平台</div>
+        <div class="account-card-icon"><i class="bi {% block auth_icon %}bi-shield-lock{% endblock %}"></i></div>
+        <h1 class="login-title">{% block auth_title %}{% endblock %}</h1>
+        <p class="login-subtitle">{% block auth_subtitle %}{% endblock %}</p>
+      </div>
+      <div class="account-card-body">
+        {% with messages=get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <script id="loginFlashMessagesData" type="application/json">{{ messages | tojson }}</script>
+          {% endif %}
+        {% endwith %}
+        {% block auth_form %}{% endblock %}
+      </div>
+    </div>
+  </div>
+  <script src="/static/vendor/sweetalert2/sweetalert2.all.min.js"></script>
+  <script src="{{ url_for('static', filename='js/auth/login.js') }}"></script>
+</body>
+</html>

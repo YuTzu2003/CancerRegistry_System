@@ -1,0 +1,147 @@
+.export-section.card-flat {
+    box-shadow: none;
+    border: 1px solid var(--border);
+  }
+  .export-section .section-head {
+    background: var(--white);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 20px;
+  }
+  .export-section .section-head h2 {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--gray-700);
+    margin: 0;
+  }
+  .export-item {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: grab;
+    transition: background-color .15s ease, border-color .15s ease;
+  }
+  .export-item:hover {
+    background: var(--gray-50);
+    border-color: var(--gray-400);
+  }
+  .export-item:active {
+    cursor: grabbing;
+  }
+  .export-item.sortable-ghost {
+    opacity: 0.5;
+    background: var(--gray-100);
+    border: 1px dashed var(--gray-400);
+  }
+  .export-item-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+  }
+  .export-actions .badge {
+    font-size: 12px;
+    font-weight: 400;
+    padding: 4px 9px;
+    background: var(--gray-50) !important;
+    color: var(--gray-500) !important;
+    border: 1px solid var(--border);
+  }
+  .export-section .section-body {
+    padding: 20px;
+  }
+  .export-section .format-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 24px;
+    padding-bottom: 16px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+  }
+  .export-section .format-row .form-check-label {
+    font-weight: 400;
+    color: var(--text);
+    cursor: pointer;
+  }
+  .export-language-picker {
+    position: relative;
+    min-width: 132px;
+  }
+  .export-language-picker summary {
+    align-items: center;
+    background: var(--white);
+    border: 1px solid var(--gray-300);
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    font-size: .875rem;
+    height: 31px;
+    justify-content: center;
+    list-style: none;
+    padding: .25rem 2rem .25rem .5rem;
+    position: relative;
+  }
+  .export-language-picker summary::-webkit-details-marker { display: none; }
+  .export-language-picker summary::after {
+    border: solid currentColor;
+    border-width: 0 1px 1px 0;
+    content: '';
+    height: 6px;
+    position: absolute;
+    right: .75rem;
+    top: 10px;
+    transform: rotate(45deg);
+    width: 6px;
+  }
+  .export-language-picker-menu {
+    background: var(--white);
+    border: 1px solid var(--gray-300);
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, .12);
+    left: 0;
+    margin-top: 4px;
+    overflow: hidden;
+    position: absolute;
+    right: 0;
+    z-index: 20;
+  }
+  .export-language-option {
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    display: block;
+    font-size: .875rem;
+    padding: .45rem .5rem;
+    text-align: center;
+    width: 100%;
+  }
+  .export-language-option:hover { background: var(--gray-100); }
+  .export-section .action-row {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    text-align: right;
+  }
+  .export-section .btn-export {
+    background: var(--gray-800);
+    color: var(--white);
+    border: 1px solid var(--gray-800);
+  }
+  .export-section .btn-export:hover {
+    background: var(--gray-700);
+    border-color: var(--gray-700);
+  }
+  .export-section .btn-export-outline {
+    background: var(--white);
+    color: var(--gray-700);
+    border: 1px solid var(--gray-300);
+  }
+  .export-section .btn-export-outline:hover {
+    background: var(--gray-50);
+    border-color: var(--gray-400);
+  }

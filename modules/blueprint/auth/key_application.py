@@ -1,6 +1,7 @@
 from flask import Blueprint, flash, jsonify, redirect, render_template, request, session, url_for
 from modules.services.auth import login_required
 from modules.services.db import get_conn
+from modules.services.audit import write_audit_log
 
 key_application_bp = Blueprint("key_application", __name__, template_folder="templates")
 
@@ -42,6 +43,7 @@ def create_application():
     cursor.execute("INSERT INTO dbo.User_applications (UserID, Content, Usage_days, Status) VALUES (?, ?, ?, 'Pending')",session["userid"], content, int(usage_days),)
     conn.commit()
     conn.close()
+    write_audit_log("key_application_application_create", {"usage_days": int(usage_days)})
     flash("權限申請已送出，請等待管理員審核。", "success")
     return _return_to_applications()
 
@@ -52,8 +54,11 @@ def activate_application(application_id):
     conn = get_conn()
     cursor = conn.cursor()
     cursor.execute("UPDATE dbo.User_applications SET Status = 'Active', Start_time = GETDATE(), End_time = DATEADD(day, Usage_days, GETDATE()) WHERE Application_id = ? AND UserID = ? AND Status = 'Approved'", application_id, session["userid"])
+    updated = cursor.rowcount
     conn.commit()
     conn.close()
+    if updated:
+        write_audit_log("key_application_application_activate", {"application_id": application_id})
     flash("Key 已啟用，借用時間已開始計算。", "success")
     return _return_to_applications()
 
@@ -68,6 +73,7 @@ def delete_application(application_id):
     conn.close()
 
     if deleted:
+        write_audit_log("key_application_application_delete", {"application_id": application_id})
         flash("申請紀錄已刪除。", "success")
     else:
         flash("管理員已審核的申請不可刪除。", "warning")
