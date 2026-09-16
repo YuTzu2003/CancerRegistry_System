@@ -6,7 +6,7 @@ import pandas as pd
 from modules.blueprint.dashboard.definition.cancer_grouping import classify_cancer_group
 from modules.blueprint.dashboard.definition.cancer_group_rules import CANCER_GROUP_RULES
 from modules.blueprint.indicators.indicator_definitions import get_indicator_definitions
-from modules.blueprint.indicators.rules import _clean_code, _date_key, _find_column, apply_global_indicators_exclusions
+from modules.blueprint.indicators.exclusion_rules import _clean_code, _date_key, _find_column, apply_global_indicators_exclusions
 
 
 def _cancer_mask(frame, cancer_key):
@@ -52,7 +52,7 @@ def run_indicators_analysis(frame, cancers, year_start, year_end):
             reports.append({"cancer_key": cancer_key, "input_count": int(len(cancer_cases)), "indicators": [], "message": "此癌別尚未設定監測指標定義。"})
             continue
 
-        # All current oral definitions use hospital self-reported registry fields.
+        # Cancer-specific definitions identify whether shared exclusions apply.
         included_cases, audit_cases, global_summary = apply_global_indicators_exclusions(
             cancer_cases, is_hospital_self_reported=True
         )

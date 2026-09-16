@@ -1,79 +1,100 @@
-"""Version 115 indicators indicator definitions."""
-from modules.blueprint.indicators.calculators import (
-    calculate_oral_indicator_1,
-    calculate_oral_indicator_2,
-    calculate_oral_indicator_3,
-    calculate_oral_indicator_4,
-    calculate_oral_indicator_5,
-    calculate_oral_indicator_6,
-)
+"""Expose configured cancer-indicator rules to the indicators page."""
+from __future__ import annotations
 
+import pandas as pd
 
-INDICATOR_DEFINITIONS = {
-    "Oral_Cavity": [
-        {
-            "id": 1,
-            "direction": "正向指標",
-            "source": "hospital_self_reported",
-            "name": "口腔癌病人手術後6週內開始輔助治療（放射治療或化學放射治療）的比率。",
-            "numerator_definition": "分母中，手術後6週內開始輔助治療（放射治療或化學放射治療）的人數。",
-            "denominator_definition": "手術後接受輔助治療（放射治療或化學放射治療）的人數。",
-            "selection_reason": "會影響局部區域的控制：根據研究文獻，口腔癌接受術後輔助治療須在6週內給予，才能達到預期效果；超過6週對局部控制效果不佳。",
-            "registry_fields": "分母中，取放射治療開始日期（4.2.1.3）與申報醫院化學治療開始日期（4.3.4）較早者，減原發部位最確切的手術切除日期（4.1.2）≦42天。",
-            "notes": "申報醫院原發部位手術方式（4.1.4）=30–90，且符合以下任一：A. 手術日早於放射治療開始日；B. 手術日早於化學治療開始日，且放射治療開始日期不等於00000000。術後放射治療通常於手術後4–6週開始，應避免延遲超過6週，以降低頭頸癌局部區域復發率。",
-            "calculator": calculate_oral_indicator_1,
-        },
-        {
-            "id": 2,
-            "direction": "負向指標",
-            "source": "hospital_self_reported",
-            "name": "口腔癌病人手術後30天內死亡的比率。",
-            "numerator_definition": "分母中，手術後30天內死亡的人數。",
-            "denominator_definition": "口腔癌手術的人數。（排除緩和治療。）",
-            "selection_reason": "手術死亡率為醫院手術及術前評估品質的重要指標之一。",
-            "registry_fields": "分母中，生存狀態（5.4）=0，且最後聯絡或死亡日期（5.3）減原發部位最確切的手術切除日期（4.1.2）≦30天。",
-            "notes": "申報醫院原發部位手術方式（4.1.4）=30–90，且申報醫院緩和照護（4.4）=0。",
-            "calculator": calculate_oral_indicator_2,
-        },
-        {
-            "id": 3,
-            "direction": "負向指標",
-            "source": "hospital_self_reported",
-            "name": "口腔癌病人開始接受放射治療（不含化療）後90天內死亡的比率。",
-            "numerator_definition": "口腔癌病人開始接受放射治療（不含化療）後90天內死亡的人數。",
-            "denominator_definition": "口腔癌病人接受放射治療（不含化療）的人數。（排除緩和治療）",
-            "calculator": calculate_oral_indicator_3,
-        },
-        {
-            "id": 4,
-            "direction": "負向指標",
-            "source": "hospital_self_reported",
-            "name": "口腔癌病人開始接受同步化學治療及放射治療後90天內死亡的比率。",
-            "numerator_definition": "口腔癌病人開始接受同步化學治療及放射治療後90天內死亡的人數。",
-            "denominator_definition": "口腔癌病人接受同步化學治療及放射治療的人數。（排除緩和治療）",
-            "calculator": calculate_oral_indicator_4,
-        },
-        {
-            "id": 5,
-            "direction": "正向指標",
-            "source": "hospital_self_reported",
-            "name": "第一個口腔癌淋巴結病理檢查15顆（含）以上的比率。",
-            "numerator_definition": "分母中，口腔癌切除標本淋巴結病理檢查報告15顆（含）以上的人數。",
-            "denominator_definition": "第一個癌是口腔癌且接受頸部淋巴廓清術的人數。",
-            "calculator": calculate_oral_indicator_5,
-        },
-        {
-            "id": 6,
-            "direction": "負向指標",
-            "source": "hospital_self_reported",
-            "name": "病理切片證實為口腔鱗狀細胞癌並施行口腔根除性手術，其病理切緣（pathological margins）小於4 mm的比例。",
-            "numerator_definition": "病理切緣小於4 mm（不包含4 mm）的人數；若有多個手術切緣距離，採最近距離。",
-            "denominator_definition": "口腔鱗狀細胞癌施行根除性手術且有紀錄病理切緣的人數。（排除病理切緣不詳者及病理報告描述手術切緣為非侵襲癌。）",
-            "calculator": calculate_oral_indicator_6,
-        },
-    ],
+from modules.blueprint.indicators.cancer_indicator import ORAL_CANCER_RULES
+from modules.blueprint.indicators.exclusion_rules import _find_column
+from modules.blueprint.indicators.rule import evaluate_rule
+
+RULES_BY_CANCER = {"Oral_Cavity": ORAL_CANCER_RULES}
+
+FIELD_SPECS = {
+    "surgery_code": ("4.1.4", ("申報醫院原發部位手術方式",)),
+    "surgery_date": ("4.1.2", ("原發部位最確切的手術切除日期",)),
+    "radiation_date": ("4.2.1.3", ("放射治療開始日期",)),
+    "radiation_dose": ("4.2.2.2.2", ("最高放射劑量臨床標靶體積劑量",)),
+    "chemotherapy_code": ("4.3.3", ("申報醫院化學治療",)),
+    "chemotherapy_date": ("4.3.4", ("申報醫院化學治療開始日期",)),
+    "palliative_care": ("4.4", ("申報醫院緩和照護",)),
+    "survival_status": ("5.4", ("生存狀態",)),
+    "last_contact_date": ("5.3", ("最後聯絡或死亡日期",)),
+    "lymph_nodes_examined": ("2.14", ("區域淋巴結檢查數目",)),
+    "sequence_number": ("2.2", ("癌症發生順序號碼",)),
+    "histology": ("2.8", ("組織型態",)),
+    "margin_distance": ("4.1.5.1", ("原發部位手術切緣距離",)),
 }
 
 
+def _column_map(frame):
+    return {
+        field: _find_column(frame.columns, code, aliases)
+        for field, (code, aliases) in FIELD_SPECS.items()
+    }
+
+
+def _calculator_for(rule):
+    def calculator(frame):
+        columns = _column_map(frame)
+        denominator_values = []
+        numerator_values = []
+        for _, row in frame.iterrows():
+            record = {field: row[column] if column else None for field, column in columns.items()}
+            denominator = bool(evaluate_rule(record, rule["denominator"]))
+            numerator = denominator and bool(evaluate_rule(record, rule["numerator"]))
+            denominator_values.append(denominator)
+            numerator_values.append(numerator)
+        return {
+            "denominator_mask": pd.Series(denominator_values, index=frame.index, dtype=bool),
+            "numerator_mask": pd.Series(numerator_values, index=frame.index, dtype=bool),
+        }
+    return calculator
+
+
+def _metadata_by_indicator(cancer_key):
+    """Read editable display text; calculations always remain code-driven."""
+    try:
+        from modules.database import get_conn
+        conn = get_conn()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT indicator_no, selection_reason, numerator_definition,
+                       denominator_definition, notes
+                FROM dbo.indicator_definition_metadata
+                WHERE cancer_group_key = ?
+                """,
+                (str(cancer_key or ""),),
+            )
+            return {
+                int(row[0]): {
+                    "selection_reason": row[1] or "",
+                    "numerator_definition": row[2] or "",
+                    "denominator_definition": row[3] or "",
+                    "notes": row[4] or "",
+                }
+                for row in cursor.fetchall()
+            }
+        finally:
+            conn.close()
+    except Exception:
+        return {}
+
+
 def get_indicator_definitions(cancer_key):
-    return INDICATOR_DEFINITIONS.get(str(cancer_key or ""), [])
+    rules = RULES_BY_CANCER.get(str(cancer_key or ""), {})
+    metadata = _metadata_by_indicator(cancer_key)
+    return [
+        {
+            "id": number,
+            "direction": rule["type"],
+            "name": rule["name"],
+            "selection_reason": metadata.get(number, {}).get("selection_reason", ""),
+            "numerator_definition": metadata.get(number, {}).get("numerator_definition", "") or "依已設定的分子規則計算。",
+            "denominator_definition": metadata.get(number, {}).get("denominator_definition", "") or "依已設定的分母規則計算。",
+            "notes": metadata.get(number, {}).get("notes", ""),
+            "calculator": _calculator_for(rule),
+        }
+        for number, rule in sorted(rules.items())
+    ]

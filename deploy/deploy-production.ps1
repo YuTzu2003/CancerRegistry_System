@@ -1,5 +1,6 @@
 param(
-    [switch]$InitializeDatabase
+    [switch]$InitializeDatabase,
+    [switch]$SkipLlmReadinessCheck
 )
 
 $ErrorActionPreference = "Stop"
@@ -142,8 +143,13 @@ if (-not $allHealthy) { throw "One or more Waitress workers did not become ready
 if (-not (Test-Health "http://127.0.0.1:${publicPort}/health")) { throw "IIS + ARR did not become ready on public port $publicPort." }
 if (@(Get-ScheduledTask -TaskName "CancerRegistrySystem-LLM-??" -ErrorAction Stop).Count -ne $llmWorkerCount) { throw "Not every LLM worker scheduled task was registered." }
 Test-DatabaseConnection
-Write-Host "Phase: checking the LLM provider."
-& (Join-Path $projectRoot ".venv\Scripts\python.exe") .\deploy\check_llm_readiness.py
-if ($LASTEXITCODE -ne 0) { throw "LLM provider readiness failed. Read tasks\\logs\\cancer-registry-llm-*.log" }
+if ($SkipLlmReadinessCheck) {
+    Write-Warning "Skipping LLM provider readiness check. Configure and verify the LLM provider before using LLM features."
+}
+else {
+    Write-Host "Phase: checking the LLM provider."
+    & (Join-Path $projectRoot ".venv\Scripts\python.exe") .\deploy\check_llm_readiness.py
+    if ($LASTEXITCODE -ne 0) { throw "LLM provider readiness failed. Read tasks\\logs\\cancer-registry-llm-*.log" }
+}
 
 Write-Host "Deployment completed. Open http://<server-ip>:$publicPort/"
