@@ -37,7 +37,10 @@ def date_value(frame, column):
             return pd.NaT
         digits = re.sub(r"\D", "", text)
         if len(digits) >= 8:
-            return pd.to_datetime(digits[:8], format="%Y%m%d", errors="coerce")
+            date_digits = digits[:8]
+            if date_digits[6:8] == "99":
+                date_digits = f"{date_digits[:6]}01"
+            return pd.to_datetime(date_digits, format="%Y%m%d", errors="coerce")
         return pd.to_datetime(text, errors="coerce")
 
     return frame[column].map(parse)

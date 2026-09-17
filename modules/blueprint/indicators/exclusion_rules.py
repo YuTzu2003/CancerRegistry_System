@@ -47,13 +47,16 @@ def _find_column(columns, code=None, aliases=()):
 
 
 def _date_key(value):
-    """Return a sortable diagnosis date; invalid values sort after valid ones."""
+    """Return a sortable diagnosis date; treat an unknown day (99) as day 01."""
     text = _clean_code(value)
     if text in {"", "00000000", "88888888", "99999999"}:
         return pd.Timestamp.max
     digits = re.sub(r"\D", "", text)
     if len(digits) >= 8:
-        parsed = pd.to_datetime(digits[:8], format="%Y%m%d", errors="coerce")
+        date_digits = digits[:8]
+        if date_digits[6:8] == "99":
+            date_digits = f"{date_digits[:6]}01"
+        parsed = pd.to_datetime(date_digits, format="%Y%m%d", errors="coerce")
     else:
         parsed = pd.to_datetime(text, errors="coerce")
     return parsed if not pd.isna(parsed) else pd.Timestamp.max
@@ -95,9 +98,10 @@ def _annual_ajcc_stage(row, columns):
     pathology_stage = _clean_code(row.get(columns["path_stage"], "")).upper() if columns["path_stage"] else ""
     clinical_stage = _clean_code(row.get(columns["clinical_stage"], "")) if columns["clinical_stage"] else ""
     surgery_date = _clean_code(row.get(columns["surgery_date"], "")) if columns["surgery_date"] else ""
+    surgery_date_digits = re.sub(r"\D", "", surgery_date)
 
     # Same selection order as dashboard.period_rule.ajcc_stages.
-    if pathology_prefix in {"4", "6"} or surgery_date == "00000000" or pathology_stage == "BBB":
+    if pathology_prefix in {"4", "6"} or surgery_date_digits == "00000000" or pathology_stage == "BBB":
         return clinical_stage
     return pathology_stage
 
@@ -110,6 +114,29 @@ def _annual_ajcc_exclusion_reason(selected_stage):
     if not stage or stage in {"999", "9999"}:
         return "AJCC期別不明"
     return ""
+
+
+def _apply_ajcc_stage_exclusion(audit, columns, warnings):
+    """Exclude eligible rows whose annual-report AJCC stage is unknown or not applicable."""
+    required = ("clinical_stage", "path_stage", "path_prefix", "surgery_date")
+    missing = [name for name in required if not columns[name]]
+    if missing:
+        warnings.append("缺少AJCC期別判定欄位，未套用期別不明／不適用排除規則。")
+        return
+
+    selected_stages = audit.apply(lambda row: _annual_ajcc_stage(row, columns), axis=1)
+    exclusion_reasons = selected_stages.map(_annual_ajcc_exclusion_reason)
+    currently_included = audit["指標模組納入統計"].astype(bool)
+    _append_reason(
+        audit,
+        currently_included & exclusion_reasons.eq("AJCC期別不明"),
+        "AJCC期別不明",
+    )
+    _append_reason(
+        audit,
+        currently_included & exclusion_reasons.eq("AJCC期別不適用"),
+        "AJCC期別不適用",
+    )
 
 
 def _cancer_key(row, site_col, hist_col, behavior_col, diagnosis_col, ajcc_ed_col):
@@ -216,8 +243,9 @@ def _apply_duplicate_exclusion(audit, columns, warnings):
 def apply_global_indicators_exclusions(dataframe: pd.DataFrame, *, is_hospital_self_reported: bool = True):
     """Apply the version-115 shared exclusions and return an auditable result.
 
-    Class and cross-hospital exclusions are applied first. Duplicate selection
-    runs only across the remaining eligible rows when its source fields exist.
+    Class, cross-hospital, and AJCC-stage exclusions are applied first.
+    Duplicate selection runs only across the remaining eligible rows when its
+    source fields exist.
     """
     audit = dataframe.copy()
     audit["指標模組納入統計"] = True
@@ -253,6 +281,7 @@ def apply_global_indicators_exclusions(dataframe: pd.DataFrame, *, is_hospital_s
     else:
         warnings.append("缺少跨院治療判定欄位，未套用跨院治療排除規則。")
 
+    _apply_ajcc_stage_exclusion(audit, columns, warnings)
     duplicate_exclusion_count = _apply_duplicate_exclusion(audit, columns, warnings)
 
     included = audit.loc[audit["指標模組納入統計"]].copy()

@@ -36,12 +36,14 @@ def to_int(value: Any) -> int | None:
 
 
 def parse_date(value: Any) -> date | None:
-    """將 YYYYMMDD 轉成日期；空值、00000000 或錯誤日期回傳 None。"""
+    """將 YYYYMMDD 轉成日期；日為99時按癌登規則以01計算。"""
     if value is None:
         return None
     text = str(value).strip()
     if text in INVALID_DATE_VALUES:
         return None
+    if len(text) == 8 and text.isdigit() and text[6:8] == "99":
+        text = f"{text[:6]}01"
     try:
         return datetime.strptime(text, "%Y%m%d").date()
     except ValueError:

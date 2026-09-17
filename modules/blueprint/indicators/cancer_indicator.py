@@ -18,6 +18,26 @@ def _solid_histology_exclusion_rule() -> dict[str, Any]:
 
 # 癌別層級基礎收案規則。必須先符合此處條件，才執行個別指標分母與分子。
 CANCER_BASE_RULES: dict[str, dict[str, Any]] = {
+    "Oral_Cavity": {
+        "op": "all",
+        "rules": [
+            {"op": "text_in", "field": "case_classification", "values": ["1", "2"]},
+            {"op": "code_prefix_in", "field": "site", "values": ["C00", "C02", "C03", "C04", "C05", "C06"]},
+            {
+                "op": "not",
+                "rule": {"op": "code_in", "field": "site", "values": ["C024", "C051", "C052"]},
+            },
+            _solid_histology_exclusion_rule(),
+        ],
+    },
+    "Esophagus": {
+        "op": "all",
+        "rules": [
+            {"op": "text_in", "field": "case_classification", "values": ["1", "2"]},
+            {"op": "code_prefix_in", "field": "site", "values": ["C15"]},
+            _solid_histology_exclusion_rule(),
+        ],
+    },
     "Pancreas": {
         "op": "all",
         "rules": [
@@ -381,15 +401,13 @@ ESOPHAGEAL_CANCER_RULES: dict[int, dict[str, Any]] = {
 }
 
 
-# 胰臟癌指標 4-9 限定的腺癌組織型態（工作表「胰臟癌(念)」A2、A32:A34）。
+# 胰臟癌指標
 PANCREATIC_ADENOCARCINOMA_HISTOLOGIES = [
     "8020", "8035", "8140", "8141", "8144", "8148", "8255",
     "8310", "8323", "8440", "8441", "8453", "8470", "8480",
     "8481", "8490", "8500", "8503", "8552", "8560", "8510",
 ]
 
-
-# 胰臟癌指標
 PANCREATIC_CANCER_RULES: dict[int, dict[str, Any]] = {
     1: {
         "name": "胰臟癌病人首次治療前有組織學或細胞學診斷的比率",
@@ -399,6 +417,7 @@ PANCREATIC_CANCER_RULES: dict[int, dict[str, Any]] = {
             "rules": [
                 {"op": "text_in", "field": "case_classification", "values": ["1", "2"]},
                 {"op": "text_equals", "field": "behavior", "value": "3"},
+                {"op": "valid_date", "field": "microscopic_confirmation_date"},
                 {"op": "text_not_in", "field": "palliative_care", "values": ["7"]},
                 {"op": "valid_date", "field": "first_treatment_date"},
             ],
@@ -629,7 +648,6 @@ CERVICAL_CANCER_RULES: dict[int, dict[str, Any]] = {
     },
     5: {
         "name": "指定FIGO期別子宮頸癌首次接受放療時合併化療的比率",
-        # 原始工作表未填指標屬性，因此不自行判定正向或負向。
         "type": "unspecified",
         "denominator": {
             "op": "all",
@@ -655,7 +673,7 @@ CERVICAL_CANCER_RULES: dict[int, dict[str, Any]] = {
 }
 
 
-# 肺癌指標。is_nsclc 由共用欄位整理層依組織型態判定，規則檔不重複維護代碼表。
+# 肺癌指標
 LUNG_CANCER_RULES: dict[int, dict[str, Any]] = {
     1: {
         "name": "臨床第IB至II期非小細胞肺癌手術淋巴結取樣至少3個位置的比率",
@@ -748,11 +766,27 @@ BREAST_CANCER_RULES: dict[int, dict[str, Any]] = {
             "op": "all",
             "rules": [
                 {
-                    "op": "text_in",
-                    "field": "her2",
-                    "values": [
-                        "103", "201", "301", "401", "501", "901",
-                        "511", "521", "591", "530", "531", "532",
+                    "op": "any",
+                    "rules": [
+                        {
+                            "op": "text_in",
+                            "field": "her2",
+                            "values": ["103", "201", "301", "401", "501", "901"],
+                        },
+                        {
+                            "op": "all",
+                            "rules": [
+                                {"op": "date_year_between", "field": "diagnosis_date", "min": 2023, "max": 2023},
+                                {"op": "text_in", "field": "her2", "values": ["511", "521", "591"]},
+                            ],
+                        },
+                        {
+                            "op": "all",
+                            "rules": [
+                                {"op": "date_year_between", "field": "diagnosis_date", "min": 2024, "max": 2024},
+                                {"op": "text_in", "field": "her2", "values": ["530", "531", "532"]},
+                            ],
+                        },
                     ],
                 },
                 {"op": "between", "field": "positive_lymph_nodes", "min": 1, "max": 97},
@@ -773,7 +807,7 @@ BREAST_CANCER_RULES: dict[int, dict[str, Any]] = {
 }
 
 
-# 集中註冊癌別規則；key 與監測指標介面的癌別 value 一致。
+# 癌別收案條件
 INDICATOR_RULES: dict[str, dict[int, dict[str, Any]]] = {
     "Oral_Cavity": ORAL_CANCER_RULES,
     "Esophagus": ESOPHAGEAL_CANCER_RULES,

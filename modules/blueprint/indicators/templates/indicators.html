@@ -780,10 +780,12 @@
       const excludedReasons = exclusion.excluded_by_reason || {};
       const classExclusionCount = Number(excludedReasons['個案分類非 class 1、2'] || 0);
       const crossHospitalCount = Number(excludedReasons['跨院治療個案'] || 0);
+      const ajccUnknownCount = Number(excludedReasons['AJCC期別不明'] || 0);
+      const ajccNotApplicableCount = Number(excludedReasons['AJCC期別不適用'] || 0);
       const duplicateCount = exclusion.duplicate_exclusion_count;
       const duplicateSummary = duplicateCount == null
-        ? '同院重複個案 ? 筆'
-        : `同院重複個案 ${Number(duplicateCount).toLocaleString()} 筆`;
+        ? '同院重複個案 共 ? 筆'
+        : `同院重複個案 共 ${Number(duplicateCount).toLocaleString()} 筆`;
       const warnings = (exclusion.warnings || []).map(warning => `<div class="small text-warning-emphasis mt-1">${escapeHtml(warning)}</div>`).join('');
       const rows = report.indicators.map((indicator) => `<tr>
         <td>${escapeHtml(cancerName)}</td>
@@ -798,7 +800,7 @@
       return `<div class="indicators-cancer-panel" data-indicators-cancer-panel="${escapeHtml(cancerKey)}"><div class="indicators-report-card mb-4">
         ${warnings}
         <div class="indicators-report-table-wrap"><table class="indicators-result-table"><caption>表、${escapeHtml(startSelect.value)}–${escapeHtml(endSelect.value)}年${escapeHtml(cancerName)}監測指標表<br><span class="text-muted fw-normal" style="font-size: 0.85em;">資料來源：癌症登記資料庫</span></caption><thead><tr><th>癌別</th><th>指標編號</th><th>指標名稱</th><th>分子定義</th><th>分母定義</th><th>分子件數</th><th>分母件數</th><th>監測結果(%)</th></tr></thead><tbody>${rows}</tbody></table></div>
-        <div class="small text-secondary mb-3">符合年度與癌別 共 ${Number(report.input_count || 0).toLocaleString()} 筆；排除 Class 0 或 Class 3 共 ${classExclusionCount.toLocaleString()} 筆、跨院治療個案 ${crossHospitalCount.toLocaleString()} 筆、${duplicateSummary}；最終納入 ${Number(report.included_count || 0).toLocaleString()} 筆</div>
+        <div class="small text-secondary mb-3">符合年度與癌別 共 ${Number(report.input_count || 0).toLocaleString()} 筆；排除 Class 0 或 Class 3 共 ${classExclusionCount.toLocaleString()} 筆、跨院治療個案 共 ${crossHospitalCount.toLocaleString()} 筆、AJCC期別不明 共 ${ajccUnknownCount.toLocaleString()} 筆、AJCC期別不適用 共 ${ajccNotApplicableCount.toLocaleString()} 筆、${duplicateSummary}；<span class="text-danger">最終納入 ${Number(report.included_count || 0).toLocaleString()} 筆</span></div>
         <div class="indicators-chart-heading">
           <div class="indicators-chart-title">${escapeHtml(startSelect.value)}–${escapeHtml(endSelect.value)}年${escapeHtml(cancerName)}監測指標分析圖</div>
           <div class="indicators-chart-source">資料來源：癌症登記資料庫</div>
