@@ -1,8 +1,5 @@
-"""Expose configured cancer-indicator rules to the indicators page."""
 from __future__ import annotations
-
 import pandas as pd
-
 from modules.blueprint.indicators.cancer_indicator import ORAL_CANCER_RULES
 from modules.blueprint.indicators.exclusion_rules import _find_column
 from modules.blueprint.indicators.rule import evaluate_rule
@@ -52,39 +49,42 @@ def _calculator_for(rule):
 
 
 def _metadata_by_indicator(cancer_key):
-    """Read editable display text; calculations always remain code-driven."""
+    from modules.services.db import get_conn
+
+    conn = get_conn()
     try:
-        from modules.database import get_conn
-        conn = get_conn()
-        try:
-            cursor = conn.cursor()
-            cursor.execute(
-                """
-                SELECT indicator_no, selection_reason, numerator_definition,
-                       denominator_definition, notes
-                FROM dbo.indicator_definition_metadata
-                WHERE cancer_group_key = ?
-                """,
-                (str(cancer_key or ""),),
-            )
-            return {
-                int(row[0]): {
-                    "selection_reason": row[1] or "",
-                    "numerator_definition": row[2] or "",
-                    "denominator_definition": row[3] or "",
-                    "notes": row[4] or "",
-                }
-                for row in cursor.fetchall()
+        cursor = conn.cursor()
+        cursor.execute( """SELECT indicator_no, selection_reason, numerator_definition,denominator_definition, notes FROM dbo.indicator_definition_metadata WHERE cancer_group_key = ?""",(str(cancer_key or ""),),)
+        return {
+            int(row[0]): {
+                "selection_reason": row[1] or "",
+                "numerator_definition": row[2] or "",
+                "denominator_definition": row[3] or "",
+                "notes": row[4] or "",
             }
-        finally:
-            conn.close()
-    except Exception:
-        return {}
+            for row in cursor.fetchall()
+        }
+    finally:
+        conn.close()
 
 
-def get_indicator_definitions(cancer_key):
+def get_indicator_metadata(cancer_key):
+    """Return editable indicator definitions for display, even without a calculator."""
+    return [
+        {"id": number, **definition}
+        for number, definition in sorted(_metadata_by_indicator(cancer_key).items())
+    ]
+
+
+def get_indicator_definitions(cancer_key, metadata=None):
     rules = RULES_BY_CANCER.get(str(cancer_key or ""), {})
-    metadata = _metadata_by_indicator(cancer_key)
+    if metadata is None:
+        metadata = _metadata_by_indicator(cancer_key)
+    elif isinstance(metadata, list):
+        metadata = {
+            definition["id"]: {key: value for key, value in definition.items() if key != "id"}
+            for definition in metadata
+        }
     return [
         {
             "id": number,

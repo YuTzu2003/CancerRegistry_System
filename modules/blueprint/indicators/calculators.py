@@ -1,16 +1,7 @@
-"""Shared calculation helpers for cancer-indicator rules.
-
-Cancer-specific numerator and denominator calculators are added only after
-that cancer's definition has been confirmed.
-"""
 from __future__ import annotations
-
 import re
-
 import pandas as pd
-
 from modules.blueprint.indicators.exclusion_rules import _clean_code
-
 
 def number_value(frame, column):
     """Return a numeric series, with missing or special values as NaN."""

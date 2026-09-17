@@ -148,6 +148,23 @@
     '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
   }[character]));
 
+  const renderDefinitionRows = (report, cancerName) => {
+    const metadata = report.indicator_definition_metadata || [];
+    if (!metadata.length) return '';
+    const rows = metadata.map((definition) => `<tr>
+      <td>${escapeHtml(cancerName)}</td>
+      <td>${escapeHtml(definition.id)}</td>
+      <td class="text-start">${escapeHtml(definition.selection_reason)}</td>
+      <td class="text-start">${escapeHtml(definition.numerator_definition)}</td>
+      <td class="text-start">${escapeHtml(definition.denominator_definition)}</td>
+      <td class="text-start">${escapeHtml(definition.notes)}</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+    </tr>`).join('');
+    return `<div class="table-responsive mt-3"><table class="table table-bordered align-middle text-center mb-0"><thead><tr><th>癌別</th><th>指標編號</th><th>收案條件</th><th>分子定義</th><th>分母定義</th><th>備註</th><th>分子件數</th><th>分母件數</th><th>監測結果</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  };
+
   const renderIndicatorsPreview = (result) => {
     const cancerLabels = Object.fromEntries(cancerInputs.map((input) => [
       input.value, input.parentElement.querySelector('span').childNodes[0].textContent.trim()
@@ -156,6 +173,8 @@
     const content = reports.map((report) => {
       const cancerName = cancerLabels[report.cancer_key] || report.cancer_key;
       if (!report.indicators || !report.indicators.length) {
+        const definitions = renderDefinitionRows(report, cancerName);
+        if (definitions) return `<div class="mb-3">${definitions}</div>`;
         return `<div class="alert alert-warning mb-3"><strong>${escapeHtml(cancerName)}</strong><div>${escapeHtml(report.message || '尚未設定監測指標定義。')}</div></div>`;
       }
       const exclusion = report.global_exclusions || {};
