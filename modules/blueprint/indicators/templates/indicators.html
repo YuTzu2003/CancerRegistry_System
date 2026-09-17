@@ -28,6 +28,9 @@
   </div>
 </div>
 
+<!-- ========================================================================= -->
+<!-- 步驟 1：上傳欲分析的資料檔案 (Excel / CSV)                                -->
+<!-- ========================================================================= -->
 <section class="indicators-step">
   <div class="indicators-step-title"><span class="indicators-step-number">1</span>上傳欲分析的資料</div>
   <div class="indicators-step-body">
@@ -39,6 +42,9 @@
   </div>
 </section>
 
+<!-- ========================================================================= -->
+<!-- 步驟 2：拉選欲分析的資料診斷年度 (起始年度至結束年度)                     -->
+<!-- ========================================================================= -->
 <section class="indicators-step">
   <div class="indicators-step-title"><span class="indicators-step-number">2</span>拉選欲分析的資料診斷年度</div>
   <div class="indicators-step-body">
@@ -47,6 +53,9 @@
   </div>
 </section>
 
+<!-- ========================================================================= -->
+<!-- 步驟 3：選擇癌症部位 (多選)                                               -->
+<!-- ========================================================================= -->
 <section class="indicators-step">
   <div class="indicators-step-title"><span class="indicators-step-number">3</span>選擇癌症部位</div>
   <div class="indicators-step-body">
@@ -58,6 +67,9 @@
   </div>
 </section>
 
+<!-- ========================================================================= -->
+<!-- 步驟 4：產生指標表內容預覽 (分子件數、分母件數、達成率)                   -->
+<!-- ========================================================================= -->
 <section class="indicators-step">
   <div class="indicators-step-title"><span class="indicators-step-number">4</span>產生指標表內容</div>
   <div class="indicators-step-body">
@@ -67,6 +79,9 @@
   </div>
 </section>
 
+<!-- ========================================================================= -->
+<!-- 步驟 5：指標合併檔下載 (依勾選需求匯出報表或加註資料)                     -->
+<!-- ========================================================================= -->
 <section class="indicators-step">
   <div class="indicators-step-title"><span class="indicators-step-number">5</span>指標合併檔下載</div>
   <div class="indicators-step-body">
@@ -83,6 +98,9 @@
 {% block extra_scripts %}
 <script>
 (() => {
+  // -------------------------------------------------------------------------
+  // 1. DOM 元素快取與狀態管理變數
+  // -------------------------------------------------------------------------
   const fileInput = document.getElementById('indicatorsFile');
   const uploadButton = document.getElementById('uploadIndicatorsFile');
   const fileStatus = document.getElementById('indicatorsFileStatus');
@@ -94,6 +112,9 @@
   let uploaded = false;
   let availableYears = [];
 
+  // -------------------------------------------------------------------------
+  // 2. 表單狀態更新與年度下拉選單連動
+  // -------------------------------------------------------------------------
   const updateReadyState = () => {
     const cancerSelected = cancerInputs.some(input => input.checked);
     previewButton.disabled = !(uploaded && startSelect.value && endSelect.value && cancerSelected);
@@ -112,6 +133,9 @@
   endSelect.addEventListener('change', updateReadyState);
   cancerInputs.forEach(input => input.addEventListener('change', updateReadyState));
 
+  // -------------------------------------------------------------------------
+  // 3. 事件監聽：檔案選取與上傳處理
+  // -------------------------------------------------------------------------
   uploadButton.addEventListener('click', async () => {
     const file = fileInput.files[0];
     if (!file) return;
@@ -144,6 +168,9 @@
     }
   });
 
+  // -------------------------------------------------------------------------
+  // 4. HTML 字串安全轉義與表格內容渲染
+  // -------------------------------------------------------------------------
   const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (character) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
   }[character]));
@@ -188,10 +215,10 @@
         <td class="text-start">${escapeHtml(indicator.denominator_definition)}</td>
         <td>${Number(indicator.numerator || 0).toLocaleString()}</td>
         <td>${Number(indicator.denominator || 0).toLocaleString()}</td>
-        <td>${indicator.percentage == null ? '-' : `${escapeHtml(indicator.percentage)}%`}</td>
+        <td>${indicator.percentage == null ? '—' : `${escapeHtml(indicator.percentage)}%`}</td>
       </tr>`).join('');
       return `<div class="mb-4">
-        <div class="small text-secondary mb-2">符合年度與癌別 ${Number(report.input_count || 0).toLocaleString()} 筆；共用排除規則後納入 ${Number(report.included_count || 0).toLocaleString()} 筆${reasonSummary ? `；排除：${reasonSummary}` : ''}。</div>
+        <div class="small text-secondary mb-2">符合年度與癌別 ${Number(report.input_count || 0).toLocaleString()} 筆；共用排除規則後納入 ${Number(report.included_count || 0).toLocaleString()} 筆；共排除 ${Number(exclusion.excluded_count || 0).toLocaleString()} 筆${reasonSummary ? `（${reasonSummary}）` : ''}。</div>
         ${warnings}
         <div class="table-responsive"><table class="table table-bordered align-middle text-center mb-0"><thead><tr><th>癌別</th><th>指標編號</th><th>指標名稱</th><th>分子定義</th><th>分母定義</th><th>分子件數</th><th>分母件數</th><th>監測結果(%)</th></tr></thead><tbody>${rows}</tbody></table></div>
       </div>`;
@@ -200,6 +227,9 @@
     preview.innerHTML = `<div class="mb-3"><strong>${escapeHtml(startSelect.value)}–${escapeHtml(endSelect.value)} 年指標結果預覽</strong></div>${content}`;
   };
 
+  // -------------------------------------------------------------------------
+  // 5. 事件監聽：送出指標計算請求並預覽結果
+  // -------------------------------------------------------------------------
   previewButton.addEventListener('click', async () => {
     const cancers = cancerInputs.filter(input => input.checked).map(input => input.value);
     const originalLabel = previewButton.innerHTML;

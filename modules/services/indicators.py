@@ -1,3 +1,10 @@
+"""
+指標模組服務層 (Indicators Service Blueprint)
+
+負責指標模組之前端頁面路由、分析資料檔上傳與診斷年度解析，
+以及指標分子分母分析之預覽計算 API。
+"""
+
 import os
 import re
 import uuid
@@ -7,13 +14,19 @@ from werkzeug.utils import secure_filename
 from modules.services.auth import login_required
 from modules.blueprint.indicators.analysis import run_indicators_analysis
 
-indicators_bp = Blueprint("indicators",__name__,template_folder="../blueprint/indicators/templates",)
+indicators_bp = Blueprint("indicators", __name__, template_folder="../blueprint/indicators/templates")
 
+# ---------------------------------------------------------------------------
+# 模組設定與常數
+# ---------------------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 INDICATORS_DATA_DIR = os.path.join(BASE_DIR, "tasks", "data", "indicators")
 ALLOWED_EXTENSIONS = {".xlsx", ".xls", ".csv"}
 YEAR_COLUMN_HINTS = ("didiag", "診斷日期", "診斷年度", "diagnosis date", "diagnosis year")
 
+# ---------------------------------------------------------------------------
+# 檔案讀取與欄位解析輔助函式
+# ---------------------------------------------------------------------------
 def _read_uploaded_file(path, extension, nrows=5000):
     options = {"nrows": nrows} if nrows is not None else {}
     if extension == ".csv":
@@ -39,6 +52,10 @@ def _extract_years(values):
             years.append(int(match.group(1)))
     return sorted(set(years))
 
+
+# ---------------------------------------------------------------------------
+# 頁面路由
+# ---------------------------------------------------------------------------
 @indicators_bp.route("/indicators")
 @login_required
 def indicators():
@@ -49,6 +66,10 @@ def indicators():
 def monitoring_legacy():
     return redirect(url_for("indicators.indicators"))
 
+
+# ---------------------------------------------------------------------------
+# API：資料檔案上傳與年份萃取
+# ---------------------------------------------------------------------------
 @indicators_bp.route("/api/monitoring/upload", methods=["POST"])
 @indicators_bp.route("/api/indicators/upload", methods=["POST"])
 @login_required
@@ -90,6 +111,11 @@ def upload_indicators_source():
         "year_column": str(year_column) if year_column is not None else "",
         "years": years,
     })
+
+
+# ---------------------------------------------------------------------------
+# API：指標預覽與運算
+# ---------------------------------------------------------------------------
 @indicators_bp.route("/api/monitoring/preview", methods=["POST"])
 @indicators_bp.route("/api/indicators/preview", methods=["POST"])
 @login_required

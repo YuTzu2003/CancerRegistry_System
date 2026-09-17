@@ -1,10 +1,26 @@
+"""
+指標分析核心邏輯 (Indicators Analysis Engine)
+
+負責依據使用者指定之診斷年度區間與癌別清單：
+1. 篩選指定年度與癌別個案。
+2. 套用全域共用排除規則（class 1/2、跨院治療、AJCC 期別不明/不適用、院內重複個案）。
+3. 執行各指標之分子與分母運算。
+4. 進行分子不大於分母之防呆校驗並回傳彙整報表。
+"""
+
 from __future__ import annotations
+import logging
 import pandas as pd
 from modules.blueprint.dashboard.definition.cancer_grouping import classify_cancer_group
 from modules.blueprint.dashboard.definition.cancer_group_rules import CANCER_GROUP_RULES
-from modules.blueprint.indicators.indicator_definitions import (get_indicator_definitions,get_indicator_metadata,)
+from modules.blueprint.indicators.indicator_definitions import (get_indicator_definitions, get_indicator_metadata)
 from modules.blueprint.indicators.exclusion_rules import _clean_code, _date_key, _find_column, apply_global_indicators_exclusions
 
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# 特定癌別收案準則（原發部位與組織型態條件）
+# ---------------------------------------------------------------------------
 INDICATOR_CANCER_CRITERIA = {
     "Ovary": {
         "sites": {"C569"},
@@ -31,6 +47,9 @@ INDICATOR_CANCER_CRITERIA = {
 }
 
 
+# ---------------------------------------------------------------------------
+# 代碼清洗與部位/組織型態標準化輔助函式
+# ---------------------------------------------------------------------------
 def _normalize_site(value):
     return _clean_code(value).upper().replace(".", "")
 
@@ -40,6 +59,9 @@ def _normalize_histology(value):
     return code.zfill(4) if code.isdigit() and len(code) < 4 else code
 
 
+# ---------------------------------------------------------------------------
+# 個案篩選遮罩（癌別與診斷年度）
+# ---------------------------------------------------------------------------
 def _indicator_cancer_mask(frame, cancer_key):
     criteria = INDICATOR_CANCER_CRITERIA[cancer_key]
     case_class_col = _find_column(frame.columns, "2.3", ("class", "個案分類"))
@@ -94,6 +116,41 @@ def _year_mask(frame, year_start, year_end):
     return years.between(int(year_start), int(year_end), inclusive="both").fillna(False), ""
 
 
+# ---------------------------------------------------------------------------
+# 唯一個案計數計算
+# ---------------------------------------------------------------------------
+def _unique_case_count(frame, mask):
+    selected = frame.loc[pd.Series(mask, index=frame.index).fillna(False).astype(bool)]
+    if selected.empty:
+        return 0
+
+    explicit_id = _find_column(
+        selected.columns,
+        aliases=("案件識別值", "個案識別值", "case_id", "record_id", "資料編號"),
+    )
+    if explicit_id:
+        values = selected[explicit_id].map(_clean_code)
+        return int(values[values.ne("")].nunique() + values.eq("").sum())
+
+    key_specs = (
+        ("1.1", ("申報醫院代碼", "醫院代碼")),
+        ("1.4", ("身分證統一編號", "身分證")),
+        ("2.6", ("原發部位", "site")),
+        ("2.5", ("最初診斷日期", "didiag")),
+        ("2.2", ("癌症發生順序號碼",)),
+    )
+    key_columns = [_find_column(selected.columns, code, aliases) for code, aliases in key_specs]
+    if not all(key_columns):
+        return int(len(selected))
+
+    keys = selected[key_columns].map(_clean_code)
+    complete = keys.ne("").all(axis=1)
+    return int(keys.loc[complete].drop_duplicates().shape[0] + (~complete).sum())
+
+
+# ---------------------------------------------------------------------------
+# 指標分析主流程
+# ---------------------------------------------------------------------------
 def run_indicators_analysis(frame, cancers, year_start, year_end):
     year_mask, error = _year_mask(frame, year_start, year_end)
     if error:
@@ -122,8 +179,18 @@ def run_indicators_analysis(frame, cancers, year_start, year_end):
         indicators = []
         for definition in definitions:
             masks = definition["calculator"](included_cases)
-            denominator = int(masks["denominator_mask"].sum())
-            numerator = int(masks["numerator_mask"].sum())
+            denominator = _unique_case_count(included_cases, masks["denominator_mask"])
+            numerator = _unique_case_count(included_cases, masks["numerator_mask"])
+            calculation_error = ""
+            if numerator > denominator:
+                calculation_error = "分子件數大於分母件數，已停止顯示監測結果。"
+                logger.error(
+                    "Indicator numerator exceeds denominator: cancer=%s indicator=%s numerator=%s denominator=%s",
+                    cancer_key,
+                    definition["id"],
+                    numerator,
+                    denominator,
+                )
             indicators.append({
                 "id": definition["id"],
                 "direction": definition["direction"],
@@ -132,7 +199,12 @@ def run_indicators_analysis(frame, cancers, year_start, year_end):
                 "denominator_definition": definition["denominator_definition"],
                 "numerator": numerator,
                 "denominator": denominator,
-                "percentage": round(numerator / denominator * 100, 1) if denominator else None,
+                "percentage": (
+                    round(numerator / denominator * 100, 1)
+                    if denominator and not calculation_error
+                    else None
+                ),
+                "calculation_error": calculation_error,
             })
         reports.append({
             "cancer_key": cancer_key,

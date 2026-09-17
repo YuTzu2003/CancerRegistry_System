@@ -1,12 +1,22 @@
 """
-口腔癌品質指標
-規則設定：欄位名稱可以依實際資料庫或 Excel 欄名調整
+各癌別品質指標規則定義 (Cancer Indicator Rules)
+
+本檔案集中定義各癌別之分子 (numerator) 與分母 (denominator) 規則邏輯，
+包含：
+1. 口腔癌 (Oral Cavity)
+2. 卵巢癌 (Ovary)
+3. 膀胱癌 (Bladder)
+4. 攝護腺癌 (Prostate)
+5. 子宮體癌 (Corpus Uteri)
 """
 
 from __future__ import annotations
 
 from typing import Any
 
+# ===========================================================================
+# 1. 口腔癌品質指標規則庫 (Oral Cavity)
+# ===========================================================================
 ORAL_CANCER_RULES: dict[int, dict[str, Any]] = {
     1: {
         "name": "口腔癌病人手術後 6 週內開始輔助治療（放射治療或化學放射治療)的比率。",
@@ -169,8 +179,6 @@ ORAL_CANCER_RULES: dict[int, dict[str, Any]] = {
 """食道癌品質指標
 注意：surgical_margin 等欄位包含英文字母，因此使用文字型運算子
 """
-
-
 ESOPHAGEAL_CANCER_RULES: dict[int, dict[str, Any]] = {
     1: {
         "name": "食道癌手術切除標本切除端無殘餘侵襲性癌細胞（R0切除）的比率",
@@ -290,3 +298,112 @@ ESOPHAGEAL_CANCER_RULES: dict[int, dict[str, Any]] = {
         },
     },
 }
+
+
+# ===========================================================================
+# 2. 已建置癌別基礎定義 (Owned Cancer Declarations)
+# ===========================================================================
+OWNED_CANCER_RULES: dict[str, dict[int, dict[str, Any]]] = {
+    "Ovary": {
+        2: {"name": "卵巢癌手術病人殘存腫瘤狀態及大小有詳細記載的比率。", "type": "positive"},
+        3: {"name": "卵巢癌手術病人無殘存腫瘤大小的比率。", "type": "positive"},
+    },
+    "Prostate": {
+        1: {"name": "新診斷攝護腺癌病人治療前有肛診檢查的比率。", "type": "positive"},
+        2: {"name": "新診斷攝護腺腺癌病人確診前三個月內有 PSA 值的比率。", "type": "positive"},
+        3: {"name": "局限性低風險病人採主動監測、觀察等待或觀察治療的比率。", "type": "observation"},
+        4: {"name": "局部侵犯型病人接受根治性體外放療且合併荷爾蒙治療的比率。", "type": "observation"},
+        5: {"name": "局部侵犯型病人接受攝護腺根除術治療的比率。", "type": "observation"},
+    },
+    "Bladder": {
+        1: {"name": "膀胱癌經尿道腫瘤切除術標本有固有肌肉層描述的比率。", "type": "positive"},
+        2: {"name": "接受膀胱切除術病人完成病理期別的比率。", "type": "positive"},
+        3: {"name": "接受膀胱根除性手術病人淋巴結至少檢查十顆的比率。", "type": "positive"},
+    },
+    "Corpus_Uteri": {
+        2: {"name": "第一型子宮內膜癌早期期別病人接受完整分期手術的比率。", "type": "positive"},
+        3: {"name": "第一型子宮內膜癌指定 FIGO 期別病人術後接受輔助治療的比率。", "type": "positive"},
+        4: {"name": "第一型子宮內膜癌 FIGO III 至 IVA 期病人術後接受輔助治療的比率。", "type": "positive"},
+        5: {"name": "子宮內膜癌病人於術後六十天內開始輔助治療的比率。", "type": "positive"},
+        6: {"name": "第二型子宮內膜癌病人接受完整分期手術的比率。", "type": "positive"},
+        7: {"name": "第二型子宮內膜癌病人術後接受輔助治療的比率。", "type": "positive"},
+    },
+}
+
+# ---------------------------------------------------------------------------
+# 組織型態群組、臨床試驗欄位與局部侵犯型判定共用條件
+# ---------------------------------------------------------------------------
+TYPE_I_HISTOLOGIES = [8380, 8382, 8383, 8480, 8560, 8570, 8140]
+TYPE_II_HISTOLOGIES = [8441, 8310, 8041, 8045, 8246, 8013, 8020, 8323, 8070, 8071, 8072, 8076]
+CLINICAL_TRIAL_FIELDS = [
+    "clinical_trial_432", "clinical_trial_433", "clinical_trial_435", "clinical_trial_436",
+    "clinical_trial_438", "clinical_trial_439", "clinical_trial_4313", "clinical_trial_4314",
+]
+LOCALLY_ADVANCED_PROSTATE = {"op": "all", "rules": [
+    {"op": "text_in_without_prefix", "field": "clinical_t", "prefix": "T", "values": ["3", "3A", "3B", "4"]},
+    {"op": "text_in_without_prefix", "field": "clinical_n", "prefix": "N", "values": ["0", "1"]},
+    {"op": "text_in_without_prefix", "field": "clinical_m", "prefix": "M", "values": ["0"]},
+    {"op": "text_in_without_prefix", "field": "pathological_m", "prefix": "M", "values": ["B"]},
+    {"op": "equals", "field": "palliative_care", "value": 0},
+    {"op": "all_fields_not_in", "fields": CLINICAL_TRIAL_FIELDS, "values": ["20", "21", "30", "31"]},
+    {"op": "equals", "field": "other_treatment", "value": 0},
+]}
+
+# ---------------------------------------------------------------------------
+# 3. 卵巢癌 (Ovary) 分子分母規則裝配
+# ---------------------------------------------------------------------------
+for _number in (2, 3):
+    OWNED_CANCER_RULES["Ovary"][_number].update({
+        "denominator": {"op": "all", "rules": [
+            {"op": "stage_first_char_in", "field": "pathological_stage", "values": ["2", "3", "4"]},
+            {"op": "between", "field": "surgery_code", "min": 25, "max": 90},
+            {"op": "present", "field": "ssf3"},
+            {"op": "not_in", "field": "ssf3", "values": [988]},
+        ]},
+        "numerator": (
+            {"op": "text_in", "field": "ssf3", "values": ["000", "010", "020", "030", "040"]}
+            if _number == 2 else {"op": "equals", "field": "ssf3", "value": 0}
+        ),
+    })
+
+# ---------------------------------------------------------------------------
+# 4. 膀胱癌 (Bladder) 分子分母規則裝配
+# ---------------------------------------------------------------------------
+OWNED_CANCER_RULES["Bladder"].update({
+    1: {**OWNED_CANCER_RULES["Bladder"][1], "denominator": {"op": "all", "rules": [
+        {"op": "between", "field": "surgery_code", "min": 20, "max": 27},
+        {"op": "present", "field": "ssf3"}, {"op": "not_in", "field": "ssf3", "values": [988]},
+    ]}, "numerator": {"op": "equals", "field": "ssf3", "value": 10}},
+    2: {**OWNED_CANCER_RULES["Bladder"][2], "denominator": {"op": "between", "field": "surgery_code", "min": 50, "max": 80},
+        "numerator": {"op": "any", "rules": [{"op": "stage_in", "field": "pathological_stage", "values": ["BBB"]}, {"op": "stage_matches", "field": "pathological_stage", "pattern": r"[0-4](?:A|B|C|IS)?"}]}},
+    3: {**OWNED_CANCER_RULES["Bladder"][3], "denominator": {"op": "between", "field": "surgery_code", "min": 60, "max": 74},
+        "numerator": {"op": "between", "field": "lymph_nodes_examined", "min": 10, "max": 90}},
+})
+
+# ---------------------------------------------------------------------------
+# 5. 攝護腺癌 (Prostate) 分子分母規則裝配
+# ---------------------------------------------------------------------------
+OWNED_CANCER_RULES["Prostate"].update({
+    1: {**OWNED_CANCER_RULES["Prostate"][1], "denominator": {"op": "text_not_in", "field": "other_clinical_stage", "values": ["X", "TX"]}, "numerator": {"op": "text_not_equals", "field": "other_clinical_stage", "value": "8888"}},
+    2: {**OWNED_CANCER_RULES["Prostate"][2], "denominator": {"op": "all", "rules": []}, "numerator": {"op": "between", "field": "ssf1", "min": 1, "max": 998}},
+    3: {**OWNED_CANCER_RULES["Prostate"][3], "denominator": {"op": "all", "rules": [
+        {"op": "text_in_without_prefix", "field": "clinical_t", "prefix": "T", "values": ["1", "1A", "1B", "1C", "2A"]},
+        {"op": "text_in_without_prefix", "field": "clinical_n", "prefix": "N", "values": ["0"]}, {"op": "text_in_without_prefix", "field": "clinical_m", "prefix": "M", "values": ["0"]},
+        {"op": "between", "field": "ssf1", "min": 1, "max": 99}, {"op": "between", "field": "ssf3", "min": 2, "max": 6}, {"op": "equals", "field": "palliative_care", "value": 0},
+        {"op": "all_fields_not_in", "fields": CLINICAL_TRIAL_FIELDS, "values": ["20", "21", "30", "31"]}, {"op": "equals", "field": "other_treatment", "value": 0},
+    ]}, "numerator": {"op": "all", "rules": [{"op": "equals", "field": "treatment_status", "value": 4}, {"op": "valid_date", "field": "first_course_date"}]}},
+    4: {**OWNED_CANCER_RULES["Prostate"][4], "denominator": {"op": "all", "rules": [LOCALLY_ADVANCED_PROSTATE, {"op": "in", "field": "radiation_summary", "values": [1, 3]}, {"op": "present", "field": "radiation_instrument"}, {"op": "not_in", "field": "radiation_instrument", "values": [4, 5, 8, 9, 20, 21, 24, 25, 36, 37, 40, 41, 52, 56, 64, 65, 80, 81, 96, 97, 112]}, {"op": "present", "field": "surgery_code"}, {"op": "not_in", "field": "surgery_code", "values": [14, 16, 17, 24, 26, 27, 30, 50, 70, 80]}]}, "numerator": {"op": "all", "rules": [{"op": "bed_at_least", "courses": [{"dose_field": "radiation_dose", "fractions_field": "radiation_fractions"}, {"dose_field": "other_radiation_dose", "fractions_field": "other_radiation_fractions"}], "value": 150}, {"op": "equals", "field": "hormone_therapy", "value": 1}]}},
+    5: {**OWNED_CANCER_RULES["Prostate"][5], "denominator": {"op": "all", "rules": [LOCALLY_ADVANCED_PROSTATE, {"op": "present", "field": "surgery_code"}, {"op": "not_in", "field": "surgery_code", "values": [14, 16, 17, 24, 26, 27, 30]}]}, "numerator": {"op": "between", "field": "surgery_code", "min": 31, "max": 80}},
+})
+
+# ---------------------------------------------------------------------------
+# 6. 子宮體癌 (Corpus Uteri) 分子分母規則裝配
+# ---------------------------------------------------------------------------
+OWNED_CANCER_RULES["Corpus_Uteri"].update({
+    2: {**OWNED_CANCER_RULES["Corpus_Uteri"][2], "denominator": {"op": "all", "rules": [{"op": "in", "field": "histology", "values": TYPE_I_HISTOLOGIES}, {"op": "stage_in", "field": "clinical_stage", "values": ["1", "1A", "1B", "1C", "2"]}, {"op": "between", "field": "surgery_code", "min": 30, "max": 90}, {"op": "not", "rule": {"op": "all", "rules": [{"op": "stage_in", "field": "clinical_stage", "values": ["1A"]}, {"op": "text_in", "field": "clinical_grade", "values": ["1", "L"]}]}}]}, "numerator": {"op": "all", "rules": [{"op": "between", "field": "surgery_code", "min": 50, "max": 79}, {"op": "between", "field": "regional_lymph_surgery", "min": 3, "max": 7}]}},
+    3: {**OWNED_CANCER_RULES["Corpus_Uteri"][3], "denominator": {"op": "all", "rules": [{"op": "in", "field": "histology", "values": TYPE_I_HISTOLOGIES}, {"op": "between", "field": "surgery_code", "min": 30, "max": 90}, {"op": "any", "rules": [{"op": "all", "rules": [{"op": "date_year_between", "field": "diagnosis_date", "min": 1, "max": 2023}, {"op": "any", "rules": [{"op": "all", "rules": [{"op": "preferred_stage_in", "preferred_field": "other_pathological_stage", "fallback_field": "pathological_stage", "invalid_values": ["", "0000", "8888", "9999"], "values": ["1B"]}, {"op": "text_in", "field": "pathological_grade", "values": ["3", "H", "C"]}]}, {"op": "preferred_stage_in", "preferred_field": "other_pathological_stage", "fallback_field": "pathological_stage", "invalid_values": ["", "0000", "8888", "9999"], "values": ["2"]}]}, {"op": "not_in", "field": "surgery_code", "values": [60, 61, 62, 63, 64]}]}, {"op": "all", "rules": [{"op": "date_year_between", "field": "diagnosis_date", "min": 2024, "max": 9999}, {"op": "preferred_stage_in", "preferred_field": "other_pathological_stage", "fallback_field": "pathological_stage", "invalid_values": ["", "0000", "8888", "9999"], "values": ["1C", "2A", "2B", "2C"]}]}]}]}, "numerator": {"op": "any_date_on_or_after", "reference_field": "surgery_date", "candidate_fields": ["radiation_date", "chemotherapy_date"]}},
+    4: {**OWNED_CANCER_RULES["Corpus_Uteri"][4], "denominator": {"op": "all", "rules": [{"op": "in", "field": "histology", "values": TYPE_I_HISTOLOGIES}, {"op": "between", "field": "surgery_code", "min": 30, "max": 90}, {"op": "valid_date", "field": "surgery_date"}, {"op": "any", "rules": [{"op": "all", "rules": [{"op": "date_year_between", "field": "diagnosis_date", "min": 1, "max": 2023}, {"op": "preferred_stage_in", "preferred_field": "other_pathological_stage", "fallback_field": "pathological_stage", "invalid_values": ["", "0000", "8888", "9999"], "values": ["3", "3A", "3B", "3C1", "3C2", "4A"]}]}, {"op": "all", "rules": [{"op": "date_year_between", "field": "diagnosis_date", "min": 2024, "max": 9999}, {"op": "preferred_stage_in", "preferred_field": "other_pathological_stage", "fallback_field": "pathological_stage", "invalid_values": ["", "0000", "8888", "9999"], "values": ["3", "3A", "3A1", "3A2", "3B", "3B1", "3B2", "3C", "3C1", "3C1I", "3C1II", "3C2", "3C2I", "3C2II", "4A"]}]}]}]}, "numerator": {"op": "any_date_on_or_after", "reference_field": "surgery_date", "candidate_fields": ["radiation_date", "chemotherapy_date", "immunotherapy_date", "targeted_therapy_date"]}},
+    5: {**OWNED_CANCER_RULES["Corpus_Uteri"][5], "denominator": {"op": "all", "rules": [{"op": "concatenated_text_in", "fields": ["case_class", "diagnosis_status", "treatment_status"], "values": ["111", "221"]}, {"op": "between", "field": "surgery_code", "min": 30, "max": 90}, {"op": "any_date_on_or_after", "reference_field": "surgery_date", "candidate_fields": ["radiation_date", "chemotherapy_date"]}]}, "numerator": {"op": "earliest_on_or_after_within", "reference_field": "surgery_date", "candidate_fields": ["radiation_date", "chemotherapy_date"], "min_days": 0, "max_days": 60}},
+    6: {**OWNED_CANCER_RULES["Corpus_Uteri"][6], "denominator": {"op": "all", "rules": [{"op": "in", "field": "histology", "values": TYPE_II_HISTOLOGIES}, {"op": "between", "field": "surgery_code", "min": 30, "max": 90}]}, "numerator": {"op": "all", "rules": [{"op": "between", "field": "surgery_code", "min": 50, "max": 79}, {"op": "between", "field": "regional_lymph_surgery", "min": 3, "max": 7}, {"op": "any", "rules": [{"op": "equals", "field": "other_site_surgery", "value": 4}, {"op": "zero_fill_text_in", "field": "hospital_diagnostic_surgery", "width": 2, "values": ["01", "10"]}, {"op": "zero_fill_text_in", "field": "external_diagnostic_surgery", "width": 2, "values": ["01", "10"]}]}]}},
+    7: {**OWNED_CANCER_RULES["Corpus_Uteri"][7], "denominator": {"op": "all", "rules": [{"op": "in", "field": "histology", "values": TYPE_II_HISTOLOGIES}, {"op": "between", "field": "surgery_code", "min": 40, "max": 79}, {"op": "valid_date", "field": "surgery_date"}]}, "numerator": {"op": "any_date_on_or_after", "reference_field": "surgery_date", "candidate_fields": ["radiation_date", "chemotherapy_date", "immunotherapy_date", "targeted_therapy_date"]}},
+})
