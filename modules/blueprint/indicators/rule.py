@@ -72,39 +72,47 @@ def normalize_code(value: Any) -> str | None:
 # ---------------------------------------------------------------------------
 
 def evaluate_rule(record: Record, rule: RuleConfig) -> bool:
-    """遞迴解讀一個規則設定。"""
     operation = rule.get("op")
 
+    # 全部規則都成立，相當於「且」
     if operation == "all":
         return all(evaluate_rule(record, item) for item in rule["rules"])
 
+    # 至少一條規則成立，相當於「或」
     if operation == "any":
         return any(evaluate_rule(record, item) for item in rule["rules"])
 
+    # 將子規則的判定結果反轉，相當於「非」
     if operation == "not":
         return not evaluate_rule(record, rule["rule"])
 
+    # 數字完全相等；比較前會先安全轉成整數
     if operation == "equals":
         return to_int(record.get(rule["field"])) == to_int(rule["value"])
 
+    # 文字完全相等；忽略英文字母大小寫
     if operation == "text_equals":
         return normalize_text(record.get(rule["field"])) == normalize_text(rule["value"])
 
+    # 文字值必須包含在指定清單中
     if operation == "text_in":
         value = normalize_text(record.get(rule["field"]))
         allowed = {normalize_text(item) for item in rule["values"]}
         return value is not None and value in allowed
 
+    # 文字值不得包含在指定清單中
     if operation == "text_not_in":
         value = normalize_text(record.get(rule["field"]))
         excluded = {normalize_text(item) for item in rule["values"]}
         return value is not None and value not in excluded
 
+    # 癌登代碼完全相等；會先移除小數點等非英數字元
     if operation == "code_in":
         value = normalize_code(record.get(rule["field"]))
         allowed = {normalize_code(item) for item in rule["values"]}
         return value is not None and value in allowed
 
+    # 癌登代碼須以指定內容開頭，例如 C25 可涵蓋 C250～C259
     if operation == "code_prefix_in":
         value = normalize_code(record.get(rule["field"]))
         prefixes = [normalize_code(item) for item in rule["values"]]
@@ -112,59 +120,72 @@ def evaluate_rule(record: Record, rule: RuleConfig) -> bool:
             prefix is not None and value.startswith(prefix) for prefix in prefixes
         )
 
+    # 比較兩個欄位的文字內容是否相同
     if operation == "fields_equal":
         left = normalize_text(record.get(rule["left_field"]))
         right = normalize_text(record.get(rule["right_field"]))
         return left is not None and right is not None and left == right
 
+    # 比較兩個欄位解析後的日期是否相同
     if operation == "dates_equal":
         left = parse_date(record.get(rule["left_field"]))
         right = parse_date(record.get(rule["right_field"]))
         return left is not None and right is not None and left == right
 
+    # 欄位第一個字元必須包含在指定清單中
     if operation == "first_char_in":
         value = normalize_text(record.get(rule["field"]))
         allowed = {normalize_text(item) for item in rule["values"]}
         return value is not None and value[0] in allowed
 
+    # 數值必須介於最小值與最大值之間，包含上下限
     if operation == "between":
         value = to_int(record.get(rule["field"]))
         return value is not None and rule["min"] <= value <= rule["max"]
 
+    # 數值必須大於指定門檻
     if operation == "greater_than":
         value = to_int(record.get(rule["field"]))
         return value is not None and value > rule["value"]
 
+    # 數值必須大於或等於指定門檻
     if operation == "greater_than_or_equal":
         value = to_int(record.get(rule["field"]))
         return value is not None and value >= rule["value"]
 
+    # 數值必須小於或等於指定門檻
     if operation == "less_than_or_equal":
         value = to_int(record.get(rule["field"]))
         return value is not None and value <= rule["value"]
 
+    # 數值不得包含在指定清單中
     if operation == "not_in":
         value = to_int(record.get(rule["field"]))
         excluded = {to_int(item) for item in rule["values"]}
         return value is not None and value not in excluded
 
+    # 欄位必須能解析成有效日期
     if operation == "valid_date":
         return parse_date(record.get(rule["field"])) is not None
 
+    # 結束日期必須晚於開始日期，不包含同一天
     if operation == "date_after":
         start_date = parse_date(record.get(rule["start_field"]))
         end_date = parse_date(record.get(rule["end_field"]))
         return start_date is not None and end_date is not None and end_date > start_date
 
+    # 結束日期必須等於或晚於開始日期，包含同一天
     if operation == "date_on_or_after":
         start_date = parse_date(record.get(rule["start_field"]))
         end_date = parse_date(record.get(rule["end_field"]))
         return start_date is not None and end_date is not None and end_date >= start_date
 
+    # 日期年份必須落在指定起訖年度內
     if operation == "date_year_between":
         value = parse_date(record.get(rule["field"]))
         return value is not None and rule["min"] <= value.year <= rule["max"]
 
+    # 開始與結束日期的間隔天數必須落在指定範圍內
     if operation == "date_interval":
         start_date = parse_date(record.get(rule["start_field"]))
         end_date = parse_date(record.get(rule["end_field"]))
@@ -173,6 +194,7 @@ def evaluate_rule(record: Record, rule: RuleConfig) -> bool:
         days = (end_date - start_date).days
         return rule["min_days"] <= days <= rule["max_days"]
 
+    # 從多個候選事件中選取參考日期之後最早的一天，再檢查間隔
     if operation == "earliest_after_within":
         reference_date = parse_date(record.get(rule["reference_field"]))
         if reference_date is None:
@@ -190,6 +212,7 @@ def evaluate_rule(record: Record, rule: RuleConfig) -> bool:
         days = (min(candidate_dates) - reference_date).days
         return rule["min_days"] <= days <= rule["max_days"]
 
+    # 從多個開始日期中選最早者，再與結束日期計算間隔
     if operation == "earliest_date_interval":
         start_dates = [
             parsed

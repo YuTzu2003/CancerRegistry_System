@@ -35,10 +35,7 @@ FIELD_ALIASES = {
     "regional_systemic_sequence": ("regional_systemic_sequence", "區域治療與全身性治療順序"),
     "mediastinal_nodes_sampled": ("mediastinal_nodes_sampled", "癌症部位特定因子 5"),
     "pathological_n": ("pathological_n", "病理N"),
-    "regional_lymph_node_surgery_scope": (
-        "regional_lymph_node_surgery_scope",
-        "申報醫院區域淋巴結手術範圍",
-    ),
+    "regional_lymph_node_surgery_scope": ("regional_lymph_node_surgery_scope", "申報醫院區域淋巴結手術範圍"),
     "merged_stage": ("merged_stage", "SUMMARY_STAGE"),
     "radiation_status": ("radiation_status", "放射治療執行狀態"),
     "radiation_dose": ("radiation_dose", "最高放射劑量臨床標靶體積劑量"),
