@@ -84,8 +84,15 @@ def validate_cell(val, rule):
 
     if 'is_date' in rule:
         check_val = val
-        if len(check_val) == 8 and check_val.endswith('99'):
-            check_val = check_val[:-2] + '15'
+        if len(check_val) == 8 and check_val.isdigit():
+            year, month, day = check_val[:4], check_val[4:6], check_val[6:8]
+            if month == '99':
+                # 月份未知時只驗證年份；01/01 僅供 datetime 驗證使用，
+                # 不會改寫原始資料，也不代表實際日期為 1 月 1 日。
+                check_val = year + '0101'
+            elif day == '99':
+                # 日期未知時只驗證年月；15 日僅供 datetime 驗證使用。
+                check_val = year + month + '15'
         try:
             datetime.strptime(check_val, '%Y%m%d')
         except ValueError:
@@ -121,6 +128,10 @@ def compare_cancer_date(date1, date2):
 
     if d1 is None or d2 is None:
         return None
+
+    # 只要其中一個日期的 MM 是 99，就只比較 CCYY。
+    if d1[4:6] == '99' or d2[4:6] == '99':
+        return d1[:4] <= d2[:4]
 
     # 只要其中一個日期的 DD 是 99，就只比較 CCYYMM
     if d1[6:8] == '99' or d2[6:8] == '99':

@@ -16,5 +16,11 @@ def start_system_scheduler():
     scheduler.add_job(refresh_twcr_updates, "date", run_date=datetime.now(), id="home_updates_startup", replace_existing=True)
     scheduler.add_job(run_database_backup, "cron", hour=2, minute=0, id="database_backup", replace_existing=True)
     scheduler.start()
-    atexit.register(lambda: scheduler.shutdown(wait=False))
+
+    def shutdown_scheduler():
+        """Flask reloader may already have stopped this scheduler at exit."""
+        if scheduler.running:
+            scheduler.shutdown(wait=False)
+
+    atexit.register(shutdown_scheduler)
     return scheduler

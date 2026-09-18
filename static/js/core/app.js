@@ -7,15 +7,54 @@
 
   const isMobile = () => window.matchMedia("(max-width: 768px)").matches;
 
+  const SIDEBAR_PREFERENCE_KEY = "sidebarCollapsed";
+
+  function saveSidebarPreference(isCollapsed) {
+    try {
+      localStorage.setItem(SIDEBAR_PREFERENCE_KEY, String(isCollapsed));
+    } catch (_) {}
+  }
+
+  function toggleDesktopSidebar() {
+    const shouldCollapse = !sidebar.classList.contains("collapsed");
+    closeCollapsedSubmenus();
+    sidebar.classList.toggle("collapsed", shouldCollapse);
+    saveSidebarPreference(shouldCollapse);
+  }
+
   // Sidebar toggle
   toggle.addEventListener("click", function () {
     if (isMobile()) {
       sidebar.classList.toggle("open");
     } else {
-      sidebar.classList.toggle("collapsed");
+      toggleDesktopSidebar();
     }
   });
 
+  function closeCollapsedSubmenus() {
+    sidebar.querySelectorAll(".submenu-popover").forEach((item) => {
+      item.classList.remove("submenu-popover");
+    });
+  }
+
+  // A collapsed group icon opens a compact popover instead of widening the sidebar.
+  sidebar.querySelector(".sidebar-nav")?.addEventListener("click", function (event) {
+    const groupLink = event.target.closest('.nav-link[data-bs-toggle="collapse"]');
+    if (!groupLink || isMobile() || !sidebar.classList.contains("collapsed")) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const groupItem = groupLink.closest("li");
+    const wasOpen = groupItem?.classList.contains("submenu-popover");
+    closeCollapsedSubmenus();
+    if (!wasOpen && groupItem) groupItem.classList.add("submenu-popover");
+  });
+
+  document.addEventListener("click", function (event) {
+    if (!sidebar.classList.contains("collapsed") || sidebar.contains(event.target)) return;
+    closeCollapsedSubmenus();
+  });
   // Auto-hide alerts after 2 seconds
   function autoHideAlerts() {
     const alerts = document.querySelectorAll(".alert:not(.alert-persistent)");

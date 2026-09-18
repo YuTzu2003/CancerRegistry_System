@@ -46,6 +46,12 @@ def parse_date(value: Any) -> date | None:
     digits = "".join(character for character in text if character.isdigit())
     if digits in INVALID_DATE_VALUES or len(digits) != 8:
         return None
+    # DD=99 means the day is unknown.  Use the first day of that month only
+    # for indicator day-interval calculations; preserve MM=99 as unusable.
+    if digits[4:6] == "99":
+        return None
+    if digits[6:8] == "99":
+        digits = digits[:6] + "01"
     try:
         return datetime.strptime(digits, "%Y%m%d").date()
     except ValueError:
@@ -78,11 +84,15 @@ def evaluate_rule(record: Record, rule: RuleConfig) -> bool:
 
     #數字完全相等
     if operation == "equals":
-        return to_int(record.get(rule["field"])) == to_int(rule["value"])
+        value = to_int(record.get(rule["field"]))
+        expected = to_int(rule["value"])
+        return value is not None and expected is not None and value == expected
 
     #文字完全相等，不分大小寫
     if operation == "text_equals":
-        return normalize_text(record.get(rule["field"])) == normalize_text(rule["value"])
+        value = normalize_text(record.get(rule["field"]))
+        expected = normalize_text(rule["value"])
+        return value is not None and expected is not None and value == expected
 
     #文字屬於清單之一
     if operation == "text_in":
@@ -95,6 +105,12 @@ def evaluate_rule(record: Record, rule: RuleConfig) -> bool:
         value = normalize_text(record.get(rule["field"]))
         excluded = {normalize_text(item) for item in rule["values"]}
         return value is not None and value not in excluded
+
+    #文字以指定前綴開頭，例如原發部位 C18、C19、C20。
+    if operation == "text_starts_with":
+        value = normalize_text(record.get(rule["field"]))
+        prefixes = tuple(normalize_text(item) for item in rule["values"])
+        return value is not None and value.startswith(prefixes)
 
     #文字第一碼在清單中
     if operation == "first_char_in":
@@ -127,6 +143,12 @@ def evaluate_rule(record: Record, rule: RuleConfig) -> bool:
         start_date = parse_date(record.get(rule["start_field"]))
         end_date = parse_date(record.get(rule["end_field"]))
         return start_date is not None and end_date is not None and end_date > start_date
+
+    # end_field 的日期，必須等於或晚於 start_field 的日期
+    if operation == "date_on_or_after":
+        start_date = parse_date(record.get(rule["start_field"]))
+        end_date = parse_date(record.get(rule["end_field"]))
+        return start_date is not None and end_date is not None and end_date >= start_date
 
     #兩日期相差落在範圍內
     if operation == "date_interval":
