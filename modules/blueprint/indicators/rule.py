@@ -15,7 +15,7 @@ from typing import Any
 Record = dict[str, Any]
 RuleConfig = dict[str, Any]
 
-INVALID_DATE_VALUES = {"", "00000000", "88888888", "99999999", None}
+INVALID_DATE_VALUES = {"", "00000000", "88888888", None}
 
 
 # ---------------------------------------------------------------------------
@@ -47,6 +47,11 @@ def parse_date(value: Any) -> date | None:
     digits = "".join(character for character in text if character.isdigit())
     if digits in INVALID_DATE_VALUES or len(digits) != 8:
         return None
+    # 登錄日期的月碼或日碼為 99 時，仍可納入指標判定；以一日代替。
+    if digits[4:6] == "99":
+        digits = f"{digits[:4]}01{digits[6:]}"
+    if digits[6:8] == "99":
+        digits = f"{digits[:6]}01"
     try:
         return datetime.strptime(digits, "%Y%m%d").date()
     except ValueError:
@@ -106,6 +111,11 @@ def evaluate_rule(record: Record, rule: RuleConfig) -> bool:
         value = normalize_text(record.get(rule["field"]))
         excluded = {normalize_text(item) for item in rule["values"]}
         return value is not None and value not in excluded
+
+    if operation == "text_starts_with":
+        value = normalize_text(record.get(rule["field"]))
+        prefixes = tuple(normalize_text(item) for item in rule["values"])
+        return value is not None and value.startswith(prefixes)
 
     if operation == "text_not_equals":
         value = normalize_text(record.get(rule["field"]))
@@ -193,6 +203,11 @@ def evaluate_rule(record: Record, rule: RuleConfig) -> bool:
         start_date = parse_date(record.get(rule["start_field"]))
         end_date = parse_date(record.get(rule["end_field"]))
         return start_date is not None and end_date is not None and end_date > start_date
+
+    if operation == "date_on_or_after":
+        start_date = parse_date(record.get(rule["start_field"]))
+        end_date = parse_date(record.get(rule["end_field"]))
+        return start_date is not None and end_date is not None and end_date >= start_date
 
     if operation == "date_interval":
         start_date = parse_date(record.get(rule["start_field"]))

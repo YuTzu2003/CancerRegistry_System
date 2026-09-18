@@ -407,3 +407,120 @@ OWNED_CANCER_RULES["Corpus_Uteri"].update({
     6: {**OWNED_CANCER_RULES["Corpus_Uteri"][6], "denominator": {"op": "all", "rules": [{"op": "in", "field": "histology", "values": TYPE_II_HISTOLOGIES}, {"op": "between", "field": "surgery_code", "min": 30, "max": 90}]}, "numerator": {"op": "all", "rules": [{"op": "between", "field": "surgery_code", "min": 50, "max": 79}, {"op": "between", "field": "regional_lymph_surgery", "min": 3, "max": 7}, {"op": "any", "rules": [{"op": "equals", "field": "other_site_surgery", "value": 4}, {"op": "zero_fill_text_in", "field": "hospital_diagnostic_surgery", "width": 2, "values": ["01", "10"]}, {"op": "zero_fill_text_in", "field": "external_diagnostic_surgery", "width": 2, "values": ["01", "10"]}]}]}},
     7: {**OWNED_CANCER_RULES["Corpus_Uteri"][7], "denominator": {"op": "all", "rules": [{"op": "in", "field": "histology", "values": TYPE_II_HISTOLOGIES}, {"op": "between", "field": "surgery_code", "min": 40, "max": 79}, {"op": "valid_date", "field": "surgery_date"}]}, "numerator": {"op": "any_date_on_or_after", "reference_field": "surgery_date", "candidate_fields": ["radiation_date", "chemotherapy_date", "immunotherapy_date", "targeted_therapy_date"]}},
 })
+
+
+# Dashboard3 cancer indicator definitions.
+GASTRIC_CANCER_RULES: dict[int, dict[str, Any]] = {
+    1: {
+        "name": "臨床分期為第 I~ IIIC 期之胃及食道賁門癌病人手術後 R0 切除的比率。",
+        "type": "positive",
+        "denominator": {"op": "all", "rules": [
+            {"op": "first_char_in", "field": "clinical_stage", "values": ["1", "2", "3"]},
+            {"op": "any", "rules": [
+                {"op": "between", "field": "surgery_code", "min": 20, "max": 90},
+                {"op": "text_in", "field": "surgery_code", "values": ["2E", "2M"]},
+            ]},
+            {"op": "equals", "field": "palliative_care", "value": 0},
+            {"op": "text_not_in", "field": "surgical_margin", "values": ["7", "9"]},
+        ]},
+        "numerator": {"op": "text_in", "field": "surgical_margin", "values": ["0", "C", "D", "E"]},
+    },
+    3: {
+        "name": "胃及食道賁門癌手術病人於術後 30 天內死亡的比率。",
+        "type": "negative",
+        "denominator": {"op": "all", "rules": [
+            {"op": "any", "rules": [
+                {"op": "between", "field": "surgery_code", "min": 20, "max": 90},
+                {"op": "text_in", "field": "surgery_code", "values": ["2E", "2M"]},
+            ]},
+            {"op": "equals", "field": "palliative_care", "value": 0},
+        ]},
+        "numerator": {"op": "all", "rules": [
+            {"op": "equals", "field": "survival_status", "value": 0},
+            {"op": "date_interval", "start_field": "surgery_date", "end_field": "last_contact_date", "min_days": 0, "max_days": 29},
+        ]},
+    },
+    4: {
+        "name": "病理期別第 II-III 期胃及食道賁門癌病人術後接受輔助化療的比率。",
+        "type": "positive",
+        "denominator": {"op": "all", "rules": [
+            {"op": "first_char_in", "field": "pathological_stage", "values": ["2", "3"]},
+            {"op": "between", "field": "surgery_code", "min": 30, "max": 90},
+            {"op": "text_not_in", "field": "pathology_prefix", "values": ["4", "6"]},
+        ]},
+        "numerator": {"op": "date_on_or_after", "start_field": "surgery_date", "end_field": "chemotherapy_date"},
+    },
+}
+
+LIVER_CANCER_RULES: dict[int, dict[str, Any]] = {
+    1: {
+        "name": "極早期和早期肝細胞癌病人接受治癒性療法的比率。",
+        "type": "positive",
+        "denominator": {"op": "all", "rules": [
+            {"op": "equals", "field": "treatment_status", "value": 1},
+            {"op": "equals", "field": "other_staging_system", "value": 6},
+            {"op": "first_char_in", "field": "other_clinical_stage", "values": ["0", "A"]},
+        ]},
+        "numerator": {"op": "any", "rules": [
+            {"op": "any", "rules": [
+                {"op": "equals", "field": "surgery_code", "value": 61},
+                {"op": "equals", "field": "surgery_code", "value": 75},
+            ]},
+            {"op": "all", "rules": [
+                {"op": "any", "rules": [
+                    {"op": "between", "field": "surgery_code", "min": 20, "max": 25}, {"op": "between", "field": "surgery_code", "min": 27, "max": 29}, {"op": "between", "field": "surgery_code", "min": 30, "max": 32}, {"op": "in", "field": "surgery_code", "values": [34, 35, 38, 54, 55, 59, 60, 66, 90]},
+                ]},
+                {"op": "date_interval", "start_field": "first_treatment_date", "end_field": "first_surgery_date", "min_days": 0, "max_days": 0},
+            ]},
+            {"op": "all", "rules": [
+                {"op": "in", "field": "surgery_code", "values": [26, 33, 53]},
+                {"op": "date_interval", "start_field": "first_treatment_date", "end_field": "first_surgery_date", "min_days": 0, "max_days": 0},
+                {"op": "date_interval", "start_field": "first_surgery_date", "end_field": "surgery_date", "min_days": 0, "max_days": 60},
+            ]},
+            {"op": "all", "rules": [
+                {"op": "between", "field": "chemotherapy_code", "min": 4, "max": 7},
+                {"op": "date_interval", "start_field": "first_treatment_date", "end_field": "chemotherapy_date", "min_days": 0, "max_days": 0},
+                {"op": "any", "rules": [
+                    {"op": "between", "field": "surgery_code", "min": 20, "max": 25}, {"op": "between", "field": "surgery_code", "min": 30, "max": 32}, {"op": "between", "field": "surgery_code", "min": 50, "max": 52}, {"op": "in", "field": "surgery_code", "values": [60, 66, 90]},
+                ]},
+                {"op": "date_interval", "start_field": "first_treatment_date", "end_field": "surgery_date", "min_days": 0, "max_days": 60},
+            ]},
+            {"op": "all", "rules": [
+                {"op": "between", "field": "chemotherapy_code", "min": 4, "max": 7},
+                {"op": "date_interval", "start_field": "first_treatment_date", "end_field": "chemotherapy_date", "min_days": 0, "max_days": 0},
+                {"op": "any", "rules": [
+                    {"op": "in", "field": "surgery_code", "values": [26, 33, 53, 34, 35, 38, 54, 55, 59]},
+                    {"op": "between", "field": "surgery_code", "min": 27, "max": 29},
+                ]},
+                {"op": "date_interval", "start_field": "first_treatment_date", "end_field": "first_surgery_date", "min_days": 0, "max_days": 60},
+            ]},
+            {"op": "all", "rules": [
+                {"op": "in", "field": "surgery_code", "values": [16, 17, 19]},
+                {"op": "date_interval", "start_field": "first_treatment_date", "end_field": "surgery_date", "min_days": 0, "max_days": 0},
+            ]},
+            {"op": "all", "rules": [
+                {"op": "equals", "field": "surgery_code", "value": 18},
+                {"op": "date_interval", "start_field": "first_treatment_date", "end_field": "first_surgery_date", "min_days": 0, "max_days": 0},
+            ]},
+            {"op": "all", "rules": [
+                {"op": "between", "field": "chemotherapy_code", "min": 4, "max": 7},
+                {"op": "date_interval", "start_field": "first_treatment_date", "end_field": "chemotherapy_date", "min_days": 0, "max_days": 0},
+                {"op": "in", "field": "surgery_code", "values": [16, 17, 19]},
+                {"op": "date_interval", "start_field": "first_treatment_date", "end_field": "surgery_date", "min_days": 0, "max_days": 60},
+            ]},
+            {"op": "all", "rules": [
+                {"op": "between", "field": "chemotherapy_code", "min": 4, "max": 7},
+                {"op": "date_interval", "start_field": "first_treatment_date", "end_field": "chemotherapy_date", "min_days": 0, "max_days": 0},
+                {"op": "equals", "field": "surgery_code", "value": 18},
+                {"op": "date_interval", "start_field": "first_treatment_date", "end_field": "first_surgery_date", "min_days": 0, "max_days": 60},
+            ]},
+        ]},
+    },
+    5: {"name": "肝癌患者接受手術切除其邊緣無殘留癌細胞的比率。", "type": "positive", "denominator": {"op": "any", "rules": [{"op": "between", "field": "surgery_code", "min": 22, "max": 60}, {"op": "between", "field": "surgery_code", "min": 65, "max": 66}, {"op": "equals", "field": "surgery_code", "value": 90}]}, "numerator": {"op": "text_equals", "field": "surgical_margin", "value": "0"}},
+    6: {"name": "肝細胞癌 BCLC stage 0+A+B 病患等待治療時間在 45 天以內。", "type": "positive", "denominator": {"op": "all", "rules": [{"op": "equals", "field": "other_staging_system", "value": 6}, {"op": "first_char_in", "field": "other_clinical_stage", "values": ["0", "A", "B"]}, {"op": "in", "field": "treatment_status", "values": [1, 3]}]}, "numerator": {"op": "date_interval", "start_field": "diagnosis_date", "end_field": "first_treatment_date", "min_days": 0, "max_days": 45}},
+}
+
+COLON_RECTUM_CANCER_RULES: dict[int, dict[str, Any]] = {
+    2: {"name": "病理期別第 I-III 期結腸癌手術病人，淋巴結病理檢查 12 顆以上的比率。", "type": "positive", "denominator": {"op": "all", "rules": [{"op": "text_starts_with", "field": "site", "values": ["C18"]}, {"op": "first_char_in", "field": "pathological_stage", "values": ["1", "2", "3"]}, {"op": "between", "field": "surgery_code", "min": 30, "max": 90}]}, "numerator": {"op": "between", "field": "lymph_nodes_examined", "min": 12, "max": 90}},
+    3: {"name": "第 II、III 期直腸癌病人，6 週內開始治療的比率。", "type": "positive", "denominator": {"op": "all", "rules": [{"op": "text_starts_with", "field": "site", "values": ["C19", "C20"]}, {"op": "equals", "field": "case_classification", "value": 1}, {"op": "first_char_in", "field": "clinical_stage", "values": ["2", "3"]}]}, "numerator": {"op": "date_interval", "start_field": "microscopic_confirmation_date", "end_field": "first_treatment_date", "min_days": 0, "max_days": 42}},
+}

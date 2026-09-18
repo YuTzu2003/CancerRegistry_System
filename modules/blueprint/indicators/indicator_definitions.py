@@ -13,6 +13,10 @@ from __future__ import annotations
 import pandas as pd
 
 from modules.blueprint.indicators.cancer_indicator import (
+    COLON_RECTUM_CANCER_RULES,
+    ESOPHAGEAL_CANCER_RULES,
+    GASTRIC_CANCER_RULES,
+    LIVER_CANCER_RULES,
     ORAL_CANCER_RULES,
     OWNED_CANCER_RULES as OWNED_CANCER_RULE_DECLARATIONS,
 )
@@ -80,6 +84,18 @@ FIELD_SPECS = {
 # ---------------------------------------------------------------------------
 # 欄位對照與計算器包裝
 # ---------------------------------------------------------------------------
+FIELD_SPECS.update({
+    "site": ("2.6", ("原發部位", "site")),
+    "microscopic_confirmation_date": ("2.12", ("首次顯微鏡檢證實日期",)),
+    "surgical_margin": ("4.1.5", ("原發部位手術邊緣",)),
+    "pathology_prefix": ("3.14", ("病理分期字根", "病理分期字首")),
+    "other_staging_system": ("3.17", ("其他分期系統",)),
+    "first_treatment_date": ("4.1", ("首次療程開始日期", "dtrt_1st")),
+    "first_surgery_date": ("4.1.1", ("首次手術日期",)),
+    "case_classification": ("2.3", ("個案分類", "class")),
+})
+
+
 def _column_map(frame):
     return {
         field: _find_column(frame.columns, code, aliases)
@@ -150,7 +166,14 @@ OWNED_CANCER_RULES = {
     }
     for cancer_key, declarations in OWNED_CANCER_RULE_DECLARATIONS.items()
 }
-RULES_BY_CANCER = {"Oral_Cavity": ORAL_CANCER_RULES, **OWNED_CANCER_RULES}
+RULES_BY_CANCER = {
+    "Oral_Cavity": ORAL_CANCER_RULES,
+    "Esophagus": ESOPHAGEAL_CANCER_RULES,
+    "Stomach": GASTRIC_CANCER_RULES,
+    "Colon_Rectum": COLON_RECTUM_CANCER_RULES,
+    "Liver": LIVER_CANCER_RULES,
+    **OWNED_CANCER_RULES,
+}
 
 
 # ---------------------------------------------------------------------------

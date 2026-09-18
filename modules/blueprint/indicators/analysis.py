@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 import logging
+import re
 import pandas as pd
 from modules.blueprint.dashboard.definition.cancer_grouping import classify_cancer_group
 from modules.blueprint.dashboard.definition.cancer_group_rules import CANCER_GROUP_RULES
@@ -45,6 +46,12 @@ INDICATOR_CANCER_CRITERIA = {
         },
     },
 }
+
+GASTRIC_ADENOCARCINOMA_HISTOLOGY = {
+    "8140", "8144", "8145", "8148", "8210", "8211", "8255", "8260",
+    "8263", "8480", "8481", "8490", "8550", "8576",
+}
+LIVER_HEPATOCELLULAR_CARCINOMA_HISTOLOGY = {str(code) for code in range(8170, 8176)}
 
 
 # ---------------------------------------------------------------------------
@@ -95,6 +102,17 @@ def _cancer_mask(frame, cancer_key):
         return pd.Series(False, index=frame.index)
 
     def matches(row):
+        site_code = re.sub(r"[^A-Z0-9]", "", _normalize_site(row.get(site_col, "")))
+        histology_digits = re.sub(r"\D", "", _clean_code(row.get(hist_col, "")))
+        if cancer_key == "Colon_Rectum":
+            if len(histology_digits) < 4:
+                return False
+            histology = int(histology_digits[:4])
+            return site_code[:3] in {"C18", "C19", "C20"} and histology != 9140 and not 9590 <= histology <= 9993
+        if cancer_key == "Stomach":
+            return site_code in {"C160", "C161", "C162", "C163", "C164", "C165", "C166", "C168", "C169"} and histology_digits[:4] in GASTRIC_ADENOCARCINOMA_HISTOLOGY
+        if cancer_key == "Liver":
+            return site_code == "C220" and histology_digits[:4] in LIVER_HEPATOCELLULAR_CARCINOMA_HISTOLOGY
         cancer = classify_cancer_group(
             row.get(site_col, ""), row.get(hist_col, ""), CANCER_GROUP_RULES,
             behavior=row.get(behavior_col, "") if behavior_col else None,

@@ -61,10 +61,14 @@ def _find_column(columns, code=None, aliases=()):
 def _date_key(value):
     """Return a sortable diagnosis date; invalid values sort after valid ones."""
     text = _clean_code(value)
-    if text in {"", "00000000", "88888888", "99999999"}:
+    if text in {"", "00000000", "88888888"}:
         return pd.Timestamp.max
     digits = re.sub(r"\D", "", text)
     if len(digits) >= 8:
+        if digits[4:6] == "99":
+            digits = f"{digits[:4]}01{digits[6:]}"
+        if digits[6:8] == "99":
+            digits = f"{digits[:6]}01{digits[8:]}"
         parsed = pd.to_datetime(digits[:8], format="%Y%m%d", errors="coerce")
     else:
         parsed = pd.to_datetime(text, errors="coerce")
