@@ -235,12 +235,17 @@ def _apply_duplicate_exclusion(audit, columns, warnings):
 # ---------------------------------------------------------------------------
 # 全域指標共用排除規則主流程
 # ---------------------------------------------------------------------------
-def apply_global_indicators_exclusions(dataframe: pd.DataFrame, *, is_hospital_self_reported: bool = True):
+def apply_global_indicators_exclusions(
+    dataframe: pd.DataFrame,
+    *,
+    is_hospital_self_reported: bool = True,
+    exclude_case_class: bool = True,
+):
     """Apply the version-115 shared exclusions and return an auditable result.
 
-    Hard exclusions are applied first: class not 1/2, cross-hospital treatment,
-    and annual-report AJCC stage unknown/not-applicable.  Duplicate selection
-    runs only across the remaining eligible rows.
+    Hard exclusions are applied first: optionally class not 1/2, cross-hospital
+    treatment, and annual-report AJCC stage unknown/not-applicable. Duplicate
+    selection runs only across the remaining eligible rows.
     """
     audit = dataframe.copy()
     audit["指標模組納入統計"] = True
@@ -259,10 +264,10 @@ def apply_global_indicators_exclusions(dataframe: pd.DataFrame, *, is_hospital_s
     warnings = []
 
     class_col = columns["case_class"]
-    if class_col:
+    if class_col and exclude_case_class:
         eligible_class = audit[class_col].map(_clean_code).isin(ELIGIBLE_CASE_CLASSES)
         _append_reason(audit, ~eligible_class, "個案分類非 class 1、2")
-    else:
+    elif not class_col:
         warnings.append("找不到個案分類(2.3)欄位，未套用 class=1、2 排除規則。")
 
     diagnosis_col = columns["diagnosis_status"]

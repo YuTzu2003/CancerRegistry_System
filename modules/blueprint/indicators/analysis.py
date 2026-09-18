@@ -67,14 +67,13 @@ def _indicator_cancer_mask(frame, cancer_key):
     case_class_col = _find_column(frame.columns, "2.3", ("class", "個案分類"))
     site_col = _find_column(frame.columns, "2.6", ("原發部位", "site"))
     hist_col = _find_column(frame.columns, "2.8", ("組織型態", "hist"))
-    if not case_class_col or not site_col or not hist_col:
+    if not site_col or not hist_col or (cancer_key != "Prostate" and not case_class_col):
         return pd.Series(False, index=frame.index)
 
     histology = frame[hist_col].map(_normalize_histology)
-    mask = (
-        frame[case_class_col].map(_clean_code).isin({"1", "2"})
-        & frame[site_col].map(_normalize_site).isin(criteria["sites"])
-    )
+    mask = frame[site_col].map(_normalize_site).isin(criteria["sites"])
+    if cancer_key != "Prostate":
+        mask &= frame[case_class_col].map(_clean_code).isin({"1", "2"})
     if "histology_include" in criteria:
         return mask & histology.isin(criteria["histology_include"])
 
@@ -172,15 +171,29 @@ def run_indicators_analysis(frame, cancers, year_start, year_end):
             })
             continue
 
-        # Cancer-specific definitions identify whether shared exclusions apply.
         included_cases, audit_cases, global_summary = apply_global_indicators_exclusions(
-            cancer_cases, is_hospital_self_reported=True
+            cancer_cases,
+            is_hospital_self_reported=True,
         )
+        prostate_indicator_1_2_cases = included_cases
+        if cancer_key == "Prostate":
+            # Only prostate indicators 1 and 2 ignore the case-class exclusion.
+            prostate_indicator_1_2_cases, _, _ = apply_global_indicators_exclusions(
+                cancer_cases,
+                is_hospital_self_reported=True,
+                exclude_case_class=False,
+            )
         indicators = []
         for definition in definitions:
-            masks = definition["calculator"](included_cases)
-            denominator = _unique_case_count(included_cases, masks["denominator_mask"])
-            numerator = _unique_case_count(included_cases, masks["numerator_mask"])
+            denominator_cases = (
+                prostate_indicator_1_2_cases
+                if cancer_key == "Prostate" and definition["id"] in {1, 2}
+                else included_cases
+            )
+            denominator_masks = definition["calculator"](denominator_cases)
+            numerator_masks = definition["calculator"](included_cases)
+            denominator = _unique_case_count(denominator_cases, denominator_masks["denominator_mask"])
+            numerator = _unique_case_count(included_cases, numerator_masks["numerator_mask"])
             calculation_error = ""
             if numerator > denominator:
                 calculation_error = "分子件數大於分母件數，已停止顯示監測結果。"
