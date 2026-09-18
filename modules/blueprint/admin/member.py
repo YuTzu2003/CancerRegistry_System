@@ -3,7 +3,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash
 from modules.services.db import get_conn
 from modules.services.auth import login_required, admin_required
 
-member_bp = Blueprint('member', __name__)
+member_bp = Blueprint('member', __name__, template_folder='templates')
 
 @member_bp.route("/member")
 @login_required
@@ -46,9 +46,14 @@ def member():
             
     # Sort logs by login_time descending
     login_logs.sort(key=lambda x: x.get('login_time', ''), reverse=True)
-            
+
     conn.close()
-    return render_template("member.html", active="member", users=users, login_logs=login_logs)
+    return render_template(
+        "member.html",
+        active="member",
+        users=users,
+        login_logs=login_logs,
+    )
 
 @member_bp.route("/member/tool", methods=["POST"])
 @login_required

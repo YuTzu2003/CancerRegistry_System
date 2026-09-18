@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+{% block extra_head %}
+<style>
+  .commit-ledger { max-width: 100%; }
+  .commit-ledger__toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 0 20px; border-bottom: 1px solid var(--border); }
+  .commit-ledger__branch { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-weight: 700; white-space: nowrap; }
+  .commit-ledger__filters { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+  .commit-ledger__filter { position: relative; }
+  .commit-ledger__filter > i { position: absolute; top: 50%; left: 10px; z-index: 1; color: var(--muted); pointer-events: none; transform: translateY(-50%); }
+  .commit-ledger__filter select, .commit-ledger__filter input { min-height: 36px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: .875rem; }
+  .commit-ledger__filter select { min-width: 148px; padding: 0 28px 0 32px; }
+  .commit-ledger__filter input { padding: 0 9px 0 32px; }
+  .commit-ledger__clear { color: var(--muted); font-size: .85rem; white-space: nowrap; }
+  .commit-day { position: relative; margin-top: 28px; padding-left: 36px; }
+  .commit-day::before { content: ""; position: absolute; top: 30px; bottom: -28px; left: 10px; width: 2px; background: var(--border); }
+  .commit-day:last-child::before { bottom: 0; }
+  .commit-day__label { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; color: var(--muted); font-size: .875rem; font-weight: 700; }
+  .commit-day__node { position: absolute; left: 3px; display: grid; width: 16px; height: 16px; place-items: center; border: 2px solid var(--surface); border-radius: 50%; background: var(--gray-700); color: var(--surface); font-size: .55rem; }
+  .commit-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 18px 20px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow-sm); }
+  .commit-card + .commit-card { margin-top: -1px; border-top-left-radius: 0; border-top-right-radius: 0; }
+  .commit-card__title { margin: 0; color: var(--text); font-size: 1rem; font-weight: 750; }
+  .commit-card__meta { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 7px; color: var(--muted); font-size: .85rem; }
+  .commit-card__meta code { color: var(--text); font-size: .8rem; }
+  .commit-card__actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+  .commit-card__actions form { margin: 0; }
+  .commit-card__commit-id { color: var(--text); font-family: var(--bs-font-monospace); font-size: .85rem; font-weight: 700; white-space: nowrap; }
+  .commit-card__action-icon { display: inline-grid; width: 34px; height: 34px; padding: 0; place-items: center; border-color: var(--border); background: var(--surface); }
+  .commit-card__deadline { color: var(--muted); font-size: .78rem; white-space: nowrap; }
+  .commit-ledger__empty { padding: 48px 24px; border: 1px dashed var(--border); border-radius: var(--radius); color: var(--muted); text-align: center; }
+  @media (max-width: 48rem) { .commit-ledger__toolbar { align-items: flex-start; flex-direction: column; } .commit-ledger__filters { justify-content: flex-start; width: 100%; } .commit-day { padding-left: 28px; } .commit-card { grid-template-columns: minmax(0, 1fr); } .commit-card__actions { justify-content: flex-start; flex-wrap: wrap; } .commit-card__deadline { width: 100%; } }
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-head d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3"><div><h1>{{ title }}</h1><p class="lead mb-0">{{ description }}</p></div><a class="btn btn-outline-dark" href="{{ back_url }}"><i class="bi bi-arrow-left me-1"></i>返回資料頁</a></div>
+<section class="card-flat commit-ledger"><div class="section-body">
+  <div class="commit-ledger__toolbar"><span class="commit-ledger__branch"><i class="bi bi-diagram-3"></i>版本紀錄</span>{% if show_filters %}<form class="commit-ledger__filters" method="get"><label class="commit-ledger__filter"><i class="bi bi-person"></i><select name="user_id" onchange="this.form.submit()"><option value="">所有操作者</option>{% for user in users %}<option value="{{ user.id }}" {% if selected_user_id == user.id %}selected{% endif %}>{{ user.name }}</option>{% endfor %}</select></label><label class="commit-ledger__filter"><i class="bi bi-calendar3"></i><input type="date" name="date" value="{{ selected_date }}" onchange="this.form.submit()"></label>{% if selected_user_id or selected_date %}<a class="commit-ledger__clear" href="{{ url_for(version_endpoint) }}">清除篩選</a>{% endif %}</form>{% endif %}</div>
+  {% for version in versions %}
+    {% if loop.first or version.CreatedAt.date() != loop.previtem.CreatedAt.date() %}<section class="commit-day"><div class="commit-day__label"><span class="commit-day__node"><i class="bi bi-dot"></i></span>{{ version.CreatedAt.strftime('%Y 年 %m 月 %d 日') if version.CreatedAt else '日期未記錄' }}</div>{% endif %}
+    <article class="commit-card"><div><h2 class="commit-card__title">{{ version.Info or ('回到先前版本狀態' if version.Action == 'Revert' else '更新資料版本') }}</h2><div class="commit-card__meta"><span><i class="bi bi-person me-1"></i>{{ version.CreatedByName or version.CreatedByUserID }}</span><span><i class="bi bi-clock me-1"></i>{{ version.CreatedAt.strftime('%H:%M') if version.CreatedAt else '—' }}</span><span><i class="bi bi-pencil-square me-1"></i>{{ version.ChangeCount }} 筆異動</span><span title="父版本">父版本：<code>{{ version.ParentCommitId or '初始版本' }}</code></span></div></div>
+      <div class="commit-card__actions"><span class="commit-card__commit-id" title="{{ version.CommitId }}">{{ (version.CommitId|string)[:7] }}</span><a class="btn btn-sm btn-outline-secondary commit-card__action-icon" href="{{ url_for(preview_endpoint, version_id=version.CommitId) }}" title="預覽此版本"><i class="bi bi-file-earmark-text"></i></a>{% if version.RevertUntil and version.RevertUntil >= now %}<form method="post" action="{{ url_for(restore_endpoint, version_id=version.CommitId) }}"><button class="btn btn-sm btn-outline-secondary commit-card__action-icon" type="submit" onclick="return confirm('確定要回復到此版本嗎？回復後請儲存目前版本。');" title="回到此時間點"><i class="bi bi-arrow-counterclockwise"></i></button></form>{% else %}<span class="commit-card__deadline">已超過可還原期限</span>{% endif %}</div>
+    </article>
+    {% if loop.last or version.CreatedAt.date() != loop.nextitem.CreatedAt.date() %}</section>{% endif %}
+  {% else %}<div class="commit-ledger__empty"><i class="bi bi-bookmark fs-4 d-block mb-2"></i>尚未儲存任何版本。</div>{% endfor %}
+</div></section>
+{% endblock %}

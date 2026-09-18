@@ -39,10 +39,9 @@ def _should_include_result_file(filename, original_filename=None):
 
         if file_base == original_base and file_ext.lower() in [".txt", ".xls", ".xlsx"]:
             return True
-
     return False
 
-@history_bp.route("/history")
+@history_bp.route("/clean/history")
 @login_required
 def history():
     user_id = session.get("id")
@@ -57,7 +56,7 @@ def history():
     conn.close()
     return render_template("history.html", active="history", history=history_data)
 
-@history_bp.route("/history/delete/<job_id>", methods=["POST"])
+@history_bp.route("/clean/history/delete/<job_id>", methods=["POST"])
 @login_required
 def delete_history(job_id):
     user_id = session.get("id")
@@ -79,7 +78,7 @@ def delete_history(job_id):
     flash("紀錄已成功刪除", "success")
     return redirect(url_for("history.history"))
 
-@history_bp.route("/history/batch_delete", methods=["POST"])
+@history_bp.route("/clean/history/batch_delete", methods=["POST"])
 @login_required
 def batch_delete_history():
     user_id = session.get("id")
@@ -105,27 +104,32 @@ def batch_delete_history():
     conn.close()
     return jsonify({"ok": True})
 
-@history_bp.route("/history/detail/<job_id>")
+@history_bp.route("/clean/history/detail/<job_id>")
 @login_required
 def detail_history(job_id):
+    user_id = session.get("id")
     conn = get_conn()
     cursor = conn.cursor()
     cursor.execute("""SELECT Job.JobID,DataFormat.FmtName,DataFormat.Version,Job.TotalCount,Job.CompletenessScore,Job.CorrectScore,Job.ConsistencyScore,Job.DQI,Job.Path,Job.CreatedAt
-                      FROM DataFormat RIGHT JOIN Job ON DataFormat.FmtID = Job.FmtID WHERE Job.JobID = ?""", (job_id,))
+                      FROM DataFormat RIGHT JOIN Job ON DataFormat.FmtID = Job.FmtID WHERE Job.JobID = ? AND Job.UserID = ?""", (job_id, user_id))
     row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return jsonify({"ok": False, "error": "找不到紀錄"}), 404
     data = dict(zip([c[0] for c in cursor.description], row))
     if isinstance(data['CreatedAt'], datetime.datetime): 
         data['CreatedAt'] = data['CreatedAt'].strftime("%Y/%m/%d %H:%M:%S")
     conn.close()
     return jsonify({"ok": True, "data": data})
 
-@history_bp.route("/history/download/<job_id>")
+@history_bp.route("/clean/history/download/<job_id>")
 @login_required
 def history_download_zip(job_id):
     try:
+        user_id = session.get("id")
         conn = get_conn()
         cursor = conn.cursor()
-        cursor.execute("SELECT Path, FileName FROM Job WHERE JobID=?", (job_id,))
+        cursor.execute("SELECT Path, FileName FROM Job WHERE JobID=? AND UserID=?", (job_id, user_id))
         row = cursor.fetchone()
         conn.close()
         if not row or not row[0]: return jsonify({"ok": False, "error": "Not found"}), 404
@@ -149,7 +153,7 @@ def history_download_zip(job_id):
         return send_file(os.path.abspath(zip_path), as_attachment=True)
     except Exception as e: return jsonify({"ok": False, "error": str(e)}), 500
 
-@history_bp.route("/history/batch_download", methods=["POST"])
+@history_bp.route("/clean/history/batch_download", methods=["POST"])
 @login_required
 def batch_download_history():
     user_id = session.get("id")

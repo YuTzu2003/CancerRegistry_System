@@ -71,18 +71,27 @@ def get_chart_insight_logic(data):
     definitions = []
 
     if fields:
-        conn = get_conn()
-        cursor = conn.cursor()
-        placeholders = ','.join(['?'] * len(fields))
-        query = f"""SELECT [中文欄位名稱], [define] FROM [Hospital_data].[dbo].[CancerRegistry_FieldMap] WHERE [中文欄位名稱] IN ({placeholders})"""
-        cursor.execute(query, fields)
-        rows = cursor.fetchall()
-        for row in rows:
-            col_name = row[0]
-            col_def = row[1]
-            if col_def and str(col_def).strip():
-                definitions.append(f"- {col_name}: {str(col_def).strip()}")
-        conn.close()
+        conn = None
+        try:
+            conn = get_conn()
+            cursor = conn.cursor()
+            placeholders = ','.join(['?'] * len(fields))
+            query = f"""SELECT [中文欄位名稱], [define] FROM [Hospital_data].[dbo].[CancerRegistry_FieldMap] WHERE [中文欄位名稱] IN ({placeholders})"""
+            cursor.execute(query, fields)
+            rows = cursor.fetchall()
+            for row in rows:
+                col_name = row[0]
+                col_def = row[1]
+                if col_def and str(col_def).strip():
+                    definitions.append(f"- {col_name}: {str(col_def).strip()}")
+        except Exception as e:
+            logging.warning(f"Unable to load chart field definitions: {e}")
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception as e:
+                    logging.warning(f"Unable to close chart field definition connection: {e}")
 
     if definitions:
         def_section = f"[Related Field Definitions]:\n" + "\n".join(definitions)
@@ -137,8 +146,7 @@ def get_chart_insight_logic(data):
                 {"role": "system", "content": "You are a professional cancer-registry data analyst. Return valid bilingual JSON only."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.5,
-            timeout=180.0
+            temperature=0.5
         )
         content = response.choices[0].message.content
         insights = _parse_bilingual_insights(content)

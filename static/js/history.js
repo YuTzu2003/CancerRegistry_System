@@ -1,5 +1,5 @@
 function openDetail(jobId) {
-    fetch(`/history/detail/${jobId}`)
+    fetch(`/clean/history/detail/${jobId}`)
         .then(response => response.json())
         .then(res => {
             if (res.ok && res.data) {
@@ -19,7 +19,7 @@ function openDetail(jobId) {
                 document.getElementById('detail-dqi').innerText = data.DQI ? data.DQI.toFixed(2) + '%' : '-';
                 
                 // 設定下載連結
-                document.getElementById('btnDownloadLink').href = `/history/download/${jobId}`;
+                document.getElementById('btnDownloadLink').href = `/clean/history/download/${jobId}`;
                 
                 const detailModal = new bootstrap.Modal(document.getElementById('jobDetailModal'));
                 detailModal.show();
@@ -99,7 +99,7 @@ async function batchDelete() {
     const confirmed = await utils.confirm(`確定要刪除這 ${ids.length} 筆紀錄嗎？此動作無法復原。`);
     if (!confirmed.isConfirmed) return;
 
-    fetch('/history/batch_delete', {
+    fetch('/clean/history/batch_delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ job_ids: ids })
@@ -129,7 +129,7 @@ async function batchDownload() {
     if (!confirmed.isConfirmed) return;
     
     try {
-        const response = await fetch('/history/batch_download', {
+        const response = await fetch('/clean/history/batch_download', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ job_ids: ids })

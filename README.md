@@ -1,58 +1,55 @@
-本專案是一個專為醫療機構設計的癌症登記資料管理系統。透過自動化的資料清洗流程，協助癌症登記人員（Cancer Registrar）提升資料申報的品質與效率。
+## 癌症登記資料管理平台
+是一個專為醫療機構設計的癌症登記資料管理系統，透過自動化的資料清洗、年報分析與版本控制，提升申報品質與效率。
 
-## 目前功能
-1.  **資料清洗模組**：自動偵測原始 CSV/Excel 資料中的格式錯誤、邏輯衝突，並根據癌症登記手冊進行標準化轉換。
-2.  **申報紀錄與審核**：完整紀錄每次資料清洗的歷程，支援結果匯出與歷史申報檔案管理。
-3.  **虛擬資料生成**：支援產生符合格式規範的測試資料，用於系統測試。
-4.  **使用者權限管理**：區分管理者與一般使用者權限，確保資料存取安全。
+---
 
-## 環境建置與執行流程
-### 1. 環境準備
--   Python3.12 或更高版本
--   [uv](https://github.com/astral-sh/uv)
--   SQL Server
+### 1. 環境建置與安裝指南
 
-### 2. 下載專案與環境初始化
+請開啟終端機 (Terminal / PowerShell) 並執行以下指令：
 ```bash
 git clone https://github.com/YuTzu2003/CancerRegistry_System.git
 cd CancerRegistry_System
 
-uv venv
-.venv\Scripts\activate  # Windows
-source .venv/bin/activate # Linux/Mac
+# 使用uv建立虛擬環境
 uv sync
+playwright install chromium
 ```
 
-### 3. 資料庫及環境變數配置
-1. **還原資料庫**：請在SQL Server中還原 `data/Hospital_data.bak` 備份檔。
-2. **設定環境變數**：設定新增`.env`
-   ```env
-   FLASK_PORT=5000
-   DB_SERVER=127.0.0.1
-   DB_PORT=1433
-   DB_NAME=Hospital_data
-   DB_USER=YLH
-   DB_PASSWORD=YLH
+### 2. 資料庫還原配置
+系統預設資料需透過還原備份檔來建立：
+1. 開啟 **SQL Server Management Studio (SSMS)**。
+2. 找到本專案資料夾下的 `data/Hospital_data.bak` 備份檔。
+3. 確認登入的 SQL 使用者帳號擁有讀寫該資料庫的完整權限。
 
-   # LLM Configuration (Ollama)
-   LLM_PROVIDER= ollama
-   LLM_BASE_URL= your API_URL
-   LLM_API_KEY= your API_KEY
-   LLM_MODEL= your LLM Model
+### 3. 環境變數設定 (`.env`)
+請在專案根目錄下建立一個名為 `.env` 的純文字檔案，並填入以下系統設定（請依據您的實際MSSQL帳密與語言模型選擇進行修改）：
 
-   # LLM Configuration (使用OpenAI，LLM_PROVIDER改為openai)
-   # LLM_PROVIDER= openai
-   # OPENAI_API_KEY= your openai_api_key
-   # OPENAI_MODEL= Openai Model
-   ```
+```env
+# Flask設定
+FLASK_PORT=5000
 
-### 4. 執行應用程式
+# SQL Server 資料庫連接設定
+DB_SERVER=127.0.0.1
+DB_PORT=1433
+DB_NAME=Hospital_data
+DB_USER=您的資料庫帳號 (例如: YLH)
+DB_PASSWORD=您的資料庫密碼
+
+# Ollama:
+LLM_PROVIDER=ollama
+LLM_BASE_URL=http://localhost:11434
+LLM_API_KEY=ollama
+LLM_MODEL=gemma4:26b  # 替換為您實際下載的本地模型名稱
+
+# OpenAI:
+# LLM_PROVIDER=openai
+# OPENAI_API_KEY=您的_OPENAI_API_KEY
+# OPENAI_MODEL=gpt-4o-mini
+```
+
+### 4. 啟動系統
+當上述環境變數與資料庫皆設定完成後，於終端機輸入以下指令啟動系統：
+
 ```bash
 uv run app.py
 ```
-平台網址 `http://127.0.0.1:5000`。
----
-
-## 備註
--   如需調整網頁Port或資料庫連接設定，請直接修改 `.env` 檔案。
--   資料清洗邏輯在 `modules/clean_pipeline/rules/` 目錄下。

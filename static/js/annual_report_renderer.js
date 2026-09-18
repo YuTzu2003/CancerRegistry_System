@@ -66,12 +66,13 @@
     const lines = [];
     const segments = String(value ?? '')
       .trim()
-      .replace(/\s*(?=[[(（])/g, '\n')
+      // 中文原位癌後綴視為名稱的一部分，不強制拆成下一行。
+      .replace(/\s*(?=[[(])/g, '\n')
       .split('\n')
       .filter(Boolean);
     segments.forEach(segment => {
       let line = '';
-      const segmentMaxLength = /^[[(（]/.test(segment) ? 88 : 82;
+      const segmentMaxLength = /^[[(]/.test(segment) ? 88 : 82;
       segment.split(/\s+/).filter(Boolean).forEach(word => {
         const candidate = line ? `${line} ${word}` : word;
         if (line && candidate.length > segmentMaxLength) {
@@ -88,7 +89,7 @@
 
   function rightAlignedAxisLabel(value, maxLength = 68) {
     return axisLabelLines(value, maxLength)
-      .map(text => `{${/^[[(（]/.test(text) ? 'bracket' : 'right'}|${text}}`)
+      .map(text => `{${/^[[(]/.test(text) ? 'bracket' : 'right'}|${text}}`)
       .join('\n');
   }
 

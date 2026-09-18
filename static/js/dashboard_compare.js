@@ -30,6 +30,7 @@
   const customYearControls = new Map();
   const yearSelects = [mainYear, mainYearEnd, targetYear, targetYearEnd];
   let activeTreatmentStageSystem = '';
+  let activeSurgeryTableKey = '';
   const stageResultGroupItem = '__stage_reports__';
   let activeStageReportOption = '';
 
@@ -581,9 +582,21 @@
       .join('\n');
   }
 
+  function histologyAxisLabel(value) {
+    const text = String(value ?? '').replace(/\s*\n\s*/g, ' ').trim();
+    // The in-situ suffix is part of the histology name, so keep it on one line.
+    return /[\u3400-\u9fff]/.test(text) || /\(in situ\)$/i.test(text)
+      ? `{right|${text}}`
+      : rightAlignedAxisLabel(text);
+  }
+
   function histologyRowHeight(names) {
-    return window.AnnualReportRenderer.histologyRowHeight(names);
-    const maxLines = Math.max(1, ...names.map(name => axisLabelLines(name).length));
+    const maxLines = Math.max(1, ...(names || []).map(name => {
+      const text = String(name ?? '').replace(/\s*\n\s*/g, ' ').trim();
+      return /[\u3400-\u9fff]/.test(text) || /\(in situ\)$/i.test(text)
+        ? 1
+        : axisLabelLines(text).length;
+    }));
     return Math.max(40, maxLines * 18 + 8);
   }
 
@@ -859,7 +872,7 @@
           const pct = totalCount > 0 ? (Number(item.count || 0) / totalCount * 100).toFixed(1) : '0.0';
           return `
             <tr>
-              <td>${escapeHtml(item.code)}</td>
+
               <td class="text-start">${escapeHtml(item.name)}</td>
               <td>${Number(item.count || 0)}</td>
               <td>${pct}%</td>
@@ -868,11 +881,11 @@
         }).join('') + `
           <tr class="fw-bold" style="background-color: var(--gray-50);">
             <td>${t('total')}</td>
-            <td></td>
+
             <td>${totalCount}</td>
             <td>${validData.length ? '100.0%' : '0.0%'}</td>
           </tr>`
-      : `<tr><td colspan="4" class="text-center">${t('noData')}<br><span class="text-muted small">${noDataReason}</span></td></tr>`;
+      : `<tr><td colspan="3" class="text-center">${t('noData')}<br><span class="text-muted small">${noDataReason}</span></td></tr>`;
 
     const cancer = reportCancerTitle(cancerTitle);
 
@@ -885,17 +898,16 @@
       </div>
       <div data-compare-view-panel="table" class="d-none">
         <div class="annual-report-table-wrap">
-          <table class="annual-report-table compare-histology-table">
+          <table class="annual-report-table annual-histology-table compare-histology-table">
             <caption>${isEnglish() ? `Table. Histological Distribution of ${cancer},\u00a0${yearTitle}` : `表、${yearTitle}年${cancer}組織型態分佈表`}${sourceLine()}</caption>
             <colgroup>
-              <col style="width: 10%;">
-              <col style="width: 75%;">
-              <col style="width: 7.5%;">
-              <col style="width: 7.5%;">
+              <col class="annual-histology-name-col">
+              <col class="annual-histology-count-col">
+              <col class="annual-histology-percent-col">
             </colgroup>
             <thead>
               <tr>
-                <th>${t('icdoCode')}</th>
+
                 <th>${t('histology')}</th>
                 <th>${t('people')}</th>
                 <th>${isEnglish() ? '%' : `${t('percentage')}%`}</th>
@@ -1047,7 +1059,9 @@
       chartEl.style.height = '450px';
       chart.setOption({
         animation: false,
-        title: { text: chartTitle, subtext: t('source'), left: 'center', textStyle: { fontSize: 18, fontWeight: 'bold' } },
+        title: { text: chartTitle, subtext: t('source'), left: 500,
+        right: 60,
+        textAlign: 'center', },
         tooltip: { show: false },
         toolbox: { show: false },
         xAxis: { show: false },
@@ -1075,7 +1089,8 @@
       title: {
         text: chartTitle,
         subtext: t('source'),
-        left: 'center',
+        left: '50%',
+        textAlign: 'center',
         textStyle: { fontSize: 18, fontWeight: 'bold' }
       },
       tooltip: {
@@ -1106,7 +1121,7 @@
           width: 420,
           align: 'right',
           margin: 20,
-          formatter: value => rightAlignedAxisLabel(value),
+          formatter: value => histologyAxisLabel(value),
           rich: {
             right: { width: 420, align: 'right', lineHeight: 18, fontSize: 12 },
             bracket: { width: 420, align: 'right', lineHeight: 18, fontSize: 10.5 }
@@ -1209,6 +1224,39 @@
     return `<div class="annual-report-table-wrap"><table class="annual-report-table"><caption>${caption}</caption><thead><tr><th rowspan="2">${isEnglish() ? 'First Course of Treatment' : '首次療程'}</th><th colspan="${Math.max(stages.length, 1)}">${escapeHtml(item.system)} ${isEnglish() ? 'Stage' : '期別'}</th><th rowspan="2">${isEnglish() ? 'Total' : '小計'}</th><th rowspan="2">%</th></tr><tr>${stages.map(stage => `<th>${escapeHtml(displayStage(stage))}</th>`).join('')}</tr></thead><tbody>${bodyRows}<tr class="fw-bold"><td>${isEnglish() ? 'Total' : '總計'}</td>${totals}<td>${totalCount}</td><td>${totalCount ? '100.0%' : '0.0%'}</td></tr><tr><td>%</td>${percentages}<td>${totalCount ? '100.0%' : '0.0%'}</td><td>-</td></tr></tbody></table></div><div class="compare-note"><div>${definitionNote}</div><div>${stageNote}</div></div>`;
   }
 
+<<<<<<< HEAD
+=======
+  function surgeryProcedureBlock(chartData, yearTitle, cancerTitle, activeKey) {
+    const tables = Array.isArray(chartData?.stageSurgeryData) ? chartData.stageSurgeryData : [];
+    const tableKeyOf = table => `${table.manual_key || 'unknown'}::${table.system || 'stage'}`;
+    const item = tables.find(table => tableKeyOf(table) === activeKey) || tables[0];
+    if (!item) return `<div class="alert alert-light border mb-0">${isEnglish() ? 'No stage and surgical procedure data are available.' : '目前沒有可呈現的期別與手術術式資料。'}</div>`;
+    const stages = item.stage_columns || [];
+    const rows = item.rows || [];
+    const rowByKey = new Map(rows.map(row => [row.row_key, row]));
+    const levelOf = row => {
+      if (row.display_level !== null && row.display_level !== undefined && row.display_level !== '' && Number.isFinite(Number(row.display_level))) return Math.max(0, Number(row.display_level));
+      let level = 0, parent = rowByKey.get(row.parent_row_key), seen = new Set();
+      while (parent && !seen.has(parent.row_key)) { seen.add(parent.row_key); level += 1; parent = rowByKey.get(parent.parent_row_key); }
+      return level;
+    };
+    const total = Number(item.total_count || 0);
+    const stageSystem = item.system || (isEnglish() ? 'Unspecified' : '未指定');
+    const procedure = row => {
+      const code = row.code_short && row.code_long ? `${row.code_short}/${row.code_long}` : (row.code_short || row.code_long || '');
+      return row.row_type === 'heading' ? (row.procedure || '') : `${code}${code && row.procedure ? ' ' : ''}${row.procedure || ''}`;
+    };
+    const body = rows.map(row => {
+      const indent = Math.min(levelOf(row), 3) * 1.5;
+      const values = (row.values || []).map(value => `<td>${value}</td>`).join('');
+      return `<tr class="${row.row_type === 'heading' ? 'table-light fw-semibold' : ''}"><td class="text-start" style="padding-left: calc(0.75rem + ${indent}rem) !important">${escapeHtml(procedure(row))}</td>${values}<td>${Number(row.subtotal || 0)}</td><td>${total ? (Number(row.subtotal || 0) / total * 100).toFixed(1) : '0.0'}%</td></tr>`;
+    }).join('');
+    const caption = isEnglish()
+      ? `Table. Surgical Procedure Distribution of Newly Diagnosed ${escapeHtml(reportCancerTitle(cancerTitle))} Cases by ${escapeHtml(stageSystem)} Stage, ${yearTitle}${sourceLine()}`
+      : `表、${yearTitle}年新診斷${escapeHtml(reportCancerTitle(cancerTitle))}病患${escapeHtml(stageSystem)}期別與手術術式分佈${sourceLine()}`;
+    return `<div class="annual-report-table-wrap"><table class="annual-report-table"><caption class="surgery-table-caption">${caption}</caption><thead><tr><th class="text-center">${isEnglish() ? 'Surgical Codes/Surgical Procedure' : '術式編碼/術式名稱'}</th><th colspan="${Math.max(stages.length, 1)}">${escapeHtml(stageSystem)} ${isEnglish() ? 'Stage' : '期別'}</th><th rowspan="2">${isEnglish() ? 'Total' : '小計'}</th><th rowspan="2">%</th></tr><tr><th class="text-center">${isEnglish() ? '(Taiwan Cancer Registry Surgery Codes)' : '（按台灣癌症登記術式編碼分類）'}</th>${stages.map(stage => `<th>${escapeHtml(String(stage || '').replace(/^Stage\s+/i, ''))}</th>`).join('')}</tr></thead><tbody>${body}<tr class="fw-bold"><td>${isEnglish() ? 'Total' : '總計'}</td>${(item.totals || []).map(value => `<td>${value}</td>`).join('')}<td>${total}</td><td>${total ? '100.0%' : '0.0%'}</td></tr><tr><td>%</td>${(item.percentages || []).map(value => `<td>${value}%</td>`).join('')}<td>${total ? '100.0%' : '0.0%'}</td><td>-</td></tr></tbody></table></div>`;
+  }
+>>>>>>> 0a1ab48bd508a1d27a27d218813bba492c7c2a04
   function normalizeStageReport(report) {
     const stageLabels = Array.isArray(report?.stage_labels) ? report.stage_labels.map(String) : [];
     const values = source => stageLabels.map((_, index) => Number(source?.[index] || 0));
@@ -1346,7 +1394,7 @@
         <caption>${t(captionKey, titleOptions)}${sourceLine()}</caption>
         <thead>${head}</thead><tbody>${rows}</tbody>
       </table>
-      <div class="annual-stage-report-note text-start">${escapeHtml(stageNote(report))}</div>
+      <div class="annual-stage-report-note small text-secondary mt-2 mb-0 text-start">${escapeHtml(stageNote(report))}</div>
     </div>`;
   }
 
@@ -1360,7 +1408,7 @@
       <div data-compare-view-panel="chart">
         <div id="${chartId}" class="compare-chart compare-stage-chart"></div>
         <div class="compare-chart-caption">${t(figureKey, titleOptions)}</div>
-        <div class="annual-stage-chart-note">${escapeHtml(stageNote(report))}</div>
+        <div class="annual-stage-chart-note small text-secondary mt-2 mb-0">${escapeHtml(stageNote(report))}</div>
       </div>
       <div data-compare-view-panel="table" class="d-none">${stageTableHtml(report, yearTitle, cancerTitle)}</div>`;
   }
@@ -1392,7 +1440,7 @@
           name: sexLabel(row.sex),
           type: 'bar',
           stack: 'stage',
-          barMaxWidth: 58,
+          barWidth: 45,
           data: row.values.map(value => Number(percentage(value).toFixed(1))),
           itemStyle: {
             color: male ? '#5470C6' : '#EE6666',
@@ -1407,7 +1455,7 @@
       const topLabelSeries = {
         name: '__stageSexLabels',
         type: 'bar',
-        barMaxWidth: 58,
+        barWidth: 45,
         barGap: '-100%',
         silent: true,
         z: 10,
@@ -1422,8 +1470,9 @@
           show: true,
           position: 'top',
           distance: 4,
+          align: 'center',
           fontSize: 13,
-          fontWeight: 600,
+          fontWeight: 'bold',
           formatter: params => {
             return [
               `{female|${Number(params.data.femalePercent || 0).toFixed(1)}%}`,
@@ -1431,8 +1480,8 @@
             ].join('\n');
           },
           rich: {
-            male: { color: '#36558f', fontWeight: 600, lineHeight: 16 },
-            female: { color: '#b54848', fontWeight: 600, lineHeight: 16 }
+            male: { color: '#36558f', fontSize: 13, fontWeight: 'bold', lineHeight: 16, width: 45, align: 'center' },
+            female: { color: '#b54848', fontSize: 13, fontWeight: 'bold', lineHeight: 16, width: 45, align: 'center' }
           }
         }
       };
@@ -1457,20 +1506,81 @@
         series: [...sexSeries, topLabelSeries]
       });
     } else if (report.view === 'age') {
-      const colors = ['#5470C6', '#EE6666', '#91CC75', '#9A8CD8', '#F28C45'];
+      const colors = ['#F3AE9F', '#E9CB92', '#C3E4C3', '#A7B9DF', '#C8B0DC'];
       const labels = report.chart_stage_labels;
-      chartEl.style.height = '560px';
-      chart.setOption({ ...common, tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } }, legend: { top: 55 }, grid: { left: 62, right: 28, top: 95, bottom: 45 },
+      const ageStagePercentages = report.chart_age_rows.map(row => {
+        const total = (row.values || []).reduce((sumValue, value) => sumValue + Number(value || 0), 0);
+        return labels.map((_, index) => total
+          ? Number((Number(row.values?.[index] || 0) / total * 100).toFixed(1))
+          : 0);
+      });
+      const smallStageLabelData = [];
+      ageStagePercentages.forEach((values, rowIndex) => {
+        let cumulative = 0;
+        values.forEach((value, stageIndex) => {
+          if (value > 0 && value <= 3) {
+            smallStageLabelData.push([
+              cumulative + value / 2,
+              report.chart_age_rows[rowIndex].age,
+              value,
+              stageIndex
+            ]);
+          }
+          cumulative += value;
+        });
+      });
+      const smallStageLabelSeries = {
+        name: '__smallStageLabels',
+        type: 'custom',
+        silent: true,
+        tooltip: { show: false },
+        z: 20,
+        data: smallStageLabelData,
+        renderItem: (params, api) => {
+          const point = api.coord([api.value(0), api.value(1)]);
+          const stageIndex = Number(api.value(3) || 0);
+          const horizontalShift = 8;
+          const lineStartY = point[1] - 10;
+          const lineEnd = [point[0] + horizontalShift, point[1] - 18];
+          return { type: 'group', children: [
+            { type: 'line', shape: { x1: point[0], y1: lineStartY, x2: lineEnd[0], y2: lineEnd[1] }, style: { stroke: colors[stageIndex % colors.length], lineWidth: 1.5 } },
+            { type: 'text', style: { text: `${Number(api.value(2)).toFixed(1)}%`, x: lineEnd[0], y: lineEnd[1] - 2, fill: '#4b5563', font: '700 11px Arial, sans-serif', align: 'center', verticalAlign: 'bottom' } }
+          ] };
+        }
+      };
+      chartEl.style.height = '680px';
+      chart.setOption({ ...common, tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } }, legend: { top: 55, data: labels }, grid: { left: 62, right: 28, top: 95, bottom: 45 },
         xAxis: { type: 'value', min: 0, max: 100, axisLabel: { formatter: '{value}%' } }, yAxis: { type: 'category', data: report.chart_age_rows.map(row => row.age) },
-        series: labels.map((label, index) => ({ name: label, type: 'bar', stack: 'age-stage', data: report.chart_age_rows.map(row => {
-          const total = (row.values || []).reduce((sumValue, value) => sumValue + Number(value || 0), 0);
-          return total ? Number((Number(row.values?.[index] || 0) / total * 100).toFixed(1)) : 0;
-        }), itemStyle: { color: colors[index % colors.length] } })) });
+        series: [...labels.map((label, index) => ({ name: label, type: 'bar', stack: 'age-stage', barMaxWidth: 22, data: ageStagePercentages.map(values => values[index]), itemStyle: { color: colors[index % colors.length] }, label: {
+          show: true,
+          position: 'inside',
+          align: 'center',
+          verticalAlign: 'middle',
+          offset: [0, 1],
+          color: '#4b5563',
+          fontSize: 11,
+          fontFamily: 'Arial, sans-serif',
+          fontStyle: 'normal',
+          fontWeight: 700,
+          lineHeight: 22,
+          textBorderWidth: 0,
+          textShadowBlur: 0,
+          formatter: params => Number(params.value || 0) > 3 ? `${Number(params.value).toFixed(1)}%` : ''
+        } })), smallStageLabelSeries] });
     } else {
       chart.setOption({ ...common, tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } }, grid: { left: 58, right: 28, top: 82, bottom: 55 },
         xAxis: { type: 'category', data: report.stage_labels }, yAxis: { type: 'value', min: 0, max: 100, interval: 10, axisLabel: { formatter: '{value}%' } },
+<<<<<<< HEAD
         series: [{ type: 'bar', barMaxWidth: 58, data: report.stage_totals.map(value => Number(percentage(value).toFixed(1))),
           itemStyle: { color: '#9A8CD8', borderColor: '#9A8CD8', borderWidth: 1 },
+=======
+        series: [{ type: 'bar', barWidth: 45, data: report.stage_totals.map(value => Number(percentage(value).toFixed(1))),
+          itemStyle: {
+            color: '#D4B2F6',
+            borderColor: '#D4B2F6',
+            borderWidth: 1
+          },
+>>>>>>> 0a1ab48bd508a1d27a27d218813bba492c7c2a04
           label: { show: true, position: 'top', fontSize: 13, fontWeight: 'bold', formatter: params => `${Number(params.value || 0).toFixed(1)}%` } }] });
     }
     setTimeout(() => chart.resize(), 50);
@@ -1484,6 +1594,10 @@
     if (item === '組織型態') return histologyBlock(chartData, meta.year_label, cancerTitle, `${chartPrefix}HistologyChart`);
     if (item === '個案分類') return classificationBlock(chartData, meta.year_label, cancerTitle, `${chartPrefix}ClassificationChart`);
     if (item === '期別與首次療程') return treatmentFirstCourseBlock(chartData, meta.year_label, cancerTitle, activeStageSystem);
+<<<<<<< HEAD
+=======
+    if (item === '期別與手術術式') return surgeryProcedureBlock(chartData, meta.year_label, cancerTitle, activeStageSystem);
+>>>>>>> 0a1ab48bd508a1d27a27d218813bba492c7c2a04
     if ((chartData?.stageReports || []).some(report => report.option === item)) {
       return stageBlock(chartData, meta.year_label, cancerTitle, `${chartPrefix}StageChart`, item);
     }
@@ -1516,18 +1630,68 @@
 
   function changeNumberText(value, suffix = '') {
     const number = Number(value || 0);
-    if (number === 0) return '無變化 —';
+    if (number === 0) return isEnglish() ? 'No change —' : '無變化 —';
     const amount = Number.isInteger(Math.abs(number)) ? Math.abs(number) : Math.abs(number).toFixed(1);
+    if (isEnglish()) {
+      const englishSuffix = suffix === '人'
+        ? ` ${Number(amount) === 1 ? 'case' : 'cases'}`
+        : suffix === '人／年' ? ' cases/year' : suffix ? ` ${suffix}` : '';
+      return `${number > 0 ? 'Increase by' : 'Decrease by'} ${amount}${englishSuffix} ${number > 0 ? '▲' : '▼'}`;
+    }
     return `${number > 0 ? '增加' : '減少'}${amount}${suffix} ${number > 0 ? '▲' : '▼'}`;
   }
 
   function signedPercentText(mainValue, targetValue) {
     const main = Number(mainValue || 0);
     const target = Number(targetValue || 0);
-    if (!main) return target ? '無法計算' : '0.0%';
+    if (!main) return target ? (isEnglish() ? 'N/A' : '無法計算') : '0.0%';
     const percentage = (target - main) / main * 100;
     if (percentage === 0) return '0.0%';
     return `${percentage > 0 ? '+' : '−'}${Math.abs(percentage).toFixed(1)}%`;
+  }
+
+  function summaryText(zhText, enText) {
+    return isEnglish() ? enText : zhText;
+  }
+
+  function summaryCount(value) {
+    const count = Number(value || 0);
+    return isEnglish() ? `${count} ${count === 1 ? 'case' : 'cases'}` : `${count}人`;
+  }
+
+  function summaryPeriod(label, zhFallback, enFallback) {
+    const text = String(label || (isEnglish() ? enFallback : zhFallback));
+    if (isEnglish()) return text.replace(/年/g, '');
+    return text.includes('年') ? text : `${text}年`;
+  }
+
+  function summaryParentheses(text) {
+    return isEnglish() ? ` (${text})` : `（${text}）`;
+  }
+
+  const summaryTitleTranslations = {
+    '可分析個案差異': 'Analyzable Case Difference',
+    '顯微鏡檢確診個案差異': 'Microscopically Confirmed Case Difference',
+    '主要組織型態差異': 'Leading Histology Difference',
+    '個案分類最大差異': 'Largest Case Classification Difference',
+    '可分析期別個案數差異': 'Analyzable Staged Case Difference',
+    '主要期別差異': 'Leading Stage Difference',
+    '性別期別最大差異': 'Largest Stage Difference by Sex',
+    '年齡層期別最大差異': 'Largest Stage Difference by Age',
+    '整體主要療程': 'Overall Leading Treatment',
+    '整體主要療程差異': 'Overall Leading Treatment Difference',
+    '早期主要療程': 'Leading Treatment for Early Stage',
+    '早期主要療程（Stage I–II）': 'Leading Treatment for Early Stage (Stage I–II)',
+    '早期主要療程差異（Stage I–II）': 'Leading Treatment Difference for Early Stage (Stage I–II)',
+    '晚期主要療程': 'Leading Treatment for Late Stage',
+    '晚期主要療程（Stage III–IV）': 'Leading Treatment for Late Stage (Stage III–IV)',
+    '晚期主要療程差異（Stage III–IV）': 'Leading Treatment Difference for Late Stage (Stage III–IV)',
+    '手術治療概況': 'Surgical Treatment Overview',
+    '手術治療概況差異': 'Surgical Treatment Overview Difference'
+  };
+
+  function summaryTitle(title) {
+    return isEnglish() ? (summaryTitleTranslations[title] || title) : title;
   }
 
   const summaryCardTitles = {
@@ -1538,16 +1702,16 @@
       '個案分類最大差異'
     ],
     stage: [
-      '有效期別個案數差異',
-      '早期期別（Stage I–II）比例差異',
-      '晚期期別（Stage III–IV）比例差異',
-      '個案數差異最大的期別'
+      '可分析期別個案數差異',
+      '主要期別差異',
+      '性別期別最大差異',
+      '年齡層期別最大差異'
     ],
     treatment: [
-      '接受初次療程個案數差異',
-      '接受初次療程比例差異',
-      '手術治療個案數差異',
-      '手術治療比例差異'
+      '整體主要療程',
+      '早期主要療程',
+      '晚期主要療程',
+      '手術治療概況'
     ],
     cross_year: [
       '區間總個案數差異',
@@ -1570,7 +1734,7 @@
     const titles = summaryCardTitles[category] || [];
     document.getElementById('compareResultSummary').innerHTML = titles.map(() => `
       <div class="compare-summary-card">
-        <div class="compare-summary-placeholder-value">未設置</div>
+        <div class="compare-summary-placeholder-value">${summaryText('未設置', 'Not configured')}</div>
       </div>
     `).join('');
   }
@@ -1586,9 +1750,8 @@
       return Number.isFinite(parsed) ? parsed : 0;
     };
     const valueClass = value => numberValue(value) > 0 ? 'is-up' : numberValue(value) < 0 ? 'is-down' : 'is-flat';
-    const formatPeriod = label => String(label || '').includes('–') ? label : `${label}年`;
-    const mainPeriod = escapeHtml(formatPeriod(data.main?.year_label || '基準期'));
-    const targetPeriod = escapeHtml(formatPeriod(data.target?.year_label || '比較期'));
+    const mainPeriod = escapeHtml(summaryPeriod(data.main?.year_label, '基準期', 'Baseline'));
+    const targetPeriod = escapeHtml(summaryPeriod(data.target?.year_label, '比較期', 'Comparison'));
 
     const analyzableMain = numberValue(mainCases.analyzable_count);
     const analyzableTarget = numberValue(targetCases.analyzable_count);
@@ -1602,15 +1765,20 @@
       .sort((a, b) => numberValue(b.count) - numberValue(a.count));
     const mainHistology = validHistology(mainAnalysis)[0] || null;
     const targetHistology = validHistology(targetAnalysis)[0] || null;
-    let histologyPrimary = '<span class="is-flat">無法判定 —</span>';
-    let histologyDetail = '兩期皆無可比較的組織型態資料';
+    let histologyPrimary = `<span class="is-flat">${summaryText('無法判定 —', 'Unable to determine —')}</span>`;
+    let histologyDetail = summaryText('兩期皆無可比較的組織型態資料', 'No comparable histology data in either period');
     if (mainHistology && targetHistology && mainHistology.name === targetHistology.name) {
       const histologyDiff = numberValue(targetHistology.count) - numberValue(mainHistology.count);
-      histologyPrimary = `<span>${escapeHtml(mainHistology.name)}</span> <span class="${valueClass(histologyDiff)}">${changeNumberText(histologyDiff, '人')}（${signedPercentText(mainHistology.count, targetHistology.count)}）</span>`;
-      histologyDetail = `${mainPeriod} ${numberValue(mainHistology.count)}人（${escapeHtml(mainHistology.percentage || '0.0%')}）→ ${targetPeriod} ${numberValue(targetHistology.count)}人（${escapeHtml(targetHistology.percentage || '0.0%')}）`;
+      const histologyShareDiff = percentValue(targetHistology.percentage) - percentValue(mainHistology.percentage);
+      const histologyShareDiffText = `${histologyShareDiff > 0 ? '+' : histologyShareDiff < 0 ? '−' : ''}${Math.abs(histologyShareDiff).toFixed(1)}%`;
+      const histologyCountChangeText = histologyDiff === 0
+        ? `${summaryText('無變化', 'No change')} <span class="compare-summary-flat-dash">—</span>`
+        : changeNumberText(histologyDiff, '人');
+      histologyPrimary = `<span>${escapeHtml(mainHistology.name)}</span><span class="compare-summary-histology-change ${valueClass(histologyDiff)}"><span class="compare-summary-histology-change-text">${histologyCountChangeText}${summaryParentheses(histologyShareDiffText)}</span></span>`;
+      histologyDetail = `${mainPeriod} ${summaryCount(mainHistology.count)}${summaryParentheses(escapeHtml(mainHistology.percentage || '0.0%'))} → ${targetPeriod} ${summaryCount(targetHistology.count)}${summaryParentheses(escapeHtml(targetHistology.percentage || '0.0%'))}`;
     } else if (mainHistology && targetHistology) {
-      histologyPrimary = '<span class="is-flat">主要型態發生變化 →</span>';
-      histologyDetail = `${mainPeriod} ${escapeHtml(mainHistology.name)}（${escapeHtml(mainHistology.percentage || '0.0%')}）→ ${targetPeriod} ${escapeHtml(targetHistology.name)}（${escapeHtml(targetHistology.percentage || '0.0%')}）`;
+      histologyPrimary = `<span class="is-flat">${summaryText('主要型態發生變化 ⇄', 'Leading histology changed ⇄')}</span>`;
+      histologyDetail = `<span class="compare-summary-diagnosis-period-line">${mainPeriod} ${escapeHtml(mainHistology.name)}${summaryParentheses(escapeHtml(mainHistology.percentage || '0.0%'))}</span><span class="compare-summary-diagnosis-period-line">→ ${targetPeriod} ${escapeHtml(targetHistology.name)}${summaryParentheses(escapeHtml(targetHistology.percentage || '0.0%'))}</span>`;
     }
 
     const mainClass = mainAnalysis.diagnosisClassificationData || {};
@@ -1635,35 +1803,120 @@
       (a, b) => Math.abs(b.difference) - Math.abs(a.difference)
         || (b.mainCount + b.targetCount) - (a.mainCount + a.targetCount)
     )[0];
+
+    if (data.compare_mode === 'range') {
+      const periodYearCount = period => Number(period?.year_count || 0)
+        || Object.keys(period?.yearly_counts || {}).length
+        || 1;
+      const percentagePointText = difference => {
+        if (Math.abs(difference) < 0.05) return summaryText('無變化 —', 'No change —');
+        return difference > 0
+          ? summaryText(`上升${Math.abs(difference).toFixed(1)}個百分點 ▲`, `Increase by ${Math.abs(difference).toFixed(1)} percentage points ▲`)
+          : summaryText(`下降${Math.abs(difference).toFixed(1)}個百分點 ▼`, `Decrease by ${Math.abs(difference).toFixed(1)} percentage points ▼`);
+      };
+      const countRatioText = (numerator, denominator) => isEnglish()
+        ? `${numerator}/${denominator} cases`
+        : `${numerator}／${denominator}人`;
+
+      const mainTotal = numberValue(mainCases.total_count ?? data.main?.total_count);
+      const targetTotal = numberValue(targetCases.total_count ?? data.target?.total_count);
+      const mainAnalyzableShare = mainTotal ? analyzableMain / mainTotal * 100 : 0;
+      const targetAnalyzableShare = targetTotal ? analyzableTarget / targetTotal * 100 : 0;
+      const analyzableShareDiff = targetAnalyzableShare - mainAnalyzableShare;
+      const mainAnnualAverage = analyzableMain / periodYearCount(data.main);
+      const targetAnnualAverage = analyzableTarget / periodYearCount(data.target);
+      const annualAverageDiff = targetAnnualAverage - mainAnnualAverage;
+
+      const histologyRows = new Map();
+      const addHistologyRows = (items, side) => {
+        (Array.isArray(items) ? items : [])
+          .filter(item => item?.name && item.name !== 'Unknown / 未對應組織型態')
+          .forEach(item => {
+            const row = histologyRows.get(item.name) || {
+              name: item.name,
+              mainCount: 0,
+              targetCount: 0,
+              mainShare: 0,
+              targetShare: 0
+            };
+            row[`${side}Count`] = numberValue(item.count);
+            row[`${side}Share`] = percentValue(item.percentage);
+            histologyRows.set(item.name, row);
+          });
+      };
+      addHistologyRows(mainAnalysis.histologyData, 'main');
+      addHistologyRows(targetAnalysis.histologyData, 'target');
+      const biggestHistology = [...histologyRows.values()]
+        .map(row => ({ ...row, difference: row.targetShare - row.mainShare }))
+        .sort((a, b) => Math.abs(b.difference) - Math.abs(a.difference)
+          || (b.mainCount + b.targetCount) - (a.mainCount + a.targetCount))[0] || null;
+
+      const histologyPrimaryRange = biggestHistology
+        ? `<span>${escapeHtml(biggestHistology.name)}</span><span class="compare-summary-histology-change ${valueClass(biggestHistology.difference)}"><span class="compare-summary-histology-change-text">${percentagePointText(biggestHistology.difference)}</span></span>`
+        : `<span class="is-flat">${summaryText('無法判定 —', 'Unable to determine —')}</span>`;
+      const histologyDetailRange = biggestHistology
+        ? `${mainPeriod} ${summaryCount(biggestHistology.mainCount)}${summaryParentheses(`${biggestHistology.mainShare.toFixed(1)}%`)} → ${targetPeriod} ${summaryCount(biggestHistology.targetCount)}${summaryParentheses(`${biggestHistology.targetShare.toFixed(1)}%`)}`
+        : summaryText('兩個區間皆無可比較的組織型態資料', 'No comparable histology data in either interval');
+
+      document.getElementById('compareResultSummary').innerHTML = `
+        <div class="compare-summary-card">
+          <div class="compare-summary-label">${summaryText('年平均可分析個案數差異', 'Annual Average Analyzable Case Difference')}</div>
+          <div class="compare-summary-value ${valueClass(annualAverageDiff)}">${summaryText('年平均', 'Annual average ')}${changeNumberText(annualAverageDiff, '人／年')}${summaryParentheses(signedPercentText(mainAnnualAverage, targetAnnualAverage))}</div>
+          <div class="compare-summary-period-detail">${mainPeriod} ${mainAnnualAverage.toFixed(1)}${summaryText('人／年', ' cases/year')} → ${targetPeriod} ${targetAnnualAverage.toFixed(1)}${summaryText('人／年', ' cases/year')}</div>
+          <div class="compare-summary-period-detail compare-summary-period-detail-next">${summaryText('區間總數：', 'Interval total: ')}${summaryCount(analyzableMain)} → ${summaryCount(analyzableTarget)}</div>
+        </div>
+        <div class="compare-summary-card">
+          <div class="compare-summary-label">${summaryText('可分析個案差異（依區間內確診個案的可分析率判定）', 'Analyzable Case Difference (based on the analyzable rate among diagnosed cases in each interval)')}</div>
+          <div class="compare-summary-value ${valueClass(analyzableShareDiff)}">${percentagePointText(analyzableShareDiff)}</div>
+          <div class="compare-summary-period-detail compare-summary-period-comparison compare-summary-range-diagnosis-detail">
+            <span class="compare-summary-period-main">${mainPeriod} ${countRatioText(analyzableMain, mainTotal)}${summaryParentheses(`${mainAnalyzableShare.toFixed(1)}%`)}</span>
+            <span class="compare-summary-period-target"><span class="compare-summary-period-arrow">→</span>${targetPeriod} ${countRatioText(analyzableTarget, targetTotal)}${summaryParentheses(`${targetAnalyzableShare.toFixed(1)}%`)}</span>
+          </div>
+        </div>
+        <div class="compare-summary-card">
+          <div class="compare-summary-label">${summaryText('組織型態分布差異', 'Histology Distribution Difference')}</div>
+          <div class="compare-summary-diagnosis-primary">${histologyPrimaryRange}</div>
+          <div class="compare-summary-period-detail compare-summary-diagnosis-detail">${histologyDetailRange}</div>
+        </div>
+        <div class="compare-summary-card">
+          <div class="compare-summary-label">${summaryText('個案分類分布差異', 'Case Classification Distribution Difference')}</div>
+          <div class="compare-summary-age-row">
+            <span class="compare-summary-age-group">${escapeHtml(biggestClass?.label || '—')}</span>
+            <span class="compare-summary-age-change ${valueClass(biggestClass?.difference)}">${biggestClass ? percentagePointText(biggestClass.difference) : summaryText('無法判定', 'Unable to determine')}</span>
+          </div>
+          <div class="compare-summary-period-values compare-summary-range-classification-detail">${mainPeriod} ${summaryCount(biggestClass?.mainCount)}${summaryParentheses(`${numberValue(biggestClass?.mainShare).toFixed(1)}%`)} → ${targetPeriod} ${summaryCount(biggestClass?.targetCount)}${summaryParentheses(`${numberValue(biggestClass?.targetShare).toFixed(1)}%`)}</div>
+        </div>
+      `;
+      return;
+    }
+
     const classChangeText = biggestClass
-      ? biggestClass.difference === 0
-        ? '無變化 —'
-        : `${biggestClass.difference > 0 ? '上升' : '下降'}${Math.abs(biggestClass.difference).toFixed(1)}個百分點 ${biggestClass.difference > 0 ? '▲' : '▼'}`
-      : '無法判定';
+      ? `${changeNumberText(biggestClass.targetCount - biggestClass.mainCount, '人')}${summaryParentheses(`${biggestClass.difference > 0 ? '+' : biggestClass.difference < 0 ? '−' : ''}${Math.abs(biggestClass.difference).toFixed(1)}%`)}`
+      : summaryText('無法判定', 'Unable to determine');
 
     document.getElementById('compareResultSummary').innerHTML = `
       <div class="compare-summary-card">
-        <div class="compare-summary-label">可分析個案差異</div>
-        <div class="compare-summary-value ${valueClass(analyzableDiff)}">${changeNumberText(analyzableDiff, '人')}（${signedPercentText(analyzableMain, analyzableTarget)}）</div>
-        <div class="compare-summary-period-detail">${mainPeriod} ${analyzableMain}人（${escapeHtml(mainCases.analyzable_percent || '0.0%')}）→ ${targetPeriod} ${analyzableTarget}人（${escapeHtml(targetCases.analyzable_percent || '0.0%')}）</div>
+        <div class="compare-summary-label">${summaryTitle('可分析個案差異')}</div>
+        <div class="compare-summary-value ${valueClass(analyzableDiff)}">${changeNumberText(analyzableDiff, '人')}${summaryParentheses(signedPercentText(analyzableMain, analyzableTarget))}</div>
+        <div class="compare-summary-period-detail">${mainPeriod} ${summaryCount(analyzableMain)}${summaryParentheses(escapeHtml(mainCases.analyzable_percent || '0.0%'))} → ${targetPeriod} ${summaryCount(analyzableTarget)}${summaryParentheses(escapeHtml(targetCases.analyzable_percent || '0.0%'))}</div>
       </div>
       <div class="compare-summary-card">
-        <div class="compare-summary-label">顯微鏡檢確診個案差異</div>
-        <div class="compare-summary-value ${valueClass(confirmedDiff)}">${changeNumberText(confirmedDiff, '人')}（${signedPercentText(confirmedMain, confirmedTarget)}）</div>
-        <div class="compare-summary-period-detail">${mainPeriod} ${confirmedMain}人（${escapeHtml(mainCases.confirmed_percent || '0.0%')}）→ ${targetPeriod} ${confirmedTarget}人（${escapeHtml(targetCases.confirmed_percent || '0.0%')}）</div>
+        <div class="compare-summary-label">${summaryTitle('顯微鏡檢確診個案差異')}</div>
+        <div class="compare-summary-value ${valueClass(confirmedDiff)}">${changeNumberText(confirmedDiff, '人')}${summaryParentheses(signedPercentText(confirmedMain, confirmedTarget))}</div>
+        <div class="compare-summary-period-detail">${mainPeriod} ${summaryCount(confirmedMain)}${summaryParentheses(escapeHtml(mainCases.confirmed_percent || '0.0%'))} → ${targetPeriod} ${summaryCount(confirmedTarget)}${summaryParentheses(escapeHtml(targetCases.confirmed_percent || '0.0%'))}</div>
       </div>
       <div class="compare-summary-card">
-        <div class="compare-summary-label">主要組織型態差異</div>
+        <div class="compare-summary-label">${summaryTitle('主要組織型態差異')}</div>
         <div class="compare-summary-diagnosis-primary">${histologyPrimary}</div>
         <div class="compare-summary-period-detail compare-summary-diagnosis-detail">${histologyDetail}</div>
       </div>
       <div class="compare-summary-card">
-        <div class="compare-summary-label">個案分類最大差異</div>
+        <div class="compare-summary-label">${summaryTitle('個案分類最大差異')}</div>
         <div class="compare-summary-age-row">
           <span class="compare-summary-age-group">${escapeHtml(biggestClass?.label || '—')}</span>
           <span class="compare-summary-age-change ${valueClass(biggestClass?.difference)}">${classChangeText}</span>
         </div>
-        <div class="compare-summary-period-values">${mainPeriod} ${numberValue(biggestClass?.mainCount)}人（${numberValue(biggestClass?.mainShare).toFixed(1)}%）→ ${targetPeriod} ${numberValue(biggestClass?.targetCount)}人（${numberValue(biggestClass?.targetShare).toFixed(1)}%）</div>
+        <div class="compare-summary-period-values">${mainPeriod} ${summaryCount(biggestClass?.mainCount)}${summaryParentheses(`${numberValue(biggestClass?.mainShare).toFixed(1)}%`)} → ${targetPeriod} ${summaryCount(biggestClass?.targetCount)}${summaryParentheses(`${numberValue(biggestClass?.targetShare).toFixed(1)}%`)}</div>
       </div>
     `;
   }
@@ -1751,7 +2004,9 @@
       : ageShareDiff < 0 ? `−${Math.abs(ageShareDiff).toFixed(1)}%` : '0.0%';
     const formatAgeGroup = label => {
       const text = String(label || '—').replace(/^(\d+)-(\d+)$/, '$1–$2');
-      return `${text}${text.includes('歲') || text === '—' ? '' : '歲'}`;
+      if (text === '—') return text;
+      if (isEnglish()) return `${text.replace(/歲/g, '')} yrs`;
+      return `${text}${text.includes('歲') ? '' : '歲'}`;
     };
     const ageGroupLabel = formatAgeGroup(biggest.label);
     const medianGroup = genderData => {
@@ -1775,12 +2030,12 @@
       ? targetMedianGroup.index - mainMedianGroup.index
       : 0;
     const medianGroupChangeText = mainMedianGroup.index < 0 || targetMedianGroup.index < 0
-      ? '無法判定'
+      ? summaryText('無法判定', 'Unable to determine')
       : medianGroupDiff > 0
-        ? `上升${medianGroupDiff}個年齡級距 ▲`
+        ? summaryText(`上升${medianGroupDiff}個年齡級距 ▲`, `Increased by ${medianGroupDiff} age ${medianGroupDiff === 1 ? 'band' : 'bands'} ▲`)
         : medianGroupDiff < 0
-          ? `下降${Math.abs(medianGroupDiff)}個年齡級距 ▼`
-          : '中位年齡層無變化 —';
+          ? summaryText(`下降${Math.abs(medianGroupDiff)}個年齡級距 ▼`, `Decreased by ${Math.abs(medianGroupDiff)} age ${Math.abs(medianGroupDiff) === 1 ? 'band' : 'bands'} ▼`)
+          : summaryText('中位年齡層無變化 —', 'No change in median age group —');
     const totalDiff = Number(data.target?.total_count || 0) - Number(data.main?.total_count || 0);
     const maleCountDiff = Number(targetAge.male_count || 0) - Number(mainAge.male_count || 0);
     const femaleCountDiff = Number(targetAge.female_count || 0) - Number(mainAge.female_count || 0);
@@ -1798,34 +2053,82 @@
       return `${difference > 0 ? '+' : '−'}${Math.abs(difference).toFixed(1)}%`;
     };
     const shareValueClass = difference => difference > 0 ? 'is-up' : difference < 0 ? 'is-down' : '';
-    const formatPeriod = label => String(label || '').includes('–') ? label : `${label}年`;
-    const mainPeriodLabel = escapeHtml(formatPeriod(data.main?.year_label || '基準期'));
-    const targetPeriodLabel = escapeHtml(formatPeriod(data.target?.year_label || '比較期'));
-    const rangeAverage = data.compare_mode === 'range'
-      ? `<div class="compare-summary-subvalue">年平均${changeNumberText(data.diff?.annual_average, '人')}</div>` : '';
+    const formatPeriod = (label, zhFallback, enFallback) => summaryPeriod(label, zhFallback, enFallback);
+    const mainPeriodLabel = escapeHtml(formatPeriod(data.main?.year_label, '基準期', 'Baseline'));
+    const targetPeriodLabel = escapeHtml(formatPeriod(data.target?.year_label, '比較期', 'Comparison'));
+    const rangePeriodComparison = (prefix, mainText, targetText) => `<span class="compare-summary-period-main">${prefix}${mainText}</span><span class="compare-summary-period-target"><span class="compare-summary-period-arrow">→</span>${targetText}</span>`;
     const valueClass = value => Number(value) > 0 ? 'is-up' : Number(value) < 0 ? 'is-down' : 'is-flat';
+    if (data.compare_mode === 'range') {
+      const periodYearCount = period => Number(period?.year_count || 0)
+        || Object.keys(period?.yearly_counts || {}).length
+        || 1;
+      const mainAnnualAverage = Number(data.main?.total_count || 0) / periodYearCount(data.main);
+      const targetAnnualAverage = Number(data.target?.total_count || 0) / periodYearCount(data.target);
+      const annualAverageDiff = targetAnnualAverage - mainAnnualAverage;
+      const annualAveragePercent = mainAnnualAverage ? annualAverageDiff / mainAnnualAverage * 100 : 0;
+      const percentagePointChangeText = difference => {
+        if (Math.abs(difference) < 0.05) return summaryText('無變化 —', 'No change —');
+        return difference > 0
+          ? summaryText(`上升${Math.abs(difference).toFixed(1)}個百分點 ▲`, `Increase by ${Math.abs(difference).toFixed(1)} percentage points ▲`)
+          : summaryText(`下降${Math.abs(difference).toFixed(1)}個百分點 ▼`, `Decrease by ${Math.abs(difference).toFixed(1)} percentage points ▼`);
+      };
+      const mainRangeTotal = summaryCount(data.main?.total_count);
+      const targetRangeTotal = summaryCount(data.target?.total_count);
+      document.getElementById('compareResultSummary').innerHTML = `
+        <div class="compare-summary-card">
+          <div class="compare-summary-label">${summaryText('年平均個案數差異', 'Annual Average Case Difference')}</div>
+          <div class="compare-summary-value ${valueClass(annualAverageDiff)}">${changeNumberText(annualAverageDiff, '人／年')}${summaryParentheses(`${annualAveragePercent > 0 ? '+' : annualAveragePercent < 0 ? '−' : ''}${Math.abs(annualAveragePercent).toFixed(1)}%`)}</div>
+          <div class="compare-summary-period-detail">${mainPeriodLabel} ${mainAnnualAverage.toFixed(1)}${summaryText('人／年', ' cases/year')} → ${targetPeriodLabel} ${targetAnnualAverage.toFixed(1)}${summaryText('人／年', ' cases/year')}</div>
+          <div class="compare-summary-period-detail compare-summary-period-detail-next">${summaryText('區間總數：', 'Period total: ')}${mainRangeTotal} → ${targetRangeTotal}</div>
+        </div>
+        <div class="compare-summary-card">
+          <div class="compare-summary-label">${summaryText('年齡層分布差異', 'Age Distribution Difference')}</div>
+          <div class="compare-summary-age-row">
+            <span class="compare-summary-age-group">${escapeHtml(ageGroupLabel)}</span>
+            <span class="compare-summary-age-change ${valueClass(ageShareDiff)}">${percentagePointChangeText(ageShareDiff)}</span>
+          </div>
+          <div class="compare-summary-period-values">${mainPeriodLabel} ${summaryCount(biggest.mainCount)}${summaryParentheses(`${mainAgeShare.toFixed(1)}%`)} → ${targetPeriodLabel} ${summaryCount(biggest.targetCount)}${summaryParentheses(`${targetAgeShare.toFixed(1)}%`)}</div>
+        </div>
+        <div class="compare-summary-card">
+          <div class="compare-summary-label">${summaryText('性別分布差異', 'Sex Distribution Difference')}</div>
+          <div class="compare-summary-gender-primary compare-summary-range-gender-primary">
+            <span class="${shareValueClass(maleShareDiff)}">${summaryText('男', 'Male')} ${percentagePointChangeText(maleShareDiff)}</span>
+            <span class="compare-summary-divider">｜</span>
+            <span class="${shareValueClass(femaleShareDiff)}">${summaryText('女', 'Female')} ${percentagePointChangeText(femaleShareDiff)}</span>
+          </div>
+          <div class="compare-summary-period-detail compare-summary-period-comparison compare-summary-range-gender-detail">${rangePeriodComparison(summaryText('男：', 'Male: '), `${mainPeriodLabel} ${summaryCount(mainAge.male_count)}${summaryParentheses(`${mainMaleShare.toFixed(1)}%`)}`, `${targetPeriodLabel} ${summaryCount(targetAge.male_count)}${summaryParentheses(`${targetMaleShare.toFixed(1)}%`)}`)}</div>
+          <div class="compare-summary-period-detail compare-summary-period-detail-next compare-summary-period-comparison compare-summary-range-gender-detail">${rangePeriodComparison(summaryText('女：', 'Female: '), `${mainPeriodLabel} ${summaryCount(mainAge.female_count)}${summaryParentheses(`${mainFemaleShare.toFixed(1)}%`)}`, `${targetPeriodLabel} ${summaryCount(targetAge.female_count)}${summaryParentheses(`${targetFemaleShare.toFixed(1)}%`)}`)}</div>
+        </div>
+        <div class="compare-summary-card">
+          <div class="compare-summary-label">${summaryText('中位年齡層差異', 'Median Age Group Difference')}<span class="compare-summary-label-note">${summaryText('（依區間內全體個案的年齡層分布判定）', ' (based on the age distribution of all cases in each period)')}</span></div>
+          <div class="compare-summary-median-change ${valueClass(medianGroupDiff)}">${medianGroupChangeText}</div>
+          <div class="compare-summary-median-period">${mainPeriodLabel} ${escapeHtml(mainMedianGroup.label)} → ${targetPeriodLabel} ${escapeHtml(targetMedianGroup.label)}</div>
+        </div>
+      `;
+      return;
+    }
     document.getElementById('compareResultSummary').innerHTML = `
       <div class="compare-summary-card">
-        <div class="compare-summary-label">總個案數差異</div>
-        <div class="compare-summary-value ${valueClass(totalDiff)}">${changeNumberText(totalDiff, '人')}（${signedPercentText(data.main?.total_count, data.target?.total_count)}）${rangeAverage}</div>
-        <div class="compare-summary-period-detail">${mainPeriodLabel} ${Number(data.main?.total_count || 0)}人 → ${targetPeriodLabel} ${Number(data.target?.total_count || 0)}人</div>
+        <div class="compare-summary-label">${summaryText('總個案數差異', 'Total Case Difference')}</div>
+        <div class="compare-summary-value ${valueClass(totalDiff)}">${changeNumberText(totalDiff, '人')}${summaryParentheses(signedPercentText(data.main?.total_count, data.target?.total_count))}</div>
+        <div class="compare-summary-period-detail">${mainPeriodLabel} ${summaryCount(data.main?.total_count)} → ${targetPeriodLabel} ${summaryCount(data.target?.total_count)}</div>
       </div>
       <div class="compare-summary-card">
-        <div class="compare-summary-label">年齡層個案數差異</div>
+        <div class="compare-summary-label">${summaryText('年齡層個案數差異', 'Largest Case Difference by Age')}</div>
         <div class="compare-summary-age-row">
           <span class="compare-summary-age-group">${escapeHtml(ageGroupLabel)}</span>
-          <span class="compare-summary-age-change ${valueClass(biggest.value)}">${changeNumberText(biggest.value, '人')}（${ageShareDiffText}）</span>
+          <span class="compare-summary-age-change ${valueClass(biggest.value)}">${changeNumberText(biggest.value, '人')}${summaryParentheses(ageShareDiffText)}</span>
         </div>
-        <div class="compare-summary-period-values">${escapeHtml(formatPeriod(data.main?.year_label || '基準期'))} ${biggest.mainCount}人（${mainAgeShare.toFixed(1)}%）→ ${escapeHtml(formatPeriod(data.target?.year_label || '比較期'))} ${biggest.targetCount}人（${targetAgeShare.toFixed(1)}%）</div>
+        <div class="compare-summary-period-values">${escapeHtml(formatPeriod(data.main?.year_label, '基準期', 'Baseline'))} ${summaryCount(biggest.mainCount)}${summaryParentheses(`${mainAgeShare.toFixed(1)}%`)} → ${escapeHtml(formatPeriod(data.target?.year_label, '比較期', 'Comparison'))} ${summaryCount(biggest.targetCount)}${summaryParentheses(`${targetAgeShare.toFixed(1)}%`)}</div>
       </div>
       <div class="compare-summary-card">
-        <div class="compare-summary-label">性別個案數差異</div>
-        <div class="compare-summary-gender-primary"><span class="${valueClass(maleCountDiff)}">男 ${changeNumberText(maleCountDiff, '人')}</span> <span class="${shareValueClass(maleShareDiff)}">（${shareChangeText(mainMaleShare, targetMaleShare)}）</span><span class="compare-summary-divider">｜</span><span class="${valueClass(femaleCountDiff)}">女 ${changeNumberText(femaleCountDiff, '人')}</span> <span class="${shareValueClass(femaleShareDiff)}">（${shareChangeText(mainFemaleShare, targetFemaleShare)}）</span></div>
-        <div class="compare-summary-period-detail">男：${mainPeriodLabel} ${Number(mainAge.male_count || 0)}人（${mainMaleShare.toFixed(1)}%）→ ${targetPeriodLabel} ${Number(targetAge.male_count || 0)}人（${targetMaleShare.toFixed(1)}%）</div>
-        <div class="compare-summary-period-detail compare-summary-period-detail-next">女：${mainPeriodLabel} ${Number(mainAge.female_count || 0)}人（${mainFemaleShare.toFixed(1)}%）→ ${targetPeriodLabel} ${Number(targetAge.female_count || 0)}人（${targetFemaleShare.toFixed(1)}%）</div>
+        <div class="compare-summary-label">${summaryText('性別個案數差異', 'Case Difference by Sex')}</div>
+        <div class="compare-summary-gender-primary"><span class="${valueClass(maleCountDiff)}">${summaryText('男', 'Male')} ${changeNumberText(maleCountDiff, '人')}</span> <span class="${shareValueClass(maleShareDiff)}">${summaryParentheses(shareChangeText(mainMaleShare, targetMaleShare))}</span><span class="compare-summary-divider">｜</span><span class="${valueClass(femaleCountDiff)}">${summaryText('女', 'Female')} ${changeNumberText(femaleCountDiff, '人')}</span> <span class="${shareValueClass(femaleShareDiff)}">${summaryParentheses(shareChangeText(mainFemaleShare, targetFemaleShare))}</span></div>
+        <div class="compare-summary-period-detail">${summaryText('男：', 'Male: ')}${mainPeriodLabel} ${summaryCount(mainAge.male_count)}${summaryParentheses(`${mainMaleShare.toFixed(1)}%`)} → ${targetPeriodLabel} ${summaryCount(targetAge.male_count)}${summaryParentheses(`${targetMaleShare.toFixed(1)}%`)}</div>
+        <div class="compare-summary-period-detail compare-summary-period-detail-next">${summaryText('女：', 'Female: ')}${mainPeriodLabel} ${summaryCount(mainAge.female_count)}${summaryParentheses(`${mainFemaleShare.toFixed(1)}%`)} → ${targetPeriodLabel} ${summaryCount(targetAge.female_count)}${summaryParentheses(`${targetFemaleShare.toFixed(1)}%`)}</div>
       </div>
       <div class="compare-summary-card">
-        <div class="compare-summary-label">全體中位年齡層差異<span class="compare-summary-label-note">（依全體個案的年齡層分布判定）</span></div>
+        <div class="compare-summary-label">${summaryText('中位年齡層差異', 'Median Age Group Difference')}<span class="compare-summary-label-note">${summaryText('（依全體個案的年齡層分布判定）', ' (based on the age distribution of all cases)')}</span></div>
         <div class="compare-summary-median-change ${valueClass(medianGroupDiff)}">${medianGroupChangeText}</div>
         <div class="compare-summary-median-period">${mainPeriodLabel} ${escapeHtml(mainMedianGroup.label)} → ${targetPeriodLabel} ${escapeHtml(targetMedianGroup.label)}</div>
       </div>
@@ -1872,6 +2175,24 @@
     if (isTreatmentFirstCourse && !treatmentSystems.includes(activeTreatmentStageSystem)) {
       activeTreatmentStageSystem = treatmentSystems[0] || '';
     }
+    const isTreatmentSurgery = activeItem === '期別與手術術式';
+    const surgeryTables = [
+      ...(data.analysis_data?.main?.stageSurgeryData || []),
+      ...(data.analysis_data?.target?.stageSurgeryData || [])
+    ];
+    const surgeryKeyOf = table => `${table.manual_key || 'unknown'}::${table.system || 'stage'}`;
+    const surgeryKeys = Array.from(new Set(surgeryTables.map(surgeryKeyOf)));
+    if (isTreatmentSurgery && !surgeryKeys.includes(activeSurgeryTableKey)) {
+      activeSurgeryTableKey = surgeryKeys[0] || '';
+    }
+    const surgeryTabs = isTreatmentSurgery && surgeryKeys.length > 1
+      ? `<div class="d-flex flex-wrap gap-2 mb-3" role="tablist">${surgeryKeys.map(key => {
+          const table = surgeryTables.find(candidate => surgeryKeyOf(candidate) === key) || {};
+          const label = isEnglish() ? `${table.cancer_name_en || table.manual_key || ''} ${table.system || ''} Stage` : `${table.cancer_name || table.manual_key || ''}${table.system || ''}期別`;
+          return `<button type="button" class="btn btn-outline-dark btn-sm compare-surgery-tab${key === activeSurgeryTableKey ? ' active' : ''}" data-surgery-key="${escapeHtml(key)}">${escapeHtml(label)}</button>`;
+        }).join('')}</div>`
+      : '';
+    const activeTableSelection = isTreatmentSurgery ? activeSurgeryTableKey : activeTreatmentStageSystem;
     const treatmentTabs = isTreatmentFirstCourse && treatmentSystems.length > 1
       ? `<div class="d-flex flex-wrap gap-2 mb-3" role="tablist">${treatmentSystems.map(system => `<button type="button" class="btn btn-outline-dark btn-sm compare-treatment-stage-tab${system === activeTreatmentStageSystem ? ' active' : ''}" data-stage-system="${escapeHtml(system)}">${escapeHtml(system)}${isEnglish() ? ' Stage' : '期別'}</button>`).join('')}</div>`
       : '';
@@ -1881,6 +2202,7 @@
     document.getElementById('compareResultPanel').innerHTML = `
       ${stageTabs}
       ${treatmentTabs}
+      ${surgeryTabs}
       <div class="compare-result-grid">
         <section class="compare-result-item is-main">
           <div class="compare-result-heading"><div><h3>${isEnglish() ? 'Baseline period' : '基準期資料'}｜${escapeHtml(data.main?.year_label || '—')}</h3></div></div>
@@ -1893,11 +2215,18 @@
       </div>
     `;
 
-    renderAnnualReport('mainAnnualReport', data.analysis_data?.main || {}, data.main, `main${index}`, activeItem, 'main', sharedScale, activeTreatmentStageSystem);
-    renderAnnualReport('targetAnnualReport', data.analysis_data?.target || {}, data.target, `target${index}`, activeItem, 'target', sharedScale, activeTreatmentStageSystem);
+    renderAnnualReport('mainAnnualReport', data.analysis_data?.main || {}, data.main, `main${index}`, activeItem, 'main', sharedScale, activeTableSelection);
+    renderAnnualReport('targetAnnualReport', data.analysis_data?.target || {}, data.target, `target${index}`, activeItem, 'target', sharedScale, activeTableSelection);
     document.querySelectorAll('.compare-treatment-stage-tab').forEach(button => {
       button.addEventListener('click', () => {
         activeTreatmentStageSystem = button.dataset.stageSystem || '';
+        renderResultItem(data, item, index);
+        renderAiNarrative(data, activeComparisonItem(item));
+      });
+    });
+    document.querySelectorAll('.compare-surgery-tab').forEach(button => {
+      button.addEventListener('click', () => {
+        activeSurgeryTableKey = button.dataset.surgeryKey || '';
         renderResultItem(data, item, index);
         renderAiNarrative(data, activeComparisonItem(item));
       });
@@ -1926,6 +2255,14 @@
         const tables = analysis?.stageFirstCourseData || [];
         selectedAnalysis.stage_first_course = tables.find(table => table.system === activeTreatmentStageSystem) || tables[0] || {};
       }
+<<<<<<< HEAD
+=======
+      if (analysisItem === '期別與手術術式') {
+        const tables = analysis?.stageSurgeryData || [];
+        const surgeryKeyOf = table => `${table.manual_key || 'unknown'}::${table.system || 'stage'}`;
+        selectedAnalysis.stage_surgery = tables.find(table => surgeryKeyOf(table) === activeSurgeryTableKey) || tables[0] || {};
+      }
+>>>>>>> 0a1ab48bd508a1d27a27d218813bba492c7c2a04
       const stageReport = (analysis?.stageReports || []).find(report => report.option === analysisItem);
       if (stageReport) selectedAnalysis.stage_report = stageReport;
       return selectedAnalysis;
@@ -1957,12 +2294,14 @@
   }
 
   function aiNarrativeCacheKey(analysisItem) {
-    const stageSystem = analysisItem === '期別與首次療程' ? `|${activeTreatmentStageSystem}` : '';
+    const stageSystem = analysisItem === '期別與首次療程'
+      ? `|${activeTreatmentStageSystem}`
+      : analysisItem === '期別與手術術式' ? `|${activeSurgeryTableKey}` : '';
     return `${window.DashboardI18n?.getLanguage() || 'zh-TW'}|${analysisItem}${stageSystem}`;
   }
 
   function fetchAiNarrative(data, analysisItem, force = false) {
-    const stageSystemAtRequest = analysisItem === '期別與首次療程' ? activeTreatmentStageSystem : '';
+    const stageSystemAtRequest = analysisItem === '期別與首次療程' ? activeTreatmentStageSystem : analysisItem === '期別與手術術式' ? activeSurgeryTableKey : '';
     const language = window.DashboardI18n?.getLanguage() || 'zh-TW';
     const cacheKey = `${language}|${analysisItem}${stageSystemAtRequest ? `|${stageSystemAtRequest}` : ''}`;
     if (!force && aiNarrativeCache.has(cacheKey)) {
@@ -2387,7 +2726,7 @@
     }
     const compareItems = selectedCompareItems();
     const stageOptions = [...selectedCompareStageOptions().options];
-    if (compareItems.includes('期別與首次療程')) {
+    if (compareItems.includes('期別與首次療程') || compareItems.includes('期別與手術術式')) {
       treatmentStageOptions().forEach(option => {
         if (!stageOptions.some(selected => selected.system === option.system && selected.option === option.option)) {
           stageOptions.push(option);
@@ -2415,13 +2754,37 @@
       .then(r => r.json())
       .then(data => {
         if (!data.ok) throw new Error(data.error || '比較失敗');
+        if (data.data?.noDataWarning) {
+          lastComparisonData = null;
+          hasRenderedResult = false;
+          activeAiNarrativeItem = '';
+          aiNarrativeRequestId += 1;
+          aiNarrativeCache.clear();
+          resultStale.classList.add('d-none');
+          resultBox.classList.add('d-none');
+          document.getElementById('compareResultSummary').replaceChildren();
+          document.getElementById('compareResultTabs').replaceChildren();
+          document.getElementById('compareResultPanel').replaceChildren();
+          document.getElementById('compareAiNarrative').classList.add('d-none');
+          document.getElementById('compareAiNarrativeText').textContent = '';
+          showAlert('查無符合資料', data.data.noDataWarning);
+          return;
+        }
         const items = selectedCompareItems();
         aiNarrativeCache.clear();
         const treatmentSystems = Array.from(new Set([
           ...(data.data.analysis_data?.main?.stageFirstCourseData || []).map(table => table.system),
           ...(data.data.analysis_data?.target?.stageFirstCourseData || []).map(table => table.system)
         ]));
-        const originalTreatmentSystem = activeTreatmentStageSystem;
+const originalTreatmentSystem = activeTreatmentStageSystem;
+        const surgeryTables = [
+          ...(data.data.analysis_data?.main?.stageSurgeryData || []),
+          ...(data.data.analysis_data?.target?.stageSurgeryData || [])
+        ];
+        const surgeryKeyOf = table => `${table.manual_key || 'unknown'}::${table.system || 'stage'}`;
+        if (!surgeryTables.some(table => surgeryKeyOf(table) === activeSurgeryTableKey)) {
+          activeSurgeryTableKey = surgeryKeyOf(surgeryTables[0] || {});
+        }
         const narrativeRequests = items.flatMap(item => {
           if (item !== '期別與首次療程') return [{ item, stageSystem: '' }];
           return treatmentSystems.length

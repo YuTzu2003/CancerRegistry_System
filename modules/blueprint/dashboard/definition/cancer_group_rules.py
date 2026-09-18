@@ -29,11 +29,11 @@ def blood_rule(key, name_zh, name_en, *, site_prefixes=None, hist_include=None, 
 
 # ===== 實體癌 Solid cancers =====
 
-# 口腔癌症(含口腔、口咽、下咽) Oral_group
+# 口腔癌症（含口腔、口咽、下咽）
 ORAL_GROUP = solid_rule(
     "Oral_group",
     "口腔癌",
-    "Oral group",
+    "Oral Cavity, Oropharynx, and Hypopharynx",
     ["C00-C06", "C09-C10", "C12-C14"],
     subgroups=[
         subgroup(

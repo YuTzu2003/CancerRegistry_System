@@ -271,7 +271,7 @@ def _stage_sort_key(label):
     return (order.get(upper, 999), "", text)
 
 
-def build_stage_report(stage_result, option):
+def build_stage_report(stage_result, option, period_codes=None):
     """把 2.4 分期結果整理成前端三種表圖共用的資料契約。"""
     rows = stage_result.get("rows", [])
     option_name = option.get("option") or option["system"]
@@ -297,7 +297,9 @@ def build_stage_report(stage_result, option):
         else:
             included_rows.append((row, label))
 
-    stage_labels = sorted({label for _, label in included_rows}, key=_stage_sort_key)
+    observed_stage_labels = {label for _, label in included_rows}
+    # 只呈現查詢資料中實際出現的期別，避免空資料欄位使表圖過度展開。
+    stage_labels = sorted(observed_stage_labels, key=_stage_sort_key)
     stage_index = {label: index for index, label in enumerate(stage_labels)}
     stage_totals = [0] * len(stage_labels)
     sex_values = {"男性": [0] * len(stage_labels), "女性": [0] * len(stage_labels)}
@@ -328,7 +330,10 @@ def build_stage_report(stage_result, option):
             if raw_code in {"888", "8888", "999", "9999"} or not label:
                 continue
             chart_rows.append((row, label))
-        chart_stage_labels = sorted({label for _, label in chart_rows}, key=_stage_sort_key)
+        chart_stage_labels = sorted(
+            {label for _, label in chart_rows},
+            key=_stage_sort_key,
+        )
         chart_stage_index = {label: index for index, label in enumerate(chart_stage_labels)}
         chart_age_values = {label: [0] * len(chart_stage_labels) for label, _, _ in AGE_GROUPS}
         for row, label in chart_rows:
@@ -385,7 +390,7 @@ def calculate_stage_reports(cases, options, period_codes=None):
             continue
         if system not in results_by_system:
             results_by_system[system] = STAGE_FUNCTIONS[system](cases, period_codes)
-        reports.append(build_stage_report(results_by_system[system], option))
+        reports.append(build_stage_report(results_by_system[system], option, period_codes))
     return reports
 
 
@@ -408,6 +413,9 @@ def _treatment_record(case):
         return case.get(registry_header)
 
     return {
+        "class": value("class", "個案分類"),
+        "class_d": value("class_d", "診斷狀態分類"),
+        "class_t": value("class_t", "治療狀態分類"),
         "site": value("site", "原發部位"),
         "hist": value("hist", "組織型態"),
         "optype_o": value("optype_o", "外院原發部位手術方式"),
@@ -449,7 +457,8 @@ def _available_stage_labels(system, detailed, period_codes):
         if normalize_code(code.get("stage_value")).replace(",", "") in {"888", "8888", "999", "9999"}:
             continue
         value = str(code.get(stage_column) or "").strip()
-        if value:
+        if value.lower() not in {"", "nan", "none"}:
+            value = re.sub(r"^Stage\s+", "", value, flags=re.I)
             labels.append(value)
     return sorted(set(labels), key=_stage_sort_key)
 
@@ -526,4 +535,129 @@ def calculate_stage_first_course_distribution(cases, options, period_codes=None)
             "excluded_unmapped": excluded_unmapped,
             "excluded_unclassified_treatment": excluded_unclassified_treatment,
         })
+    return tables
+
+
+def calculate_stage_surgery_distribution(cases, options, period_codes=None, manual_key=None, manual_keys=None):
+    """Create appendix-B surgical tables, separated by surgery manual."""
+    from modules.blueprint.dashboard.definition.cancer_grouping import classify_cancer_group
+    from modules.blueprint.dashboard.definition.surgery_code_mapping import (
+        get_surgery_code_rules,
+        format_surgery_code,
+        surgery_display_name,
+        select_highest_ranked_surgery,
+        resolve_surgery_manual_key,
+        get_surgery_manual_labels,
+    )
+
+    raw_manual_keys = manual_keys or ([manual_key] if manual_key else [])
+    requested_manual_keys = []
+    for key in raw_manual_keys:
+        resolved = resolve_surgery_manual_key(key)
+        if resolved and resolved not in requested_manual_keys:
+            requested_manual_keys.append(resolved)
+
+    if not requested_manual_keys:
+        for record in cases.to_dict("records"):
+            cancer = classify_cancer_group(record.get("site"), record.get("hist"))
+            resolved = resolve_surgery_manual_key(
+                (cancer or {}).get("subgroup_key") or (cancer or {}).get("group_key")
+            )
+            if resolved and resolved not in requested_manual_keys:
+                requested_manual_keys.append(resolved)
+
+    rules_by_manual = {
+        key: get_surgery_code_rules(key)
+        for key in requested_manual_keys
+    }
+    rules_by_manual = {key: rules for key, rules in rules_by_manual.items() if rules}
+    requested_manual_keys = [key for key in requested_manual_keys if key in rules_by_manual]
+    code_rules_by_manual = {
+        key: [rule for rule in rules if str(rule.get("RowType") or "").lower() == "code"]
+        for key, rules in rules_by_manual.items()
+    }
+
+    cases = filter_class(cases)
+    period_codes = load_period_codes() if period_codes is None else period_codes
+    tables, seen_systems = [], set()
+    for option in options or []:
+        system = option.get("system")
+        if system not in STAGE_FUNCTIONS or system in seen_systems:
+            continue
+        seen_systems.add(system)
+        detailed = option.get("detailed", False)
+        stage_column = "stage_detail" if detailed else "stage_detail_hide"
+        stage_result = STAGE_FUNCTIONS[system](cases, period_codes)
+        summaries = {
+            key: {
+                "counts": {}, "stage_columns": set(), "analyzable_count": 0,
+                "excluded_unknown": 0, "excluded_not_applicable": 0,
+                "excluded_unmapped_surgery": 0,
+            }
+            for key in requested_manual_keys
+        }
+
+        for row in stage_result.get("rows", []):
+            case = _treatment_record(row["case"])
+            cancer = classify_cancer_group(case.get("site"), case.get("hist"))
+            case_manual_key = resolve_surgery_manual_key(
+                (cancer or {}).get("subgroup_key") or (cancer or {}).get("group_key")
+            )
+            summary = summaries.get(case_manual_key)
+            if not cancer or summary is None:
+                continue
+            summary["analyzable_count"] += 1
+            raw_code, category = _raw_stage_code(row), row.get("ajcc_stage_category")
+            if category == "Stage Not Applicable" or raw_code in {"888", "8888"}:
+                summary["excluded_not_applicable"] += 1
+                continue
+            stage = str(row.get(stage_column) or "").strip()
+            if category == "Stage Unknown" or raw_code in {"999", "9999"} or not stage:
+                summary["excluded_unknown"] += 1
+                continue
+            surgery = select_highest_ranked_surgery(
+                case.get("optype_o"), case.get("optype_h"), code_rules_by_manual[case_manual_key]
+            )
+            if not surgery:
+                summary["excluded_unmapped_surgery"] += 1
+                continue
+            row_key = str(surgery["RowKey"])
+            summary["stage_columns"].add(stage)
+            summary["counts"].setdefault(row_key, {})[stage] = (
+                summary["counts"].setdefault(row_key, {}).get(stage, 0) + 1
+            )
+
+        for key in requested_manual_keys:
+            summary, rules = summaries[key], rules_by_manual[key]
+            stage_columns = sorted(summary["stage_columns"], key=_stage_sort_key)
+            if not stage_columns:
+                stage_columns = _available_stage_labels(system, detailed, period_codes)
+            rows = [
+                {
+                    "row_key": str(rule["RowKey"]),
+                    "code_short": format_surgery_code(rule.get("CodeShort"), 2),
+                    "code_long": format_surgery_code(rule.get("CodeLong"), 3),
+                    "procedure": surgery_display_name(rule),
+                    "row_type": str(rule.get("RowType") or "code"),
+                    "parent_row_key": str(rule.get("ParentRowKey") or ""),
+                    "display_level": rule.get("DisplayLevel"),
+                    "values": [int(summary["counts"].get(str(rule["RowKey"]), {}).get(stage, 0)) for stage in stage_columns],
+                    "subtotal": int(sum(summary["counts"].get(str(rule["RowKey"]), {}).values())),
+                }
+                for rule in rules
+            ]
+            totals = [sum(item["values"][index] for item in rows) for index in range(len(stage_columns))]
+            total_count = int(sum(totals))
+            cancer_name, cancer_name_en = get_surgery_manual_labels(key)
+            tables.append({
+                "manual_key": key, "cancer_name": cancer_name, "cancer_name_en": cancer_name_en,
+                "system": system, "stage_mode": "detailed" if detailed else "summary",
+                "stage_columns": stage_columns, "rows": rows, "totals": totals,
+                "total_count": total_count,
+                "percentages": [round(value / total_count * 100, 1) if total_count else 0 for value in totals],
+                "analyzable_count": summary["analyzable_count"], "included_count": total_count,
+                "excluded_unknown": summary["excluded_unknown"],
+                "excluded_not_applicable": summary["excluded_not_applicable"],
+                "excluded_unmapped_surgery": summary["excluded_unmapped_surgery"],
+            })
     return tables

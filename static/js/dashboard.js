@@ -218,8 +218,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }
           },
           grid: {
-            left: 500,
-            right: 60,
+            left: 410,
+            right: 125,
             bottom: 50,
             top: 60,
             containLabel: false
@@ -249,15 +249,15 @@ document.addEventListener('DOMContentLoaded', function() {
             data: [], 
             inverse: true,
             axisLabel: {
-              width: 420,
+              width: 350,
               align: 'right',
-              margin: 20,
+              margin: 16,
               formatter: function(value) {
-                return window.DashboardRenderer.rightAlignedAxisLabel(value);
+                return window.DashboardRenderer.histologyAxisLabel(value);
               },
               rich: {
-                right: { width: 420, align: 'right', lineHeight: 18, fontSize: 12 },
-                bracket: { width: 420, align: 'right', lineHeight: 18, fontSize: 10.5 }
+                right: { width: 350, align: 'right', lineHeight: 18, fontSize: 12 },
+                bracket: { width: 350, align: 'right', lineHeight: 18, fontSize: 10.5 }
               }
             }
           },
@@ -537,7 +537,7 @@ window.DashboardRenderer.renderStageReportTabs = function(stageReports, yearTitl
             sex: document.getElementById('annualStageSexSection'),
             age: document.getElementById('annualStageAgeSection')
         };
-        const showReport = (report, button) => {
+        const showReport = (report, button, { generateInsight = false } = {}) => {
             Object.values(sections).forEach(section => section?.classList.add('d-none'));
             tabs.querySelectorAll('button').forEach(item => item.classList.remove('active'));
             button?.classList.add('active');
@@ -550,7 +550,7 @@ window.DashboardRenderer.renderStageReportTabs = function(stageReports, yearTitl
             if (view === 'sex') this.renderStageSexReport(report, yearTitle, cancerTitle);
             else if (view === 'age') this.renderStageAgeReport(report, yearTitle, cancerTitle);
             else this.renderStageDistributionReport(report, yearTitle, cancerTitle);
-            this.configureStageInsight(report);
+            this.configureStageInsight(report, { generate: generateInsight });
 
             requestAnimationFrame(() => {
                 if (view === 'sex') window.dashboardStageSexChartInstance?.resize();
@@ -567,14 +567,14 @@ window.DashboardRenderer.renderStageReportTabs = function(stageReports, yearTitl
             button.textContent = window.DashboardI18n?.getLanguage() === 'en'
                 ? this.t(tabKey, { system: this.getStageSystemTitle(report.staging_system) })
                 : (report.option || this.t(tabKey, { system: report.staging_system }));
-            button.addEventListener('click', () => showReport(report, button));
+            button.addEventListener('click', () => showReport(report, button, { generateInsight: true }));
             tabs.appendChild(button);
             if (index === 0) showReport(report, button);
         });
     };
 
 /* 目前顯示的期別分頁共用同一個敘述區塊；切換分頁時改用該報表資料產生敘述。 */
-window.DashboardRenderer.configureStageInsight = function(stageReport) {
+window.DashboardRenderer.configureStageInsight = function(stageReport, { generate = true } = {}) {
         const button = document.getElementById('btnAiStageSummary');
         const response = document.getElementById('llmResponseStageSummary');
         if (!button || !response || !stageReport) return;
@@ -606,7 +606,7 @@ window.DashboardRenderer.configureStageInsight = function(stageReport) {
         button.style.display = 'block';
         button.textContent = this.t('regenerateInsight');
         button.dataset.insightFieldKey = fieldKey;
-        button.onclick = event => this.fetchLlmInsight(
+        button.onclick = event => this.fetchLlmInsightWithRetry(
             fieldKey,
             insightData,
             fields,
@@ -615,7 +615,7 @@ window.DashboardRenderer.configureStageInsight = function(stageReport) {
             { forceRefresh: event?.isTrusted === true }
         );
         if (reportChanged) response.textContent = this.t('autoInsight');
-        return button.onclick();
+        return generate ? button.onclick() : null;
     };
 
 /* ── 表一、圖一：期別分布 ── */
@@ -697,11 +697,11 @@ window.DashboardRenderer.renderStageDistributionReport = function(stageData, yea
                 series: [{
                     name: this.t('caseRatio'),
                     type: 'bar',
-                    barMaxWidth: 68,
+                    barWidth: 45,
                     data: data.stage_totals.map(value => Number(percentage(value).toFixed(1))),
                     itemStyle: {
-                        color: '#9A8CD8',
-                        borderColor: '#9A8CD8',
+                        color: '#D4B2F6',
+                        borderColor: '#D4B2F6',
                         borderWidth: 1
                     },
                     label: {
@@ -711,9 +711,7 @@ window.DashboardRenderer.renderStageDistributionReport = function(stageData, yea
                         color: '#4b5563',
                         fontSize: 14,
                         fontWeight: 'bold',
-                        formatter: params => Number(params.value) > 0
-                            ? `${Number(params.value).toFixed(1)}%`
-                            : ''
+                        formatter: params => `${Number(params.value || 0).toFixed(1)}%`
                     }
                 }]
             });
@@ -771,7 +769,7 @@ window.DashboardRenderer.renderStageSexReport = function(stageData, yearTitle, c
                     name: sexLabel(row.sex),
                     type: 'bar',
                     stack: 'stage-total',
-                    barMaxWidth: 68,
+                    barWidth: 45,
                     data: row.values.map(value => Number(percentage(value).toFixed(1))),
                     itemStyle: {
                         color: isMale ? '#5470C6' : '#EE6666',
@@ -795,7 +793,7 @@ window.DashboardRenderer.renderStageSexReport = function(stageData, yearTitle, c
             const topLabelSeries = {
                 name: '__stageSexLabels',
                 type: 'bar',
-                barMaxWidth: 68,
+                barWidth: 45,
                 barGap: '-100%',
                 silent: true,
                 z: 10,
@@ -806,8 +804,9 @@ window.DashboardRenderer.renderStageSexReport = function(stageData, yearTitle, c
                     show: true,
                     position: 'top',
                     distance: 4,
-                    fontSize: 13,
-                    fontWeight: 600,
+                    align: 'center',
+                    fontSize: 14,
+                    fontWeight: 'bold',
                     formatter: params => {
                         return [
                             `{female|${Number(params.data.femalePercent || 0).toFixed(1)}%}`,
@@ -815,8 +814,8 @@ window.DashboardRenderer.renderStageSexReport = function(stageData, yearTitle, c
                         ].join('\n');
                     },
                     rich: {
-                        male: { color: '#36558f', fontWeight: 600, lineHeight: 16 },
-                        female: { color: '#b54848', fontWeight: 600, lineHeight: 16 }
+                        male: { color: '#36558f', fontSize: 14, fontWeight: 'bold', lineHeight: 17, width: 45, align: 'center' },
+                        female: { color: '#b54848', fontSize: 14, fontWeight: 'bold', lineHeight: 17, width: 45, align: 'center' }
                     }
                 }
             };
@@ -842,7 +841,13 @@ window.DashboardRenderer.renderStageSexReport = function(stageData, yearTitle, c
                         return `${systemName} ${params[0]?.name || ''}<br/>${lines.join('<br/>')}`;
                     }
                 },
-                legend: { show: false },
+                legend: {
+                    show: true,
+                    data: data.sex_rows.map(row => sexLabel(row.sex)),
+                    top: 52,
+                    left: 'center',
+                    itemGap: 12
+                },
                 toolbox: {
                     right: 16,
                     feature: {
@@ -850,7 +855,7 @@ window.DashboardRenderer.renderStageSexReport = function(stageData, yearTitle, c
                         saveAsImage: { show: true, title: this.t('downloadImage') }
                     }
                 },
-                grid: { left: 70, right: 50, top: 60, bottom: 40, containLabel: true },
+                grid: { left: 70, right: 50, top: 95, bottom: 40, containLabel: true },
                 xAxis: {
                     type: 'category',
                     data: data.stage_labels
@@ -909,7 +914,65 @@ window.DashboardRenderer.renderStageAgeReport = function(stageData, yearTitle, c
         /* 圖三：年齡層及期別分布圖 */
         const chartDom = document.getElementById('annualStageAgeChart');
         if (chartDom && typeof echarts !== 'undefined') {
-            const stageColors = ['#5470C6', '#EE6666', '#91CC75', '#9A8CD8', '#F28C45'];
+            const stageColors = ['#F3AE9F', '#E9CB92', '#C3E4C3', '#A7B9DF', '#C8B0DC'];
+            const ageStagePercentages = chartAgeRows.map(row => {
+                const total = rowTotal(row);
+                return chartStageLabels.map((_, stageIndex) => total > 0
+                    ? Number((row.values[stageIndex] / total * 100).toFixed(1))
+                    : 0);
+            });
+            const smallStageLabelData = [];
+            ageStagePercentages.forEach((values, rowIndex) => {
+                let cumulative = 0;
+                values.forEach((value, stageIndex) => {
+                    if (value > 0 && value <= 3) {
+                        smallStageLabelData.push([
+                            cumulative + value / 2,
+                            chartAgeRows[rowIndex].age,
+                            value,
+                            stageIndex
+                        ]);
+                    }
+                    cumulative += value;
+                });
+            });
+            const smallStageLabelSeries = {
+                name: '__smallStageLabels',
+                type: 'custom',
+                silent: true,
+                tooltip: { show: false },
+                z: 20,
+                data: smallStageLabelData,
+                renderItem: (params, api) => {
+                    const point = api.coord([api.value(0), api.value(1)]);
+                    const stageIndex = Number(api.value(3) || 0);
+                    const horizontalShift = 8;
+                    const lineStartY = point[1] - 10;
+                    const lineEnd = [point[0] + horizontalShift, point[1] - 18];
+                    return {
+                        type: 'group',
+                        children: [
+                            {
+                                type: 'line',
+                                shape: { x1: point[0], y1: lineStartY, x2: lineEnd[0], y2: lineEnd[1] },
+                                style: { stroke: stageColors[stageIndex % stageColors.length], lineWidth: 1.5 }
+                            },
+                            {
+                                type: 'text',
+                                style: {
+                                    text: `${Number(api.value(2)).toFixed(1)}%`,
+                                    x: lineEnd[0],
+                                    y: lineEnd[1] - 2,
+                                    fill: '#4b5563',
+                                    font: '700 11px Arial, sans-serif',
+                                    align: 'center',
+                                    verticalAlign: 'bottom'
+                                }
+                            }
+                        ]
+                    };
+                }
+            };
             window.dashboardStageAgeChartInstance?.dispose();
             window.dashboardStageAgeChartInstance = echarts.init(chartDom);
             window.dashboardStageAgeChartInstance.setOption({
@@ -924,10 +987,11 @@ window.DashboardRenderer.renderStageAgeReport = function(stageData, yearTitle, c
                     trigger: 'axis',
                     axisPointer: { type: 'shadow' },
                     formatter: params => {
-                        const rowIndex = params[0]?.dataIndex ?? 0;
+                        const stageParams = params.filter(item => item.seriesName !== '__smallStageLabels');
+                        const rowIndex = stageParams[0]?.dataIndex ?? 0;
                         const row = chartAgeRows[rowIndex];
                         const total = row ? rowTotal(row) : 0;
-                        const lines = params.map(item => {
+                        const lines = stageParams.map(item => {
                             const count = row?.values[item.seriesIndex] || 0;
                             return `${item.marker}${item.seriesName}: ${this.t('stageTooltipCount', { percent: Number(item.value).toFixed(1), count })}`;
                         });
@@ -959,17 +1023,32 @@ window.DashboardRenderer.renderStageAgeReport = function(stageData, yearTitle, c
                     data: chartAgeRows.map(row => row.age),
                     axisTick: { show: false }
                 },
-                series: chartStageLabels.map((label, stageIndex) => ({
+                series: [...chartStageLabels.map((label, stageIndex) => ({
                     name: label,
                     type: 'bar',
                     stack: 'age-stage-total',
                     barMaxWidth: 22,
-                    itemStyle: { color: stageColors[stageIndex % stageColors.length], opacity: 0.75 },
-                    data: chartAgeRows.map(row => {
-                        const total = rowTotal(row);
-                        return total > 0 ? Number((row.values[stageIndex] / total * 100).toFixed(1)) : 0;
-                    })
-                }))
+                    itemStyle: { color: stageColors[stageIndex % stageColors.length] },
+                    label: {
+                        show: true,
+                        position: 'inside',
+                        align: 'center',
+                        verticalAlign: 'middle',
+                        offset: [0, 1],
+                        color: '#4b5563',
+                        fontSize: 11,
+                        fontFamily: 'Arial, sans-serif',
+                        fontStyle: 'normal',
+                        fontWeight: 700,
+                        lineHeight: 22,
+                        textBorderWidth: 0,
+                        textShadowBlur: 0,
+                        formatter: params => Number(params.value || 0) > 3
+                            ? `${Number(params.value).toFixed(1)}%`
+                            : ''
+                    },
+                    data: ageStagePercentages.map(values => values[stageIndex])
+                })), smallStageLabelSeries]
             });
         }
     };
@@ -1016,7 +1095,7 @@ window.DashboardRenderer.renderStageFirstCourseTables = function(tables, yearTit
             const displayTreatment = (treatment) => isEnglish
                 ? String(treatment || '').split('、').map(item => treatmentEnglish[item] || item).join('、')
                 : treatment;
-            const title = isEnglish
+        const title = isEnglish
                 ? `Table . ${this.escapeHtml(item.system)} Stage and First Course Treatment Distribution of Newly Diagnosed ${this.getEnglishCancerPatientLabel(selectedCancer)} Cases,\u00a0${yearTitle}${this.sourceLine()}`
                 : this.reportCaption('table', yearTitle, selectedCancer, `${item.system}期別與首次療程`);
             const rowPercentage = row => item.total_count
@@ -1040,7 +1119,7 @@ window.DashboardRenderer.renderStageFirstCourseTables = function(tables, yearTit
             const definitionNote = isEnglish
                 ? 'Note: First course treatment refers to all treatments administered before disease progression or recurrence.'
                 : '註：首次療程的定義係指在癌病惡化或復發之前所執行的治療方法。';
-            return `<div class="stage-first-course-panel${item.system === activeSystem ? '' : ' d-none'}" data-stage-system="${this.escapeHtml(item.system)}"><table class="annual-report-table"><caption>${title}</caption><thead><tr><th rowspan="2">${isEnglish ? 'First Course of Treatment' : '首次療程'}</th><th colspan="${Math.max(stages.length, 1)}">${this.escapeHtml(item.system)}${isEnglish ? ' Stage' : '期別'}</th><th rowspan="2">${isEnglish ? 'Total' : '小計'}</th><th rowspan="2">%</th></tr><tr>${stages.map(stage => `<th>${this.escapeHtml(displayStage(stage))}</th>`).join('')}</tr></thead><tbody>${bodyRows}<tr class="fw-bold"><td>${this.t('total')}</td>${totals}<td>${Number(item.total_count || 0)}</td><td>${item.total_count ? '100.0%' : '0.0%'}</td></tr><tr><td>%</td>${percentages}<td>${item.total_count ? '100.0%' : '0.0%'}</td><td>-</td></tr></tbody></table><div class="small text-secondary mt-2 mb-0">${definitionNote}</div><div class="small text-secondary mt-0 mb-0">${stageNote}</div></div>`;
+            return `<div class="stage-first-course-panel${item.system === activeSystem ? '' : ' d-none'}" data-stage-system="${this.escapeHtml(item.system)}"><table class="annual-report-table"><caption class="surgery-table-caption">${title}</caption><thead><tr><th rowspan="2">${isEnglish ? 'First Course of Treatment' : '首次療程'}</th><th colspan="${Math.max(stages.length, 1)}">${this.escapeHtml(item.system)}${isEnglish ? ' Stage' : '期別'}</th><th rowspan="2">${isEnglish ? 'Total' : '小計'}</th><th rowspan="2">%</th></tr><tr>${stages.map(stage => `<th>${this.escapeHtml(displayStage(stage))}</th>`).join('')}</tr></thead><tbody>${bodyRows}<tr class="fw-bold"><td>${this.t('total')}</td>${totals}<td>${Number(item.total_count || 0)}</td><td>${item.total_count ? '100.0%' : '0.0%'}</td></tr><tr><td>%</td>${percentages}<td>${item.total_count ? '100.0%' : '0.0%'}</td><td>-</td></tr></tbody></table><div class="small text-secondary mt-2 mb-0">${definitionNote}</div><div class="small text-secondary mt-0 mb-0">${stageNote}</div></div>`;
         }).join('');
         container.innerHTML = `${tabs}${panels}`;
         container.querySelectorAll('.stage-first-course-tab').forEach(button => {
@@ -1177,6 +1256,21 @@ window.DashboardRenderer.renderColonHistologyTableNote = function(histologyWarni
     };
 
 /* ── 組織型態分佈表 ── */
+window.DashboardRenderer.histologyDisplayName = function(item) {
+        const isEnglish = window.DashboardI18n?.getLanguage() === 'en';
+        return isEnglish
+            ? (item?.name_en || item?.name || '')
+            : (item?.name_zh || item?.name || '');
+    };
+
+window.DashboardRenderer.histologyAxisLabel = function(value) {
+        const text = String(value ?? '').replace(/\s*\n\s*/g, ' ').trim();
+        // 原位癌後綴屬於名稱的一部分，中文與英文皆固定同一列。
+        return /[\u3400-\u9fff]/.test(text) || /\(in situ\)$/i.test(text)
+            ? `{right|${text}}`
+            : this.rightAlignedAxisLabel(text);
+    };
+
 window.DashboardRenderer.renderHistologyTable = function(histologyData, yearTitle, cancerTitle, noDataReason = '') {
         const body = document.getElementById('annualHistologyTableBody');
         const caption = document.getElementById('annualHistologyCaption');
@@ -1190,7 +1284,7 @@ window.DashboardRenderer.renderHistologyTable = function(histologyData, yearTitl
         }
         if (!histologyData || histologyData.length === 0) {
             const reason = this.escapeHtml(noDataReason || '查無符合條件的組織型態資料。');
-            body.innerHTML = `<tr><td colspan="4" class="text-center py-4">${this.t('noData')}<br><span class="text-muted small">${reason}</span></td></tr>`;
+            body.innerHTML = `<tr><td colspan="3" class="text-center py-4">${this.t('noData')}<br><span class="text-muted small">${reason}</span></td></tr>`;
             this.renderColonHistologyTableNote([]);
             return;}
 
@@ -1200,8 +1294,7 @@ window.DashboardRenderer.renderHistologyTable = function(histologyData, yearTitl
             const pct = totalCount > 0 ? ((item.count / totalCount) * 100).toFixed(1) : '0.0';
             return `
                 <tr>
-                    <td>${item.code}</td>
-                    <td class="text-start">${item.name}</td>
+                    <td class="text-start">${this.escapeHtml(this.histologyDisplayName(item))}</td>
                     <td>${item.count}</td>
                     <td>${pct}%</td>
                 </tr>
@@ -1211,7 +1304,6 @@ window.DashboardRenderer.renderHistologyTable = function(histologyData, yearTitl
         const totalRowHtml = `
             <tr class="fw-bold" style="background-color: var(--gray-50);">
                 <td>${this.t('total')}</td>
-                <td></td>
                 <td>${totalCount}</td>
                 <td>100.0%</td>
             </tr>`;
@@ -1335,7 +1427,6 @@ window.DashboardRenderer.renderSurvivalChart = function(survivalData, yearTitle,
                 }
             });
         });
-
         const title = isEnglish
             ? `Kaplan–Meier Survival Curve (N=${includedCount})`
             : `Kaplan–Meier存活曲線圖 (N=${includedCount})`;
@@ -1585,10 +1676,14 @@ window.DashboardRenderer.fetchLlmInsight = function(fieldKey, chartData, fields,
         if (shouldManageButton && button) button.disabled = true;
 
         const cacheGeneration = this.insightCacheGeneration;
-        const controller = new AbortController();
-        const timeoutId = window.setTimeout(() => controller.abort(), 120000);
-        const request = fetch('/api/chart_insight', {method: 'POST',headers: { 'Content-Type': 'application/json' },signal: controller.signal,body: JSON.stringify({ field_key: fieldKey, data: chartData, fields: fields, mode_ai: modeAi, year_start: yearStart, year_end: yearEnd, language })})
-        .then(res => res.json())
+        const request = fetch('/api/chart_insight', {method: 'POST',headers: { 'Content-Type': 'application/json' },body: JSON.stringify({ field_key: fieldKey, data: chartData, fields: fields, mode_ai: modeAi, year_start: yearStart, year_end: yearEnd, language })})
+        .then(async res => {
+            try {
+                return await res.json();
+            } catch (_) {
+                return { success: false, error: `HTTP ${res.status}` };
+            }
+        })
         .then(data => {
             if (data.success) {
                 if (this.insightCacheGeneration === cacheGeneration) {
@@ -1602,10 +1697,9 @@ window.DashboardRenderer.fetchLlmInsight = function(fieldKey, chartData, fields,
         })
         .catch(error => ({
             success: false,
-            error: error.name === 'AbortError' ? '語言模型敘述產生逾時，請稍後重試。' : 'error'
+            error: error.message || 'error'
         }))
         .finally(() => {
-            window.clearTimeout(timeoutId);
             if (this.insightRequests.get(requestKey) === request) this.insightRequests.delete(requestKey);
         });
         this.insightRequests.set(requestKey, request);
@@ -1614,6 +1708,18 @@ window.DashboardRenderer.fetchLlmInsight = function(fieldKey, chartData, fields,
             showResult(result);
             return result;
         });
+    };
+
+window.DashboardRenderer.fetchLlmInsightWithRetry = async function(fieldKey, chartData, fields, responseContainerId, buttonId, options = {}) {
+        let result = null;
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+            result = await this.fetchLlmInsight(
+                fieldKey, chartData, fields, responseContainerId, buttonId,
+                { ...options, forceRefresh: options.forceRefresh === true || attempt > 0 }
+            );
+            if (result?.success) return result;
+        }
+        return result;
     };
 
 // 取得年度字串
@@ -1769,14 +1875,15 @@ window.DashboardRenderer.refreshInsightControls = function() {
         });
     };
 
-window.DashboardRenderer.regenerateInsightsForLanguage = function() {
+window.DashboardRenderer.regenerateInsightsForLanguage = function({ excludeButtonIds = [] } = {}) {
+        const excluded = new Set(excludeButtonIds);
         const buttons = Array.from(document.querySelectorAll('button[id^="btnAi"]'))
-            .filter(button => button.style.display !== 'none' && typeof button.onclick === 'function');
+            .filter(button => !excluded.has(button.id) && button.style.display !== 'none' && typeof button.onclick === 'function');
         return Promise.all(buttons.map(button => button.onclick()));
     };
 
-window.DashboardRenderer.ensureInsightsForLanguage = async function({ retry = true } = {}) {
-        const run = () => this.regenerateInsightsForLanguage();
+window.DashboardRenderer.ensureInsightsForLanguage = async function({ retry = true, excludeButtonIds = [] } = {}) {
+        const run = () => this.regenerateInsightsForLanguage({ excludeButtonIds });
         let results = await run();
         if (retry && results.some(result => !result?.success)) results = await run();
         if (results.some(result => !result?.success)) {
@@ -1784,7 +1891,6 @@ window.DashboardRenderer.ensureInsightsForLanguage = async function({ retry = tr
         }
         return results;
     };
-
 window.DashboardRenderer.updateHistologyChart = function(histologyData, noDataReason = '') {
         if (!window.dashboardHistologyChartInstance || !histologyData) return;
         const yearTitle = this.getSelectedYearTitle();
@@ -1793,7 +1899,7 @@ window.DashboardRenderer.updateHistologyChart = function(histologyData, noDataRe
         const validData = histologyData.filter(item => item.name !== 'Unknown / 未對應組織型態');
         const totalValid = validData.reduce((sum, item) => sum + item.count, 0);
         const topData = [...validData].reverse();
-        const categories = topData.map(item => item.name);
+        const categories = topData.map(item => this.histologyDisplayName(item));
         const chartSeriesData = topData.map(item => ({
             value: totalValid > 0 ? Number(((item.count / totalValid) * 100).toFixed(1)) : 0,
             count: item.count
@@ -1860,7 +1966,7 @@ window.DashboardRenderer.rerenderDashboardLanguage = function(options = {}) {
         const languageLabel = document.getElementById('dashboardLanguageLabel');
         if (languageLabel && selector) languageLabel.textContent = selector.value === 'en' ? 'English' : '繁體中文';
         const headerMap = {
-            histologyCodeHeader: this.t('icdoCode'), histologyNameHeader: this.t('histology'),
+            histologyNameHeader: this.t('histology'),
             histologyCountHeader: this.t('people'),
             histologyPercentageHeader: window.DashboardI18n?.getLanguage() === 'en' ? '%' : `${this.t('percentage')}%`
         };
@@ -1884,11 +1990,12 @@ window.DashboardRenderer.rerenderDashboardLanguage = function(options = {}) {
             this.renderStageReportTabs(window.lastChartData.stageReports, yearTitle, cancerTitle);
         }
         this.renderStageFirstCourseTables(window.lastChartData.stageFirstCourseData, yearTitle, cancerTitle);
+        this.renderStageSurgeryTables(window.lastChartData.stageSurgeryData, yearTitle, cancerTitle);
         this.renderSurvivalTable(window.lastChartData.survivalData, yearTitle, cancerTitle);
         this.updateChartCaptions(yearTitle, cancerTitle);
         if (window.dashboardChartInstance) window.dashboardChartInstance.setOption(this.getGenderAgeChartOption(window.lastChartData.genderAgeData), true);
         this.updateHistologyChart(window.lastChartData.histologyData, window.lastChartData.histologyNoDataReason);
-        if (options.regenerateInsights) this.regenerateInsightsForLanguage();
+        if (options.regenerateInsights && !window.dashboardExportPreparing) this.regenerateInsightsForLanguage();
     };
 
 /* ── 顯示年度資料區塊 ── */
@@ -2011,11 +2118,12 @@ document.addEventListener('DOMContentLoaded', function() {
             return canvas.toDataURL('image/png');
     };
 
-    const collectExportData = async (sharedChartImages = {}) => {
+    const collectExportData = async (sharedChartImages = {}, options = {}) => {
             const exportData = [];
             let orderIndex = 0;
             const exportLanguage = window.DashboardI18n?.getLanguage() || 'zh-TW';
             const modeAi = document.getElementById('mode_ai')?.value || 'balanced';
+            const generateInsights = options.generateInsights === true;
             const insightFieldKeys = {
                 'chartPane-IncidenceAge': '性別與年齡分佈',
                 'chartPane-IncidenceMedian': '年齡中位數',
@@ -2024,6 +2132,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 'chartPane-DiagnosisClassification': '個案分類',
                 'chartPane-StageSummary': '期別',
                 'chartPane-TreatmentFirstCourse': '期別與首次療程',
+                'chartPane-TreatmentSurgery': '期別與手術術式',
                 'chartPane-CrossYearSurvival': '存活率'
             };
             
@@ -2074,8 +2183,11 @@ document.addEventListener('DOMContentLoaded', function() {
                             if (view === 'sex') window.DashboardRenderer.renderStageSexReport(report, window.DashboardRenderer.getSelectedYearTitle(), window.DashboardRenderer.getSelectedCancerTitle());
                             else if (view === 'age') window.DashboardRenderer.renderStageAgeReport(report, window.DashboardRenderer.getSelectedYearTitle(), window.DashboardRenderer.getSelectedCancerTitle());
                             else window.DashboardRenderer.renderStageDistributionReport(report, window.DashboardRenderer.getSelectedYearTitle(), window.DashboardRenderer.getSelectedCancerTitle());
-
-                            await window.DashboardRenderer.configureStageInsight(report);
+                            if (generateInsights) {
+                                const insightResult = await window.DashboardRenderer.configureStageInsight(report);
+                                if (!insightResult?.success) throw new Error('Stage insight generation failed.');
+                                options.onInsightComplete?.();
+                            }
                             await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
                             const chart = view === 'sex'
@@ -2124,6 +2236,73 @@ document.addEventListener('DOMContentLoaded', function() {
                         continue;
                     }
 
+<<<<<<< HEAD
+=======
+                    if (paneId === 'chartPane-TreatmentSurgery') {
+                        const surgeryTables = Array.isArray(window.lastChartData?.stageSurgeryData)
+                            ? window.lastChartData.stageSurgeryData
+                            : [];
+                        const surgeryContainer = document.getElementById('annualStageSurgeryTables');
+                        const surgeryInsightButton = document.getElementById('btnAiTreatmentSurgery');
+                        const tableKeyOf = (table, index) => `${table.manual_key || 'unknown'}::${table.system || 'stage'}::${index}`;
+                        const tableKeys = surgeryTables.map(tableKeyOf);
+                        const activeTableKey = tableKeys.includes(window.stageSurgeryActiveTableKey)
+                            ? window.stageSurgeryActiveTableKey
+                            : tableKeys[0];
+
+                        for (let surgeryIndex = 0; surgeryIndex < surgeryTables.length; surgeryIndex += 1) {
+                            const table = surgeryTables[surgeryIndex];
+                            window.stageSurgeryActiveTableKey = tableKeyOf(table, surgeryIndex);
+                            window.DashboardRenderer.renderStageSurgeryTables(
+                                surgeryTables,
+                                window.DashboardRenderer.getSelectedYearTitle(),
+                                window.DashboardRenderer.getSelectedCancerTitle()
+                            );
+
+                            if (generateInsights && typeof surgeryInsightButton?.onclick === 'function') {
+                                const insightResult = await surgeryInsightButton.onclick();
+                                if (!insightResult?.success) throw new Error('Surgery insight generation failed.');
+                                options.onInsightComplete?.();
+                            }
+
+                            const tablePanel = Array.from(
+                                surgeryContainer?.querySelectorAll('.stage-surgery-panel') || []
+                            ).find(panel => panel.dataset.stageSurgeryKey === tableKeyOf(table, surgeryIndex));
+                            const fieldKey = surgeryInsightButton?.dataset.insightFieldKey || '';
+                            const llmText = fieldKey
+                                ? (window.DashboardRenderer?.insightCache?.get(`${exportLanguage}|${modeAi}|${fieldKey}`) || '')
+                                : '';
+                            const stageSystem = table.system || (exportLanguage === 'en' ? 'Unspecified' : '未指定');
+                            const title = exportLanguage === 'en'
+                                ? `${table.cancer_name_en || table.manual_key} (${stageSystem} Stage) and Surgical Procedure`
+                                : `${table.cancer_name || table.manual_key}（${stageSystem}期別）與手術術式`;
+
+                            exportData.push({
+                                id: `chartPane-TreatmentSurgery-${surgeryIndex}`,
+                                order: orderIndex++,
+                                title,
+                                tableHtml: tablePanel ? tablePanel.innerHTML : '',
+                                chartImage: '',
+                                chartImageKey: '',
+                                llmText
+                            });
+                        }
+
+                        window.stageSurgeryActiveTableKey = activeTableKey;
+                        window.DashboardRenderer.renderStageSurgeryTables(
+                            surgeryTables,
+                            window.DashboardRenderer.getSelectedYearTitle(),
+                            window.DashboardRenderer.getSelectedCancerTitle()
+                        );
+
+                        if (wasHidden) {
+                            pane.classList.add('d-none');
+                            pane.style.visibility = '';
+                            pane.style.display = '';
+                        }
+                        continue;
+                    }
+>>>>>>> 0a1ab48bd508a1d27a27d218813bba492c7c2a04
                     if (paneId === 'chartPane-TreatmentFirstCourse') {
                         const treatmentTables = Array.isArray(window.lastChartData?.stageFirstCourseData)
                             ? window.lastChartData.stageFirstCourseData
@@ -2143,8 +2322,11 @@ document.addEventListener('DOMContentLoaded', function() {
                                 window.DashboardRenderer.getSelectedYearTitle(),
                                 window.DashboardRenderer.getSelectedCancerTitle()
                             );
-                            if (typeof treatmentInsightButton?.onclick === 'function') {
-                                await treatmentInsightButton.onclick();
+
+                            if (generateInsights && typeof treatmentInsightButton?.onclick === 'function') {
+                                const insightResult = await treatmentInsightButton.onclick();
+                                if (!insightResult?.success) throw new Error('First-course insight generation failed.');
+                                options.onInsightComplete?.();
                             }
 
                             const tablePanel = Array.from(
@@ -2154,6 +2336,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             const llmText = fieldKey
                                 ? (window.DashboardRenderer?.insightCache?.get(`${exportLanguage}|${modeAi}|${fieldKey}`) || '')
                                 : '';
+                            const stageSystem = table.system || (exportLanguage === 'en' ? 'Unspecified' : '未指定');
                             const title = exportLanguage === 'en'
                                 ? `${table.system} Stage and First Course Treatment`
                                 : `${table.system}期別與首次療程`;
@@ -2175,9 +2358,6 @@ document.addEventListener('DOMContentLoaded', function() {
                             window.DashboardRenderer.getSelectedYearTitle(),
                             window.DashboardRenderer.getSelectedCancerTitle()
                         );
-                        if (typeof treatmentInsightButton?.onclick === 'function') {
-                            await treatmentInsightButton.onclick();
-                        }
 
                         if (wasHidden) {
                             pane.classList.add('d-none');
@@ -2212,6 +2392,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     const llmDiv = pane.querySelector('[id^="llmResponse"]');
                     if (llmDiv) {
                         const insightButton = pane.querySelector('button[id^="btnAi"]');
+                        if (generateInsights && typeof insightButton?.onclick === 'function') {
+                            const insightResult = await insightButton.onclick();
+                            if (!insightResult?.success) throw new Error('Insight generation failed.');
+                            options.onInsightComplete?.();
+                        }
                         const fieldKey = insightButton?.dataset.insightFieldKey || insightFieldKeys[paneId];
                         const cachedInsight = fieldKey
                             ? window.DashboardRenderer?.insightCache?.get(`${exportLanguage}|${modeAi}|${fieldKey}`)
@@ -2235,6 +2420,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     else if (paneId === 'chartPane-DiagnosisClassification') title = window.DashboardRenderer.t('chartClassification');
                     else if (paneId === 'chartPane-StageSummary') title = window.DashboardRenderer.t('chartStage');
                     else if (paneId === 'chartPane-TreatmentFirstCourse') title = window.DashboardI18n?.getLanguage() === 'en' ? 'Stage and First Course Treatment' : '期別與首次療程';
+                    else if (paneId === 'chartPane-TreatmentSurgery') title = window.DashboardI18n?.getLanguage() === 'en' ? 'Stage and Surgical Procedure' : '期別與手術術式';
                     else if (paneId === 'chartPane-CrossYearSurvival') title = window.DashboardI18n?.getLanguage() === 'en' ? 'Survival' : '存活率';
 
                     exportData.push({
@@ -2260,25 +2446,46 @@ document.addEventListener('DOMContentLoaded', function() {
             const sharedChartImages = {};
             let preparationError = null;
             btnPrepareExport.disabled = true;
+            window.dashboardExportPreparing = true;
             if (window.utils?.showLoading) {
-                window.utils.showLoading('正在準備匯出內容中，請稍候…');
+                window.utils.showLoading('資料分析中，請稍後...');
             }
             try {
-                for (const language of ['zh-TW', 'en']) {
-                    await window.DashboardI18n?.setLanguage(language);
-                    await window.DashboardRenderer?.ensureInsightsForLanguage?.();
-                    exportDataByLanguage[language] = await collectExportData(sharedChartImages);
+
+                const activePaneIds = new Set(Array.from(document.querySelectorAll('#chartTabsContainer .chart-tab-btn')).map(button => button.dataset.target));
+                let totalInsights = 0;
+                if (activePaneIds.has('#chartPane-StageSummary')) totalInsights += (window.lastChartData?.stageReports || []).length;
+                if (activePaneIds.has('#chartPane-TreatmentFirstCourse')) totalInsights += (window.lastChartData?.stageFirstCourseData || []).length;
+                if (activePaneIds.has('#chartPane-TreatmentSurgery')) totalInsights += (window.lastChartData?.stageSurgeryData || []).length;
+                for (const paneId of activePaneIds) {
+                    if (['#chartPane-StageSummary', '#chartPane-TreatmentFirstCourse', '#chartPane-TreatmentSurgery'].includes(paneId)) continue;
+                    const pane = document.querySelector(paneId);
+                    if (pane?.querySelector('[id^=llmResponse]') && pane.querySelector('[id^=btnAi]')) totalInsights += 1;
                 }
+                let completedInsights = 0;
+                const updateInsightProgress = () => window.utils?.showLoading?.('正在產生LLM敘述(' + completedInsights + '/' + Math.max(totalInsights, 1) + ')...');
+                updateInsightProgress();
+                const onInsightComplete = () => {
+                    completedInsights += 1;
+                    updateInsightProgress();
+                };
+                await window.DashboardI18n?.setLanguage('zh-TW');
+                exportDataByLanguage['zh-TW'] = await collectExportData(sharedChartImages, { generateInsights: true, onInsightComplete });
+                await window.DashboardI18n?.setLanguage('en');
+                exportDataByLanguage.en = await collectExportData(sharedChartImages);
             } catch (error) {
+                console.error('Export preparation failed:', error);
                 preparationError = error;
             } finally {
                 await window.DashboardI18n?.setLanguage(originalLanguage);
+                window.dashboardExportPreparing = false;
                 btnPrepareExport.disabled = false;
             }
 
             if (preparationError) {
                 if (window.utils?.hideLoading) window.utils.hideLoading();
-                utils.alert('匯出內容準備失敗，請再試一次。', 'error');
+                const isInsightFailure = /insight generation failed/i.test(String(preparationError?.message || ''));
+                utils.alert(isInsightFailure ? '語言模型敘述尚未完成；系統未建立不完整匯出，請稍後再試。' : '匯出內容準備失敗，請再試一次。', 'error');
                 return;
             }
 
@@ -2297,3 +2504,64 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+/* ── 期別與手術術式表（附錄 B） ── */
+window.DashboardRenderer.renderStageSurgeryTables = function(tables, yearTitle, cancerTitle) {
+    const container = document.getElementById('annualStageSurgeryTables');
+    if (!container) return;
+    if (!Array.isArray(tables) || !tables.length) {
+        container.innerHTML = '<div class="text-secondary">目前沒有符合所選癌別的手術術式資料；請選擇已匯入術式對照的癌別與至少一項期別分析。</div>';
+        return;
+    }
+    const isEnglish = window.DashboardI18n?.getLanguage() === 'en';
+    const tableKeyOf = (item, index) => `${item.manual_key || 'unknown'}::${item.system || 'stage'}::${index}`;
+    const tableKeys = tables.map(tableKeyOf);
+    const activeTableKey = tableKeys.includes(window.stageSurgeryActiveTableKey)
+        ? window.stageSurgeryActiveTableKey
+        : tableKeys[0];
+    const panels = tables.map((item, tableIndex) => {
+        const tableKey = tableKeyOf(item, tableIndex);
+        const tableCancer = isEnglish ? (item.cancer_name_en || cancerTitle) : (item.cancer_name || cancerTitle);
+        const stages = item.stage_columns || [];
+        const rows = item.rows || [];
+        const rowByKey = new Map(rows.map(row => [row.row_key, row]));
+        const levelOf = (row) => {
+            const configuredLevel = row.display_level;
+            if (configuredLevel !== null && configuredLevel !== undefined && configuredLevel !== ''
+                && Number.isFinite(Number(configuredLevel))) {
+                return Math.max(0, Number(configuredLevel));
+            }
+            let level = 0, parent = rowByKey.get(row.parent_row_key), seen = new Set();
+            while (parent && !seen.has(parent.row_key)) {
+                seen.add(parent.row_key); level += 1; parent = rowByKey.get(parent.parent_row_key);
+            }
+            return level;
+        };
+        const bodyRows = rows.map(row => {
+            const isHeading = String(row.row_type || '').toLowerCase() === 'heading';
+            const code = row.code_short && row.code_long
+                ? `${row.code_short}/${row.code_long}`
+                : row.code_short || row.code_long || '';
+            const label = isHeading
+                ? row.procedure || ''
+                : `${code}${code && row.procedure ? ' ' : ''}${row.procedure || ''}`;            const indent = Math.min(levelOf(row), 3) * 1.5;
+            const values = (row.values || []).map(value => `<td>${value}</td>`).join('');
+            return `<tr class="${isHeading ? 'table-light fw-semibold' : ''}"><td class="text-start" data-surgery-level="${levelOf(row)}" style="padding-left: calc(0.75rem + ${indent}rem) !important">${this.escapeHtml(label)}</td>${values}<td>${Number(row.subtotal || 0)}</td><td>${item.total_count ? (Number(row.subtotal || 0) / Number(item.total_count || 0) * 100).toFixed(1) : '0.0'}%</td></tr>`;
+        }).join('');
+        const totals = (item.totals || []).map(value => `<td>${value}</td>`).join('');
+        const percentages = (item.percentages || []).map(value => `<td>${value}%</td>`).join('');
+        const stageSystem = item.system || (isEnglish ? 'Unspecified' : '未指定');
+        const title = isEnglish
+            ? `Table. Surgical Procedure Distribution of Newly Diagnosed ${tableCancer} Cancer Cases by ${this.escapeHtml(stageSystem)} Stage, ${yearTitle}`
+            : `表、${yearTitle}年新診斷${tableCancer}病患${stageSystem}期別與手術術式分佈`;
+        return `<div class="stage-surgery-panel${tableKey === activeTableKey ? '' : ' d-none'}" data-stage-surgery-key="${this.escapeHtml(tableKey)}"><table class="annual-report-table"><caption class="surgery-table-caption">${title}${this.sourceLine()}</caption><thead><tr><th class="text-center">${isEnglish ? 'Surgical Codes/Surgical Procedure' : '術式編碼/術式名稱'}</th><th colspan="${Math.max(stages.length, 1)}">${this.escapeHtml(item.system)} ${isEnglish ? 'Stage' : '期別'}</th><th rowspan="2">${isEnglish ? 'Total' : '小計'}</th><th rowspan="2">%</th></tr><tr><th class="text-center surgery-table-classification">${isEnglish ? '(Taiwan Cancer Registry Surgery Codes)' : '（按台灣癌症登記術式編碼分類）'}</th>${stages.map(stage => `<th>${this.escapeHtml(String(stage || '').replace(/^Stage\s+/i, ''))}</th>`).join('')}</tr></thead><tbody>${bodyRows}<tr class="fw-bold"><td>${isEnglish ? 'Total' : '總計'}</td>${totals}<td>${Number(item.total_count || 0)}</td><td>${item.total_count ? '100.0%' : '0.0%'}</td></tr><tr><td>%</td>${percentages}<td>${item.total_count ? '100.0%' : '0.0%'}</td><td>-</td></tr></tbody></table></div>`;
+    }).join('');
+    const tabs = tables.length > 1 ? `<div class="d-flex flex-wrap gap-2 mb-3">${tables.map((item, index) => { const tableKey = tableKeyOf(item, index); const label = isEnglish ? `${item.cancer_name_en || item.manual_key} ${item.system} Stage` : `${item.cancer_name || item.manual_key}${item.system}期別`; return `<button type="button" class="btn btn-outline-dark btn-sm stage-surgery-tab${tableKey === activeTableKey ? ' active' : ''}" data-stage-surgery-key="${this.escapeHtml(tableKey)}">${this.escapeHtml(label)}</button>`; }).join('')}</div>` : '';
+    container.innerHTML = `${tabs}${panels}`;
+    container.querySelectorAll('.stage-surgery-tab').forEach(button => button.addEventListener('click', () => {
+        window.stageSurgeryActiveTableKey = button.dataset.stageSurgeryKey;
+        container.querySelectorAll('.stage-surgery-tab').forEach(tab => tab.classList.toggle('active', tab === button));
+        container.querySelectorAll('.stage-surgery-panel').forEach(panel => panel.classList.toggle('d-none', panel.dataset.stageSurgeryKey !== button.dataset.stageSurgeryKey));
+        document.getElementById('btnAiTreatmentSurgery')?.onclick?.();
+    }));
+};
