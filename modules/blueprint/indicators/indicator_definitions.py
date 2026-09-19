@@ -55,7 +55,7 @@ def _metadata_by_indicator(cancer_key):
     conn = get_conn()
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT indicator_no, selection_reason, numerator_definition, denominator_definition, notes FROM dbo.indicator_definition_metadata WHERE cancer_group_key = ?",(str(cancer_key or ""),),)
+        cursor.execute("SELECT indicator_no, selection_reason, numerator_definition, denominator_definition, notes FROM dbo.Indicator_definition_metadata WHERE cancer_group_key = ?",(str(cancer_key or ""),),)
         return {
             int(row[0]): {
                 "selection_reason": row[1] or "",
