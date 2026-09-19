@@ -17,6 +17,13 @@
 <body>
   <div class="app-shell">
     <aside class="sidebar" id="sidebar">
+      <script>
+        try {
+          if (window.matchMedia("(min-width: 769px)").matches && localStorage.getItem("sidebarCollapsed") === "true") {
+            document.currentScript.parentElement.classList.add("collapsed");
+          }
+        } catch (_) {}
+      </script>
       <div class="sidebar-brand">
         <a href="/" class="brand-link">
           <div class="brand-logo">
@@ -63,8 +70,8 @@
               {% set ns.is_active = true %}
             {% endif %}
           {% endfor %}
-          <li>
-            <a href="#submenu-{{ loop.index }}" data-bs-toggle="collapse" class="nav-link {% if ns.is_active %}active{% endif %}" aria-expanded="{% if ns.is_active %}true{% else %}false{% endif %}">
+          <li class="nav-group">
+            <a href="#submenu-{{ loop.index }}" data-bs-toggle="collapse" class="nav-link {% if ns.is_active %}active{% endif %}" aria-expanded="{% if ns.is_active %}true{% else %}false{% endif %}" data-sidebar-label="{{ item.title }}" aria-label="{{ item.title }}" title="{{ item.title }}">
               <span class="nav-icon"><i class="bi {{ item.icon }}"></i></span>
               <span class="nav-text">{{ item.title }}</span>
               <i class="bi bi-chevron-down ms-auto submenu-icon" style="transition: transform 0.3s; font-size: 0.8rem;"></i>
@@ -82,7 +89,7 @@
           </li>
           {% else %}
           <li>
-            <a href="{{ url_for(item.endpoint) }}" class="nav-link {% if active == item.endpoint or active == item.endpoint.split('.')[-1] %}active{% endif %}">
+            <a href="{{ url_for(item.endpoint) }}" class="nav-link {% if active == item.endpoint or active == item.endpoint.split('.')[-1] %}active{% endif %}" data-sidebar-label="{{ item.title }}" aria-label="{{ item.title }}" title="{{ item.title }}">
               <span class="nav-icon"><i class="bi {{ item.icon }}"></i></span>
               <span class="nav-text">{{ item.title }}</span>
             </a>

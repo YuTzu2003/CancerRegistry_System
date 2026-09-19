@@ -202,7 +202,7 @@ def run_indicators_analysis(frame, cancers, year_start, year_end):
     for cancer_key in selected:
         metadata = get_indicator_metadata(cancer_key)
         definitions = get_indicator_definitions(cancer_key, metadata)
-        cancer_cases = frame.loc[year_mask & _cancer_mask(frame, cancer_key)].copy()
+        cancer_cases = frame.loc[year_mask & _cancer_mask(frame, cancer_key)]
         included_cases, audit_cases, global_summary = apply_global_indicators_exclusions(
             cancer_cases,
             is_hospital_self_reported=True,
@@ -247,8 +247,12 @@ def run_indicators_analysis(frame, cancers, year_start, year_end):
                 if cancer_key == "Prostate" and definition["id"] in {1, 2}
                 else included_cases
             )
-            denominator_masks = definition["calculator"](denominator_cases)
             numerator_masks = definition["calculator"](included_cases)
+            denominator_masks = (
+                numerator_masks
+                if denominator_cases is included_cases
+                else definition["calculator"](denominator_cases)
+            )
             denominator = _unique_case_count(denominator_cases, denominator_masks["denominator_mask"])
             numerator = _unique_case_count(included_cases, numerator_masks["numerator_mask"])
             calculation_error = ""

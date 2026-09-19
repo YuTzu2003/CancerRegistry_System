@@ -52,6 +52,9 @@
   .indicators-file-delete { align-items: center; background: transparent; border: 0; border-radius: 6px; color: var(--gray-500); display: inline-flex; height: 29px; justify-content: center; padding: 0; width: 29px; }
   .indicators-file-delete:hover { background: #fcebec; color: #b4232c; }
   .indicators-year-range { align-items: end; display: grid; gap: 10px; grid-template-columns: minmax(130px, 180px) 24px minmax(130px, 180px); justify-content: start; }
+  .indicators-year-controls { align-items: end; display: flex; flex-wrap: wrap; gap: 18px; }
+  .indicators-narrative-group { flex: 0 0 243px; max-width: 243px; width: 243px; }
+  .indicators-narrative-group .form-select { width: 100%; }
   .indicators-year-separator { align-items: center; display: flex; height: 43px; justify-content: center; }
   .indicators-cancer-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
   .indicators-cancer-option { align-items: center; border: 1px solid var(--gray-200); border-radius: 8px; display: flex; gap: 9px; margin: 0; padding: 10px 12px; }
@@ -104,6 +107,7 @@
   @media (max-width: 575.98px) {
     .indicators-year-range { grid-template-columns: 1fr; }
     .indicators-year-separator { height: auto; }
+    .indicators-narrative-group { flex: 1 1 100%; max-width: 100%; width: 100%; }
     .indicator-kpi-head { align-items: flex-start; flex-direction: column; gap: 5px; }
     .indicator-kpi-meta { flex-wrap: wrap; gap: 7px 12px; white-space: normal; }
   }
@@ -143,12 +147,15 @@
 </section>
 
 <section id="indicatorsYearStep" class="indicators-step indicators-year-step is-disabled" aria-disabled="true">
-  <div class="indicators-step-title"><span class="indicators-step-marker" aria-hidden="true"></span>診斷年度</div>
+  <div class="indicators-step-title"><span class="indicators-step-marker" aria-hidden="true"></span>年度與敘述風格</div>
   <div class="indicators-step-body">
-    <div class="indicators-year-range">
-      <div><label class="compare-label" for="indicatorsYearStart">起始年度</label><select id="indicatorsYearStart" class="form-select" disabled><option value="">尚未選擇</option></select></div>
-      <span class="indicators-year-separator" aria-hidden="true">至</span>
-      <div><label class="compare-label" for="indicatorsYearEnd">結束年度</label><select id="indicatorsYearEnd" class="form-select" disabled><option value="">尚未選擇</option></select></div>
+    <div class="indicators-year-controls">
+      <div class="indicators-year-range">
+        <div><label class="compare-label" for="indicatorsYearStart">起始年度</label><select id="indicatorsYearStart" class="form-select" disabled><option value="">尚未選擇</option></select></div>
+        <span class="indicators-year-separator" aria-hidden="true">至</span>
+        <div><label class="compare-label" for="indicatorsYearEnd">結束年度</label><select id="indicatorsYearEnd" class="form-select" disabled><option value="">尚未選擇</option></select></div>
+      </div>
+      <div class="indicators-narrative-group"><label class="compare-label" for="indicatorsNarrativeStyle">敘述風格</label><select id="indicatorsNarrativeStyle" class="form-select" disabled><option value="balanced" selected>平穩客觀</option><option value="formal">正式報告</option><option value="concise">精簡摘要</option></select></div>
     </div>
   </div>
 </section>
@@ -165,7 +172,7 @@
 </section>
 
 <section id="indicatorsPreviewStep" class="indicators-step is-disabled" aria-disabled="true">
-  <div class="indicators-step-title"><span class="indicators-step-marker" aria-hidden="true"></span><span>監測指標內容</span><span class="hint mb-0">分子件數為符合指標分子定義的案件數；分母件數為符合指標分母定義的案件數；監測結果(%)為分子件數／分母件數</span></div>
+  <div class="indicators-step-title"><span class="indicators-step-marker" aria-hidden="true"></span><span>監測指標內容</span><span class="hint mb-0">分子件數為符合指標分子定義的案件數；分母件數為符合指標分母定義的案件數；監測結果(%)為分子件數／分母件數</span><button id="analyzeIndicators" class="btn btn-success btn-sm ms-auto" type="button" disabled><i class="bi bi-play-fill me-1"></i>開始分析</button></div>
   <div class="indicators-step-body">
     <div id="indicatorsPreview" class="indicators-result-empty">請先上傳資料、選擇診斷年度與癌別</div>
   </div>
@@ -191,8 +198,10 @@
   const uploadButton = document.getElementById('uploadIndicatorsFile');
   const startSelect = document.getElementById('indicatorsYearStart');
   const endSelect = document.getElementById('indicatorsYearEnd');
+  const narrativeStyle = document.getElementById('indicatorsNarrativeStyle');
   const cancerInputs = [...document.querySelectorAll('.indicators-cancer')];
   const preview = document.getElementById('indicatorsPreview');
+  const analyzeButton = document.getElementById('analyzeIndicators');
   const fileList = document.getElementById('indicatorsFileList');
   const fileCount = document.getElementById('indicatorsFileCount');
   const yearStep = document.getElementById('indicatorsYearStep');
@@ -212,7 +221,7 @@
   let indicatorChartInstances = [];
   let activePreviewCancerKey = null;
   let previewRequestId = 0;
-  let previewRequestTimer = null;
+  let previewInFlight = false;
   const customYearControls = new Map();
 
   const disposeIndicatorCharts = () => {
@@ -309,10 +318,6 @@
 
   const resetPreviewResult = () => {
     previewRequestId += 1;
-    if (previewRequestTimer) {
-      window.clearTimeout(previewRequestTimer);
-      previewRequestTimer = null;
-    }
     disposeIndicatorCharts();
     activePreviewCancerKey = null;
     previewGenerated = false;
@@ -331,8 +336,10 @@
     if (!yearsSelected) cancerInputs.forEach((input) => { input.checked = false; });
     const cancerSelected = yearsSelected && cancerInputs.some(input => input.checked);
     setStepState(yearStep, uploaded, !uploaded);
+    narrativeStyle.disabled = !uploaded;
     setStepState(cancerStep, yearsSelected, !yearsSelected);
     setStepState(previewStep, cancerSelected, !cancerSelected);
+    analyzeButton.disabled = !cancerSelected || previewInFlight;
     setStepState(exportStep, cancerSelected, !cancerSelected);
     cancerInputs.forEach((input) => { input.disabled = !yearsSelected; });
     exportInputs.forEach((input) => { input.disabled = !cancerSelected; });
@@ -538,8 +545,8 @@
   cancerInputs.forEach(input => input.addEventListener('change', () => {
     resetPreviewResult();
     updateReadyState();
-    queueIndicatorsPreview();
   }));
+  analyzeButton.addEventListener('click', () => { void generateIndicatorsPreview(); });
   exportInputs.forEach(input => input.addEventListener('change', updateReadyState));
 
   uploadButton.addEventListener('click', async () => {
@@ -884,7 +891,9 @@
   const generateIndicatorsPreview = async () => {
     const cancers = cancerInputs.filter(input => input.checked).map(input => input.value);
     if (!uploaded || !startSelect.value || !endSelect.value || !cancers.length) return;
+    if (previewInFlight) return;
     const requestId = ++previewRequestId;
+    previewInFlight = true;
     previewGenerated = false;
     updateReadyState();
     preview.className = 'indicators-result-empty';
@@ -906,21 +915,9 @@
       preview.className = 'alert alert-danger mb-0';
       preview.textContent = error.message || '監測內容產生失敗。';
     } finally {
+      previewInFlight = false;
       if (requestId === previewRequestId) updateReadyState();
     }
-  };
-
-  const queueIndicatorsPreview = () => {
-    if (previewRequestTimer) window.clearTimeout(previewRequestTimer);
-    const ready = uploaded
-      && startSelect.value
-      && endSelect.value
-      && cancerInputs.some((input) => input.checked);
-    if (!ready) return;
-    previewRequestTimer = window.setTimeout(() => {
-      previewRequestTimer = null;
-      void generateIndicatorsPreview();
-    }, 150);
   };
 })();
 </script>
