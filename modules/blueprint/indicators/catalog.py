@@ -3,19 +3,22 @@ from dataclasses import dataclass
 import pandas as pd
 from modules.blueprint.dashboard.definition.cancer_grouping import classify_cancer_group
 from modules.blueprint.dashboard.definition.cancer_group_rules import CANCER_GROUP_RULES
+from modules.blueprint.indicators.exclusion_rules import _clean_code, _find_column
 from modules.blueprint.indicators.cancer_indicator import (
     BREAST_CANCER_RULES,
+    BLADDER_CANCER_RULES,
     CERVICAL_CANCER_RULES,
     COLON_RECTUM_CANCER_RULES,
+    CORPUS_UTERI_CANCER_RULES,
     ESOPHAGEAL_CANCER_RULES,
     GASTRIC_CANCER_RULES,
     LIVER_CANCER_RULES,
     LUNG_CANCER_RULES,
     ORAL_CANCER_RULES,
-    OWNED_CANCER_RULES,
+    OVARY_CANCER_RULES,
     PANCREATIC_CANCER_RULES,
+    PROSTATE_CANCER_RULES,
 )
-from modules.blueprint.indicators.exclusion_rules import _clean_code, _find_column
 
 @dataclass(frozen=True)
 class CancerSpec:
@@ -81,26 +84,26 @@ CANCER_SPECS: dict[str, CancerSpec] = {
         require_case_class=True,
     ),
     "Corpus_Uteri": CancerSpec(
-        OWNED_CANCER_RULES["Corpus_Uteri"],
+        CORPUS_UTERI_CANCER_RULES,
         site_codes=frozenset({"C540", "C541", "C543", "C548", "C549"}),
         histology_exclude=SOLID_TUMOR_EXCLUDED_HISTOLOGY,
         histology_exclude_ranges=SOLID_TUMOR_EXCLUDED_RANGES,
         require_case_class=True,
     ),
     "Ovary": CancerSpec(
-        OWNED_CANCER_RULES["Ovary"],
+        OVARY_CANCER_RULES,
         site_codes=frozenset({"C569"}),
         histology_exclude=SOLID_TUMOR_EXCLUDED_HISTOLOGY,
         histology_exclude_ranges=SOLID_TUMOR_EXCLUDED_RANGES,
         require_case_class=True,
     ),
     "Prostate": CancerSpec(
-        OWNED_CANCER_RULES["Prostate"],
+        PROSTATE_CANCER_RULES,
         site_codes=frozenset({"C619"}),
         histology_include=frozenset({"8140", "8141", "8201", "8255", "8500", "8550", "8551", "8552"}),
     ),
     "Bladder": CancerSpec(
-        OWNED_CANCER_RULES["Bladder"],
+        BLADDER_CANCER_RULES,
         site_codes=frozenset({"C679"}),
         histology_include=frozenset({"8020", "8031", "8082", "8120", "8122", "8130", "8131"}),
         require_case_class=True,
@@ -111,7 +114,6 @@ CANCER_SPECS: dict[str, CancerSpec] = {
 def get_indicator_rules(cancer_key: str) -> dict:
     spec = CANCER_SPECS.get(str(cancer_key or ""))
     return spec.rules if spec else {}
-
 
 def _site(value) -> str:
     return _clean_code(value).upper().replace(".", "")

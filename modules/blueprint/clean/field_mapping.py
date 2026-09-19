@@ -100,6 +100,7 @@ def field_mapping(target_col):
 
     return alias_dict, output_field_list
 
+
 def get_field_map(target_scheme_key, fmt_name):
     scheme_map = {
         "field_name_zh":"中文欄位名稱",
