@@ -10,144 +10,12 @@
 
 from __future__ import annotations
 import logging
-import re
 import pandas as pd
-from modules.blueprint.dashboard.definition.cancer_grouping import classify_cancer_group
-from modules.blueprint.dashboard.definition.cancer_group_rules import CANCER_GROUP_RULES
+from modules.blueprint.indicators.catalog import cancer_case_mask
 from modules.blueprint.indicators.indicator_definitions import (get_indicator_definitions, get_indicator_metadata)
 from modules.blueprint.indicators.exclusion_rules import _clean_code, _date_key, _find_column, apply_global_indicators_exclusions
 
 logger = logging.getLogger(__name__)
-
-# ---------------------------------------------------------------------------
-# 特定癌別收案準則（原發部位與組織型態條件）
-# ---------------------------------------------------------------------------
-INDICATOR_CANCER_CRITERIA = {
-    "Pancreas": {
-        "sites": {"C250", "C251", "C252", "C253", "C254", "C257", "C258", "C259"},
-        "histology_exclude": {"9140"},
-        "histology_exclude_ranges": ((9590, 9993),),
-    },
-    "Cervix_Uteri": {
-        "site_prefixes": ("C53",),
-        "histology_exclude": {"9140"},
-        "histology_exclude_ranges": ((9590, 9993),),
-    },
-    "Lung": {
-        "site_prefixes": ("C34",),
-        "histology_exclude": {"9140"},
-        "histology_exclude_ranges": ((9590, 9993),),
-    },
-    "Breast": {
-        "site_prefixes": ("C50",),
-        "histology_exclude": {"9140"},
-        "histology_exclude_ranges": ((9590, 9993),),
-    },
-    "Ovary": {
-        "sites": {"C569"},
-        "histology_exclude": {"9140"},
-        "histology_exclude_ranges": ((9590, 9993),),
-    },
-    "Prostate": {
-        "sites": {"C619"},
-        "histology_include": {"8140", "8141", "8201", "8255", "8500", "8550", "8551", "8552"},
-    },
-    "Bladder": {
-        "sites": {"C679"},
-        "histology_include": {"8020", "8031", "8082", "8120", "8122", "8130", "8131"},
-    },
-    "Corpus_Uteri": {
-        "sites": {"C540", "C541", "C543", "C548", "C549"},
-        "histology_exclude": {"9140"},
-        "histology_exclude_ranges": ((9590, 9993),),
-        "histology_types": {
-            "type_i": {"8380", "8382", "8383", "8480", "8560", "8570", "8140"},
-            "type_ii": {"8441", "8310", "8041", "8045", "8246", "8013", "8020", "8323", "8070", "8071", "8072", "8076"},
-        },
-    },
-}
-
-GASTRIC_ADENOCARCINOMA_HISTOLOGY = {
-    "8140", "8144", "8145", "8148", "8210", "8211", "8255", "8260",
-    "8263", "8480", "8481", "8490", "8550", "8576",
-}
-LIVER_HEPATOCELLULAR_CARCINOMA_HISTOLOGY = {str(code) for code in range(8170, 8176)}
-
-
-# ---------------------------------------------------------------------------
-# 代碼清洗與部位/組織型態標準化輔助函式
-# ---------------------------------------------------------------------------
-def _normalize_site(value):
-    return _clean_code(value).upper().replace(".", "")
-
-
-def _normalize_histology(value):
-    code = _clean_code(value)
-    return code.zfill(4) if code.isdigit() and len(code) < 4 else code
-
-
-# ---------------------------------------------------------------------------
-# 個案篩選遮罩（癌別與診斷年度）
-# ---------------------------------------------------------------------------
-def _indicator_cancer_mask(frame, cancer_key):
-    criteria = INDICATOR_CANCER_CRITERIA[cancer_key]
-    case_class_col = _find_column(frame.columns, "2.3", ("class", "個案分類"))
-    site_col = _find_column(frame.columns, "2.6", ("原發部位", "site"))
-    hist_col = _find_column(frame.columns, "2.8", ("組織型態", "hist"))
-    if not site_col or not hist_col or (cancer_key != "Prostate" and not case_class_col):
-        return pd.Series(False, index=frame.index)
-
-    histology = frame[hist_col].map(_normalize_histology)
-    sites = frame[site_col].map(_normalize_site)
-    mask = sites.isin(criteria.get("sites", set()))
-    site_prefixes = criteria.get("site_prefixes", ())
-    if site_prefixes:
-        mask |= sites.str.startswith(site_prefixes)
-    if cancer_key != "Prostate":
-        mask &= frame[case_class_col].map(_clean_code).isin({"1", "2"})
-    if "histology_include" in criteria:
-        return mask & histology.isin(criteria["histology_include"])
-
-    mask &= ~histology.isin(criteria["histology_exclude"])
-    histology_number = pd.to_numeric(histology, errors="coerce")
-    for start, end in criteria["histology_exclude_ranges"]:
-        mask &= ~histology_number.between(start, end, inclusive="both")
-    return mask.fillna(False)
-
-
-def _cancer_mask(frame, cancer_key):
-    if cancer_key in INDICATOR_CANCER_CRITERIA:
-        return _indicator_cancer_mask(frame, cancer_key)
-
-    site_col = _find_column(frame.columns, "2.6", ("原發部位", "site"))
-    hist_col = _find_column(frame.columns, "2.8", ("組織型態", "hist"))
-    behavior_col = _find_column(frame.columns, "2.9", ("性態碼", "behavior"))
-    if not site_col or not hist_col:
-        return pd.Series(False, index=frame.index)
-
-    def matches(row):
-        site_code = re.sub(r"[^A-Z0-9]", "", _normalize_site(row.get(site_col, "")))
-        histology_digits = re.sub(r"\D", "", _clean_code(row.get(hist_col, "")))
-        if cancer_key == "Colon_Rectum":
-            if len(histology_digits) < 4:
-                return False
-            histology = int(histology_digits[:4])
-            return site_code[:3] in {"C18", "C19", "C20"} and histology != 9140 and not 9590 <= histology <= 9993
-        if cancer_key == "Stomach":
-            return site_code in {"C160", "C161", "C162", "C163", "C164", "C165", "C166", "C168", "C169"} and histology_digits[:4] in GASTRIC_ADENOCARCINOMA_HISTOLOGY
-        if cancer_key == "Liver":
-            return site_code == "C220" and histology_digits[:4] in LIVER_HEPATOCELLULAR_CARCINOMA_HISTOLOGY
-        cancer = classify_cancer_group(
-            row.get(site_col, ""), row.get(hist_col, ""), CANCER_GROUP_RULES,
-            behavior=row.get(behavior_col, "") if behavior_col else None,
-        )
-        if not cancer:
-            return False
-        keys = {cancer.get("group_key"), cancer.get("subgroup_key"), *cancer.get("ancestor_subgroup_keys", [])}
-        return cancer_key in keys
-
-    return frame.apply(matches, axis=1)
-
 
 def _year_mask(frame, year_start, year_end):
     diagnosis_col = _find_column(frame.columns, "2.5", ("最初診斷日期", "didiag", "診斷日期"))
@@ -202,7 +70,7 @@ def run_indicators_analysis(frame, cancers, year_start, year_end):
     for cancer_key in selected:
         metadata = get_indicator_metadata(cancer_key)
         definitions = get_indicator_definitions(cancer_key, metadata)
-        cancer_cases = frame.loc[year_mask & _cancer_mask(frame, cancer_key)]
+        cancer_cases = frame.loc[year_mask & cancer_case_mask(frame, cancer_key)]
         included_cases, audit_cases, global_summary = apply_global_indicators_exclusions(
             cancer_cases,
             is_hospital_self_reported=True,

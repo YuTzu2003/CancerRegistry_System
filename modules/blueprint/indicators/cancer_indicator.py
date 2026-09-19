@@ -1,17 +1,7 @@
 """
 各癌別品質指標規則定義 (Cancer Indicator Rules)
-
-本檔案集中定義各癌別之分子 (numerator) 與分母 (denominator) 規則邏輯，
-包含：
-1. 口腔癌 (Oral Cavity)
-2. 卵巢癌 (Ovary)
-3. 膀胱癌 (Bladder)
-4. 攝護腺癌 (Prostate)
-5. 子宮體癌 (Corpus Uteri)
 """
-
 from __future__ import annotations
-
 from typing import Any
 
 # ===========================================================================
@@ -523,4 +513,408 @@ LIVER_CANCER_RULES: dict[int, dict[str, Any]] = {
 COLON_RECTUM_CANCER_RULES: dict[int, dict[str, Any]] = {
     2: {"name": "病理期別第 I-III 期結腸癌手術病人，淋巴結病理檢查 12 顆以上的比率。", "type": "positive", "denominator": {"op": "all", "rules": [{"op": "text_starts_with", "field": "site", "values": ["C18"]}, {"op": "first_char_in", "field": "pathological_stage", "values": ["1", "2", "3"]}, {"op": "between", "field": "surgery_code", "min": 30, "max": 90}]}, "numerator": {"op": "between", "field": "lymph_nodes_examined", "min": 12, "max": 90}},
     3: {"name": "第 II、III 期直腸癌病人，6 週內開始治療的比率。", "type": "positive", "denominator": {"op": "all", "rules": [{"op": "text_starts_with", "field": "site", "values": ["C19", "C20"]}, {"op": "equals", "field": "case_classification", "value": 1}, {"op": "first_char_in", "field": "clinical_stage", "values": ["2", "3"]}]}, "numerator": {"op": "date_interval", "start_field": "microscopic_confirmation_date", "end_field": "first_treatment_date", "min_days": 0, "max_days": 42}},
+}
+
+PANCREATIC_ADENOCARCINOMA_HISTOLOGIES = [
+    "8020", "8035", "8140", "8141", "8144", "8148", "8255",
+    "8310", "8323", "8440", "8441", "8453", "8470", "8480",
+    "8481", "8490", "8500", "8503", "8552", "8560", "8510",
+]
+
+PANCREATIC_CANCER_RULES: dict[int, dict[str, Any]] = {
+    1: {
+        "name": "胰臟癌病人首次治療前有組織學或細胞學診斷的比率",
+        "type": "positive",
+        "denominator": {
+            "op": "all",
+            "rules": [
+                {"op": "text_in", "field": "case_classification", "values": ["1", "2"]},
+                {"op": "text_equals", "field": "behavior", "value": "3"},
+                {"op": "valid_date", "field": "microscopic_confirmation_date"},
+                {"op": "text_not_in", "field": "palliative_care", "values": ["7"]},
+                {"op": "valid_date", "field": "first_treatment_date"},
+            ],
+        },
+        "numerator": {
+            "op": "date_after",
+            "start_field": "microscopic_confirmation_date",
+            "end_field": "first_treatment_date",
+        },
+    },
+    4: {
+        "name": "胰臟癌病人確診後30天內開始治療的比率",
+        "type": "positive",
+        "denominator": {
+            "op": "all",
+            "rules": [
+                {"op": "text_in", "field": "histology", "values": PANCREATIC_ADENOCARCINOMA_HISTOLOGIES},
+                {"op": "text_equals", "field": "case_classification", "value": "1"},
+                {"op": "text_equals", "field": "behavior", "value": "3"},
+                {"op": "valid_date", "field": "microscopic_confirmation_date"},
+                {"op": "text_not_in", "field": "palliative_care", "values": ["7"]},
+                {"op": "valid_date", "field": "first_treatment_date"},
+            ],
+        },
+        "numerator": {
+            "op": "date_interval",
+            "start_field": "diagnosis_date",
+            "end_field": "first_treatment_date",
+            "min_days": 0,
+            "max_days": 30,
+        },
+    },
+    5: {
+        "name": "胰臟癌治癒性手術完全切除且邊緣無侵犯的比率",
+        "type": "positive",
+        "denominator": {
+            "op": "all",
+            "rules": [
+                {"op": "text_in", "field": "histology", "values": PANCREATIC_ADENOCARCINOMA_HISTOLOGIES},
+                {"op": "text_equals", "field": "behavior", "value": "3"},
+                {"op": "between", "field": "surgery_code", "min": 30, "max": 80},
+                {"op": "text_not_in", "field": "margin_distance", "values": ["988", "991", "999"]},
+            ],
+        },
+        "numerator": {
+            "op": "all",
+            "rules": [
+                {"op": "text_equals", "field": "surgical_margin", "value": "0"},
+                {"op": "between", "field": "margin_distance", "min": 10, "max": 980},
+            ],
+        },
+    },
+    6: {
+        "name": "胰臟癌治癒性手術淋巴結病理檢查12顆以上的比率",
+        "type": "positive",
+        "denominator": {
+            "op": "all",
+            "rules": [
+                {"op": "text_in", "field": "histology", "values": PANCREATIC_ADENOCARCINOMA_HISTOLOGIES},
+                {"op": "text_equals", "field": "behavior", "value": "3"},
+                {"op": "between", "field": "surgery_code", "min": 30, "max": 80},
+                {"op": "text_not_in", "field": "margin_distance", "values": ["988", "991", "999"]},
+                {"op": "text_not_in", "field": "surgical_margin", "values": ["3", "A", "B"]},
+            ],
+        },
+        "numerator": {
+            "op": "greater_than_or_equal",
+            "field": "lymph_nodes_examined",
+            "value": 12,
+        },
+    },
+    7: {
+        "name": "胰臟癌前置切除手術後接受輔助型化療的比率",
+        "type": "positive",
+        "denominator": {
+            "op": "all",
+            "rules": [
+                {"op": "text_in", "field": "histology", "values": PANCREATIC_ADENOCARCINOMA_HISTOLOGIES},
+                {"op": "text_in", "field": "case_classification", "values": ["1", "2"]},
+                {"op": "text_equals", "field": "behavior", "value": "3"},
+                {"op": "between", "field": "surgery_code", "min": 30, "max": 80},
+                {"op": "text_in", "field": "surgical_margin", "values": ["0", "2", "5", "C", "D", "E"]},
+                {
+                    "op": "not",
+                    "rule": {"op": "first_char_in", "field": "clinical_stage", "values": ["4"]},
+                },
+                {
+                    "op": "not",
+                    "rule": {
+                        "op": "date_after",
+                        "start_field": "chemotherapy_date",
+                        "end_field": "surgery_date",
+                    },
+                },
+            ],
+        },
+        "numerator": {
+            "op": "date_after",
+            "start_field": "surgery_date",
+            "end_field": "chemotherapy_date",
+        },
+    },
+    8: {
+        "name": "臨床第三期胰臟癌手術前接受前導化療的比率",
+        "type": "positive",
+        "denominator": {
+            "op": "all",
+            "rules": [
+                {"op": "text_in", "field": "histology", "values": PANCREATIC_ADENOCARCINOMA_HISTOLOGIES},
+                {"op": "text_in", "field": "case_classification", "values": ["1", "2"]},
+                {"op": "text_equals", "field": "behavior", "value": "3"},
+                {"op": "text_not_in", "field": "palliative_care", "values": ["7"]},
+                {"op": "first_char_in", "field": "clinical_stage", "values": ["3"]},
+                {"op": "first_char_in", "field": "clinical_t", "values": ["4"]},
+                {"op": "first_char_in", "field": "clinical_n", "values": ["0", "1", "2", "3"]},
+                {"op": "first_char_in", "field": "clinical_m", "values": ["0"]},
+                {"op": "between", "field": "surgery_code", "min": 30, "max": 80},
+                {"op": "valid_date", "field": "surgery_date"},
+            ],
+        },
+        "numerator": {
+            "op": "date_after",
+            "start_field": "chemotherapy_date",
+            "end_field": "surgery_date",
+        },
+    },
+    9: {
+        "name": "臨床第三或第四期胰臟癌接受全身性化療的比率",
+        "type": "positive",
+        "denominator": {
+            "op": "all",
+            "rules": [
+                {"op": "text_in", "field": "histology", "values": PANCREATIC_ADENOCARCINOMA_HISTOLOGIES},
+                {"op": "text_in", "field": "case_classification", "values": ["1", "2"]},
+                {"op": "text_equals", "field": "behavior", "value": "3"},
+                {"op": "first_char_in", "field": "clinical_stage", "values": ["3", "4"]},
+            ],
+        },
+        "numerator": {"op": "valid_date", "field": "chemotherapy_date"},
+    },
+}
+
+
+# 子宮頸癌指標
+CERVICAL_CANCER_RULES: dict[int, dict[str, Any]] = {
+    1: {
+        "name": "CIN3或子宮頸原位癌以子宮頸錐狀手術為完整治療的比率",
+        "type": "positive",
+        "denominator": {
+            "op": "all",
+            "rules": [
+                {"op": "text_in", "field": "case_classification", "values": ["1", "2"]},
+                {"op": "text_equals", "field": "behavior", "value": "2"},
+            ],
+        },
+        "numerator": {
+            "op": "all",
+            "rules": [
+                {"op": "between", "field": "surgery_code", "min": 20, "max": 29},
+                {"op": "not_in", "field": "surgery_code", "values": [25]},
+            ],
+        },
+    },
+    2: {
+        "name": "FIGO期別IA2以上手術病人骨盆腔淋巴結摘除12顆以上的比率",
+        "type": "positive",
+        "denominator": {
+            "op": "all",
+            "rules": [
+                {
+                    "op": "text_in",
+                    "field": "figo_stage",
+                    "values": [
+                        "1A2", "1B", "1B1", "1B2", "1B3", "2", "2A", "2A1",
+                        "2A2", "2B", "3", "3A", "3B", "3C1", "3C2", "4A", "4B",
+                    ],
+                },
+                {"op": "between", "field": "surgery_code", "min": 20, "max": 90},
+                {
+                    "op": "dates_equal",
+                    "left_field": "first_treatment_date",
+                    "right_field": "surgery_date",
+                },
+            ],
+        },
+        "numerator": {
+            "op": "between",
+            "field": "lymph_nodes_examined",
+            "min": 12,
+            "max": 90,
+        },
+    },
+    3: {
+        "name": "子宮頸癌首次接受放射治療於63天內完成的比率",
+        "type": "positive",
+        "denominator": {
+            "op": "dates_equal",
+            "left_field": "first_treatment_date",
+            "right_field": "radiation_date",
+        },
+        "numerator": {
+            "op": "date_interval",
+            "start_field": "radiation_date",
+            "end_field": "radiation_end_date",
+            "min_days": 0,
+            "max_days": 63,
+        },
+    },
+    4: {
+        "name": "子宮頸癌首次接受放射治療包含近接放射治療的比率",
+        "type": "positive",
+        "denominator": {
+            "op": "all",
+            "rules": [
+                {"op": "text_not_in", "field": "figo_stage", "values": ["4B"]},
+                {
+                    "op": "dates_equal",
+                    "left_field": "first_treatment_date",
+                    "right_field": "radiation_date",
+                },
+            ],
+        },
+        "numerator": {
+            "op": "text_in",
+            "field": "radiation_machine",
+            "values": ["4", "5", "6", "7"],
+        },
+    },
+    5: {
+        "name": "指定FIGO期別子宮頸癌首次接受放療時合併化療的比率",
+        "type": "unspecified",
+        "denominator": {
+            "op": "all",
+            "rules": [
+                {
+                    "op": "text_in",
+                    "field": "figo_stage",
+                    "values": ["1B2", "1B3", "2A2", "2B", "3", "3A", "3B", "3C1", "3C2", "4A"],
+                },
+                {
+                    "op": "dates_equal",
+                    "left_field": "first_treatment_date",
+                    "right_field": "radiation_date",
+                },
+            ],
+        },
+        "numerator": {
+            "op": "text_in",
+            "field": "regional_systemic_sequence",
+            "values": ["2", "3", "6", "7"],
+        },
+    },
+}
+
+
+# 肺癌指標
+LUNG_CANCER_RULES: dict[int, dict[str, Any]] = {
+    1: {
+        "name": "臨床第IB至II期非小細胞肺癌手術淋巴結取樣至少3個位置的比率",
+        "type": "positive",
+        "denominator": {
+            "op": "all",
+            "rules": [
+                {"op": "text_in", "field": "clinical_stage", "values": ["1B", "2A", "2B"]},
+                {"op": "text_equals", "field": "is_nsclc", "value": "TRUE"},
+                {"op": "between", "field": "surgery_code", "min": 20, "max": 90},
+                {"op": "text_not_in", "field": "mediastinal_nodes_sampled", "values": ["988"]},
+                {"op": "text_in", "field": "case_classification", "values": ["1", "2"]},
+            ],
+        },
+        "numerator": {
+            "op": "between",
+            "field": "mediastinal_nodes_sampled",
+            "min": 3,
+            "max": 8,
+        },
+    },
+    2: {
+        "name": "臨床第IIIA期非小細胞肺癌手術淋巴結取樣至少3個位置的比率",
+        "type": "positive",
+        "denominator": {
+            "op": "all",
+            "rules": [
+                {"op": "text_equals", "field": "clinical_stage", "value": "3A"},
+                {"op": "text_equals", "field": "is_nsclc", "value": "TRUE"},
+                {"op": "between", "field": "surgery_code", "min": 20, "max": 90},
+                {"op": "text_not_in", "field": "mediastinal_nodes_sampled", "values": ["988"]},
+                {"op": "text_in", "field": "case_classification", "values": ["1", "2"]},
+            ],
+        },
+        "numerator": {
+            "op": "between",
+            "field": "mediastinal_nodes_sampled",
+            "min": 3,
+            "max": 8,
+        },
+    },
+}
+
+
+# 乳癌指標
+BREAST_CANCER_RULES: dict[int, dict[str, Any]] = {
+    2: {
+        "name": "臨床第一、二期乳癌手術病人施行哨兵淋巴結取樣術的比率",
+        "type": "positive",
+        "denominator": {
+            "op": "all",
+            "rules": [
+                {"op": "first_char_in", "field": "clinical_stage", "values": ["1", "2"]},
+                {"op": "between", "field": "surgery_code", "min": 20, "max": 90},
+                {"op": "text_in", "field": "pathological_n", "values": ["0", "0A", "0B", "0C", "0D"]},
+                {"op": "text_in", "field": "case_classification", "values": ["1", "2"]},
+                {"op": "equals", "field": "positive_lymph_nodes", "value": 0},
+            ],
+        },
+        "numerator": {
+            "op": "text_in",
+            "field": "regional_lymph_node_surgery_scope",
+            "values": ["2", "6", "7"],
+        },
+    },
+    3: {
+        "name": "乳房全切除且淋巴結陽性4顆以上病人接受放射治療的比率",
+        "type": "positive",
+        "denominator": {
+            "op": "all",
+            "rules": [
+                {"op": "between", "field": "positive_lymph_nodes", "min": 4, "max": 90},
+                {"op": "between", "field": "surgery_code", "min": 30, "max": 72},
+                {"op": "first_char_in", "field": "merged_stage", "values": ["0", "1", "2", "3"]},
+                {"op": "text_in", "field": "case_classification", "values": ["1", "2"]},
+            ],
+        },
+        "numerator": {
+            "op": "all",
+            "rules": [
+                {"op": "text_in", "field": "radiation_status", "values": ["00", "04", "09", "10"]},
+                {"op": "greater_than_or_equal", "field": "radiation_dose", "value": 4000},
+            ],
+        },
+    },
+    4: {
+        "name": "HER2陽性且淋巴轉移之乳癌手術病人接受anti-HER2治療的比率",
+        "type": "positive",
+        "denominator": {
+            "op": "all",
+            "rules": [
+                {
+                    "op": "any",
+                    "rules": [
+                        {
+                            "op": "text_in",
+                            "field": "her2",
+                            "values": ["103", "201", "301", "401", "501", "901"],
+                        },
+                        {
+                            "op": "all",
+                            "rules": [
+                                {"op": "date_year_between", "field": "diagnosis_date", "min": 2023, "max": 2023},
+                                {"op": "text_in", "field": "her2", "values": ["511", "521", "591"]},
+                            ],
+                        },
+                        {
+                            "op": "all",
+                            "rules": [
+                                {"op": "date_year_between", "field": "diagnosis_date", "min": 2024, "max": 2024},
+                                {"op": "text_in", "field": "her2", "values": ["530", "531", "532"]},
+                            ],
+                        },
+                    ],
+                },
+                {"op": "between", "field": "positive_lymph_nodes", "min": 1, "max": 97},
+                {"op": "text_in", "field": "case_classification", "values": ["1", "2"]},
+                {"op": "between", "field": "surgery_code", "min": 10, "max": 90},
+                {
+                    "op": "not",
+                    "rule": {"op": "first_char_in", "field": "merged_stage", "values": ["4"]},
+                },
+            ],
+        },
+        "numerator": {
+            "op": "text_in",
+            "field": "targeted_therapy_code",
+            "values": ["01", "20", "21", "31"],
+        },
+    },
 }

@@ -9,25 +9,9 @@
 """
 
 from __future__ import annotations
-
 import pandas as pd
-
-from modules.blueprint.indicators.cancer_indicator import (
-    COLON_RECTUM_CANCER_RULES,
-    ESOPHAGEAL_CANCER_RULES,
-    GASTRIC_CANCER_RULES,
-    LIVER_CANCER_RULES,
-    ORAL_CANCER_RULES,
-    OWNED_CANCER_RULES as OWNED_CANCER_RULE_DECLARATIONS,
-)
-from modules.blueprint.indicators.dashboard_v1_rules import (
-    BREAST_CANCER_RULES,
-    CERVICAL_CANCER_RULES,
-    LUNG_CANCER_RULES,
-    PANCREATIC_CANCER_RULES,
-)
-from modules.blueprint.indicators.exclusion_rules import _find_column
-from modules.blueprint.indicators.record_mapping import _is_nsclc
+from modules.blueprint.indicators.catalog import get_indicator_rules
+from modules.blueprint.indicators.exclusion_rules import _clean_code, _find_column
 from modules.blueprint.indicators.rule import evaluate_rule
 
 # ---------------------------------------------------------------------------
@@ -116,6 +100,14 @@ FIELD_SPECS.update({
 })
 
 
+def _is_nsclc(value) -> bool:
+    try:
+        code = int(float(_clean_code(value)))
+    except (TypeError, ValueError):
+        return False
+    return code != 8002 and not 8041 <= code <= 8045
+
+
 def _column_map(frame):
     return {
         field: _find_column(frame.columns, code, aliases)
@@ -145,9 +137,7 @@ def _calculator_for(rule):
 # ---------------------------------------------------------------------------
 # 資料庫詮釋資料查詢 (Metadata)
 # ---------------------------------------------------------------------------
-DB_CANCER_KEY_ALIASES = {
-    "Cervix_Uteri": ("Cervix_Uteri", "Cervix Uteri"),
-}
+DB_CANCER_KEY_ALIASES = {"Cervix_Uteri": ("Cervix_Uteri", "Cervix Uteri"),}
 
 
 def _metadata_by_indicator(cancer_key):
@@ -186,34 +176,10 @@ def get_indicator_metadata(cancer_key):
 
 
 # ---------------------------------------------------------------------------
-# 各癌別規則與計算器整合
-# ---------------------------------------------------------------------------
-OWNED_CANCER_RULES = {
-    cancer_key: {
-        number: {**definition, "calculator": _calculator_for(definition)}
-        for number, definition in declarations.items()
-    }
-    for cancer_key, declarations in OWNED_CANCER_RULE_DECLARATIONS.items()
-}
-RULES_BY_CANCER = {
-    "Oral_Cavity": ORAL_CANCER_RULES,
-    "Esophagus": ESOPHAGEAL_CANCER_RULES,
-    "Stomach": GASTRIC_CANCER_RULES,
-    "Colon_Rectum": COLON_RECTUM_CANCER_RULES,
-    "Liver": LIVER_CANCER_RULES,
-    "Pancreas": PANCREATIC_CANCER_RULES,
-    "Cervix_Uteri": CERVICAL_CANCER_RULES,
-    "Lung": LUNG_CANCER_RULES,
-    "Breast": BREAST_CANCER_RULES,
-    **OWNED_CANCER_RULES,
-}
-
-
-# ---------------------------------------------------------------------------
 # 完整指標定義取得入口
 # ---------------------------------------------------------------------------
 def get_indicator_definitions(cancer_key, metadata=None):
-    rules = RULES_BY_CANCER.get(str(cancer_key or ""), {})
+    rules = get_indicator_rules(cancer_key)
     if metadata is None:
         metadata = _metadata_by_indicator(cancer_key)
     elif isinstance(metadata, list):

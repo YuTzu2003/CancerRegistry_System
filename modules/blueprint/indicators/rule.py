@@ -8,19 +8,13 @@
 """
 
 from __future__ import annotations
-
 from datetime import date, datetime
 from typing import Any
 
 Record = dict[str, Any]
 RuleConfig = dict[str, Any]
-
 INVALID_DATE_VALUES = {"", "00000000", "88888888", None}
 
-
-# ---------------------------------------------------------------------------
-# 共用轉換工具
-# ---------------------------------------------------------------------------
 def to_int(value: Any) -> int | None:
     """安全轉換整數，例如 '040' 或 Excel 的 40.0 都轉成 40。"""
     if value is None:
