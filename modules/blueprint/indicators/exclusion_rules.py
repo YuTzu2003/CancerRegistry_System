@@ -300,15 +300,21 @@ def apply_global_indicators_exclusions(
 
     included = audit.loc[audit["指標模組納入統計"]].copy()
     reason_counts = Counter()
+    primary_reason_counts = Counter()
     for value in audit.loc[~audit["指標模組納入統計"], "指標模組排除原因"]:
-        for reason in str(value).split("；"):
+        reasons = [reason for reason in str(value).split("；") if reason]
+        for reason in reasons:
             if reason:
                 reason_counts[reason] += 1
+        if reasons:
+            primary_reason_counts[reasons[0]] += 1
     summary = {
         "input_count": int(len(audit)),
         "included_count": int(len(included)),
         "excluded_count": int(len(audit) - len(included)),
-        "excluded_by_reason": dict(reason_counts),
+        "excluded_by_reason": dict(primary_reason_counts),
+        "exclusion_marks_by_reason": dict(reason_counts),
+        "duplicate_exclusion_count": int(reason_counts["院內重複個案排除"]),
         "warnings": warnings,
     }
     return included, audit, summary

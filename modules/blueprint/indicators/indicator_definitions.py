@@ -20,7 +20,14 @@ from modules.blueprint.indicators.cancer_indicator import (
     ORAL_CANCER_RULES,
     OWNED_CANCER_RULES as OWNED_CANCER_RULE_DECLARATIONS,
 )
+from modules.blueprint.indicators.dashboard_v1_rules import (
+    BREAST_CANCER_RULES,
+    CERVICAL_CANCER_RULES,
+    LUNG_CANCER_RULES,
+    PANCREATIC_CANCER_RULES,
+)
 from modules.blueprint.indicators.exclusion_rules import _find_column
+from modules.blueprint.indicators.record_mapping import _is_nsclc
 from modules.blueprint.indicators.rule import evaluate_rule
 
 # ---------------------------------------------------------------------------
@@ -93,6 +100,19 @@ FIELD_SPECS.update({
     "first_treatment_date": ("4.1", ("首次療程開始日期", "dtrt_1st")),
     "first_surgery_date": ("4.1.1", ("首次手術日期",)),
     "case_classification": ("2.3", ("個案分類", "class")),
+    "behavior": ("2.9", ("性態碼", "behavior")),
+    "figo_stage": ("3.19", ("其他分期系統期別(臨床分期)", "figo_stage")),
+    "radiation_end_date": (None, ("放射治療結束日期", "radiation_end_date")),
+    "radiation_machine": ("4.2.1.2", ("放射治療儀器", "radiation_machine")),
+    "regional_systemic_sequence": (None, ("區域治療與全身性治療順序", "regional_systemic_sequence")),
+    "mediastinal_nodes_sampled": (None, ("癌症部位特定因子 5", "mediastinal_nodes_sampled")),
+    "pathological_n": ("3.11", ("病理N", "pathological_n")),
+    "regional_lymph_node_surgery_scope": ("4.1.7", ("申報醫院區域淋巴結手術範圍", "regional_lymph_node_surgery_scope")),
+    "merged_stage": (None, ("SUMMARY_STAGE", "merged_stage")),
+    "radiation_status": (None, ("放射治療執行狀態", "radiation_status")),
+    "her2": (None, ("癌症部位特定因子 7", "her2")),
+    "targeted_therapy_code": (None, ("申報醫院標靶治療", "targeted_therapy_code")),
+    "positive_lymph_nodes": (None, ("區域淋巴結侵犯數目", "positive_lymph_nodes")),
 })
 
 
@@ -110,6 +130,7 @@ def _calculator_for(rule):
         numerator_values = []
         for _, row in frame.iterrows():
             record = {field: row[column] if column else None for field, column in columns.items()}
+            record["is_nsclc"] = "TRUE" if _is_nsclc(record["histology"]) else "FALSE"
             denominator = bool(evaluate_rule(record, rule["denominator"]))
             numerator = denominator and bool(evaluate_rule(record, rule["numerator"]))
             denominator_values.append(denominator)
@@ -124,17 +145,25 @@ def _calculator_for(rule):
 # ---------------------------------------------------------------------------
 # 資料庫詮釋資料查詢 (Metadata)
 # ---------------------------------------------------------------------------
+DB_CANCER_KEY_ALIASES = {
+    "Cervix_Uteri": ("Cervix_Uteri", "Cervix Uteri"),
+}
+
+
 def _metadata_by_indicator(cancer_key):
     from modules.services.db import get_conn
 
+    database_keys = DB_CANCER_KEY_ALIASES.get(str(cancer_key or ""), (str(cancer_key or ""),))
+    placeholders = ", ".join("?" for _ in database_keys)
     conn = get_conn()
     try:
         cursor = conn.cursor()
         cursor.execute(
-            """SELECT indicator_no, selection_reason, numerator_definition,
-                      denominator_definition, notes
-               FROM dbo.indicator_definition_metadata WHERE cancer_group_key = ?""",
-            (str(cancer_key or ""),),
+            f"""SELECT indicator_no, selection_reason, numerator_definition,
+                       denominator_definition, notes
+                FROM dbo.indicator_definition_metadata
+                WHERE cancer_group_key IN ({placeholders})""",
+            database_keys,
         )
         return {
             int(row[0]): {
@@ -172,6 +201,10 @@ RULES_BY_CANCER = {
     "Stomach": GASTRIC_CANCER_RULES,
     "Colon_Rectum": COLON_RECTUM_CANCER_RULES,
     "Liver": LIVER_CANCER_RULES,
+    "Pancreas": PANCREATIC_CANCER_RULES,
+    "Cervix_Uteri": CERVICAL_CANCER_RULES,
+    "Lung": LUNG_CANCER_RULES,
+    "Breast": BREAST_CANCER_RULES,
     **OWNED_CANCER_RULES,
 }
 

@@ -23,6 +23,26 @@ logger = logging.getLogger(__name__)
 # 特定癌別收案準則（原發部位與組織型態條件）
 # ---------------------------------------------------------------------------
 INDICATOR_CANCER_CRITERIA = {
+    "Pancreas": {
+        "sites": {"C250", "C251", "C252", "C253", "C254", "C257", "C258", "C259"},
+        "histology_exclude": {"9140"},
+        "histology_exclude_ranges": ((9590, 9993),),
+    },
+    "Cervix_Uteri": {
+        "site_prefixes": ("C53",),
+        "histology_exclude": {"9140"},
+        "histology_exclude_ranges": ((9590, 9993),),
+    },
+    "Lung": {
+        "site_prefixes": ("C34",),
+        "histology_exclude": {"9140"},
+        "histology_exclude_ranges": ((9590, 9993),),
+    },
+    "Breast": {
+        "site_prefixes": ("C50",),
+        "histology_exclude": {"9140"},
+        "histology_exclude_ranges": ((9590, 9993),),
+    },
     "Ovary": {
         "sites": {"C569"},
         "histology_exclude": {"9140"},
@@ -78,7 +98,11 @@ def _indicator_cancer_mask(frame, cancer_key):
         return pd.Series(False, index=frame.index)
 
     histology = frame[hist_col].map(_normalize_histology)
-    mask = frame[site_col].map(_normalize_site).isin(criteria["sites"])
+    sites = frame[site_col].map(_normalize_site)
+    mask = sites.isin(criteria.get("sites", set()))
+    site_prefixes = criteria.get("site_prefixes", ())
+    if site_prefixes:
+        mask |= sites.str.startswith(site_prefixes)
     if cancer_key != "Prostate":
         mask &= frame[case_class_col].map(_clean_code).isin({"1", "2"})
     if "histology_include" in criteria:
@@ -179,20 +203,35 @@ def run_indicators_analysis(frame, cancers, year_start, year_end):
         metadata = get_indicator_metadata(cancer_key)
         definitions = get_indicator_definitions(cancer_key, metadata)
         cancer_cases = frame.loc[year_mask & _cancer_mask(frame, cancer_key)].copy()
-        if not definitions:
-            reports.append({
-                "cancer_key": cancer_key,
-                "input_count": int(len(cancer_cases)),
-                "indicator_definition_metadata": metadata,
-                "indicators": [],
-                "message": "此癌別尚未設定監測指標定義。",
-            })
-            continue
-
         included_cases, audit_cases, global_summary = apply_global_indicators_exclusions(
             cancer_cases,
             is_hospital_self_reported=True,
         )
+        if not definitions:
+            reports.append({
+                "cancer_key": cancer_key,
+                "input_count": int(len(cancer_cases)),
+                "included_count": int(len(included_cases)),
+                "global_exclusions": global_summary,
+                "indicator_definition_metadata": metadata,
+                "indicators": [
+                    {
+                        "id": definition["id"],
+                        "direction": "unknown",
+                        "name": f"指標 {definition['id']}",
+                        "numerator_definition": definition["numerator_definition"],
+                        "denominator_definition": definition["denominator_definition"],
+                        "numerator": None,
+                        "denominator": None,
+                        "percentage": None,
+                        "calculation_available": False,
+                    }
+                    for definition in metadata
+                ],
+                "message": "此癌別尚未建立可執行的指標計算規則。",
+            })
+            continue
+
         prostate_indicator_1_2_cases = included_cases
         if cancer_key == "Prostate":
             # Only prostate indicators 1 and 2 ignore the case-class exclusion.

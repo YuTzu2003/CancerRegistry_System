@@ -78,6 +78,14 @@ def normalize_stage(value: Any) -> str | None:
     return text
 
 
+def normalize_code(value: Any) -> str | None:
+    text = normalize_text(value)
+    if text is None:
+        return None
+    normalized = "".join(character for character in text if character.isalnum())
+    return normalized or None
+
+
 # ---------------------------------------------------------------------------
 # 通用規則運算子解讀引擎
 # ---------------------------------------------------------------------------
@@ -111,6 +119,16 @@ def evaluate_rule(record: Record, rule: RuleConfig) -> bool:
         value = normalize_text(record.get(rule["field"]))
         excluded = {normalize_text(item) for item in rule["values"]}
         return value is not None and value not in excluded
+
+    if operation == "code_in":
+        value = normalize_code(record.get(rule["field"]))
+        allowed = {normalize_code(item) for item in rule["values"]}
+        return value is not None and value in allowed
+
+    if operation == "code_prefix_in":
+        value = normalize_code(record.get(rule["field"]))
+        prefixes = [normalize_code(item) for item in rule["values"]]
+        return value is not None and any(prefix is not None and value.startswith(prefix) for prefix in prefixes)
 
     if operation == "text_starts_with":
         value = normalize_text(record.get(rule["field"]))
@@ -182,6 +200,10 @@ def evaluate_rule(record: Record, rule: RuleConfig) -> bool:
         value = to_int(record.get(rule["field"]))
         return value is not None and value > rule["value"]
 
+    if operation == "greater_than_or_equal":
+        value = to_int(record.get(rule["field"]))
+        return value is not None and value >= rule["value"]
+
     if operation == "not_in":
         value = to_int(record.get(rule["field"]))
         excluded = {to_int(item) for item in rule["values"]}
@@ -208,6 +230,11 @@ def evaluate_rule(record: Record, rule: RuleConfig) -> bool:
         start_date = parse_date(record.get(rule["start_field"]))
         end_date = parse_date(record.get(rule["end_field"]))
         return start_date is not None and end_date is not None and end_date >= start_date
+
+    if operation == "dates_equal":
+        left = parse_date(record.get(rule["left_field"]))
+        right = parse_date(record.get(rule["right_field"]))
+        return left is not None and right is not None and left == right
 
     if operation == "date_interval":
         start_date = parse_date(record.get(rule["start_field"]))
