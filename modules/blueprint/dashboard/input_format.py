@@ -31,14 +31,16 @@ def _normalize_sequence(value):
 
 
 def _read_headers(file_path, extension):
+    extension = str(extension or "").lower().lstrip(".")
     if extension == "xlsx":
         workbook = load_workbook(file_path, read_only=True, data_only=True)
         try:
-            return [_text(cell.value) for cell in workbook.active[1]]
+            return [_text(cell.value) for cell in workbook.worksheets[0][1]]
         finally:
             workbook.close()
     try:
-        return [_text(value) for value in pd.read_excel(file_path, nrows=0).columns]
+        reader = pd.read_csv if extension == "csv" else pd.read_excel
+        return [_text(value) for value in reader(file_path, nrows=0).columns]
     except ImportError as error:
         raise ValueError("舊式 .xls 檔案需要額外讀取元件，請先另存為 .xlsx 後再上傳。") from error
 
@@ -121,10 +123,11 @@ def _normalize_headers(headers, input_scheme, rows):
 
 
 def _write_headers(file_path, extension, headers, keep_indexes=None):
+    extension = str(extension or "").lower().lstrip(".")
     if extension == "xlsx":
         workbook = load_workbook(file_path)
         try:
-            worksheet = workbook.active
+            worksheet = workbook.worksheets[0]
             if keep_indexes is not None:
                 keep_set = set(keep_indexes)
                 for column_index in range(worksheet.max_column, 0, -1):
@@ -137,7 +140,8 @@ def _write_headers(file_path, extension, headers, keep_indexes=None):
             workbook.close()
         return file_path
 
-    dataframe = pd.read_excel(file_path)
+    reader = pd.read_csv if extension == "csv" else pd.read_excel
+    dataframe = reader(file_path)
     if keep_indexes is not None:
         dataframe = dataframe.iloc[:, keep_indexes]
     dataframe.columns = headers

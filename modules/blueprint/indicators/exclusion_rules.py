@@ -1,26 +1,30 @@
-"""Shared case-exclusion rules for the cancer-indicator module.
+"""
+指標模組全域共用排除規則 (Indicators Global Exclusion Rules)
 
-The rules are applied only to indicators whose data source is hospital
-self-reporting.  They use the same cancer classification and AJCC selection
-order as the annual-report module.
+適用於醫院自行申報資料來源之監測指標，包含：
+1. 個案分類非 class 1、2 排除。
+2. 跨院治療個案排除 (class=2, diagnosis=2, treatment=3)。
+3. 年報 AJCC 期別不明／不適用排除。
+4. 院內重複個案排除（依診斷日期最早、期別嚴重度最高、癌症發生順序號碼最低比序擇一保留）。
 """
 from __future__ import annotations
-
 import re
 from collections import Counter
-
 import pandas as pd
-
 from modules.blueprint.dashboard.definition.cancer_grouping import classify_cancer_group
 from modules.blueprint.dashboard.definition.cancer_group_rules import CANCER_GROUP_RULES
 
-
+# ---------------------------------------------------------------------------
+# 全域排除常數定義 (115 年版定義標準)
+# ---------------------------------------------------------------------------
 ELIGIBLE_CASE_CLASSES = {"1", "2"}
 CROSS_HOSPITAL_VALUES = {"class": "2", "diagnosis": "2", "treatment": "3"}
 INVALID_IDENTITY_VALUES = {"", "9999999999"}
 INDICATOR_DEFINITION_VERSION = "115"
 
-
+# ---------------------------------------------------------------------------
+# 代碼清洗與欄位查找工具
+# ---------------------------------------------------------------------------
 def _clean_code(value) -> str:
     if value is None or pd.isna(value):
         return ""
@@ -45,19 +49,24 @@ def _find_column(columns, code=None, aliases=()):
                 return original
     return None
 
-
+# ---------------------------------------------------------------------------
+# 日期排序與期別嚴重度比序輔助函式
+# ---------------------------------------------------------------------------
 def _date_key(value):
     """Return a sortable diagnosis date; invalid values sort after valid ones."""
     text = _clean_code(value)
-    if text in {"", "00000000", "88888888", "99999999"}:
+    if text in {"", "00000000", "88888888"}:
         return pd.Timestamp.max
     digits = re.sub(r"\D", "", text)
     if len(digits) >= 8:
+        if digits[4:6] == "99":
+            digits = f"{digits[:4]}01{digits[6:]}"
+        if digits[6:8] == "99":
+            digits = f"{digits[:6]}01{digits[8:]}"
         parsed = pd.to_datetime(digits[:8], format="%Y%m%d", errors="coerce")
     else:
         parsed = pd.to_datetime(text, errors="coerce")
     return parsed if not pd.isna(parsed) else pd.Timestamp.max
-
 
 def _stage_severity(value) -> int:
     """Map the annual-report AJCC stage value to an order from 0 through IV."""
@@ -76,7 +85,6 @@ def _stage_severity(value) -> int:
         return 0
     return -1
 
-
 def _append_reason(audit, mask, reason):
     """Mark rows excluded while retaining every applicable exclusion reason."""
     mask = pd.Series(mask, index=audit.index).fillna(False).astype(bool)
@@ -88,7 +96,9 @@ def _append_reason(audit, mask, reason):
     )
     audit.loc[mask, "指標模組納入統計"] = False
 
-
+# ---------------------------------------------------------------------------
+# 年報 AJCC 期別選取與排除判定
+# ---------------------------------------------------------------------------
 def _annual_ajcc_stage(row, columns):
     """Apply annual-report AJCC rules 1–3 and return the selected raw stage."""
     pathology_prefix = _clean_code(row.get(columns["path_prefix"], "") if columns["path_prefix"] else "")
@@ -101,7 +111,6 @@ def _annual_ajcc_stage(row, columns):
         return clinical_stage
     return pathology_stage
 
-
 def _annual_ajcc_exclusion_reason(selected_stage):
     """Annual-report AJCC rules 4–5: unknown or not-applicable stages."""
     stage = _clean_code(selected_stage).replace(",", "")
@@ -111,7 +120,9 @@ def _annual_ajcc_exclusion_reason(selected_stage):
         return "AJCC期別不明"
     return ""
 
-
+# ---------------------------------------------------------------------------
+# 癌症分類與欄位對照映射
+# ---------------------------------------------------------------------------
 def _cancer_key(row, site_col, hist_col, behavior_col, diagnosis_col, ajcc_ed_col):
     """Return the most specific annual-report cancer key for duplicate grouping."""
     cancer = classify_cancer_group(
@@ -125,7 +136,6 @@ def _cancer_key(row, site_col, hist_col, behavior_col, diagnosis_col, ajcc_ed_co
     if not cancer:
         return ""
     return cancer.get("subgroup_key") or cancer.get("group_key") or ""
-
 
 def _column_map(frame):
     return {
@@ -146,7 +156,9 @@ def _column_map(frame):
         "surgery_date": _find_column(frame.columns, "4.1.2", ("最確切的手術切除日期",)),
     }
 
-
+# ---------------------------------------------------------------------------
+# 院內重複個案排除邏輯
+# ---------------------------------------------------------------------------
 def _apply_duplicate_exclusion(audit, columns, warnings):
     """Keep one eligible case for each hospital + cancer + identity group.
 
@@ -210,13 +222,14 @@ def _apply_duplicate_exclusion(audit, columns, warnings):
         else:
             warnings.append("發現癌症發生順序號碼相同的院內重複個案，已暫時全部保留。")
 
-
-def apply_global_indicators_exclusions(dataframe: pd.DataFrame, *, is_hospital_self_reported: bool = True):
+# ---------------------------------------------------------------------------
+# 全域指標共用排除規則主流程
+# ---------------------------------------------------------------------------
+def apply_global_indicators_exclusions(dataframe: pd.DataFrame,*,is_hospital_self_reported: bool = True,exclude_case_class: bool = True,):
     """Apply the version-115 shared exclusions and return an auditable result.
-
-    Hard exclusions are applied first: class not 1/2, cross-hospital treatment,
-    and annual-report AJCC stage unknown/not-applicable.  Duplicate selection
-    runs only across the remaining eligible rows.
+    Hard exclusions are applied first: optionally class not 1/2, cross-hospital
+    treatment, and annual-report AJCC stage unknown/not-applicable. Duplicate
+    selection runs only across the remaining eligible rows.
     """
     audit = dataframe.copy()
     audit["指標模組納入統計"] = True
@@ -235,10 +248,10 @@ def apply_global_indicators_exclusions(dataframe: pd.DataFrame, *, is_hospital_s
     warnings = []
 
     class_col = columns["case_class"]
-    if class_col:
+    if class_col and exclude_case_class:
         eligible_class = audit[class_col].map(_clean_code).isin(ELIGIBLE_CASE_CLASSES)
         _append_reason(audit, ~eligible_class, "個案分類非 class 1、2")
-    else:
+    elif not class_col:
         warnings.append("找不到個案分類(2.3)欄位，未套用 class=1、2 排除規則。")
 
     diagnosis_col = columns["diagnosis_status"]
@@ -267,15 +280,21 @@ def apply_global_indicators_exclusions(dataframe: pd.DataFrame, *, is_hospital_s
 
     included = audit.loc[audit["指標模組納入統計"]].copy()
     reason_counts = Counter()
+    primary_reason_counts = Counter()
     for value in audit.loc[~audit["指標模組納入統計"], "指標模組排除原因"]:
-        for reason in str(value).split("；"):
+        reasons = [reason for reason in str(value).split("；") if reason]
+        for reason in reasons:
             if reason:
                 reason_counts[reason] += 1
+        if reasons:
+            primary_reason_counts[reasons[0]] += 1
     summary = {
         "input_count": int(len(audit)),
         "included_count": int(len(included)),
         "excluded_count": int(len(audit) - len(included)),
-        "excluded_by_reason": dict(reason_counts),
+        "excluded_by_reason": dict(primary_reason_counts),
+        "exclusion_marks_by_reason": dict(reason_counts),
+        "duplicate_exclusion_count": int(reason_counts["院內重複個案排除"]),
         "warnings": warnings,
     }
     return included, audit, summary
