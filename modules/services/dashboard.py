@@ -1,4 +1,4 @@
-from flask import Blueprint, request, session, jsonify
+from flask import Blueprint, request, session, jsonify, current_app, url_for
 from modules.services.auth import login_required, admin_required
 from modules.services.db import get_conn
 from modules.blueprint.dashboard import load_user_favorites, save_user_favorites
@@ -13,6 +13,10 @@ import re
 import json
 import logging
 import uuid
+import threading
+import shutil
+from pathlib import Path
+from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 import pandas as pd
 from flask import render_template
 
@@ -21,6 +25,8 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 DASHBOARD_DATA = os.path.join(BASE_DIR, 'tasks', 'dashboard')
 LEGACY_DASHBOARD_DATA = os.path.join(BASE_DIR, 'tasks', 'data', 'dashboard')
 os.makedirs(DASHBOARD_DATA, exist_ok=True)
+PBIP_EXPORT_ROOT = Path(DASHBOARD_DATA) / 'pbip_exports'
+PBIP_EXPORT_LOCK = threading.Lock()
 
 def _dashboard_storage_path(file_id, stored_name):
     return os.path.join('file', str(stored_name))
@@ -449,6 +455,94 @@ def publish_dashboard_selection_to_pbi():
     except Exception as exc:
         logging.exception("Failed to publish dashboard selection to PBI")
         return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@dashboard_bp.route('/api/dashboard/export_pbip', methods=['POST'])
+@login_required
+def export_dashboard_pbip():
+    from modules.blueprint.dashboard.pbip_export import (
+        TOPIC_PAGES, PbipExportError, create_filtered_pbip,
+    )
+
+    data = request.get_json(silent=True) or {}
+    file_id = str(data.get('file_id') or '')
+    cancers = data.get('cancers')
+    topics = data.get('analysis_items')
+    year_start = str(data.get('year_start') or '').strip()
+    year_end = str(data.get('year_end') or '').strip()
+    behavior = str(data.get('behavior') or '').strip()
+    if not isinstance(cancers, list) or not cancers or not all(isinstance(x, str) for x in cancers):
+        return jsonify({'ok': False, 'error': '請先選擇癌別。'}), 400
+    if not isinstance(topics, list) or not topics or not all(isinstance(x, str) for x in topics):
+        return jsonify({'ok': False, 'error': '請先選擇分析主題。'}), 400
+    if set(topics).difference(TOPIC_PAGES):
+        return jsonify({'ok': False, 'error': '目前 PBIP 公版只支援：' + '、'.join(TOPIC_PAGES)}), 400
+    if (len(year_start) != 4 or not year_start.isdigit() or len(year_end) != 4
+            or not year_end.isdigit() or int(year_start) > int(year_end)):
+        return jsonify({'ok': False, 'error': '請選擇有效的起始與結束年度。'}), 400
+    if not behavior:
+        return jsonify({'ok': False, 'error': '請先選擇性態碼。'}), 400
+    owned_file = _get_owned_dashboard_file(file_id, session.get('id'))
+    if not owned_file:
+        return jsonify({'ok': False, 'error': '找不到您選擇的年報檔案。'}), 404
+    if not PBIP_EXPORT_LOCK.acquire(blocking=False):
+        return jsonify({'ok': False, 'error': '另一份 Power BI 專案正在產生，請稍後再試。'}), 409
+
+    output_dir = None
+
+    def discard_failed_output():
+        if (output_dir is not None and output_dir.is_dir()
+                and output_dir.parent.resolve() == PBIP_EXPORT_ROOT.resolve()
+                and re.fullmatch(r'[0-9a-f]{32}', output_dir.name)):
+            try:
+                shutil.rmtree(output_dir)
+            except OSError:
+                logging.warning('Could not remove failed PBIP temporary output: %s', output_dir)
+
+    try:
+        job_id = uuid.uuid4().hex
+        output_dir = PBIP_EXPORT_ROOT / job_id
+        result = create_filtered_pbip(
+            _absolute_dashboard_path(owned_file['storage_path']), output_dir,
+            cancers=cancers, year_start=year_start, year_end=year_end,
+            behavior=behavior, topics=topics,
+        )
+        signer = URLSafeTimedSerializer(current_app.secret_key, salt='dashboard-pbip-download')
+        token = signer.dumps({'job': job_id, 'user': str(session.get('id'))})
+        logging.info('PBIP generated for user %s: %s rows', session.get('id'), result['rows'])
+        return jsonify({
+            'ok': True, 'rows': result['rows'], 'pages': result['pages'],
+            'download_url': url_for('dashboard.download_dashboard_pbip', token=token),
+        })
+    except (ValueError, FileNotFoundError, PbipExportError) as exc:
+        discard_failed_output()
+        return jsonify({'ok': False, 'error': str(exc)}), 400
+    except Exception as exc:
+        logging.exception('Failed to create dashboard PBIP')
+        discard_failed_output()
+        return jsonify({
+            'ok': False,
+            'error': f'PBIP 產生失敗：{exc}',
+        }), 500
+    finally:
+        PBIP_EXPORT_LOCK.release()
+
+
+@dashboard_bp.route('/api/dashboard/pbip_download/<token>')
+@login_required
+def download_dashboard_pbip(token):
+    signer = URLSafeTimedSerializer(current_app.secret_key, salt='dashboard-pbip-download')
+    try:
+        payload = signer.loads(token, max_age=3600)
+    except (BadSignature, SignatureExpired):
+        return jsonify({'ok': False, 'error': '下載連結已失效，請重新產生 Power BI 專案。'}), 403
+    job_id = payload.get('job')
+    if payload.get('user') != str(session.get('id')) or not isinstance(job_id, str) or not re.fullmatch(r'[0-9a-f]{32}', job_id):
+        return jsonify({'ok': False, 'error': '無權下載此 Power BI 專案。'}), 403
+    file_path = PBIP_EXPORT_ROOT / job_id / 'cancer_annual_report_pbip.zip'
+    if not file_path.is_file():
+        return jsonify({'ok': False, 'error': '找不到已產生的 Power BI 專案。'}), 404
+    return send_file(file_path, as_attachment=True, download_name='cancer_annual_report_pbip.zip', mimetype='application/zip')
 
 
 @dashboard_bp.route('/api/dashboard/pbi_settings', methods=['GET'])

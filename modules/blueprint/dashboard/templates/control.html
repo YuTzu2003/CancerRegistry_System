@@ -365,6 +365,9 @@
           <button id="btnPublishPbi" class="btn btn-outline-primary d-flex justify-content-center align-items-center gap-2" type="button" style="padding: 7px 16px; font-size: 14px; height: 38px; border-radius: var(--radius-sm);">
             <i class="bi bi-cloud-arrow-up"></i> 發布至 Power BI
           </button>
+          <button id="btnExportPbip" class="btn btn-outline-primary d-flex justify-content-center align-items-center gap-2" type="button" style="padding: 7px 16px; font-size: 14px; height: 38px; border-radius: var(--radius-sm);" title="下載已依年度、癌別與分析主題篩選的 Power BI 專案；開啟後可另存為 PBIX">
+            <i class="bi bi-file-earmark-arrow-down"></i> 下載 Power BI 專案
+          </button>
           <button id="btnResetFilters" class="btn-black-outline d-flex justify-content-center align-items-center gap-2" type="button" style="padding: 7px 16px; font-size: 14px; height: 38px; border-radius: var(--radius-sm);">
             <i class="bi bi-arrow-counterclockwise"></i> 重置
           </button>
@@ -788,4 +791,4 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/control.css') }}">
 
 <script src="{{ url_for('static', filename='js/dashboard/annual_report_renderer.js') }}"></script>
-<script src="{{ url_for('static', filename='js/dashboard/dashboard_control.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard/dashboard_control.js', v='20260919-pbip') }}"></script>

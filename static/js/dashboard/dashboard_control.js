@@ -1215,6 +1215,46 @@ function initDashboardControl() {
       });
   }
 
+  const btnExportPbip = document.getElementById('btnExportPbip');
+  if (btnExportPbip) {
+      btnExportPbip.addEventListener('click', async function() {
+          const fileId = document.querySelector('#dashFileListBody tr.table-active')?.dataset.fileId || '';
+          const yearStart = document.getElementById('filterYearStart')?.value.trim() || '';
+          const yearEnd = document.getElementById('filterYearEnd')?.value.trim() || '';
+          const behavior = document.getElementById('filterBehavior')?.value || '';
+          const cancers = Array.from(window.selectedCancers || []);
+          const analysisItems = Array.from(document.querySelectorAll('.item-checkbox:checked')).map(item => item.value);
+          const supported = new Set(['性別年齡分佈', '年齡中位數', '可分析個案與確診個案']);
+          if (!fileId || !yearStart || !yearEnd || !behavior || cancers.length === 0 || analysisItems.length === 0) {
+              utils.alert('請先完成檔案、年度、性態碼、癌別及分析主題選擇。', 'warning');
+              return;
+          }
+          if (analysisItems.some(item => !supported.has(item))) {
+              utils.alert('目前 Power BI 公版只支援：性別年齡分佈、年齡中位數、可分析個案與確診個案。', 'warning');
+              return;
+          }
+          btnExportPbip.disabled = true;
+          window.utils?.showLoading?.('正在篩選資料並產生 Power BI 專案，請稍候…');
+          try {
+              const response = await fetch('/api/dashboard/export_pbip', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({file_id: fileId, cancers, year_start: yearStart, year_end: yearEnd,
+                                        behavior, analysis_items: analysisItems})
+              });
+              const result = await response.json();
+              if (!response.ok || !result.ok) throw new Error(result.error || 'Power BI 專案產生失敗');
+              window.location.assign(result.download_url);
+              utils.alert(`已產生 ${result.pages} 頁圖表、${result.rows} 筆資料的 Power BI 專案。解壓後開啟 PBIP，重新整理並另存為 PBIX。`, 'success');
+          } catch (error) {
+              utils.alert(`無法產生 Power BI 專案：${error.message}`, 'error');
+          } finally {
+              window.utils?.hideLoading?.();
+              btnExportPbip.disabled = false;
+          }
+      });
+  }
+
   const btnRunQuery = document.getElementById('btnRunQuery');
   if (btnRunQuery) {
       btnRunQuery.addEventListener('click', async function() {

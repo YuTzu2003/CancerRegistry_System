@@ -3,11 +3,50 @@
 import os
 import re
 import uuid
+
 from pathlib import Path
 
 import pandas as pd
 
 from .definition.cancer_grouping import classify_cancer_group
+
+
+# The existing PBIX query expects registry names without numeric IDs.
+_PBIX_HEADER_ALIASES = {
+    "臨床 T": "臨床T",
+    "臨床 N": "臨床N",
+    "臨床 M": "臨床M",
+    "病理 T": "病理T",
+    "病理 N": "病理N",
+    "病理 M": "病理M",
+    "其他分期系統期別(臨床分期)": "其他分期系統期別(臨床分期)\n",
+    "未放射治療原因/放射治療執行狀態": "放射治療執行狀態",
+}
+
+# The current PBIX template imports these registry codes as whole numbers,
+# although the registry permits text codes (for example, surgical margin "D"
+# and smoking status "99,99,99"). Keep the source workbook intact and make
+# only the generated Power BI dataset compatible with that fixed template.
+_PBIX_INTEGER_FIELDS = {
+    "申報醫院原發部位手術方式",
+    "原發部位手術邊緣",
+    "吸菸行為",
+    "嚼檳榔行為",
+}
+
+
+def _pbix_column_name(column):
+    name = re.sub(r"^\d+(?:\.\d+)*\.?\s*", "", str(column))
+    return _PBIX_HEADER_ALIASES.get(name, name)
+
+
+def _coerce_template_integer_fields(frame):
+    """Blank non-numeric values only in fields the existing PBIX types as Int64."""
+    for column in _PBIX_INTEGER_FIELDS.intersection(frame.columns):
+        numeric = pd.to_numeric(frame[column], errors="coerce")
+        has_value = frame[column].notna() & frame[column].astype(str).str.strip().ne("")
+        frame.loc[has_value & numeric.isna(), column] = None
+    return frame
 
 
 def _text(value):
@@ -181,6 +220,11 @@ def export_pbi_dataset(source_path, output_path, cancers=None, year_start="", ye
         [df.reset_index(drop=True), pd.DataFrame(derived_rows, columns=derived_columns)],
         axis=1,
     )
+    translated = [_pbix_column_name(column) for column in result.columns]
+    if len(translated) != len(set(translated)):
+        raise ValueError("年報欄位轉換後出現重複名稱，無法提供給 Power BI 公版。")
+    result.columns = translated
+    result = _coerce_template_integer_fields(result)
     output.parent.mkdir(parents=True, exist_ok=True)
     temporary = output.with_name(f".{output.stem}.{uuid.uuid4().hex}.tmp.xlsx")
     try:
