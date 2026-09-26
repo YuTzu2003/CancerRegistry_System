@@ -2,5 +2,26 @@
 {% block title %}帳號 Email 設定｜癌症資料登記{% endblock %}
 {% block page_title %}帳號 Email 設定{% endblock %}
 {% block content %}
-<div class="card-flat" style="max-width:760px; margin:0 auto;"><div class="section-head"><h2><span class="dot" style="background:#2563eb;"></span>帳號安全設定</h2></div><div style="padding:28px;"><p class="text-secondary">綁定 Email 後，才可使用驗證碼重設密碼。系統不會顯示或保存寄出的驗證碼原碼。</p>{% if user.Email and user.EmailVerifiedAt %}<div class="alert alert-success"><i class="bi bi-envelope-check me-2"></i>已綁定：<strong>{{ user.Email }}</strong></div><h5 class="mt-4">變更 Email</h5><form method="post" class="row g-2 align-items-end"><input type="hidden" name="action" value="send_bind"><div class="col-md"><label class="form-label">新的 Email</label><input class="form-control" type="email" name="email" required></div><div class="col-md-auto"><button class="btn btn-primary" {% if not email_enabled %}disabled{% endif %}>寄送驗證碼</button></div></form><form method="post" class="mt-4" onsubmit="return confirm('確定要取消 Email 綁定嗎？取消後將無法透過 Email 重設密碼。');"><input type="hidden" name="action" value="cancel_bind"><button class="btn btn-outline-danger">取消綁定</button></form>{% else %}<div class="alert alert-warning alert-persistent"><i class="bi bi-envelope-exclamation me-2"></i>尚未綁定 Email；忘記密碼時需聯絡資訊室協助。</div><form method="post" class="row g-2 align-items-end"><input type="hidden" name="action" value="send_bind"><div class="col-md"><label class="form-label">Email</label><input class="form-control" type="email" name="email" value="{{ pending_email }}" required></div><div class="col-md-auto"><button class="btn btn-primary" {% if not email_enabled %}disabled{% endif %}>寄送驗證碼</button></div></form>{% endif %}{% if pending_email %}<hr class="my-4"><h5>確認驗證碼</h5><p class="text-secondary small">驗證碼已寄往 {{ pending_email }}。</p><form method="post" class="row g-2 align-items-end"><input type="hidden" name="action" value="verify_bind"><div class="col-md"><label class="form-label">六位數驗證碼</label><input class="form-control" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" name="code" required></div><div class="col-md-auto"><button class="btn btn-success">完成綁定</button></div></form>{% endif %}{% if not email_enabled %}<p class="text-danger small mt-3 mb-0">Email 驗證服務目前未啟用，請聯絡資訊室。</p>{% endif %}</div></div>
+<div class="card-flat" style="max-width:760px; margin:0 auto;"><div class="section-head"><h2><span class="dot" style="background:#2563eb;"></span>帳號安全設定</h2></div><div style="padding:28px;"><p class="text-secondary">綁定 Email 後，才可使用驗證碼重設密碼。系統不會顯示或保存寄出的驗證碼原碼。</p>{% if user.Email and user.EmailVerifiedAt %}<div class="alert alert-success"><i class="bi bi-envelope-check me-2"></i>已綁定：<strong>{{ user.Email }}</strong></div><h5 class="mt-4">變更 Email</h5><form method="post" class="row g-2 align-items-end"><input type="hidden" name="action" value="send_bind"><div class="col-md"><label class="form-label">新的 Email</label><input class="form-control" type="email" name="email" required></div><div class="col-md-auto"><button class="btn btn-primary" {% if not email_enabled %}disabled{% endif %}>寄送驗證碼</button></div></form><form method="post" class="mt-4 email-unbind-form"><input type="hidden" name="action" value="cancel_bind"><button class="btn btn-outline-danger">取消綁定</button></form>{% else %}<div class="alert alert-warning alert-persistent"><i class="bi bi-envelope-exclamation me-2"></i>尚未綁定 Email；忘記密碼時需聯絡資訊室協助。</div><form method="post" class="row g-2 align-items-end"><input type="hidden" name="action" value="send_bind"><div class="col-md"><label class="form-label">Email</label><input class="form-control" type="email" name="email" value="{{ pending_email }}" required></div><div class="col-md-auto"><button class="btn btn-primary" {% if not email_enabled %}disabled{% endif %}>寄送驗證碼</button></div></form>{% endif %}{% if pending_email %}<hr class="my-4"><h5>確認驗證碼</h5><p class="text-secondary small">驗證碼已寄往 {{ pending_email }}。</p><form method="post" class="row g-2 align-items-end"><input type="hidden" name="action" value="verify_bind"><div class="col-md"><label class="form-label">六位數驗證碼</label><input class="form-control" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" name="code" required></div><div class="col-md-auto"><button class="btn btn-success">完成綁定</button></div></form>{% endif %}{% if not email_enabled %}<p class="text-danger small mt-3 mb-0">Email 驗證服務目前未啟用，請聯絡資訊室。</p>{% endif %}</div></div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+  document.querySelectorAll('.email-unbind-form').forEach((form) => {
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      Swal.fire({
+        title: '確定要取消 Email 綁定嗎？',
+        text: '取消後將無法透過 Email 重設密碼。',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc3545',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: '確定取消綁定',
+        cancelButtonText: '取消'
+      }).then((result) => {
+        if (result.isConfirmed) form.submit();
+      });
+    });
+  });
+</script>
 {% endblock %}
