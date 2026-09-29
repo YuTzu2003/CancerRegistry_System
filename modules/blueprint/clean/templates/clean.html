@@ -3,6 +3,38 @@
 {% block page_title %}資料清洗{% endblock %}
 
 {% block content %}
+<style>
+  .review-dedup-control { margin-top: 14px; }
+  .review-dedup-toggle { display: flex !important; flex-direction: row !important; align-items: center !important; gap: 11px; width: 100%; margin: 0; padding: 4px 0; border: 0; background: transparent; color: var(--gray-900); cursor: pointer; }
+  .review-dedup-toggle:hover { color: #111; }
+  .review-dedup-toggle:has(input:checked) { color: #111; }
+  .review-dedup-toggle .form-check-input { flex: 0 0 auto; width: 17px; height: 17px; margin: 0; border-color: #777; box-shadow: none; }
+  .review-dedup-toggle .form-check-input:checked { background-color: #333; border-color: #333; }
+  .review-dedup-toggle .form-check-input:focus { border-color: #333; box-shadow: 0 0 0 .2rem rgba(51, 51, 51, .14); }
+  .review-dedup-copy { display: block !important; flex: 1 1 auto; min-width: 0; }
+  .review-dedup-copy strong { display: block; font-size: 14px; line-height: 1.3; }
+  .review-dedup-copy span { display: block; margin-top: 2px; color: var(--gray-600); font-size: 12px; }
+  .review-dedup-state { display: block !important; flex: 0 0 auto; margin-left: auto; color: var(--gray-600); font-size: 12px; white-space: nowrap; }
+  .review-dedup-toggle:has(input:checked) .review-dedup-state { color: #333; font-weight: 600; }
+  .review-record-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .review-record-item { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; grid-template-areas: "check file time" "check meta time"; column-gap: 10px; row-gap: 3px; align-items: center; min-width: 0; margin: 0; padding: 10px 11px; border: 1px solid #dedede; border-radius: 7px; background: #fff; color: var(--gray-800); cursor: pointer; transition: border-color .15s ease, background .15s ease; }
+  .review-record-item:hover { border-color: #999; }
+  .review-record-item:has(input:checked) { border-color: #333; background: #f1f1f1; }
+  .review-record-item:not(:has(input)) { grid-template-columns: minmax(0, 1fr); grid-template-areas: "file" "meta"; cursor: default; }
+  .review-record-item .form-check-input { grid-area: check; width: 16px; height: 16px; margin: 0; border-color: #777; box-shadow: none; }
+  .review-record-item .form-check-input:checked { background-color: #333; border-color: #333; }
+  .review-record-item .form-check-input:focus { border-color: #333; box-shadow: 0 0 0 .2rem rgba(51, 51, 51, .14); }
+  .review-record-file { grid-area: file; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; }
+  .review-record-meta { display: flex; grid-area: meta; gap: 5px; min-width: 0; overflow: hidden; }
+  .review-record-tag { padding: 2px 6px; border: 1px solid #dedede; border-radius: 4px; background: #f7f7f7; color: var(--gray-600); font-size: 11px; line-height: 1.25; white-space: nowrap; }
+  .review-record-time { grid-area: time; color: var(--gray-600); font-size: 12px; text-align: right; white-space: nowrap; }
+  .review-record-modal .modal-box { max-width: 660px; }
+  .review-record-modal .body { max-height: 52vh; overflow-y: auto; }
+  .review-record-modal .review-record-list { grid-template-columns: minmax(0, 1fr); }
+  .review-record-modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+  @media (max-width: 720px) { .review-record-list { grid-template-columns: minmax(0, 1fr); } }
+  @media (max-width: 576px) { .review-dedup-toggle { align-items: flex-start; } .review-dedup-state { margin-left: 0; } .review-record-item { grid-template-columns: 16px minmax(0, 1fr); grid-template-areas: "check file" "check meta" "check time"; } .review-record-time { text-align: left; } }
+</style>
 <div class="page-head">
   <div>
     <div class="d-flex align-items-center gap-3">
@@ -123,6 +155,15 @@
             {% endfor %}
           </select>
           <div id="cleaningAlertContainer" class="mt-2"></div>
+          <div class="review-dedup-control">
+            <label class="review-dedup-toggle" for="checkReviewedData">
+              <input class="form-check-input" type="checkbox" id="checkReviewedData">
+              <span class="review-dedup-copy">
+                <div>排除已清洗過資料</div>
+              </span>
+              <span class="review-dedup-state" id="reviewDedupState">未選取</span>
+            </label>
+          </div>
         </div>
         <div class="form-field">
           <label>上傳檔案</label>
@@ -420,6 +461,23 @@
     <footer>
       <button class="btn" type="button" data-close>取消</button>
       <button class="btn btn-primary" type="button" id="btnSaveFormat">儲存</button>
+    </footer>
+  </div>
+</div>
+
+<div class="modal-backdrop-custom review-record-modal" id="reviewRecordModal" hidden>
+  <div class="modal-box">
+    <header>
+      <h3>選取排除依據</h3>
+      <button class="close-btn" type="button" id="btnCancelReviewRecords" aria-label="關閉"><i class="bi bi-x-lg"></i></button>
+    </header>
+    <div class="body">
+      <p class="text-muted small mb-3">選取已清洗的資料審核紀錄，系統會用它們排除重複資料。</p>
+      <div id="reviewRecordList" class="review-record-list"></div>
+    </div>
+    <footer class="review-record-modal-actions">
+      <button class="btn" type="button" id="btnCancelReviewRecordsFooter">取消</button>
+      <button class="btn btn-dark" type="button" id="btnConfirmReviewRecords">確認選擇</button>
     </footer>
   </div>
 </div>

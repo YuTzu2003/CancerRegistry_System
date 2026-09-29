@@ -4,6 +4,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from modules.config import BaseConfig
 from modules.services.database_backup import run_database_backup
 from modules.services.home import refresh_twcr_updates
+from modules.blueprint.clean import cleanup_expired_review_records
 
 def is_scheduler_leader(app_debug):
     if app_debug:
@@ -15,6 +16,7 @@ def start_system_scheduler():
     scheduler.add_job(refresh_twcr_updates, "cron", hour=3, minute=0, id="home_updates", replace_existing=True)
     scheduler.add_job(refresh_twcr_updates, "date", run_date=datetime.now(), id="home_updates_startup", replace_existing=True)
     scheduler.add_job(run_database_backup, "cron", hour=2, minute=0, id="database_backup", replace_existing=True)
+    scheduler.add_job(cleanup_expired_review_records, "cron", hour=0, minute=0, id="review_record_cleanup", replace_existing=True)
     scheduler.start()
     atexit.register(lambda: scheduler.shutdown(wait=False))
     return scheduler

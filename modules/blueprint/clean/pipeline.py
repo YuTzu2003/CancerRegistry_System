@@ -15,6 +15,7 @@ from modules.blueprint.clean.cleaner import cleanValidate
 from openpyxl import load_workbook, Workbook
 from openpyxl.utils import get_column_letter
 from modules.blueprint.clean.field_mapping import detect_system, get_field_map, validate_and_rename_headers, validate_and_unify_headers_in_file
+from modules.blueprint.clean.dedup_records import create_empty_cleaning_result, exclude_reviewed_rows, get_duplicate_comparison_columns, get_selected_review_duplicate_keys
 from modules.blueprint.clean.text_converter import convert_txt_to_excel
 from modules.blueprint.clean.rules.validate import validate_date_rules
 
@@ -854,7 +855,7 @@ def manage_format_logic(method, fmt_id, name, version, updated):
     conn.close()
     return {"ok": True}, 200
 
-def clean_job_logic(user_id, format_id, convert_txt_flag, uploaded_file):
+def clean_job_logic(user_id, format_id, convert_txt_flag, uploaded_file, review_job_ids=None):
     if not format_id or not uploaded_file or uploaded_file.filename == '': 
         return {"ok": False, "error": "未選擇檔案"}, 400
     
@@ -872,6 +873,8 @@ def clean_job_logic(user_id, format_id, convert_txt_flag, uploaded_file):
     file_ext = os.path.splitext(filename)[1].lower()
     base_name = os.path.splitext(filename)[0]
     has_no_headers = (file_ext == '.txt' and not convert_txt_flag)
+    review_job_ids = review_job_ids or []
+    excluded_duplicate_count = 0
 
     if file_ext == '.txt':
         uploaded_file.seek(0)
@@ -1032,9 +1035,21 @@ def clean_job_logic(user_id, format_id, convert_txt_flag, uploaded_file):
             json.dump(orig_headers, f_orig, ensure_ascii=False)
 
         validate_and_unify_headers_in_file(process_path, fmt_name)
+
+        if review_job_ids:
+            input_df = pd.read_excel(process_path, dtype=str)
+            input_columns = get_duplicate_comparison_columns(fmt_name, input_df.columns)
+            reference_keys = get_selected_review_duplicate_keys(user_id, review_job_ids)
+            input_df, excluded_duplicate_count = exclude_reviewed_rows(input_df, reference_keys, input_columns)
+            input_df.to_excel(process_path, index=False)
         
         _create_working_file(process_path, working_file)
-        stats, alias_mapping, sorted_df, sorted_mask = cleanValidate(process_path, out_path, rep_path, f"fmt_{fmt_name}", version, rev_date)
+        if review_job_ids and excluded_duplicate_count and pd.read_excel(process_path, dtype=str).empty:
+            stats, alias_mapping, sorted_df, sorted_mask = create_empty_cleaning_result(
+                pd.read_excel(process_path, dtype=str), out_path, rep_path
+            )
+        else:
+            stats, alias_mapping, sorted_df, sorted_mask = cleanValidate(process_path, out_path, rep_path, f"fmt_{fmt_name}", version, rev_date)
         date_errors = _build_date_errors(sorted_df, sorted_mask, alias_mapping, date_error_file)
         cursor.execute("INSERT INTO Job ([JobID],[UserID],[FmtID],[FileName],[TotalCount],[CompletenessScore],[CorrectScore],[ConsistencyScore],[DQI],[Path]) VALUES (?,?,?,?,?,?,?,?,?,?)",
                         (JobID, user_id, format_id, filename, int(stats['total']), float(stats['completeness']), float(stats['correctness']), float(stats['consistency']), float(stats['quality_score']), project_folder))
@@ -1100,7 +1115,9 @@ def clean_job_logic(user_id, format_id, convert_txt_flag, uploaded_file):
         "output_fields": output_fields,
         "date_error_limit": DATE_ERROR_LIMIT,
         "date_error_count": date_error_count,
-        "date_errors": date_errors
+        "date_errors": date_errors,
+        "excluded_duplicate_count": excluded_duplicate_count,
+        "skipped_cleaning_count": excluded_duplicate_count,
     }, 200
 
 
@@ -1261,4 +1278,3 @@ def download_file_logic(file_type, job_id, user_id):
         return {"send_file": True, "path": os.path.abspath(file_path), "download_name": display_name if display_name else target_filename}, 200
     except Exception as e:
         return {"ok": False, "error": str(e)}, 500
-

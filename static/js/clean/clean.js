@@ -91,6 +91,91 @@
   const fileChosen = $('#fileChosen');
   const fileName = $('#fileName');
   const dropZone = $('#dropZone');
+  const reviewedDataCheck = $('#checkReviewedData');
+  const reviewRecordList = $('#reviewRecordList');
+  const reviewDedupState = $('#reviewDedupState');
+  const reviewRecordModal = $('#reviewRecordModal');
+  let reviewRecordData = [];
+
+  async function loadReviewRecords() {
+    if (!reviewRecordList || reviewRecordList.dataset.loaded === 'true') return;
+    const response = await fetch('/api/review-records');
+    const result = await response.json();
+    if (!response.ok || !result.ok) throw new Error(result.error || '無法取得資料審核紀錄');
+
+    reviewRecordData = result.records;
+    reviewRecordList.replaceChildren();
+    if (!result.records.length) reviewRecordList.textContent = '目前沒有可供比對的資料審核紀錄。';
+    result.records.forEach((record) => {
+      const label = document.createElement('label');
+      label.className = 'review-record-item';
+      const input = document.createElement('input');
+      input.className = 'form-check-input review-record-check';
+      input.type = 'checkbox';
+      input.value = record.job_id;
+      const fileName = document.createElement('span');
+      fileName.className = 'review-record-file';
+      fileName.textContent = record.file_name;
+      const metadata = document.createElement('span');
+      metadata.className = 'review-record-meta';
+      [`格式 ${record.format}`, `版本 ${record.version}`, `${record.total_count} 筆`].forEach((value) => {
+        const tag = document.createElement('span');
+        tag.className = 'review-record-tag';
+        tag.textContent = value;
+        metadata.append(tag);
+      });
+      const time = document.createElement('span');
+      time.className = 'review-record-time';
+      time.textContent = record.created_at;
+      label.append(input, fileName, metadata, time);
+      reviewRecordList.append(label);
+    });
+    reviewRecordList.dataset.loaded = 'true';
+  }
+
+  function selectedReviewRecordIds() {
+    return $$('.review-record-check:checked').map((input) => input.value);
+  }
+
+  function renderSelectedReviewRecords() {
+    const selectedIds = new Set(selectedReviewRecordIds());
+    const selectedRecords = reviewRecordData.filter((record) => selectedIds.has(record.job_id));
+    const selectedText = `${selectedRecords.length} 筆紀錄已選取`;
+    if (reviewDedupState) reviewDedupState.textContent = selectedText;
+  }
+
+  function cancelReviewRecordSelection() {
+    $$('.review-record-check').forEach((input) => { input.checked = false; });
+    if (reviewedDataCheck) reviewedDataCheck.checked = false;
+    if (reviewDedupState) reviewDedupState.textContent = '未選取';
+    if (reviewRecordModal) reviewRecordModal.hidden = true;
+  }
+
+  reviewedDataCheck?.addEventListener('change', async () => {
+    if (!reviewedDataCheck.checked) {
+      cancelReviewRecordSelection();
+      return;
+    }
+    if (reviewedDataCheck.checked) {
+      try {
+        await loadReviewRecords();
+        reviewRecordModal.hidden = false;
+      } catch (error) {
+        cancelReviewRecordSelection();
+        utils.alert(error.message, 'error');
+      }
+    }
+  });
+
+  $('#btnCancelReviewRecords')?.addEventListener('click', cancelReviewRecordSelection);
+  $('#btnCancelReviewRecordsFooter')?.addEventListener('click', cancelReviewRecordSelection);
+  $('#btnConfirmReviewRecords')?.addEventListener('click', () => {
+    if (selectedReviewRecordIds().length === 0) {
+      return utils.alert('請至少選取一筆資料審核紀錄。', 'warning');
+    }
+    renderSelectedReviewRecords();
+    reviewRecordModal.hidden = true;
+  });
 
   function updateFilePreview() {
     const f = fileInput.files?.[0];
@@ -126,6 +211,14 @@
     if ($('#analysisEmpty')) $('#analysisEmpty').hidden = false;
     if ($('#cleaningAlertContainer')) $('#cleaningAlertContainer').innerHTML = '';
     if ($('#dateErrorEditor')) $('#dateErrorEditor').innerHTML = '';
+    if (reviewedDataCheck) reviewedDataCheck.checked = false;
+    if (reviewRecordModal) reviewRecordModal.hidden = true;
+    if (reviewRecordList) {
+      reviewRecordList.replaceChildren();
+      delete reviewRecordList.dataset.loaded;
+    }
+    if (reviewDedupState) reviewDedupState.textContent = '未選取';
+    reviewRecordData = [];
 
     const list = $('#outputFieldList');
     if (list) {
@@ -163,10 +256,14 @@
     const file = fileInput.files?.[0];
 
     const errors = [];
+    const selectedReviewRecords = $$('.review-record-check:checked').map((input) => input.value);
     if (!formatId) errors.push('請選擇參考資料格式');
     if (!file) errors.push('請上傳檔案');
+    if (reviewedDataCheck?.checked && selectedReviewRecords.length === 0) {
+      errors.push('請至少選取一筆資料審核紀錄。');
+    }
 
-    if (errors.length === 2) {
+    if (errors.length > 1) {
       return utils.alert('請選擇參考資料格式及上傳檔案', 'warning');
     } else if (errors.length === 1) {
       return utils.alert(errors[0], 'warning');
@@ -187,6 +284,7 @@
     
     const convertTxt = $('#checkConvertTxt')?.checked;
     formData.append('convert_txt', convertTxt ? 'true' : 'false');
+    selectedReviewRecords.forEach((jobId) => formData.append('review_job_ids', jobId));
 
     try {
       const response = await fetch('/api/cleanJob', { method: 'POST', body: formData });
@@ -349,10 +447,14 @@
             </button>
           </div>
         `;
+        if (data.excluded_duplicate_count) {
+          alertContainer.insertAdjacentHTML('beforeend', `<div class="alert alert-light border shadow-sm mt-2">已排除重複資料 ${data.excluded_duplicate_count} 筆，略過清洗 ${data.skipped_cleaning_count || data.excluded_duplicate_count} 筆。</div>`);
+        }
       } else {
+        const excludedDuplicateCount = data.excluded_duplicate_count || 0;
         alertContainer.innerHTML = `
           <div class="alert alert-light border shadow-sm mt-3" role="alert">
-            <i class="bi bi-check-circle-fill text-success me-2"></i>資料清洗並存檔完成！
+            <i class="bi bi-check-circle-fill text-success me-2"></i>資料清洗並存檔完成！${excludedDuplicateCount ? `<br><span class="ms-4">已排除重複資料 ${excludedDuplicateCount} 筆，略過清洗 ${data.skipped_cleaning_count || excludedDuplicateCount} 筆。</span>` : ''}
           </div>`;
         if (window.autoHideAlerts) window.autoHideAlerts();
       }
