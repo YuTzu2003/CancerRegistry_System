@@ -3,7 +3,8 @@ import os
 import re
 import shutil
 import pandas as pd
-from openpyxl import Workbook
+from openpyxl import load_workbook
+from openpyxl.styles import PatternFill
 from modules.blueprint.clean.field_mapping import get_field_map
 from modules.services.db import get_conn
 from modules.blueprint.clean.cleaner import FORMAT_RULES_MAP
@@ -48,43 +49,40 @@ def get_duplicate_keys(dataframe, columns):
             keys.add(key)
     return keys
 
-def exclude_reviewed_rows(dataframe, reference_keys, columns):
-    duplicate_rows = dataframe.apply(
-        lambda row: all(normalize_duplicate_value(row[columns[field_name]]) for field_name in DUPLICATE_COMPARISON_FIELDS)
-        and tuple(normalize_duplicate_value(row[columns[field_name]]) for field_name in DUPLICATE_COMPARISON_FIELDS) in reference_keys,
-        axis=1,)
-    return dataframe.loc[~duplicate_rows].copy(), int(duplicate_rows.sum())
+def append_reviewed_rows_to_cleaning_result(output_file, reviewed_rows):
+    if reviewed_rows.empty:
+        return
 
-def create_empty_cleaning_result(dataframe, output_file, report_file):
-    error_mask = pd.DataFrame("", index=dataframe.index, columns=dataframe.columns)
-    result_df = dataframe.copy()
-    result_df["錯誤類型(A:遺漏值 B:格式不符 C:日期格式錯誤 D:邏輯錯誤)"] = ""
-    result_df.to_excel(output_file, index=False, engine="openpyxl")
+    reviewed_record_marker = "E:資料已清洗過"
+    reviewed_record_fill = PatternFill("solid", fgColor="E2F0D9")
+    workbook = load_workbook(output_file)
+    worksheet = workbook.active
+    headers = [cell.value for cell in worksheet[1]]
+    marker_column = next((index for index, header in enumerate(headers, start=1) if str(header).startswith("錯誤註記說明")),None,)
+    if marker_column is None:
+        marker_column = len(headers) + 1
+        worksheet.cell(row=1, column=marker_column, value="錯誤註記說明")
+        headers.append("錯誤註記說明")
 
-    report = Workbook()
-    report.active.title = "資料清洗報告"
-    report.active.append(["資料總件數", 0])
-    report.save(report_file)
-    report.close()
-    return {
-        "total": 0,
-        "error_rows": 0,
-        "completeness": 0,
-        "correctness": 0,
-        "consistency": 0,
-        "quality_score": 0,
-        "missing_cells": 0,
-        "format_cells": 0,
-        "logic_cells": 0,
-    }, {}, result_df, error_mask
-
+    source_columns = {str(header): index for index, header in enumerate(headers, start=1) if index != marker_column}
+    for _, row in reviewed_rows.iterrows():
+        excel_row = worksheet.max_row + 1
+        for header, column_index in source_columns.items():
+            value = row.get(header, "")
+            worksheet.cell(row=excel_row, column=column_index, value="" if pd.isna(value) else value)
+        worksheet.cell(row=excel_row, column=marker_column, value=reviewed_record_marker)
+        for column_index in range(1, len(headers) + 1):
+            cell = worksheet.cell(row=excel_row, column=column_index)
+            cell.number_format = "@"
+            cell.fill = reviewed_record_fill
+    workbook.save(output_file)
+    workbook.close()
 
 def get_review_records_logic(user_id):
     conn = get_conn()
     cursor = conn.cursor()
     cursor.execute("""SELECT Job.JobID, Job.FileName, Job.TotalCount, Job.CreatedAt, DataFormat.FmtName, DataFormat.Version
-                    FROM Job JOIN DataFormat ON Job.FmtID = DataFormat.FmtID
-                    WHERE Job.UserID = ? AND Job.CreatedAt >= DATEADD(month, -3, GETDATE())
+                    FROM Job JOIN DataFormat ON Job.FmtID = DataFormat.FmtID WHERE Job.UserID = ? AND Job.CreatedAt >= DATEADD(month, -3, GETDATE())
                     ORDER BY Job.CreatedAt DESC""",(user_id,),)
     records = [
         {
@@ -95,8 +93,7 @@ def get_review_records_logic(user_id):
             "format": str(row.FmtName),
             "version": row.Version,
         }
-        for row in cursor.fetchall()
-    ]
+        for row in cursor.fetchall()]
     conn.close()
     return {"ok": True, "records": records}, 200
 
@@ -114,7 +111,6 @@ def cleanup_expired_review_records():
     cursor.execute(f"DELETE FROM Job WHERE JobID IN ({placeholders})", job_ids)
     conn.commit()
     conn.close()
-
     jobs_root = os.path.abspath(os.path.join("tasks", "Jobs"))
     for job_id, project_path in expired_records:
         path = os.path.abspath(str(project_path or ""))
@@ -126,7 +122,6 @@ def cleanup_expired_review_records():
     logging.info("Deleted %s expired review records", len(expired_records))
     return len(expired_records)
 
-
 def get_selected_review_duplicate_keys(user_id, review_job_ids):
     unique_job_ids = list(dict.fromkeys(job_id for job_id in review_job_ids if job_id))
     if not unique_job_ids:
@@ -135,8 +130,7 @@ def get_selected_review_duplicate_keys(user_id, review_job_ids):
     conn = get_conn()
     cursor = conn.cursor()
     placeholders = ", ".join("?" for job_id in unique_job_ids)
-    cursor.execute(f"""SELECT Job.JobID, Job.Path, Job.FileName, DataFormat.FmtName
-                    FROM Job JOIN DataFormat ON Job.FmtID = DataFormat.FmtID
+    cursor.execute(f"""SELECT Job.JobID, Job.Path, Job.FileName, DataFormat.FmtName FROM Job JOIN DataFormat ON Job.FmtID = DataFormat.FmtID
                     WHERE Job.UserID = ? AND Job.CreatedAt >= DATEADD(month, -3, GETDATE())
                     AND Job.JobID IN ({placeholders})""",[user_id, *unique_job_ids],)
     review_records = cursor.fetchall()
