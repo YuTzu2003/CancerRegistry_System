@@ -2,6 +2,7 @@ import logging
 import os
 import re
 import shutil
+from copy import copy
 import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
@@ -49,34 +50,43 @@ def get_duplicate_keys(dataframe, columns):
             keys.add(key)
     return keys
 
-def append_reviewed_rows_to_cleaning_result(output_file, reviewed_rows):
-    if reviewed_rows.empty:
+def append_reviewed_rows_to_cleaning_result(output_file, reviewed_output_file):
+    if not reviewed_output_file or not os.path.exists(reviewed_output_file):
         return
 
     reviewed_record_marker = "E:資料已清洗過"
     reviewed_record_fill = PatternFill("solid", fgColor="E2F0D9")
     workbook = load_workbook(output_file)
+    reviewed_workbook = load_workbook(reviewed_output_file)
     worksheet = workbook.active
+    reviewed_worksheet = reviewed_workbook.active
     headers = [cell.value for cell in worksheet[1]]
+    reviewed_columns = {str(cell.value): index for index, cell in enumerate(reviewed_worksheet[1], start=1)}
     marker_column = next((index for index, header in enumerate(headers, start=1) if str(header).startswith("錯誤註記說明")),None,)
     if marker_column is None:
         marker_column = len(headers) + 1
         worksheet.cell(row=1, column=marker_column, value="錯誤註記說明")
         headers.append("錯誤註記說明")
 
-    source_columns = {str(header): index for index, header in enumerate(headers, start=1) if index != marker_column}
-    for _, row in reviewed_rows.iterrows():
+    for reviewed_row in reviewed_worksheet.iter_rows(min_row=2):
         excel_row = worksheet.max_row + 1
-        for header, column_index in source_columns.items():
-            value = row.get(header, "")
-            worksheet.cell(row=excel_row, column=column_index, value="" if pd.isna(value) else value)
-        worksheet.cell(row=excel_row, column=marker_column, value=reviewed_record_marker)
         for column_index in range(1, len(headers) + 1):
             cell = worksheet.cell(row=excel_row, column=column_index)
-            cell.number_format = "@"
-            cell.fill = reviewed_record_fill
+            source_column = reviewed_columns.get(str(headers[column_index - 1]))
+            if source_column:
+                source_cell = reviewed_row[source_column - 1]
+                cell.value = source_cell.value
+                cell.number_format = source_cell.number_format
+                cell.fill = copy(source_cell.fill) if source_cell.fill.fill_type == "solid" else reviewed_record_fill
+            else:
+                cell.fill = reviewed_record_fill
+
+        marker_cell = worksheet.cell(row=excel_row, column=marker_column)
+        marker_text = str(marker_cell.value or "").strip()
+        marker_cell.value = f"{marker_text} {reviewed_record_marker}".strip()
     workbook.save(output_file)
     workbook.close()
+    reviewed_workbook.close()
 
 def get_review_records_logic(user_id):
     conn = get_conn()

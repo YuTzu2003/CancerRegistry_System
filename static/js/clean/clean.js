@@ -449,13 +449,13 @@
         `;
         if (data.reviewed_duplicate_count || data.excluded_duplicate_count) {
           const reviewedDuplicateCount = data.reviewed_duplicate_count || data.excluded_duplicate_count;
-          alertContainer.insertAdjacentHTML('beforeend', `<div class="alert alert-light border shadow-sm mt-2">\u5075\u6e2c\u5230\u5df2\u6e05\u6d17\u904e\u8cc7\u6599 ${reviewedDuplicateCount} \u7b46\uff0c\u5df2\u7565\u904e\u6e05\u6d17\u8207\u7d71\u8a08\uff0c\u4e26\u4fdd\u7559\u65bc\u6e05\u6d17\u7d50\u679c\u6700\u5f8c\u65b9\uff08E:\u8cc7\u6599\u5df2\u6e05\u6d17\u904e\uff09\u3002</div>`);
+          alertContainer.insertAdjacentHTML('beforeend', `<div class="alert alert-light border shadow-sm mt-2">已重新檢查已清洗過資料 ${reviewedDuplicateCount} 筆，這些資料不納入本次統計，並保留於清洗結果最後方（E:資料已清洗過）。</div>`);
         }
       } else {
         const reviewedDuplicateCount = data.reviewed_duplicate_count || data.excluded_duplicate_count || 0;
         alertContainer.innerHTML = `
           <div class="alert alert-light border shadow-sm mt-3" role="alert">
-            <i class="bi bi-check-circle-fill text-success me-2"></i>資料清洗並存檔完成！${reviewedDuplicateCount ? `<br><span class="ms-4">\u5075\u6e2c\u5230\u5df2\u6e05\u6d17\u904e\u8cc7\u6599 ${reviewedDuplicateCount} \u7b46\uff0c\u5df2\u7565\u904e\u6e05\u6d17\u8207\u7d71\u8a08\uff0c\u4e26\u4fdd\u7559\u65bc\u6e05\u6d17\u7d50\u679c\u6700\u5f8c\u65b9\uff08E:\u8cc7\u6599\u5df2\u6e05\u6d17\u904e\uff09\u3002</span>` : ''}
+            <i class="bi bi-check-circle-fill text-success me-2"></i>資料清洗並存檔完成！${reviewedDuplicateCount ? `<br><span class="ms-4">已重新檢查已清洗過資料 ${reviewedDuplicateCount} 筆，這些資料不納入本次統計，並保留於清洗結果最後方（E:資料已清洗過）。</span>` : ''}
           </div>`;
         if (window.autoHideAlerts) window.autoHideAlerts();
       }
