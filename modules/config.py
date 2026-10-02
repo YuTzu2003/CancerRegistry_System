@@ -56,11 +56,12 @@ class BaseConfig:
     LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama").strip().lower()
     LLM_BASE_URL = os.getenv("LLM_BASE_URL")
     LLM_API_KEY = os.getenv("LLM_API_KEY")
-    LLM_MODEL = os.getenv("LLM_MODEL", "").strip()
+    MODEL = os.getenv("MODEL", "").strip()
     LLM_TIMEOUT_SECONDS = float(os.getenv("LLM_TIMEOUT_SECONDS", "180"))
     LLM_WORKERS = _optional_int("LLM_WORKERS")
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-    OPENAI_MODEL = os.getenv("OPENAI_MODEL", "").strip()
+    AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY")
+    AZURE_OPENAI_RESPONSES_URL = os.getenv("AZURE_OPENAI_RESPONSES_URL", "").strip()
     WERKZEUG_RUN_MAIN = os.getenv("WERKZEUG_RUN_MAIN") == "true"
     TESTING = False
 
@@ -103,8 +104,6 @@ CONFIG_BY_NAME = {
 def test_settings():
     from modules.services.database_backup import BACKUP_DIRECTORY
     from modules.services.db import get_conn
-    from modules.services.llm_service import get_llm_client
-
     results = {}
     connection = None
     probe_path = None
@@ -120,8 +119,8 @@ def test_settings():
         if connection:
             connection.close()
     try:
-        client, _ = get_llm_client()
-        client.models.list()
+        from modules.services.llm_service import check_llm_readiness
+        check_llm_readiness()
         results["LLM"] = None
     except Exception as error:
         results["LLM"] = str(error)

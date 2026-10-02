@@ -1,6 +1,9 @@
 from __future__ import annotations
 from dataclasses import dataclass
+import json
 from typing import Mapping, Sequence
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from urllib.request import Request, urlopen
 from openai import OpenAI
 from modules.config import BaseConfig
 
@@ -13,20 +16,28 @@ class LLMSettings:
     model: str
     api_key: str | None
     base_url: str | None
+    azure_api_key: str | None
+    azure_responses_url: str | None
     timeout_seconds: float
 
 def get_llm_settings() -> LLMSettings:
     provider = BaseConfig.LLM_PROVIDER
     is_openai = provider == "openai"
-    model = BaseConfig.OPENAI_MODEL if is_openai else BaseConfig.LLM_MODEL
+    model = BaseConfig.MODEL
     api_key = BaseConfig.OPENAI_API_KEY if is_openai else BaseConfig.LLM_API_KEY
     base_url = BaseConfig.LLM_BASE_URL
+    azure_api_key = BaseConfig.AZURE_OPENAI_API_KEY
+    azure_responses_url = BaseConfig.AZURE_OPENAI_RESPONSES_URL or None
     timeout_seconds = BaseConfig.LLM_TIMEOUT_SECONDS
     if not model.strip():
         raise ValueError("LLM model is not configured")
     if timeout_seconds <= 0:
         raise ValueError("LLM_TIMEOUT_SECONDS must be greater than zero")
-    return LLMSettings(provider, model.strip(), api_key, base_url, timeout_seconds)
+    if provider == "azure" and not azure_responses_url:
+        raise ValueError("AZURE_OPENAI_RESPONSES_URL must be configured for Azure LLM provider")
+    if provider == "azure" and not azure_api_key:
+        raise ValueError("AZURE_OPENAI_API_KEY must be configured for Azure LLM provider")
+    return LLMSettings(provider, model.strip(), api_key, base_url, azure_api_key, azure_responses_url, timeout_seconds)
 
 
 def get_llm_client(settings: LLMSettings | None = None):
@@ -44,6 +55,9 @@ def get_llm_client(settings: LLMSettings | None = None):
 
 def check_llm_readiness() -> None:
     settings = get_llm_settings()
+    if settings.provider == "azure":
+        request_llm_chat([{"role": "user", "content": "health check"}], temperature=0)
+        return
     client, model = get_llm_client(settings)
     available_models = {item.id for item in client.models.list().data}
     if model not in available_models:
@@ -62,9 +76,49 @@ def check_llm_readiness() -> None:
 
 def request_llm_chat(messages: Sequence[Mapping[str, str]], *, temperature: float) -> str:
     settings = get_llm_settings()
+    if settings.provider == "azure":
+        return request_azure_responses(settings, messages, temperature=temperature)
     client, model = get_llm_client(settings)
     response = client.chat.completions.create(model=model,messages=list(messages),temperature=temperature,timeout=settings.timeout_seconds,)
     content = response.choices[0].message.content
     if not content:
         raise ValueError("LLM response is empty")
+    return content
+
+
+def request_azure_responses(settings: LLMSettings, messages: Sequence[Mapping[str, str]], *, temperature: float) -> str:
+    payload = {
+        "model": settings.model,
+        "input": [
+            {
+                "role": message["role"],
+                "content": [{"type": "input_text", "text": message["content"]}],
+            }
+            for message in messages
+        ],
+        "temperature": temperature,
+        "stream": False,
+    }
+    url = urlsplit(settings.azure_responses_url)
+    query = dict(parse_qsl(url.query))
+    query["api-version"] = "2025-03-01-preview"
+    request = Request(
+        urlunsplit((url.scheme, url.netloc, url.path, urlencode(query), url.fragment)),
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json", "Accept": "application/json", "api-key": settings.azure_api_key},
+        method="POST",
+    )
+    with urlopen(request, timeout=settings.timeout_seconds) as response:
+        body = json.loads(response.read().decode("utf-8"))
+    content = body.get("output_text")
+    if not content:
+        content = "".join(
+            item.get("text", "")
+            for output in body.get("output", [])
+            if output.get("type") == "message"
+            for item in output.get("content", [])
+            if item.get("type") == "output_text"
+        )
+    if not content:
+        raise ValueError("Azure Responses API response is empty")
     return content
