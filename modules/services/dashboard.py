@@ -97,7 +97,7 @@ def dashboard_preview(task_id):
     from modules.blueprint.dashboard.llm_tasks import get_llm_task_payload
     task = get_llm_task(task_id, session.get("id"))
     payload = get_llm_task_payload(task_id, session.get("id"))
-    if not task or not payload:
+    if not task or not payload or task.get("TaskType") not in {"chart", "annual_report"} or task.get("InsightModule") == "indicators":
         return jsonify({"success": False, "error": "找不到任務"}), 404
     return render_template("dashboard.html", active="dashboard", uploaded_files=[], cancer_name_translations=_get_cancer_name_translations(), pbi_publish_path="", preview_task=task, preview_payload=payload)
 @dashboard_bp.route("/comparison-preview/<task_id>")

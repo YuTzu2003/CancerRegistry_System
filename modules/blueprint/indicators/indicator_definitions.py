@@ -55,13 +55,15 @@ def _metadata_by_indicator(cancer_key):
     conn = get_conn()
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT indicator_no, selection_reason, numerator_definition, denominator_definition, notes FROM dbo.Indicator_definition_metadata WHERE cancer_group_key = ?",(str(cancer_key or ""),),)
+        cursor.execute("SELECT indicator_no, selection_reason, numerator_definition, denominator_definition, notes, target_value, target_operator FROM dbo.Indicator_definition_metadata WHERE cancer_group_key = ?",(str(cancer_key or ""),),)
         return {
             int(row[0]): {
                 "selection_reason": row[1] or "",
                 "numerator_definition": row[2] or "",
                 "denominator_definition": row[3] or "",
                 "notes": row[4] or "",
+                "target_value": float(row[5]) if row[5] is not None else None,
+                "target_operator": row[6] or "",
             }
             for row in cursor.fetchall()
         }
@@ -95,6 +97,8 @@ def get_indicator_definitions(cancer_key, metadata=None):
             "numerator_definition": metadata.get(number, {}).get("numerator_definition", "") or "依已設定的分子規則計算。",
             "denominator_definition": metadata.get(number, {}).get("denominator_definition", "") or "依已設定的分母規則計算。",
             "notes": metadata.get(number, {}).get("notes", ""),
+            "target_value": metadata.get(number, {}).get("target_value"),
+            "target_operator": metadata.get(number, {}).get("target_operator", "") or ("<=" if rule["type"] == "negative" else ">="),
             "calculator": _calculator_for(rule),
         }
         for number, rule in sorted(rules.items())

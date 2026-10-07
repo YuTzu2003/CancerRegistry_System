@@ -57,6 +57,81 @@ def _unique_case_count(frame, mask):
     return int(keys.loc[complete].drop_duplicates().shape[0] + (~complete).sum())
 
 
+def build_indicators_export_frame(frame, cancers, year_start, year_end, cancer_label_getter=None):
+    """Keep source rows intact and append row-level numerator/denominator flags."""
+    source_frame = frame.reset_index(drop=True).copy()
+    export_frame = source_frame.copy()
+    year_mask, error = _year_mask(source_frame, year_start, year_end)
+    if error:
+        raise ValueError(error)
+
+    selected = [str(key) for key in (cancers or []) if str(key).strip()]
+
+    def available_column_name(base_name):
+        if base_name not in export_frame.columns:
+            return base_name
+        candidate = f"{base_name}（監測指標）"
+        suffix = 2
+        while candidate in export_frame.columns:
+            candidate = f"{base_name}（監測指標{suffix}）"
+            suffix += 1
+        return candidate
+
+    for cancer_key in selected:
+        metadata = get_indicator_metadata(cancer_key)
+        definitions = get_indicator_definitions(cancer_key, metadata)
+        definition_by_id = {int(item["id"]): item for item in definitions}
+        indicator_ids = sorted({
+            *definition_by_id.keys(),
+            *(int(item["id"]) for item in metadata),
+        })
+        cancer_label = cancer_label_getter(cancer_key) if cancer_label_getter else cancer_key
+
+        cancer_cases = source_frame.loc[year_mask & cancer_case_mask(source_frame, cancer_key)]
+        included_cases, _, _ = apply_global_indicators_exclusions(
+            cancer_cases,
+            is_hospital_self_reported=True,
+        )
+        prostate_indicator_1_2_cases = included_cases
+        if cancer_key == "Prostate":
+            prostate_indicator_1_2_cases, _, _ = apply_global_indicators_exclusions(
+                cancer_cases,
+                is_hospital_self_reported=True,
+                exclude_case_class=False,
+            )
+
+        for indicator_id in indicator_ids:
+            numerator_column = available_column_name(f"{cancer_label}{indicator_id}-分子")
+            denominator_column = available_column_name(f"{cancer_label}{indicator_id}-分母")
+            export_frame[numerator_column] = ""
+            export_frame[denominator_column] = ""
+
+            definition = definition_by_id.get(indicator_id)
+            if definition is None:
+                continue
+            denominator_cases = (
+                prostate_indicator_1_2_cases
+                if cancer_key == "Prostate" and indicator_id in {1, 2}
+                else included_cases
+            )
+            numerator_masks = definition["calculator"](included_cases)
+            denominator_masks = (
+                numerator_masks
+                if denominator_cases is included_cases
+                else definition["calculator"](denominator_cases)
+            )
+            numerator_mask = pd.Series(
+                numerator_masks["numerator_mask"], index=included_cases.index
+            ).fillna(False).astype(bool)
+            denominator_mask = pd.Series(
+                denominator_masks["denominator_mask"], index=denominator_cases.index
+            ).fillna(False).astype(bool)
+            export_frame.loc[included_cases.index[numerator_mask], numerator_column] = "V"
+            export_frame.loc[denominator_cases.index[denominator_mask], denominator_column] = "V"
+
+    return export_frame
+
+
 # ---------------------------------------------------------------------------
 # 指標分析主流程
 # ---------------------------------------------------------------------------
@@ -87,12 +162,15 @@ def run_indicators_analysis(frame, cancers, year_start, year_end):
                         "id": definition["id"],
                         "direction": "unknown",
                         "name": f"指標 {definition['id']}",
+                        "selection_reason": definition.get("selection_reason", ""),
                         "numerator_definition": definition["numerator_definition"],
                         "denominator_definition": definition["denominator_definition"],
                         "numerator": None,
                         "denominator": None,
                         "percentage": None,
                         "calculation_available": False,
+                        "target_value": definition.get("target_value"),
+                        "target_operator": definition.get("target_operator") or "",
                     }
                     for definition in metadata
                 ],
@@ -137,6 +215,7 @@ def run_indicators_analysis(frame, cancers, year_start, year_end):
                 "id": definition["id"],
                 "direction": definition["direction"],
                 "name": definition["name"],
+                "selection_reason": definition.get("selection_reason", ""),
                 "numerator_definition": definition["numerator_definition"],
                 "denominator_definition": definition["denominator_definition"],
                 "numerator": numerator,
@@ -146,6 +225,8 @@ def run_indicators_analysis(frame, cancers, year_start, year_end):
                     if denominator and not calculation_error
                     else None
                 ),
+                "target_value": definition.get("target_value"),
+                "target_operator": definition.get("target_operator"),
                 "calculation_error": calculation_error,
             })
         reports.append({

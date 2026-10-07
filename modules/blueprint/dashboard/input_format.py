@@ -19,6 +19,7 @@ SCHEME_INDEX = {
 }
 SEQUENCE_PATTERN = re.compile(r"^\d+(?:\.\d+)*$")
 SEQUENCE_NAME_PATTERN = re.compile(r"^(\d+(?:\.\d+)*)\s*(.+)$")
+CSV_ENCODINGS = ("utf-8-sig", "utf-8", "cp950", "big5")
 
 
 def _text(value):
@@ -30,6 +31,32 @@ def _normalize_sequence(value):
     return text[:-2] if text.endswith(".0") else text
 
 
+def read_csv_with_encoding(file_source, **kwargs):
+    """Read a CSV using the encodings commonly produced by cancer registries."""
+    if kwargs.get("encoding"):
+        return pd.read_csv(file_source, **kwargs)
+
+    last_error = None
+    initial_position = None
+    if hasattr(file_source, "tell") and hasattr(file_source, "seek"):
+        try:
+            initial_position = file_source.tell()
+        except (OSError, ValueError):
+            initial_position = None
+
+    for encoding in CSV_ENCODINGS:
+        if initial_position is not None:
+            file_source.seek(initial_position)
+        try:
+            return pd.read_csv(file_source, encoding=encoding, **kwargs)
+        except UnicodeError as error:
+            last_error = error
+
+    if last_error:
+        raise last_error
+    return pd.read_csv(file_source, **kwargs)
+
+
 def _read_headers(file_path, extension):
     extension = str(extension or "").lower().lstrip(".")
     if extension == "xlsx":
@@ -39,7 +66,7 @@ def _read_headers(file_path, extension):
         finally:
             workbook.close()
     try:
-        reader = pd.read_csv if extension == "csv" else pd.read_excel
+        reader = read_csv_with_encoding if extension == "csv" else pd.read_excel
         return [_text(value) for value in reader(file_path, nrows=0).columns]
     except ImportError as error:
         raise ValueError("舊式 .xls 檔案需要額外讀取元件，請先另存為 .xlsx 後再上傳。") from error
@@ -140,7 +167,7 @@ def _write_headers(file_path, extension, headers, keep_indexes=None):
             workbook.close()
         return file_path
 
-    reader = pd.read_csv if extension == "csv" else pd.read_excel
+    reader = read_csv_with_encoding if extension == "csv" else pd.read_excel
     dataframe = reader(file_path)
     if keep_indexes is not None:
         dataframe = dataframe.iloc[:, keep_indexes]
