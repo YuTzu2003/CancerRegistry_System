@@ -8,11 +8,16 @@ from flask import send_file, send_from_directory
 from modules.blueprint.dashboard.export_report import generate_export_files
 from modules.blueprint.dashboard.pbi_settings import (get_pbi_publish_path,get_pbi_publish_settings,save_pbi_publish_path,)
 from modules.blueprint.dashboard.input_format import (preview_dashboard_upload,validate_and_normalize_dashboard_upload,)
+from modules.blueprint.clean.pipeline import get_formats_logic
 import os
 import re
 import json
 import logging
 import uuid
+import threading
+import shutil
+from pathlib import Path
+from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 import pandas as pd
 from flask import render_template
 
@@ -21,6 +26,8 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 DASHBOARD_DATA = os.path.join(BASE_DIR, 'tasks', 'dashboard')
 LEGACY_DASHBOARD_DATA = os.path.join(BASE_DIR, 'tasks', 'data', 'dashboard')
 os.makedirs(DASHBOARD_DATA, exist_ok=True)
+PBIP_EXPORT_ROOT = Path(DASHBOARD_DATA) / 'pbip_exports'
+PBIP_EXPORT_LOCK = threading.Lock()
 
 def _dashboard_storage_path(file_id, stored_name):
     return os.path.join('file', str(stored_name))
@@ -83,13 +90,13 @@ def _get_cancer_name_translations():
 @login_required
 def dashboard():
     uploaded_files = _get_uploaded_dashboard_files(session.get("id"))
-    return render_template("dashboard.html",active="dashboard",uploaded_files=uploaded_files,cancer_name_translations=_get_cancer_name_translations(),pbi_publish_path=get_pbi_publish_path(),)
+    return render_template("dashboard.html",active="dashboard",uploaded_files=uploaded_files,cancer_name_translations=_get_cancer_name_translations(),pbi_publish_path=get_pbi_publish_path(),formats=get_formats_logic(),)
 
 @dashboard_bp.route("/dashboard/compare")
 @login_required
 def compare():
     uploaded_files = _get_uploaded_dashboard_files(session.get("id"))
-    return render_template("compare.html",active="compare",uploaded_files=uploaded_files,cancer_name_translations=_get_cancer_name_translations(),)
+    return render_template("compare.html",active="compare",uploaded_files=uploaded_files,cancer_name_translations=_get_cancer_name_translations(),formats=get_formats_logic(),)
 
 @dashboard_bp.route("/dashboard-preview/<task_id>")
 @login_required
@@ -99,7 +106,7 @@ def dashboard_preview(task_id):
     payload = get_llm_task_payload(task_id, session.get("id"))
     if not task or not payload:
         return jsonify({"success": False, "error": "找不到任務"}), 404
-    return render_template("dashboard.html", active="dashboard", uploaded_files=[], cancer_name_translations=_get_cancer_name_translations(), pbi_publish_path="", preview_task=task, preview_payload=payload)
+    return render_template("dashboard.html", active="dashboard", uploaded_files=[], cancer_name_translations=_get_cancer_name_translations(), pbi_publish_path="", formats=[], preview_task=task, preview_payload=payload)
 @dashboard_bp.route("/comparison-preview/<task_id>")
 @login_required
 def comparison_preview(task_id):
@@ -108,7 +115,7 @@ def comparison_preview(task_id):
     payload = get_llm_task_payload(task_id, session.get("id"))
     if not task or not payload or task.get("TaskType") != "comparison_report":
         return jsonify({"success": False, "error": "找不到年度比較任務"}), 404
-    return render_template("compare.html", active="compare", uploaded_files=[], cancer_name_translations=_get_cancer_name_translations(), preview_task=task, preview_payload=payload)
+    return render_template("compare.html", active="compare", uploaded_files=[], cancer_name_translations=_get_cancer_name_translations(), formats=[], preview_task=task, preview_payload=payload)
 @dashboard_bp.route("/dashboard/upload", methods=["POST"])
 @login_required
 def dashboard_upload():
@@ -116,9 +123,13 @@ def dashboard_upload():
     if not f or not f.filename:
         return jsonify({"ok": False, "error": "未選擇檔案"}), 400
     ext = f.filename.rsplit(".", 1)[-1].lower() if "." in f.filename else ""
-    if ext not in ("xls", "xlsx"):
-        return jsonify({"ok": False, "error": "僅接受 .xls 或 .xlsx 格式"}), 400
+    if ext not in ("txt", "csv", "xls", "xlsx"):
+        return jsonify({"ok": False, "error": "僅接受 .txt、.csv、.xls 或 .xlsx 格式"}), 400
     input_scheme = str(request.form.get("input_scheme", "")).strip()
+    format_id = str(request.form.get("format_id", "")).strip()
+    txt_has_header = str(request.form.get("txt_has_header", "")).strip().lower() == "true"
+    if not format_id:
+        return jsonify({"ok": False, "error": "請先選擇申報欄位格式。"}), 400
     extra_fields_raw = request.form.get("extra_fields")
     extra_fields = None
     if extra_fields_raw is not None:
@@ -141,7 +152,15 @@ def dashboard_upload():
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
     f.save(save_path)
     try:
-        normalized_path = validate_and_normalize_dashboard_upload(save_path,ext,input_scheme,get_conn,extra_fields,)
+        normalized_path = validate_and_normalize_dashboard_upload(
+            save_path,
+            ext,
+            input_scheme,
+            get_conn,
+            extra_fields,
+            format_id=format_id,
+            txt_has_header=txt_has_header,
+        )
         if normalized_path != save_path:
             save_path = normalized_path
             storage_path = os.path.relpath(save_path, DASHBOARD_DATA)
@@ -168,11 +187,22 @@ def dashboard_input_preview():
     if not uploaded_file or not uploaded_file.filename:
         return jsonify({"ok": False, "error": "請先選擇檔案"}), 400
     extension = uploaded_file.filename.rsplit(".", 1)[-1].lower() if "." in uploaded_file.filename else ""
-    if extension not in ("xls", "xlsx"):
-        return jsonify({"ok": False, "error": "僅接受 .xls 或 .xlsx 格式"}), 400
+    if extension not in ("txt", "csv", "xls", "xlsx"):
+        return jsonify({"ok": False, "error": "僅接受 .txt、.csv、.xls 或 .xlsx 格式"}), 400
     input_scheme = str(request.form.get("input_scheme", "")).strip()
+    format_id = str(request.form.get("format_id", "")).strip()
+    txt_has_header = str(request.form.get("txt_has_header", "")).strip().lower() == "true"
+    if not format_id:
+        return jsonify({"ok": False, "error": "請先選擇申報欄位格式。"}), 400
     try:
-        result = preview_dashboard_upload(uploaded_file.stream, extension, input_scheme, get_conn)
+        result = preview_dashboard_upload(
+            uploaded_file.stream,
+            extension,
+            input_scheme,
+            get_conn,
+            format_id=format_id,
+            txt_has_header=txt_has_header,
+        )
         return jsonify({"ok": True, **result})
     except ValueError as error:
         return jsonify({"ok": False, "error": str(error)}), 400
@@ -456,6 +486,94 @@ def publish_dashboard_selection_to_pbi():
     except Exception as exc:
         logging.exception("Failed to publish dashboard selection to PBI")
         return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@dashboard_bp.route('/api/dashboard/export_pbip', methods=['POST'])
+@login_required
+def export_dashboard_pbip():
+    from modules.blueprint.dashboard.pbip_export import (
+        TOPIC_PAGES, PbipExportError, create_filtered_pbip,
+    )
+
+    data = request.get_json(silent=True) or {}
+    file_id = str(data.get('file_id') or '')
+    cancers = data.get('cancers')
+    topics = data.get('analysis_items')
+    year_start = str(data.get('year_start') or '').strip()
+    year_end = str(data.get('year_end') or '').strip()
+    behavior = str(data.get('behavior') or '').strip()
+    if not isinstance(cancers, list) or not cancers or not all(isinstance(x, str) for x in cancers):
+        return jsonify({'ok': False, 'error': '請先選擇癌別。'}), 400
+    if not isinstance(topics, list) or not topics or not all(isinstance(x, str) for x in topics):
+        return jsonify({'ok': False, 'error': '請先選擇分析主題。'}), 400
+    if set(topics).difference(TOPIC_PAGES):
+        return jsonify({'ok': False, 'error': '目前 PBIP 公版只支援：' + '、'.join(TOPIC_PAGES)}), 400
+    if (len(year_start) != 4 or not year_start.isdigit() or len(year_end) != 4
+            or not year_end.isdigit() or int(year_start) > int(year_end)):
+        return jsonify({'ok': False, 'error': '請選擇有效的起始與結束年度。'}), 400
+    if not behavior:
+        return jsonify({'ok': False, 'error': '請先選擇性態碼。'}), 400
+    owned_file = _get_owned_dashboard_file(file_id, session.get('id'))
+    if not owned_file:
+        return jsonify({'ok': False, 'error': '找不到您選擇的年報檔案。'}), 404
+    if not PBIP_EXPORT_LOCK.acquire(blocking=False):
+        return jsonify({'ok': False, 'error': '另一份 Power BI 專案正在產生，請稍後再試。'}), 409
+
+    output_dir = None
+
+    def discard_failed_output():
+        if (output_dir is not None and output_dir.is_dir()
+                and output_dir.parent.resolve() == PBIP_EXPORT_ROOT.resolve()
+                and re.fullmatch(r'[0-9a-f]{32}', output_dir.name)):
+            try:
+                shutil.rmtree(output_dir)
+            except OSError:
+                logging.warning('Could not remove failed PBIP temporary output: %s', output_dir)
+
+    try:
+        job_id = uuid.uuid4().hex
+        output_dir = PBIP_EXPORT_ROOT / job_id
+        result = create_filtered_pbip(
+            _absolute_dashboard_path(owned_file['storage_path']), output_dir,
+            cancers=cancers, year_start=year_start, year_end=year_end,
+            behavior=behavior, topics=topics,
+        )
+        signer = URLSafeTimedSerializer(current_app.secret_key, salt='dashboard-pbip-download')
+        token = signer.dumps({'job': job_id, 'user': str(session.get('id'))})
+        logging.info('PBIP generated for user %s: %s rows', session.get('id'), result['rows'])
+        return jsonify({
+            'ok': True, 'rows': result['rows'], 'pages': result['pages'],
+            'download_url': url_for('dashboard.download_dashboard_pbip', token=token),
+        })
+    except (ValueError, FileNotFoundError, PbipExportError) as exc:
+        discard_failed_output()
+        return jsonify({'ok': False, 'error': str(exc)}), 400
+    except Exception as exc:
+        logging.exception('Failed to create dashboard PBIP')
+        discard_failed_output()
+        return jsonify({
+            'ok': False,
+            'error': f'PBIP 產生失敗：{exc}',
+        }), 500
+    finally:
+        PBIP_EXPORT_LOCK.release()
+
+
+@dashboard_bp.route('/api/dashboard/pbip_download/<token>')
+@login_required
+def download_dashboard_pbip(token):
+    signer = URLSafeTimedSerializer(current_app.secret_key, salt='dashboard-pbip-download')
+    try:
+        payload = signer.loads(token, max_age=3600)
+    except (BadSignature, SignatureExpired):
+        return jsonify({'ok': False, 'error': '下載連結已失效，請重新產生 Power BI 專案。'}), 403
+    job_id = payload.get('job')
+    if payload.get('user') != str(session.get('id')) or not isinstance(job_id, str) or not re.fullmatch(r'[0-9a-f]{32}', job_id):
+        return jsonify({'ok': False, 'error': '無權下載此 Power BI 專案。'}), 403
+    file_path = PBIP_EXPORT_ROOT / job_id / 'cancer_annual_report_pbip.zip'
+    if not file_path.is_file():
+        return jsonify({'ok': False, 'error': '找不到已產生的 Power BI 專案。'}), 404
+    return send_file(file_path, as_attachment=True, download_name='cancer_annual_report_pbip.zip', mimetype='application/zip')
 
 
 @dashboard_bp.route('/api/dashboard/pbi_settings', methods=['GET'])

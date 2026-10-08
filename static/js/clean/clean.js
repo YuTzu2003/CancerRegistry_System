@@ -3,6 +3,25 @@
   const $  = (sel, ctx = document) => ctx.querySelector(sel);
   const $$ = (sel, ctx = document) => Array.from(ctx.querySelectorAll(sel));
   let currentJobId = null;
+  const cleanExtraFieldCheckboxes = () => $$('#outputFieldList input[type="checkbox"]');
+  const selectAllCleanExtrasBtn = $('#btnSelectAllCleanExtras');
+  const clearAllCleanExtrasBtn = $('#btnClearAllCleanExtras');
+
+  function syncCleanExtraFieldControls() {
+    const checkboxes = cleanExtraFieldCheckboxes();
+    const selectedCount = checkboxes.filter(checkbox => checkbox.checked).length;
+    const hasUnmatchedFields = checkboxes.length > 0;
+    if (selectAllCleanExtrasBtn) selectAllCleanExtrasBtn.disabled = !hasUnmatchedFields || selectedCount === checkboxes.length;
+    if (clearAllCleanExtrasBtn) clearAllCleanExtrasBtn.disabled = !hasUnmatchedFields || selectedCount === 0;
+  }
+
+  function setCleanExtraFieldsChecked(checked) {
+    cleanExtraFieldCheckboxes().forEach(checkbox => {
+      checkbox.checked = checked;
+      checkbox.closest('.field-chip')?.classList.toggle('selected', checked);
+    });
+    syncCleanExtraFieldControls();
+  }
 
   // Step控制
   function setStep(n) {
@@ -224,6 +243,7 @@
     if (list) {
       list.innerHTML = '<span class="field-chip disabled"><i class="bi bi-asterisk"></i> 尚未載入欄位，清洗完成後自動帶入</span>';
     }
+    syncCleanExtraFieldControls();
   
     if ($('#analysisByField tbody')) $('#analysisByField tbody').innerHTML = '';
     if ($('#analysisByType tbody')) $('#analysisByType tbody').innerHTML = '';
@@ -461,9 +481,8 @@
       }
     }
 
-    if ((data.date_errors || []).length > 0) {
-      renderDateErrorEditor(data.date_errors || [], data.date_error_limit || 3);
-    }
+    // 新檔案清洗成功時，即使沒有日期錯誤，也要清掉前一份檔案的日期錯誤內容。
+    renderDateErrorEditor(data.date_errors || [], data.date_error_limit || 3);
 
     const s = data.stats || {};
 
@@ -491,6 +510,11 @@
           <td><span class="badge-soft gray">${escapeHtml(r.format || '—')}</span></td>
           <td style="text-align:right;">${r.errors ?? 0}</td>
         </tr>`).join('');
+    } else {
+      // 新檔案沒有錯誤時，不保留前一份檔案的欄位明細。
+      fieldWrap.hidden = true;
+      fieldEmpty.hidden = false;
+      $('#analysisByField tbody').innerHTML = '';
     }
 
     // 清洗結果分析(右側)
@@ -521,6 +545,11 @@
             <td style="text-align:right;">${r.ratio ?? '—'}</td>
           </tr>`;
       }).join('');
+    } else {
+      // 新檔案沒有分析資料時，切回空白狀態，避免顯示上一份檔案的結果。
+      $('#analysisContent').hidden = true;
+      $('#analysisEmpty').hidden = false;
+      $('#analysisByType tbody').innerHTML = '';
     }
   }
 
@@ -726,13 +755,17 @@
           
           $$('#outputFieldList .field-chip input').forEach(cb => {
             const chip = cb.closest('.field-chip');
-            const sync = () => chip.classList.toggle('selected', cb.checked);
+            const sync = () => {
+              chip.classList.toggle('selected', cb.checked);
+              syncCleanExtraFieldControls();
+            };
             cb.addEventListener('change', sync); 
             sync();
           });
         } else {
-          list.innerHTML = '<span class="text-muted" style="font-size:12px;">無額外欄位</span>';
+          list.innerHTML = '<span class="text-muted" style="font-size:12px;">無未匹配欄位</span>';
         }
+        syncCleanExtraFieldControls();
       }
     } catch (err) {
       console.error('Categorization failed', err);
@@ -749,7 +782,10 @@
   }
   
   $$('#namingScheme input[type="radio"]').forEach(r => r.addEventListener('change', syncNamingSelection));
+  selectAllCleanExtrasBtn?.addEventListener('click', () => setCleanExtraFieldsChecked(true));
+  clearAllCleanExtrasBtn?.addEventListener('click', () => setCleanExtraFieldsChecked(false));
   syncNamingSelection();
+  syncCleanExtraFieldControls();
 
   // 下載清洗結果 
   $('#btnDownloadCleaned')?.addEventListener('click', () => {

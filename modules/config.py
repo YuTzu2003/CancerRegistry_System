@@ -56,7 +56,7 @@ class BaseConfig:
     LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama").strip().lower()
     LLM_BASE_URL = os.getenv("LLM_BASE_URL")
     LLM_API_KEY = os.getenv("LLM_API_KEY")
-    LLM_MODEL = os.getenv("LLM_MODEL", "").strip()
+    LLM_MODEL = (os.getenv("LLM_MODEL") or os.getenv("MODEL") or "").strip()
     LLM_TIMEOUT_SECONDS = float(os.getenv("LLM_TIMEOUT_SECONDS", "180"))
     LLM_WORKERS = _optional_int("LLM_WORKERS")
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")

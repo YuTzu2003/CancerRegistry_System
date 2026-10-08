@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 import logging
+import re
 import pandas as pd
 from modules.blueprint.indicators.catalog import cancer_case_mask
 from modules.blueprint.indicators.indicator_definitions import (get_indicator_definitions, get_indicator_metadata)
@@ -21,7 +22,16 @@ def _year_mask(frame, year_start, year_end):
     diagnosis_col = _find_column(frame.columns, "2.5", ("最初診斷日期", "didiag", "診斷日期"))
     if not diagnosis_col:
         return pd.Series(False, index=frame.index), "找不到最初診斷日期(2.5)，無法依診斷年度篩選。"
-    years = frame[diagnosis_col].map(_date_key).map(lambda value: value.year if value != pd.Timestamp.max else None)
+
+    def diagnosis_year(value):
+        """Extract CCYY without requiring MM/DD to be fully known."""
+        text = _clean_code(value)
+        digits = re.sub(r"\D", "", text)
+        if len(digits) < 4 or digits[:4] in {"0000", "8888", "9999"}:
+            return None
+        return int(digits[:4])
+
+    years = frame[diagnosis_col].map(diagnosis_year)
     return years.between(int(year_start), int(year_end), inclusive="both").fillna(False), ""
 
 

@@ -41,9 +41,9 @@ def parse_date(value: Any) -> date | None:
     digits = "".join(character for character in text if character.isdigit())
     if digits in INVALID_DATE_VALUES or len(digits) != 8:
         return None
-    # 登錄日期的月碼或日碼為 99 時，仍可納入指標判定；以一日代替。
+    # 未知月份無法推導日期；未知日期則以該月第一日代替。
     if digits[4:6] == "99":
-        digits = f"{digits[:4]}01{digits[6:]}"
+        return None
     if digits[6:8] == "99":
         digits = f"{digits[:6]}01"
     try:
@@ -99,10 +99,14 @@ def evaluate_rule(record: Record, rule: RuleConfig) -> bool:
 
     # 數值與文字比對運算子
     if operation == "equals":
-        return to_int(record.get(rule["field"])) == to_int(rule["value"])
+        value = to_int(record.get(rule["field"]))
+        expected = to_int(rule["value"])
+        return value is not None and expected is not None and value == expected
 
     if operation == "text_equals":
-        return normalize_text(record.get(rule["field"])) == normalize_text(rule["value"])
+        value = normalize_text(record.get(rule["field"]))
+        expected = normalize_text(rule["value"])
+        return value is not None and expected is not None and value == expected
 
     if operation == "text_in":
         value = normalize_text(record.get(rule["field"]))
