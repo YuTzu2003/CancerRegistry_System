@@ -8,6 +8,7 @@ from flask import send_file, send_from_directory
 from modules.blueprint.dashboard.export_report import generate_export_files
 from modules.blueprint.dashboard.pbi_settings import (get_pbi_publish_path,get_pbi_publish_settings,save_pbi_publish_path,)
 from modules.blueprint.dashboard.input_format import (preview_dashboard_upload,validate_and_normalize_dashboard_upload,)
+from modules.blueprint.clean.pipeline import get_formats_logic
 import os
 import re
 import json
@@ -89,13 +90,13 @@ def _get_cancer_name_translations():
 @login_required
 def dashboard():
     uploaded_files = _get_uploaded_dashboard_files(session.get("id"))
-    return render_template("dashboard.html",active="dashboard",uploaded_files=uploaded_files,cancer_name_translations=_get_cancer_name_translations(),pbi_publish_path=get_pbi_publish_path(),)
+    return render_template("dashboard.html",active="dashboard",uploaded_files=uploaded_files,cancer_name_translations=_get_cancer_name_translations(),pbi_publish_path=get_pbi_publish_path(),formats=get_formats_logic(),)
 
 @dashboard_bp.route("/dashboard/compare")
 @login_required
 def compare():
     uploaded_files = _get_uploaded_dashboard_files(session.get("id"))
-    return render_template("compare.html",active="compare",uploaded_files=uploaded_files,cancer_name_translations=_get_cancer_name_translations(),)
+    return render_template("compare.html",active="compare",uploaded_files=uploaded_files,cancer_name_translations=_get_cancer_name_translations(),formats=get_formats_logic(),)
 
 @dashboard_bp.route("/dashboard-preview/<task_id>")
 @login_required
@@ -105,7 +106,7 @@ def dashboard_preview(task_id):
     payload = get_llm_task_payload(task_id, session.get("id"))
     if not task or not payload:
         return jsonify({"success": False, "error": "找不到任務"}), 404
-    return render_template("dashboard.html", active="dashboard", uploaded_files=[], cancer_name_translations=_get_cancer_name_translations(), pbi_publish_path="", preview_task=task, preview_payload=payload)
+    return render_template("dashboard.html", active="dashboard", uploaded_files=[], cancer_name_translations=_get_cancer_name_translations(), pbi_publish_path="", formats=[], preview_task=task, preview_payload=payload)
 @dashboard_bp.route("/comparison-preview/<task_id>")
 @login_required
 def comparison_preview(task_id):
@@ -114,7 +115,7 @@ def comparison_preview(task_id):
     payload = get_llm_task_payload(task_id, session.get("id"))
     if not task or not payload or task.get("TaskType") != "comparison_report":
         return jsonify({"success": False, "error": "找不到年度比較任務"}), 404
-    return render_template("compare.html", active="compare", uploaded_files=[], cancer_name_translations=_get_cancer_name_translations(), preview_task=task, preview_payload=payload)
+    return render_template("compare.html", active="compare", uploaded_files=[], cancer_name_translations=_get_cancer_name_translations(), formats=[], preview_task=task, preview_payload=payload)
 @dashboard_bp.route("/dashboard/upload", methods=["POST"])
 @login_required
 def dashboard_upload():
@@ -122,9 +123,13 @@ def dashboard_upload():
     if not f or not f.filename:
         return jsonify({"ok": False, "error": "未選擇檔案"}), 400
     ext = f.filename.rsplit(".", 1)[-1].lower() if "." in f.filename else ""
-    if ext not in ("xls", "xlsx"):
-        return jsonify({"ok": False, "error": "僅接受 .xls 或 .xlsx 格式"}), 400
+    if ext not in ("txt", "csv", "xls", "xlsx"):
+        return jsonify({"ok": False, "error": "僅接受 .txt、.csv、.xls 或 .xlsx 格式"}), 400
     input_scheme = str(request.form.get("input_scheme", "")).strip()
+    format_id = str(request.form.get("format_id", "")).strip()
+    txt_has_header = str(request.form.get("txt_has_header", "")).strip().lower() == "true"
+    if not format_id:
+        return jsonify({"ok": False, "error": "請先選擇申報欄位格式。"}), 400
     extra_fields_raw = request.form.get("extra_fields")
     extra_fields = None
     if extra_fields_raw is not None:
@@ -147,7 +152,15 @@ def dashboard_upload():
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
     f.save(save_path)
     try:
-        normalized_path = validate_and_normalize_dashboard_upload(save_path,ext,input_scheme,get_conn,extra_fields,)
+        normalized_path = validate_and_normalize_dashboard_upload(
+            save_path,
+            ext,
+            input_scheme,
+            get_conn,
+            extra_fields,
+            format_id=format_id,
+            txt_has_header=txt_has_header,
+        )
         if normalized_path != save_path:
             save_path = normalized_path
             storage_path = os.path.relpath(save_path, DASHBOARD_DATA)
@@ -174,11 +187,22 @@ def dashboard_input_preview():
     if not uploaded_file or not uploaded_file.filename:
         return jsonify({"ok": False, "error": "請先選擇檔案"}), 400
     extension = uploaded_file.filename.rsplit(".", 1)[-1].lower() if "." in uploaded_file.filename else ""
-    if extension not in ("xls", "xlsx"):
-        return jsonify({"ok": False, "error": "僅接受 .xls 或 .xlsx 格式"}), 400
+    if extension not in ("txt", "csv", "xls", "xlsx"):
+        return jsonify({"ok": False, "error": "僅接受 .txt、.csv、.xls 或 .xlsx 格式"}), 400
     input_scheme = str(request.form.get("input_scheme", "")).strip()
+    format_id = str(request.form.get("format_id", "")).strip()
+    txt_has_header = str(request.form.get("txt_has_header", "")).strip().lower() == "true"
+    if not format_id:
+        return jsonify({"ok": False, "error": "請先選擇申報欄位格式。"}), 400
     try:
-        result = preview_dashboard_upload(uploaded_file.stream, extension, input_scheme, get_conn)
+        result = preview_dashboard_upload(
+            uploaded_file.stream,
+            extension,
+            input_scheme,
+            get_conn,
+            format_id=format_id,
+            txt_has_header=txt_has_header,
+        )
         return jsonify({"ok": True, **result})
     except ValueError as error:
         return jsonify({"ok": False, "error": str(error)}), 400

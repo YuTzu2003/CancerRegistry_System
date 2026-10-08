@@ -12,8 +12,25 @@
           <form id="dashUploadForm" enctype="multipart/form-data" class="d-flex flex-column gap-3">
             <div class="p-4 border rounded-3 text-center upload-input-zone">
               <h6 class="fw-semibold text-dark mb-1">選擇資料檔案</h6>
-              <p class="text-secondary small mb-3">僅接受 .xls 或 .xlsx 格式的 Excel 檔案</p>
-              <input type="file" class="form-control form-control-sm mx-auto" id="dashFileInput" name="file" accept=".xls,.xlsx" style="max-width: 280px; font-size: 13px;">
+              <p class="text-secondary small mb-3">支援 TXT、CSV、XLS、XLSX；請選擇資料所屬的申報欄位格式</p>
+              <input type="file" class="form-control form-control-sm mx-auto" id="dashFileInput" name="file" accept=".txt,.csv,.xls,.xlsx" style="max-width: 280px; font-size: 13px;">
+              <div id="dashboardFormatOptions" class="d-none w-100 mt-3 text-start mx-auto" style="max-width: 280px;">
+                <label for="dashboardFormatSelect" class="form-label small fw-semibold mb-1">申報欄位格式</label>
+                <select id="dashboardFormatSelect" name="format_id" class="form-select form-select-sm" disabled>
+                  <option value="">請選擇格式</option>
+                  {% for f in formats %}
+                    <option value="{{ f.id }}">{{ f.name }}欄位（{{ f.version }}）</option>
+                  {% endfor %}
+                </select>
+                <div class="form-text small">用於統一改版欄位名稱與判斷正式申報欄位。</div>
+              </div>
+              <div id="dashboardTxtOptions" class="d-none w-100 mt-2 text-start mx-auto" style="max-width: 280px;">
+                <div class="form-check mt-2">
+                  <input class="form-check-input" type="checkbox" name="txt_has_header" value="true" id="dashboardTxtHasHeader" disabled>
+                  <label class="form-check-label small" for="dashboardTxtHasHeader">檔案是否包含欄位標題</label>
+                </div>
+                <div class="form-text small">未勾選時，系統會依所選格式的固定欄位位置拆解 TXT。</div>
+              </div>
             </div>
           </form>
         </div>
@@ -85,7 +102,7 @@
     <div style="margin-bottom: 18px;">
       <div class="d-flex justify-content-between align-items-center mb-2">
         <div style="font-size: 13px; font-weight: 600; color: var(--gray-700);">輸入欄位命名來源
-          <span class="hint" style="font-weight: 400; margin-left: 6px;">選擇輸入 XLSX 欄位標頭採用的命名來源</span>
+          <span class="hint" style="font-weight: 400; margin-left: 6px;">選擇輸入資料欄位標頭採用的命名來源</span>
         </div>
       </div>
       <div class="naming-grid" id="dashboardInputScheme">
@@ -103,6 +120,10 @@
       <div class="d-flex justify-content-between align-items-center mb-2">
         <div style="font-size: 13px; font-weight: 600; color: var(--gray-700);">未匹配欄位處理
           <span class="hint" style="font-weight: 400; margin-left: 6px;">未匹配到的原始欄位，可勾選要保留的欄位</span>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="btnSelectAllDashboardExtras" disabled>全選</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="btnClearAllDashboardExtras" disabled>全不選</button>
         </div>
       </div>
       <div class="field-chiplist" id="dashboardInputFieldList">
@@ -126,8 +147,8 @@
   </div>
 
   <div class="section-body p-4">
-    <div class="row">
-      <div class="col-lg-9">
+    <div class="row annual-filter-layout">
+      <div class="col-lg-9 annual-filter-main">
         <!-- 篩選條件列 -->
         <div class="filter-bar" style="padding: 0;">
           <div class="filter-group">
@@ -375,28 +396,28 @@
       </div>
 
       <!-- 右側：已選條件摘要 -->
-      <div class="col-lg-3 border-start border-secondary-subtle ps-4 d-flex flex-column mt-4 mt-lg-0">
+      <div class="col-lg-3 border-start border-secondary-subtle ps-4 d-flex flex-column mt-4 mt-lg-0 annual-selection-summary">
         <h6 class="fw-bold text-dark mb-3 w-100 text-center">已選取分析條件</h6>
-        <div class="flex-grow-1" style="font-size: 14px; line-height: 2;">
-          <div class="d-flex mb-2">
-            <span class="text-secondary d-flex" style="width: 80px; flex-shrink: 0;"><span style="flex-grow: 1; text-align-last: justify;">年份</span>：</span>
-            <span id="summaryYear" class="text-dark fw-medium ms-1">尚未選擇</span>
+        <div class="flex-grow-1 annual-selection-summary-list">
+          <div class="d-flex mb-2 annual-selection-summary-item">
+            <span class="text-secondary d-flex annual-selection-summary-label"><span>年份</span>：</span>
+            <span id="summaryYear" class="text-dark fw-medium ms-1 annual-selection-summary-value">尚未選擇</span>
           </div>
-          <div class="d-flex mb-2">
-            <span class="text-secondary d-flex" style="width: 80px; flex-shrink: 0;"><span style="flex-grow: 1; text-align-last: justify;">性態碼</span>：</span>
-            <span id="summaryBehavior" class="text-dark fw-medium ms-1">尚未選擇</span>
+          <div class="d-flex mb-2 annual-selection-summary-item">
+            <span class="text-secondary d-flex annual-selection-summary-label"><span>性態碼</span>：</span>
+            <span id="summaryBehavior" class="text-dark fw-medium ms-1 annual-selection-summary-value">尚未選擇</span>
           </div>
-          <div class="d-flex mb-2">
-            <span class="text-secondary d-flex" style="width: 80px; flex-shrink: 0;"><span style="flex-grow: 1; text-align-last: justify;">敘述風格</span>：</span>
-            <span id="summaryAiStyle" class="text-dark fw-medium ms-1">平穩客觀</span>
+          <div class="d-flex mb-2 annual-selection-summary-item">
+            <span class="text-secondary d-flex annual-selection-summary-label"><span>敘述風格</span>：</span>
+            <span id="summaryAiStyle" class="text-dark fw-medium ms-1 annual-selection-summary-value">平穩客觀</span>
           </div>
-          <div class="d-flex mb-2">
-            <span class="text-secondary d-flex" style="width: 80px; flex-shrink: 0;"><span style="flex-grow: 1; text-align-last: justify;">癌別</span>：</span>
-            <span id="summaryCancer" class="text-dark fw-medium ms-1">尚未選擇</span>
+          <div class="d-flex mb-2 annual-selection-summary-item">
+            <span class="text-secondary d-flex annual-selection-summary-label"><span>癌別</span>：</span>
+            <span id="summaryCancer" class="text-dark fw-medium ms-1 annual-selection-summary-value">尚未選擇</span>
           </div>
-          <div class="d-flex mb-2">
-            <span class="text-secondary d-flex" style="width: 80px; flex-shrink: 0;"><span style="flex-grow: 1; text-align-last: justify;">分析項目</span>：</span>
-            <span id="summaryAnalysis" class="text-dark fw-medium ms-1">尚未選擇</span>
+          <div class="d-flex mb-2 annual-selection-summary-item">
+            <span class="text-secondary d-flex annual-selection-summary-label"><span>分析項目</span>：</span>
+            <span id="summaryAnalysis" class="text-dark fw-medium ms-1 annual-selection-summary-value">尚未選擇</span>
           </div>
         </div>
       </div>
@@ -503,8 +524,8 @@
                   <label class="form-check-label text-secondary" for="chk_Oral_Cavity">口腔 Oral Cavity</label>
                 </div>
                 <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
-                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Oropharynx" value="Oropharynx" data-parent="Oral_group">
-                  <label class="form-check-label text-secondary" for="chk_Oropharynx">口咽 Oropharynx</label>
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-subgroup" id="chk_group_Oropharynx" data-group="Oropharynx" data-parent="Oral_group">
+                  <label class="form-check-label fw-semibold text-dark" for="chk_group_Oropharynx">口咽 Oropharynx</label>
                 </div>
                 <div class="form-check mb-2 ms-5 d-flex align-items-center gap-2">
                   <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_oropharynx_p16_positive" value="oropharynx_p16_positive" data-parent="Oropharynx" data-grandparent="Oral_group">
@@ -590,7 +611,7 @@
                 </div>
                 <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
                   <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Rectum" value="Rectum" data-parent="Colon_and_Rectum_Anus">
-                  <label class="form-check-label text-secondary" for="chk_Rectum">直腸 Rectum</label>
+                  <label class="form-check-label text-secondary" for="chk_Rectum">直腸 Rectum(含 RS Colon)</label>
                 </div>
                 <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
                   <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Anus" value="Anus" data-parent="Colon_and_Rectum_Anus">
@@ -707,12 +728,84 @@
                   <label class="form-check-label text-secondary" for="chk_group_Non_Hodgkin_lymphoma">非何杰金氏淋巴瘤 (Non-Hodgkin lymphoma)</label>
                 </div>
                 <div class="form-check mb-2 ms-5 d-flex align-items-center gap-2">
-                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_B-cell_lymphoid_neoplasms" value="B-cell_lymphoid_neoplasms" data-parent="Non_Hodgkin_lymphoma" data-grandparent="Lymphoma">
-                  <label class="form-check-label text-secondary" for="chk_B-cell_lymphoid_neoplasms">B細胞淋巴系腫瘤 (B-cell lymphoid neoplasms)</label>
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-subgroup" id="chk_group_B-cell_lymphoid_neoplasms" data-group="B-cell_lymphoid_neoplasms" data-parent="Non_Hodgkin_lymphoma" data-grandparent="Lymphoma">
+                  <label class="form-check-label text-secondary" for="chk_group_B-cell_lymphoid_neoplasms">B細胞淋巴系腫瘤 (B-cell lymphoid neoplasms)</label>
+                </div>
+                <div class="form-check mb-2 ms-5 ps-5 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Marginal_zone_lymphoma" value="Marginal_zone_lymphoma" data-parent="B-cell_lymphoid_neoplasms" data-grandparent="Non_Hodgkin_lymphoma">
+                  <label class="form-check-label text-secondary" for="chk_Marginal_zone_lymphoma">邊緣區淋巴瘤 (Marginal zone lymphoma, splenic, nodal and MALT)</label>
+                </div>
+                <div class="form-check mb-2 ms-5 ps-5 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Lymphoplasmacytic_lymphoma" value="Lymphoplasmacytic_lymphoma" data-parent="B-cell_lymphoid_neoplasms" data-grandparent="Non_Hodgkin_lymphoma">
+                  <label class="form-check-label text-secondary" for="chk_Lymphoplasmacytic_lymphoma">淋巴漿細胞淋巴瘤 (Lymphoplasmacytic lymphoma)</label>
+                </div>
+                <div class="form-check mb-2 ms-5 ps-5 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Follicular_lymphoma" value="Follicular_lymphoma" data-parent="B-cell_lymphoid_neoplasms" data-grandparent="Non_Hodgkin_lymphoma">
+                  <label class="form-check-label text-secondary" for="chk_Follicular_lymphoma">濾泡性淋巴瘤 (Follicular lymphoma)</label>
+                </div>
+                <div class="form-check mb-2 ms-5 ps-5 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Mantle_cell_lymphoma" value="Mantle_cell_lymphoma" data-parent="B-cell_lymphoid_neoplasms" data-grandparent="Non_Hodgkin_lymphoma">
+                  <label class="form-check-label text-secondary" for="chk_Mantle_cell_lymphoma">被套細胞淋巴瘤 (Mantle cell lymphoma)</label>
+                </div>
+                <div class="form-check mb-2 ms-5 ps-5 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Burkitt_lymphoma" value="Burkitt_lymphoma" data-parent="B-cell_lymphoid_neoplasms" data-grandparent="Non_Hodgkin_lymphoma">
+                  <label class="form-check-label text-secondary" for="chk_Burkitt_lymphoma">伯基特淋巴瘤 (Burkitt lymphoma)</label>
+                </div>
+                <div class="form-check mb-2 ms-5 ps-5 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Diffuse_large_B-cell_lymphoma" value="Diffuse_large_B-cell_lymphoma" data-parent="B-cell_lymphoid_neoplasms" data-grandparent="Non_Hodgkin_lymphoma">
+                  <label class="form-check-label text-secondary" for="chk_Diffuse_large_B-cell_lymphoma">瀰漫性大 B 細胞淋巴瘤 (Diffuse large B-cell lymphoma)</label>
+                </div>
+                <div class="form-check mb-2 ms-5 ps-5 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Primary_mediastinal_large_B-cell_lymphoma" value="Primary_mediastinal_large_B-cell_lymphoma" data-parent="B-cell_lymphoid_neoplasms" data-grandparent="Non_Hodgkin_lymphoma">
+                  <label class="form-check-label text-secondary" for="chk_Primary_mediastinal_large_B-cell_lymphoma">原發性縱膈腔大型 B 細胞淋巴瘤 (Primary mediastinal large B-cell lymphoma)</label>
+                </div>
+                <div class="form-check mb-2 ms-5 ps-5 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Other_B-cell_lymphomas" value="Other_B-cell_lymphomas" data-parent="B-cell_lymphoid_neoplasms" data-grandparent="Non_Hodgkin_lymphoma">
+                  <label class="form-check-label text-secondary" for="chk_Other_B-cell_lymphomas">其他 B 細胞淋巴瘤 (Other B-cell lymphomas)</label>
                 </div>
                 <div class="form-check mb-2 ms-5 d-flex align-items-center gap-2">
-                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_T/NK-cell_lymphoid_neoplasms" value="T/NK-cell_lymphoid_neoplasms" data-parent="Non_Hodgkin_lymphoma" data-grandparent="Lymphoma">
-                  <label class="form-check-label text-secondary" for="chk_T/NK-cell_lymphoid_neoplasms">T/NK細胞淋巴系腫瘤 (T/NK-cell lymphoid neoplasms)</label>
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-subgroup" id="chk_group_T/NK-cell_lymphoid_neoplasms" data-group="T/NK-cell_lymphoid_neoplasms" data-parent="Non_Hodgkin_lymphoma" data-grandparent="Lymphoma">
+                  <label class="form-check-label text-secondary" for="chk_group_T/NK-cell_lymphoid_neoplasms">T/NK細胞淋巴系腫瘤 (T/NK-cell lymphoid neoplasms)</label>
+                </div>
+                <div class="form-check mb-2 ms-5 ps-5 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Extranodal_NK/T_cell_lymphoma_nasal_or_other_type" value="Extranodal_NK/T_cell_lymphoma_nasal_or_other_type" data-parent="T/NK-cell_lymphoid_neoplasms" data-grandparent="Non_Hodgkin_lymphoma">
+                  <label class="form-check-label text-secondary" for="chk_Extranodal_NK/T_cell_lymphoma_nasal_or_other_type">結外 NK/T 細胞淋巴瘤 (Extranodal NK/T cell lymphoma)</label>
+                </div>
+                <div class="form-check mb-2 ms-5 ps-5 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Cutaneous_T_cell_lymphoma" value="Cutaneous_T_cell_lymphoma" data-parent="T/NK-cell_lymphoid_neoplasms" data-grandparent="Non_Hodgkin_lymphoma">
+                  <label class="form-check-label text-secondary" for="chk_Cutaneous_T_cell_lymphoma">皮膚 T 細胞淋巴瘤 (Cutaneous T cell lymphoma)</label>
+                </div>
+                <div class="form-check mb-2 ms-5 ps-5 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Enteropathy-type_T-cell_lymphoma" value="Enteropathy-type_T-cell_lymphoma" data-parent="T/NK-cell_lymphoid_neoplasms" data-grandparent="Non_Hodgkin_lymphoma">
+                  <label class="form-check-label text-secondary" for="chk_Enteropathy-type_T-cell_lymphoma">腸病型 T 細胞淋巴瘤 (Enteropathy-type T-cell lymphoma)</label>
+                </div>
+                <div class="form-check mb-2 ms-5 ps-5 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Hepatosplenic_T-cell_lymphoma" value="Hepatosplenic_T-cell_lymphoma" data-parent="T/NK-cell_lymphoid_neoplasms" data-grandparent="Non_Hodgkin_lymphoma">
+                  <label class="form-check-label text-secondary" for="chk_Hepatosplenic_T-cell_lymphoma">肝脾 T 細胞淋巴瘤 (Hepatosplenic T-cell lymphoma)</label>
+                </div>
+                <div class="form-check mb-2 ms-5 ps-5 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Subcutaneous_panniculitis-like_T-cell_Lymphoma" value="Subcutaneous_panniculitis-like_T-cell_Lymphoma" data-parent="T/NK-cell_lymphoid_neoplasms" data-grandparent="Non_Hodgkin_lymphoma">
+                  <label class="form-check-label text-secondary" for="chk_Subcutaneous_panniculitis-like_T-cell_Lymphoma">皮下脂膜炎性 T 細胞淋巴瘤 (Subcutaneous panniculitis-like T-cell lymphoma)</label>
+                </div>
+                <div class="form-check mb-2 ms-5 ps-5 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Peripheral_T-cell_lymphoma_NOS" value="Peripheral_T-cell_lymphoma_NOS" data-parent="T/NK-cell_lymphoid_neoplasms" data-grandparent="Non_Hodgkin_lymphoma">
+                  <label class="form-check-label text-secondary" for="chk_Peripheral_T-cell_lymphoma_NOS">非特異性周邊 T 細胞淋巴瘤 (Peripheral T-cell lymphoma, NOS)</label>
+                </div>
+                <div class="form-check mb-2 ms-5 ps-5 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Angioimmunoblastic_T-cell_lymphoma" value="Angioimmunoblastic_T-cell_lymphoma" data-parent="T/NK-cell_lymphoid_neoplasms" data-grandparent="Non_Hodgkin_lymphoma">
+                  <label class="form-check-label text-secondary" for="chk_Angioimmunoblastic_T-cell_lymphoma">血管免疫芽細胞性 T 細胞淋巴瘤 (Angioimmunoblastic T-cell lymphoma)</label>
+                </div>
+                <div class="form-check mb-2 ms-5 ps-5 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Anaplastic_large_cell_lymphoma" value="Anaplastic_large_cell_lymphoma" data-parent="T/NK-cell_lymphoid_neoplasms" data-grandparent="Non_Hodgkin_lymphoma">
+                  <label class="form-check-label text-secondary" for="chk_Anaplastic_large_cell_lymphoma">退行性大細胞淋巴瘤 (Anaplastic large cell lymphoma)</label>
+                </div>
+                <div class="form-check mb-2 ms-5 ps-5 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Adult_T-cell_lymphoma/leukemia" value="Adult_T-cell_lymphoma/leukemia" data-parent="T/NK-cell_lymphoid_neoplasms" data-grandparent="Non_Hodgkin_lymphoma">
+                  <label class="form-check-label text-secondary" for="chk_Adult_T-cell_lymphoma/leukemia">成人 T 細胞淋巴瘤／白血病 (Adult T-cell lymphoma/leukemia)</label>
+                </div>
+                <div class="form-check mb-2 ms-5 ps-5 d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Other_T-cell_lymphomas" value="Other_T-cell_lymphomas" data-parent="T/NK-cell_lymphoid_neoplasms" data-grandparent="Non_Hodgkin_lymphoma">
+                  <label class="form-check-label text-secondary" for="chk_Other_T-cell_lymphomas">其他 T 細胞淋巴瘤 (Other T-cell lymphomas)</label>
                 </div>
                 <div class="form-check mb-2 ms-3 d-flex align-items-center gap-2">
                   <input type="checkbox" class="form-check-input mt-0 cancer-cb-leaf" id="chk_Plasma_cell_neoplasms" value="Plasma_cell_neoplasms" data-parent="Lymphoma">
@@ -788,7 +881,7 @@
   </div>
 </div>
 
-<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/control.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/control.css', v='20261007-file-list-rwd-v2') }}">
 
 <script src="{{ url_for('static', filename='js/dashboard/annual_report_renderer.js') }}"></script>
-<script src="{{ url_for('static', filename='js/dashboard/dashboard_control.js', v='20260919-pbip') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard/dashboard_control.js', v='20261008-annual-format-first') }}"></script>

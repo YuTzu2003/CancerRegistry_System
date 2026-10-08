@@ -48,3 +48,35 @@
   @media (prefers-reduced-motion: reduce) {
     #stageSummaryOptions { transition: none; }
   }
+
+  /* 依檔案清單自身寬度重排，不受螢幕解析度或左右欄分配影響。 */
+  @container dashboard-file-list (max-width: 760px) {
+    #dashFileList tbody tr {
+      height: auto;
+    }
+
+    #dashFileListBody td:first-child > .d-flex {
+      display: grid !important;
+      grid-template-columns: 22px minmax(0, 1fr);
+      column-gap: 8px !important;
+      row-gap: 4px !important;
+    }
+
+    #dashFileListBody td:first-child > .d-flex > i {
+      grid-column: 1;
+      grid-row: 1 / span 2;
+      align-self: center;
+    }
+
+    #dashFileListBody .file-display-name {
+      grid-column: 2;
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    #dashFileListBody .status-badge-selected {
+      grid-column: 2;
+      width: fit-content;
+      margin-left: 0 !important;
+    }
+  }
