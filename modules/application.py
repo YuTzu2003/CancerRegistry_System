@@ -57,7 +57,7 @@ def create_app():
 
     @flask_app.context_processor
     def inject_template_settings():
-        model = BaseConfig.OPENAI_MODEL if BaseConfig.LLM_PROVIDER == "openai" else BaseConfig.LLM_MODEL
+        model = BaseConfig.MODEL
         return {"llm_model": model}
 
     return flask_app, app_env, app_debug

@@ -19,7 +19,7 @@ class LLMSettings:
 def get_llm_settings() -> LLMSettings:
     provider = BaseConfig.LLM_PROVIDER
     is_openai = provider == "openai"
-    model = BaseConfig.OPENAI_MODEL if is_openai else BaseConfig.LLM_MODEL
+    model = BaseConfig.MODEL
     api_key = BaseConfig.OPENAI_API_KEY if is_openai else BaseConfig.LLM_API_KEY
     base_url = BaseConfig.LLM_BASE_URL
     timeout_seconds = BaseConfig.LLM_TIMEOUT_SECONDS
