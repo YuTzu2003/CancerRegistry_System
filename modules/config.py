@@ -62,6 +62,7 @@ class BaseConfig:
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
     AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY")
     AZURE_OPENAI_RESPONSES_URL = os.getenv("AZURE_OPENAI_RESPONSES_URL", "").strip()
+    AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "").strip()
     WERKZEUG_RUN_MAIN = os.getenv("WERKZEUG_RUN_MAIN") == "true"
     TESTING = False
 
@@ -104,6 +105,7 @@ CONFIG_BY_NAME = {
 def test_settings():
     from modules.services.database_backup import BACKUP_DIRECTORY
     from modules.services.db import get_conn
+
     results = {}
     connection = None
     probe_path = None

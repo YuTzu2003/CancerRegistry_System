@@ -3,6 +3,7 @@ from dataclasses import dataclass
 import json
 import logging
 from typing import Mapping, Sequence
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
 from openai import OpenAI
 from modules.config import BaseConfig
@@ -18,6 +19,7 @@ class LLMSettings:
     base_url: str | None
     azure_api_key: str | None
     azure_responses_url: str | None
+    azure_api_version: str | None
     timeout_seconds: float
 
 def get_llm_settings() -> LLMSettings:
@@ -28,6 +30,7 @@ def get_llm_settings() -> LLMSettings:
     base_url = BaseConfig.LLM_BASE_URL
     azure_api_key = BaseConfig.AZURE_OPENAI_API_KEY
     azure_responses_url = BaseConfig.AZURE_OPENAI_RESPONSES_URL or None
+    azure_api_version = BaseConfig.AZURE_OPENAI_API_VERSION or None
     timeout_seconds = BaseConfig.LLM_TIMEOUT_SECONDS
     if not model.strip():
         raise ValueError("LLM model is not configured")
@@ -37,8 +40,7 @@ def get_llm_settings() -> LLMSettings:
         raise ValueError("AZURE_OPENAI_RESPONSES_URL must be configured for Azure LLM provider")
     if provider == "azure" and not azure_api_key:
         raise ValueError("AZURE_OPENAI_API_KEY must be configured for Azure LLM provider")
-    return LLMSettings(provider, model.strip(), api_key, base_url, azure_api_key, azure_responses_url, timeout_seconds)
-
+    return LLMSettings(provider,model.strip(),api_key,base_url,azure_api_key,azure_responses_url,azure_api_version,timeout_seconds,)
 
 def get_llm_client(settings: LLMSettings | None = None):
     global _client_cache, _client_settings
@@ -81,12 +83,7 @@ def request_llm_chat(messages: Sequence[Mapping[str, str]], *, temperature: floa
     client, model = get_llm_client(settings)
     last_finish_reason = None
     for attempt in range(2):
-        response = client.chat.completions.create(
-            model=model,
-            messages=list(messages),
-            temperature=temperature,
-            timeout=settings.timeout_seconds,
-        )
+        response = client.chat.completions.create(model=model,messages=list(messages),temperature=temperature,timeout=settings.timeout_seconds,)
         choices = getattr(response, "choices", None) or []
         if choices:
             last_finish_reason = getattr(choices[0], "finish_reason", None)
@@ -101,13 +98,8 @@ def request_llm_chat(messages: Sequence[Mapping[str, str]], *, temperature: floa
                         parts.append(str(text))
                 if "".join(parts).strip():
                     return "".join(parts)
-        logging.warning(
-            "LLM returned empty content (attempt %s/2, finish_reason=%r)",
-            attempt + 1,
-            last_finish_reason,
-        )
+        logging.warning("LLM returned empty content (attempt %s/2, finish_reason=%r)",attempt + 1, last_finish_reason,)
     raise ValueError(f"LLM response is empty (finish_reason={last_finish_reason!r})")
-
 
 def request_azure_responses(settings: LLMSettings,messages: Sequence[Mapping[str, str]],*,temperature: float,) -> str:
     payload = {
@@ -122,8 +114,13 @@ def request_azure_responses(settings: LLMSettings,messages: Sequence[Mapping[str
         "temperature": temperature,
         "stream": False,
     }
+    url = urlsplit(settings.azure_responses_url or "")
+    query = dict(parse_qsl(url.query))
+    if settings.azure_api_version:
+        query["api-version"] = settings.azure_api_version
+    request_url = urlunsplit((url.scheme, url.netloc, url.path, urlencode(query), url.fragment))
     request = Request(
-        settings.azure_responses_url or "",
+        request_url,
         data=json.dumps(payload).encode("utf-8"),
         headers={
             "Content-Type": "application/json",
