@@ -36,6 +36,8 @@
   flex-direction: column;
   overflow: hidden;
   height: 100%;
+  container-type: inline-size;
+  container-name: dashboard-file-list;
 }
 
 .file-list-header {
@@ -810,10 +812,78 @@
   .upload-grid { grid-template-columns: 1fr; }
 }
 
+/* 筆電寬度優先保留檔案清單可讀性，微調上傳區與清單區比例。 */
+@media (min-width: 901px) and (max-width: 1440px) {
+  .upload-grid {
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    gap: 18px;
+  }
+}
+
 @media (max-width: 640px) {
   .filter-bar { flex-direction: column; align-items: stretch; }
   .filter-group { min-width: 0; }
 }
+
+/* 年報分析的已選取條件：寬螢幕維持右欄，筆電寬度則改為下方摘要卡。 */
+.annual-selection-summary-list {
+  font-size: 14px;
+  line-height: 2;
+}
+
+.annual-selection-summary-label {
+  width: 80px;
+  flex-shrink: 0;
+}
+
+.annual-selection-summary-label > span {
+  flex-grow: 1;
+  text-align-last: justify;
+}
+
+.annual-selection-summary-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1600px) {
+  .annual-filter-layout > .annual-filter-main,
+  .annual-filter-layout > .annual-selection-summary {
+    flex: 0 0 100%;
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .annual-selection-summary {
+    border-left: 0 !important;
+    border-top: 1px solid var(--border) !important;
+    margin-top: 1.5rem !important;
+    padding-left: 0 !important;
+    padding-top: 1.25rem;
+  }
+
+  .annual-selection-summary h6 {
+    margin-bottom: .75rem !important;
+    text-align: left !important;
+  }
+
+  .annual-selection-summary-list {
+    display: grid;
+    gap: .5rem 1.25rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .annual-selection-summary-item {
+    margin-bottom: 0 !important;
+  }
+}
+
+@media (max-width: 700px) {
+  .annual-selection-summary-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 #stageSummaryOptions .col > section {
     display: flex;
     flex-direction: column;

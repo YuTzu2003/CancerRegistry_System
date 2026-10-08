@@ -1,31 +1,30 @@
-# Python-generated files
 __pycache__/
 *.py[oc]
 build/
 dist/
 wheels/
-other/
-Jobs/
+uv.lock
+*.egg-info
+.venv
+.env
+
+# Agents & Documentation
+AGENTS.md
+CLAUDE.md
+GEMINI.md
 .codex/
 .agents
 .hallmark/
-*.egg-info
+
+# Data files & Temporary logs
+other/
+Jobs/
 *.bak
-# Virtual environments
-.venv
-*.lock
-*.python-version
+*.doc
+*.txt
+*.json
+*.jsonl
 *.xlsx
 !範本_組織型態表.xlsx
 !範本_全國比較值.xlsx
 *.csv
-*.doc
-*.txt
-.env
-*.json
-*.jsonl
-AGENTS.md
-CLAUDE.md
-GEMINI.md
-tasks
-node_modules/

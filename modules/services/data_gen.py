@@ -34,6 +34,7 @@ def _clear_generation_session(remove_files=False):
     session.pop('last_gen_file', None)
     session.pop('last_gen_output', None)
     session.pop('last_gen_folder', None)
+    session.pop('last_gen_txt_has_header', None)
     if remove_files and upload_folder:
         _remove_upload_folder(upload_folder)
 
@@ -83,17 +84,28 @@ def analyze_file():
     filename = re.sub(r'[\\/:*?"<>|\s]', '_', basename)
     if not filename.strip():
         filename = "uploaded_file"
+    extension = os.path.splitext(filename)[1].lower()
+    if extension not in {".txt", ".csv", ".xlsx"}:
+        return jsonify({"ok": False, "error": "僅接受 .txt、.csv 或 .xlsx 格式"}), 400
+    format_id = request.form.get("format_id")
+    txt_has_header = request.form.get("txt_has_header") == "true" if extension == ".txt" else None
         
     _cleanup_expired_uploads()
     _clear_generation_session(remove_files=True)
     file_path = _create_upload_path(session.get('id'), filename)
     file.save(file_path)
     
-    res, status = analyze_file_logic(file_path, filename)
+    res, status = analyze_file_logic(
+        file_path,
+        filename,
+        format_id=format_id,
+        txt_has_header=txt_has_header,
+    )
     
     if res.get("ok"):
         session['last_gen_folder'] = str(file_path.parent)
         session['last_gen_file'] = str(file_path)
+        session['last_gen_txt_has_header'] = txt_has_header
     else:
         _remove_upload_folder(file_path.parent)
     return jsonify(res), status
@@ -109,7 +121,15 @@ def process_file():
     naming_scheme = data.get('naming_scheme', 'field_name_zh')
     
     file_path = _session_file_path('last_gen_file')
-    res, status = process_file_logic(file_path, format_id, selected_date_cols_raw, extra_cols, special_configs, naming_scheme)
+    res, status = process_file_logic(
+        file_path,
+        format_id,
+        selected_date_cols_raw,
+        extra_cols,
+        special_configs,
+        naming_scheme,
+        txt_has_header=session.get('last_gen_txt_has_header'),
+    )
     if res.get("ok") and "out_path" in res:
         session['last_gen_output'] = res.pop("out_path")
         if file_path:

@@ -15,6 +15,7 @@ from modules.blueprint.clean.cleaner import cleanValidate
 from openpyxl import load_workbook, Workbook
 from openpyxl.utils import get_column_letter
 from modules.blueprint.clean.field_mapping import detect_system, get_field_map, validate_and_rename_headers, validate_and_unify_headers_in_file
+from modules.blueprint.clean.dedup_records import DUPLICATE_COMPARISON_FIELDS, append_reviewed_rows_to_cleaning_result, get_duplicate_comparison_columns, get_selected_review_duplicate_keys, normalize_duplicate_value
 from modules.blueprint.clean.text_converter import convert_txt_to_excel
 from modules.blueprint.clean.rules.validate import validate_date_rules
 
@@ -173,7 +174,7 @@ def _update_working_file_cell_only(working_file, row_index, updates):
 
 
 def _detect_text_file_format(file_path):
-    encodings = ["utf-8-sig", "utf-8", "cp950", "big5"]
+    encodings = ["utf-8-sig", "utf-8", "cp950", "big5hkscs", "big5", "gb18030"]
     content = None
     used_encoding = "utf-8-sig"
 
@@ -202,6 +203,113 @@ def _detect_text_file_format(file_path):
         delimiter = "," if ext == ".csv" else "\t"
 
     return used_encoding, delimiter
+
+
+CSV_TEXT_ENCODINGS = ("utf-8-sig", "cp950", "big5hkscs", "big5", "gb18030")
+
+
+def _csv_reader_encoding(source_encoding):
+    """Return the decoder used to read a recognized CSV source encoding.
+
+    Python's ``cp950`` codec does not cover every character in the Windows
+    CP950 user-defined area.  On Windows, ``mbcs`` uses the operating system's
+    native ANSI code page, which is how users normally open these CP950 CSV
+    files and preserves those characters for the Excel cleaning result.
+    """
+    if source_encoding == "cp950" and os.name == "nt":
+        return "mbcs"
+    return source_encoding
+
+
+def _csv_header_match_score(headers, fmt_name):
+    """Score only a decoded header row against the selected registry format."""
+    from modules.blueprint.clean.cleaner import FORMAT_RULES_MAP
+
+    fmt_key = f"fmt_{str(fmt_name).replace('fmt_', '')}"
+    expected_names = {
+        str(rule.get("ID", "")).strip(): name
+        for name, rule in FORMAT_RULES_MAP.get(fmt_key, {}).items()
+    }
+    score = 0
+    exact_matches = 0
+
+    for header in headers:
+        match = re.match(r"^(\d+(?:\.\d+)+)(.*)$", str(header).strip())
+        if not match:
+            continue
+
+        field_id, field_name = match.groups()
+        expected_name = expected_names.get(field_id)
+        if expected_name is None:
+            continue
+
+        # 編號正確只有基本分；中文欄名也正確才能判定為可信的編碼。
+        score += 1
+        if re.sub(r"\s+", "", field_name) == re.sub(r"\s+", "", expected_name):
+            score += 10
+            exact_matches += 1
+
+    return score, exact_matches
+
+
+def _read_csv_with_supported_encoding(file_path, fmt_name):
+    """Read a CSV without silently dropping unsupported characters.
+
+    Encoding selection uses the header row only.  Patient content, including
+    the name field, never affects the choice.  A legacy CP950 CSV may contain
+    a single difficult character: selecting GB18030 merely because it can
+    decode that character would corrupt the known registry headers and every
+    other Chinese field.
+    """
+    with open(file_path, "rb") as source:
+        content_bytes = source.read()
+    header_bytes = content_bytes.splitlines()[0] if content_bytes.splitlines() else b""
+    candidates = []
+
+    for priority, encoding in enumerate(CSV_TEXT_ENCODINGS):
+        header_text = header_bytes.decode(encoding, errors="replace")
+        headers = next(csv.reader([header_text]), [])
+        header_score, exact_matches = _csv_header_match_score(headers, fmt_name)
+        header_replacements = header_text.count("\ufffd")
+        candidates.append(
+            (header_score, exact_matches, -header_replacements, -priority, encoding)
+        )
+
+    if candidates:
+        header_score, exact_matches, negative_replacements, _, encoding = max(
+            candidates,
+            key=lambda item: item[:4],
+        )
+        if exact_matches == 0:
+            raise ValueError(
+                "無法從 CSV 欄位標頭可靠判斷文字編碼，未讀取個案資料。"
+                "請將檔案另存為 UTF-8 CSV 後再上傳。"
+            )
+
+        try:
+            reader_encoding = _csv_reader_encoding(encoding)
+            df = pd.read_csv(
+                file_path,
+                dtype=str,
+                encoding=reader_encoding,
+                encoding_errors="replace",
+            )
+        except (OSError, UnicodeError, pd.errors.ParserError) as exc:
+            raise ValueError(f"CSV 讀取失敗（{encoding}）：{exc}") from exc
+
+        logging.info(
+            "CSV source encoding selected as %s from headers only; "
+            "read with %s (header score=%s, exact matches=%s, header replacements=%s)",
+            encoding,
+            reader_encoding,
+            header_score,
+            exact_matches,
+            -negative_replacements,
+        )
+        return df, encoding
+
+    tried = "、".join(CSV_TEXT_ENCODINGS)
+    raise ValueError(f"無法辨識 CSV 編碼。已嘗試：{tried}。")
 
 
 def _cell_text(value):
@@ -234,7 +342,7 @@ def _truncate_to_encoded_width(text, width, encoding):
 
     for ch in text:
         candidate = result + ch
-        if len(candidate.encode(encoding, errors="ignore")) > width:
+        if len(candidate.encode(encoding, errors="replace")) > width:
             break
         result = candidate
 
@@ -243,7 +351,7 @@ def _truncate_to_encoded_width(text, width, encoding):
 
 def _format_fixed_width_value(value, width, encoding):
     text = _truncate_to_encoded_width(_cell_text(value), width, encoding)
-    byte_len = len(text.encode(encoding, errors="ignore"))
+    byte_len = len(text.encode(encoding, errors="replace"))
     return text + (" " * max(width - byte_len, 0))
 
 
@@ -257,24 +365,41 @@ def _write_fixed_width_txt_from_working(working_file, source_file, fmt_name, enc
 
     headers = rows[0]
     header_index = {name: idx for idx, name in enumerate(headers)}
+    # 日期更正會重新輸出整份 TXT。先保留原始列，讓尚未修改且含難字的欄位
+    # 可以直接沿用原始位元組，不會在重新存檔時變成「?」。
+    with open(source_file, "rb") as source:
+        original_content = source.read()
+    original_lines = original_content.splitlines()
+    newline = b"\r\n" if b"\r\n" in original_content else b"\n"
     output_lines = []
 
-    for row in rows[1:]:
+    for row_number, row in enumerate(rows[1:]):
+        original_line = original_lines[row_number] if row_number < len(original_lines) else b""
         line_parts = []
 
         for field_name, start, end in field_spec:
             col_idx = header_index.get(field_name)
             value = row[col_idx] if col_idx is not None and col_idx < len(row) else ""
-            line_parts.append(
-                _format_fixed_width_value(value, end - start + 1, encoding)
-            )
+            width = end - start + 1
+            original_field = original_line[start - 1:end]
+            original_value = original_field.decode(encoding, errors="replace").strip()
 
-        output_lines.append("".join(line_parts))
+            if _is_name_field(field_name):
+                # 姓名一律直接沿用來源位元組，不因難字、亂碼或畫面顯示而重新編碼。
+                line_parts.append(original_field)
+            elif "\ufffd" in original_value and _cell_text(value) == original_value:
+                # 未修改的難字欄位：保留來源位元組及原本的固定位置。
+                line_parts.append(original_field)
+            else:
+                formatted = _format_fixed_width_value(value, width, encoding)
+                line_parts.append(formatted.encode(encoding, errors="replace"))
 
-    with open(source_file, "w", encoding=encoding, newline="") as f:
-        f.write("\n".join(output_lines))
+        output_lines.append(b"".join(line_parts))
+
+    with open(source_file, "wb") as f:
+        f.write(newline.join(output_lines))
         if output_lines:
-            f.write("\n")
+            f.write(newline)
 
 
 def _write_csv_from_working(working_file, source_file, encoding, delimiter):
@@ -314,17 +439,19 @@ def _sync_working_file_to_source_files(working_file, source_file, converted_file
     if ext not in [".txt", ".csv"]:
         return
 
-    encoding, delimiter = _detect_text_file_format(source_file)
-
     if ext == ".csv":
+        encoding, delimiter = _detect_text_file_format(source_file)
         _write_csv_from_working(working_file, source_file, encoding, delimiter)
         return
+
+    with open(source_file, "rb") as source:
+        fixed_width_encoding = detect_fixed_width_encoding(source.read())
 
     _write_fixed_width_txt_from_working(
         working_file,
         source_file,
         fmt_name,
-        encoding,
+        fixed_width_encoding,
     )
 
 
@@ -432,15 +559,45 @@ def load_field_spec(fmt_val):
         
     return field_spec
 
-def parse_fixed_width_line(line_text, spec):
-    line_bytes = line_text.encode('big5', errors='ignore')
+FIXED_WIDTH_TEXT_ENCODINGS = ("utf-8-sig", "cp950", "big5hkscs", "big5")
+
+
+def _decode_error_count(value, encoding):
+    """Count undecodable byte sequences without dropping any source bytes."""
+    return value.decode(encoding, errors="replace").count("\ufffd")
+
+
+def detect_fixed_width_encoding(content_bytes):
+    """Choose the supported encoding that loses the fewest source bytes."""
+    if content_bytes.startswith(b"\xef\xbb\xbf"):
+        return "utf-8-sig"
+
+    return min(
+        FIXED_WIDTH_TEXT_ENCODINGS,
+        key=lambda encoding: _decode_error_count(content_bytes[:65536], encoding),
+    )
+
+
+def _is_name_field(field_name):
+    """Return True only for field 1.3, not fields such as 1.30."""
+    return bool(re.match(r"^1\.3(?:[^0-9]|$)", str(field_name).strip()))
+
+
+def parse_fixed_width_line(line_bytes, spec, encoding="cp950"):
+    """Parse a fixed-width record from its original bytes.
+
+    Field positions in cancer registry TXT files are byte positions.  Decoding a
+    full line before slicing can discard an unsupported character and shift every
+    following field.  Slice first, then decode each isolated field instead.
+    """
+    if isinstance(line_bytes, str):
+        line_bytes = line_bytes.encode(encoding, errors="replace")
+
     parsed_row = {}
     for name, start, end in spec:
-        field_value = line_bytes[start - 1:end]
-        try:
-            parsed_row[name] = field_value.decode('big5').strip()
-        except:
-            parsed_row[name] = field_value.decode('big5', errors='replace').strip()
+        field_bytes = line_bytes[start - 1:end]
+        # 先依原始位元組切欄位，再各自解碼；姓名不會另外猜測或修正編碼。
+        parsed_row[name] = field_bytes.decode(encoding, errors="replace").strip()
     return parsed_row
 
 
@@ -532,7 +689,7 @@ def categorize_fields_logic(job_id, user_id, scheme):
                     unmapped.append({"key": h, "label": h})
         
         mapped.sort(key=lambda x: _natural_sort_key(x['label']))
-        unmapped.sort(key=lambda x: _natural_sort_key(x['label']))
+        # 未匹配欄位要維持來源檔的欄位順序，方便使用者與原始檔逐欄比對。
 
         return {"ok": True,"mapped": mapped,"unmapped": unmapped}, 200
     except Exception as e:
@@ -683,7 +840,7 @@ def export_logic(job_id, user_id, scheme, selected_fields):
 
         for c_idx, (orig_col_idx, _) in enumerate(output_cols, start=1):
             if orig_col_idx is not None:
-                new_ws.column_dimensions[get_column_letter(c_idx)].width =                     ws.column_dimensions[get_column_letter(orig_col_idx)].width
+                new_ws.column_dimensions[get_column_letter(c_idx)].width =  ws.column_dimensions[get_column_letter(orig_col_idx)].width
             else:
                 new_ws.column_dimensions[get_column_letter(c_idx)].width = 15
 
@@ -854,7 +1011,7 @@ def manage_format_logic(method, fmt_id, name, version, updated):
     conn.close()
     return {"ok": True}, 200
 
-def clean_job_logic(user_id, format_id, convert_txt_flag, uploaded_file):
+def clean_job_logic(user_id, format_id, convert_txt_flag, uploaded_file, review_job_ids=None):
     if not format_id or not uploaded_file or uploaded_file.filename == '': 
         return {"ok": False, "error": "未選擇檔案"}, 400
     
@@ -872,6 +1029,12 @@ def clean_job_logic(user_id, format_id, convert_txt_flag, uploaded_file):
     file_ext = os.path.splitext(filename)[1].lower()
     base_name = os.path.splitext(filename)[0]
     has_no_headers = (file_ext == '.txt' and not convert_txt_flag)
+    # Excel 沒有可沿用的原始文字編碼，依系統匯出資料的 UTF-8 表示檢核；
+    # CSV 與固定長度 TXT 則在後續改用實際偵測到的來源編碼。
+    value_encoding = "utf-8"
+    review_job_ids = review_job_ids or []
+    excluded_duplicate_count = 0
+    reviewed_rows = pd.DataFrame()
 
     if file_ext == '.txt':
         uploaded_file.seek(0)
@@ -935,9 +1098,10 @@ def clean_job_logic(user_id, format_id, convert_txt_flag, uploaded_file):
                 log_base64 = base64.b64encode(log_content.encode('utf-8')).decode('utf-8')
                 
                 field_spec = load_field_spec(fmt_val)
+                detected_encoding = detect_fixed_width_encoding(content_bytes)
                 results = []
                 for line_bytes in lines:
-                    results.append(parse_fixed_width_line(line_bytes.decode('big5', errors='ignore'), field_spec))
+                    results.append(parse_fixed_width_line(line_bytes, field_spec, detected_encoding))
                 
                 output_xlsx = io.BytesIO()
                 keys = [f[0] for f in field_spec]
@@ -975,12 +1139,16 @@ def clean_job_logic(user_id, format_id, convert_txt_flag, uploaded_file):
 
     if file_ext == '.csv':
         try:
-            df_csv = pd.read_csv(path, dtype=str, encoding='utf-8-sig')
-        except UnicodeDecodeError:
-            df_csv = pd.read_csv(path, dtype=str, encoding='cp950')
+            df_csv, csv_encoding = _read_csv_with_supported_encoding(path, fmt_name)
+            logging.info("CSV encoding detected as %s: %s", csv_encoding, filename)
+        except (OSError, ValueError, pd.errors.ParserError) as e:
+            if conn and not conn.closed:
+                conn.close()
+            return {"ok": False, "error": f"CSV 讀取失敗: {str(e)}"}, 400
         temp_xlsx = f"{project_folder}/{base_name}.xlsx"
         df_csv.to_excel(temp_xlsx, index=False)
         process_path = temp_xlsx
+        value_encoding = csv_encoding
 
     if file_ext == '.txt':
         if convert_txt_flag:
@@ -997,9 +1165,15 @@ def clean_job_logic(user_id, format_id, convert_txt_flag, uploaded_file):
             try:
                 fmt_val = str(fmt_name).replace("fmt_", "")
                 field_spec = load_field_spec(fmt_val)
-                results = []
-                with open(path, 'r', encoding='big5', errors='ignore') as f:
-                    for line in f: results.append(parse_fixed_width_line(line, field_spec))
+                with open(path, "rb") as f:
+                    content_bytes = f.read()
+
+                detected_encoding = detect_fixed_width_encoding(content_bytes)
+                results = [
+                    parse_fixed_width_line(line_bytes, field_spec, detected_encoding)
+                    for line_bytes in content_bytes.splitlines()
+                    if line_bytes.strip()
+                ]
                 temp_xlsx = f"{project_folder}/{base_name}.xlsx"
                 keys = [f[0] for f in field_spec]
                 wb = Workbook()
@@ -1010,6 +1184,7 @@ def clean_job_logic(user_id, format_id, convert_txt_flag, uploaded_file):
                     for cell in row: cell.number_format = '@'
                 wb.save(temp_xlsx)
                 process_path = temp_xlsx
+                value_encoding = detected_encoding
             except Exception as e:
                 if conn and not conn.closed: conn.close()
                 return {"ok": False, "error": f"TXT 解析失敗: {str(e)}"}, 500
@@ -1032,9 +1207,69 @@ def clean_job_logic(user_id, format_id, convert_txt_flag, uploaded_file):
             json.dump(orig_headers, f_orig, ensure_ascii=False)
 
         validate_and_unify_headers_in_file(process_path, fmt_name)
+
+        if review_job_ids:
+            input_df = pd.read_excel(process_path, dtype=str)
+            input_columns = get_duplicate_comparison_columns(fmt_name, input_df.columns)
+            reference_keys = get_selected_review_duplicate_keys(user_id, review_job_ids)
+            duplicate_rows = input_df.apply(
+                lambda row: all(normalize_duplicate_value(row[input_columns[field_name]]) for field_name in DUPLICATE_COMPARISON_FIELDS)
+                and tuple(normalize_duplicate_value(row[input_columns[field_name]]) for field_name in DUPLICATE_COMPARISON_FIELDS) in reference_keys,
+                axis=1,
+            )
+            reviewed_rows = input_df.loc[duplicate_rows].copy()
+            input_df = input_df.loc[~duplicate_rows].copy()
+            excluded_duplicate_count = len(reviewed_rows)
+            reviewed_rows.to_excel(os.path.join(project_folder, "reviewed_duplicates.xlsx"), index=False)
+            input_df.to_excel(process_path, index=False)
         
         _create_working_file(process_path, working_file)
-        stats, alias_mapping, sorted_df, sorted_mask = cleanValidate(process_path, out_path, rep_path, f"fmt_{fmt_name}", version, rev_date)
+        if review_job_ids and excluded_duplicate_count and pd.read_excel(process_path, dtype=str).empty:
+            sorted_df = pd.read_excel(process_path, dtype=str)
+            sorted_mask = pd.DataFrame("", index=sorted_df.index, columns=sorted_df.columns)
+            sorted_df["錯誤註記說明(A:遺漏值 B:格式不符 C:邏輯錯誤 D:完全正確)"] = ""
+            sorted_df.to_excel(out_path, index=False, engine="openpyxl")
+            report = Workbook()
+            report.active.title = "資料清洗報告"
+            report.active.append(["資料總件數", 0])
+            report.save(rep_path)
+            report.close()
+            stats = {
+                "total": 0,
+                "error_rows": 0,
+                "completeness": 0,
+                "correctness": 0,
+                "consistency": 0,
+                "quality_score": 0,
+                "missing_cells": 0,
+                "format_cells": 0,
+                "logic_cells": 0,
+            }
+            alias_mapping = {}
+        else:
+            stats, alias_mapping, sorted_df, sorted_mask = cleanValidate(
+                process_path,
+                out_path,
+                rep_path,
+                f"fmt_{fmt_name}",
+                version,
+                rev_date,
+                value_encoding=value_encoding,
+            )
+        if not reviewed_rows.empty:
+            reviewed_input_file = os.path.join(project_folder, "reviewed_duplicates.xlsx")
+            reviewed_output_file = os.path.join(project_folder, "reviewed_duplicates_checked.xlsx")
+            reviewed_report_file = os.path.join(project_folder, "reviewed_duplicates_checked_report.xlsx")
+            cleanValidate(
+                reviewed_input_file,
+                reviewed_output_file,
+                reviewed_report_file,
+                f"fmt_{fmt_name}",
+                version,
+                rev_date,
+                value_encoding=value_encoding,
+            )
+            append_reviewed_rows_to_cleaning_result(out_path, reviewed_output_file)
         date_errors = _build_date_errors(sorted_df, sorted_mask, alias_mapping, date_error_file)
         cursor.execute("INSERT INTO Job ([JobID],[UserID],[FmtID],[FileName],[TotalCount],[CompletenessScore],[CorrectScore],[ConsistencyScore],[DQI],[Path]) VALUES (?,?,?,?,?,?,?,?,?,?)",
                         (JobID, user_id, format_id, filename, int(stats['total']), float(stats['completeness']), float(stats['correctness']), float(stats['consistency']), float(stats['quality_score']), project_folder))
@@ -1100,7 +1335,10 @@ def clean_job_logic(user_id, format_id, convert_txt_flag, uploaded_file):
         "output_fields": output_fields,
         "date_error_limit": DATE_ERROR_LIMIT,
         "date_error_count": date_error_count,
-        "date_errors": date_errors
+        "date_errors": date_errors,
+        "excluded_duplicate_count": excluded_duplicate_count,
+        "skipped_cleaning_count": 0,
+        "reviewed_duplicate_count": excluded_duplicate_count,
     }, 200
 
 
@@ -1169,6 +1407,14 @@ def update_date_error_logic(job_id, user_id, row_index, updates):
         _sync_working_file_to_source_files(working_file,source_file,converted_file,fmt_name)
         stats, alias_mapping, sorted_df, sorted_mask = run_clean_validate_with_clean_log(
             working_file,cleaned_file,report_file,f"fmt_{fmt_name}",version,rev_date)
+        reviewed_records_file = os.path.join(project_path, "reviewed_duplicates.xlsx")
+        if os.path.exists(reviewed_records_file):
+            reviewed_output_file = os.path.join(project_path, "reviewed_duplicates_checked.xlsx")
+            reviewed_report_file = os.path.join(project_path, "reviewed_duplicates_checked_report.xlsx")
+            run_clean_validate_with_clean_log(
+                reviewed_records_file, reviewed_output_file, reviewed_report_file, f"fmt_{fmt_name}", version, rev_date
+            )
+            append_reviewed_rows_to_cleaning_result(cleaned_file, reviewed_output_file)
         date_errors = _build_date_errors(sorted_df, sorted_mask, alias_mapping, date_error_file)
         date_error_count = len(date_errors)
 
@@ -1261,4 +1507,3 @@ def download_file_logic(file_type, job_id, user_id):
         return {"send_file": True, "path": os.path.abspath(file_path), "download_name": display_name if display_name else target_filename}, 200
     except Exception as e:
         return {"ok": False, "error": str(e)}, 500
-

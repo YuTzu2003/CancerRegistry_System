@@ -2,11 +2,32 @@ import os
 import random
 import string
 import re
+import base64
+import io
 import pandas as pd
 import numpy as np
 from modules.blueprint.clean.field_mapping import detect_system
-from modules.blueprint.clean.pipeline import _natural_sort_key
+from modules.blueprint.clean.pipeline import (
+    _natural_sort_key,
+    _csv_reader_encoding,
+    detect_fixed_width_encoding,
+    load_field_spec,
+    parse_fixed_width_line,
+)
 from modules.services.db import get_conn
+
+SUPPORTED_INPUT_EXTENSIONS = {".txt", ".csv", ".xlsx"}
+TEXT_INPUT_ENCODINGS = ("utf-8-sig", "cp950", "big5hkscs", "big5", "gb18030")
+
+
+class FixedWidthLengthError(ValueError):
+    """Length validation details that can be offered as downloads to the user."""
+
+    def __init__(self, message, *, log_data, xlsx_data, filename):
+        super().__init__(message)
+        self.log_data = log_data
+        self.xlsx_data = xlsx_data
+        self.filename = filename
 
 def get_custom_districts():
     districts = []
@@ -87,13 +108,154 @@ def find_seq_for_header(col_name, field_db_map):
     return None
 
 
-def analyze_file_logic(file_path, filename):
+def _format_name_from_id(format_id):
+    """Return the registry format name (for example ``45``) for a selected ID."""
+    if not format_id:
+        return ""
+
+    conn = get_conn()
     try:
-        ext = os.path.splitext(filename)[1].lower()
-        if ext == '.xlsx':
-            df = pd.read_excel(file_path, nrows=5, dtype=str)
-        else:
-            df = pd.read_csv(file_path, nrows=5, encoding='utf-8-sig', dtype=str)
+        cursor = conn.cursor()
+        cursor.execute("SELECT FmtName FROM [DataFormat] WHERE FmtID = ?", (str(format_id).strip(),))
+        row = cursor.fetchone()
+        return str(row[0]).strip() if row and row[0] is not None else ""
+    finally:
+        conn.close()
+
+
+def _read_fixed_width_txt(file_path, format_id, nrows=None):
+    """Parse a headerless registry TXT by its selected byte-position format."""
+    format_name = _format_name_from_id(format_id)
+    if not format_name:
+        raise ValueError("無欄位名稱的固定欄位 TXT，請先選擇參考資料格式（例如 42、45、50）。")
+
+    field_spec = load_field_spec(format_name)
+    if not field_spec:
+        raise ValueError(f"找不到 {format_name} 欄位格式定義，無法解析固定欄位 TXT。")
+
+    with open(file_path, "rb") as source:
+        content_bytes = source.read()
+
+    lines = [line for line in content_bytes.splitlines() if line.strip()]
+    expected_length = max(end for _, _, end in field_spec)
+    invalid_lengths = [
+        f"第 {index + 1} 行：實際 {len(line)} bytes，預期 {expected_length} bytes"
+        for index, line in enumerate(lines)
+        if len(line) != expected_length
+    ]
+    if invalid_lengths:
+        details = "；".join(invalid_lengths[:3])
+        suffix = "……" if len(invalid_lengths) > 3 else ""
+        encoding = detect_fixed_width_encoding(content_bytes)
+        records = [parse_fixed_width_line(line, field_spec, encoding) for line in lines]
+        headers = [name for name, _, _ in field_spec]
+
+        preview_buffer = io.BytesIO()
+        pd.DataFrame(records, columns=headers).to_excel(preview_buffer, index=False)
+
+        log_content = (
+            f"檔案名稱: {os.path.basename(str(file_path))}\n"
+            f"資料格式: {format_name}\n"
+            f"預期每列長度: {expected_length} bytes\n\n"
+            + "\n".join(invalid_lengths)
+        )
+        message = f"固定欄位 TXT 長度與所選 {format_name} 格式不符：{details}{suffix}"
+        raise FixedWidthLengthError(
+            message,
+            log_data=base64.b64encode(log_content.encode("utf-8")).decode("ascii"),
+            xlsx_data=base64.b64encode(preview_buffer.getvalue()).decode("ascii"),
+            filename=os.path.basename(str(file_path)),
+        )
+
+    encoding = detect_fixed_width_encoding(content_bytes)
+    if nrows is not None:
+        lines = lines[:nrows]
+    records = [parse_fixed_width_line(line, field_spec, encoding) for line in lines]
+    headers = [name for name, _, _ in field_spec]
+    return pd.DataFrame(records, columns=headers), "fixed_width_txt"
+
+
+def _read_delimited_text(file_path, nrows=None):
+    """Read a CSV-like text file with a supported source encoding.
+
+    The Windows CP950 decoder is deliberately attempted before Big5-HKSCS. A
+    CP950 user-defined character can otherwise make a valid file look like
+    Big5-HKSCS and change its displayed value during generation.
+    """
+    with open(file_path, "rb") as source:
+        first_line_bytes = source.readline()
+
+    if b"\t" in first_line_bytes:
+        delimiter = "\t"
+    elif b"," in first_line_bytes:
+        delimiter = ","
+    elif b";" in first_line_bytes:
+        delimiter = ";"
+    else:
+        delimiter = ","
+
+    options = {"dtype": str, "sep": delimiter}
+    if nrows is not None:
+        options["nrows"] = nrows
+
+    errors = []
+    for source_encoding in TEXT_INPUT_ENCODINGS:
+        reader_encoding = _csv_reader_encoding(source_encoding)
+        try:
+            return pd.read_csv(file_path, encoding=reader_encoding, **options)
+        except UnicodeDecodeError as error:
+            errors.append(f"{source_encoding}: {error}")
+
+    raise ValueError("無法辨識文字檔編碼，請另存為 UTF-8、CP950 或 Big5 後再上傳。")
+
+
+def _read_uploaded_dataframe(file_path, format_id=None, nrows=None, txt_has_header=None):
+    """Read an upload into a dataframe before field mapping and generation.
+
+    For TXT uploads, ``txt_has_header`` is the user's explicit choice. Headered
+    files must be comma, tab, or semicolon separated. Headerless TXT files are
+    registry fixed-width records and require the selected registry format.
+    ``None`` retains automatic detection for non-web callers.
+    """
+    extension = os.path.splitext(str(file_path))[1].lower()
+    if extension not in SUPPORTED_INPUT_EXTENSIONS:
+        raise ValueError("僅接受 .txt、.csv 或 .xlsx 格式。")
+
+    options = {"dtype": str}
+    if nrows is not None:
+        options["nrows"] = nrows
+
+    if extension == ".xlsx":
+        return pd.read_excel(file_path, **options), "excel"
+
+    with open(file_path, "rb") as source:
+        first_line_bytes = source.readline()
+    has_delimiter = any(token in first_line_bytes for token in (b",", b"\t", b";"))
+    if extension == ".csv":
+        return _read_delimited_text(file_path, nrows=nrows), "delimited_text"
+
+    if extension == ".txt" and txt_has_header is True:
+        if not has_delimiter:
+            raise ValueError("已勾選「檔案是否包含標頭」，但 TXT 第一列未找到 Tab、逗號或分號分隔符號。")
+        return _read_delimited_text(file_path, nrows=nrows), "headered_text"
+
+    if extension == ".txt" and txt_has_header is False:
+        return _read_fixed_width_txt(file_path, format_id, nrows=nrows)
+
+    if extension == ".txt" and has_delimiter:
+        return _read_delimited_text(file_path, nrows=nrows), "delimited_text"
+
+    return _read_fixed_width_txt(file_path, format_id, nrows=nrows)
+
+
+def analyze_file_logic(file_path, filename, format_id=None, txt_has_header=None):
+    try:
+        df, input_mode = _read_uploaded_dataframe(
+            file_path,
+            format_id=format_id,
+            nrows=5,
+            txt_has_header=txt_has_header,
+        )
 
         conn = get_conn()
         cursor = conn.cursor()
@@ -140,11 +302,12 @@ def analyze_file_logic(file_path, filename):
             "診斷年齡": "age_calc"
         }
 
-        for col in raw_cols:
+        for source_index, col in enumerate(raw_cols):
             found_seq = find_seq_for_header(col, field_db_map)
             
             info = {
                 "name": col,
+                "source_index": source_index,
                 "is_date": False,
                 "special_key": None,
                 "seq": found_seq,
@@ -186,24 +349,43 @@ def analyze_file_logic(file_path, filename):
             "ok": True, 
             "analyzed_columns": analyzed_columns, 
             "detected_system": system_name,
-            "filename": filename
+            "filename": filename,
+            "input_mode": input_mode,
         }, 200
+    except FixedWidthLengthError as error:
+        return {
+            "ok": False,
+            "error": str(error),
+            "has_length_error": True,
+            "log_data": error.log_data,
+            "xlsx_data": error.xlsx_data,
+            "filename": error.filename,
+        }, 400
     except Exception as e:
         import traceback
         traceback.print_exc()
         return {"ok": False, "error": str(e)}, 500
 
 
-def process_file_logic(file_path, format_id, selected_date_cols_raw, extra_cols, special_configs, naming_scheme):
+def process_file_logic(
+    file_path,
+    format_id,
+    selected_date_cols_raw,
+    extra_cols,
+    special_configs,
+    naming_scheme,
+    txt_has_header=None,
+):
     if not file_path or not os.path.exists(file_path):
         return {"ok": False, "error": "請重新上傳檔案"}, 400
         
     try:
         ext = os.path.splitext(file_path)[1].lower()
-        if ext == ".xlsx":
-            df = pd.read_excel(file_path, dtype=str)
-        else:
-            df = pd.read_csv(file_path, encoding="utf-8-sig", dtype=str)
+        df, _ = _read_uploaded_dataframe(
+            file_path,
+            format_id=format_id,
+            txt_has_header=txt_has_header,
+        )
             
         df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
         df.columns = df.columns.str.strip()
@@ -342,12 +524,14 @@ def process_file_logic(file_path, format_id, selected_date_cols_raw, extra_cols,
         is_originally_99 = {col: [False] * row_count for col in selected_date_cols_std}
         for col in selected_date_cols_std:
             if col in df.columns:
-                vals = df[col].astype(str).str.strip()
-                for i in range(row_count):
-                    val = vals[i]
+                for i, (row_index, raw_value) in enumerate(df[col].items()):
+                    if pd.isna(raw_value):
+                        continue
+
+                    val = str(raw_value).strip()
                     if len(val) >= 8 and (val.endswith("99") or "/99" in val):
                         is_originally_99[col][i] = True
-                        df.loc[i, col] = val[:-2] + "15"
+                        df.at[row_index, col] = val[:-2] + "15"
                 try:
                     df[col] = pd.to_datetime(df[col], errors='coerce', format='mixed')
                 except:
@@ -427,7 +611,8 @@ def process_file_logic(file_path, format_id, selected_date_cols_raw, extra_cols,
                 (d.year - b.year) if pd.notna(d) and pd.notna(b) else np.nan 
                 for b, d in zip(temp_birth, temp_diag)
             ]
-            df[birth_col] = temp_birth.apply(lambda x: format_date_special(x, "%Y/%m/01") if pd.notna(x) else "0000/00/00")
+            # 出生資料只保留年月，避免替沒有日期精度的來源資料虛構某一天。
+            df[birth_col] = temp_birth.apply(lambda x: format_date_special(x, "%Y/%m") if pd.notna(x) else "0000/00")
 
         for col in selected_date_cols_std:
             if col in df.columns:
@@ -487,10 +672,14 @@ def process_file_logic(file_path, format_id, selected_date_cols_raw, extra_cols,
         scheme_display = scheme_display_map.get(naming_scheme, naming_scheme)
         fmt_prefix = f"fmt{fmt_name}_" if (format_id and 'fmt_name' in locals() and fmt_name) else ""
         
-        out_filename = f"Gen_{fmt_prefix}{orig_base}_{scheme_display}{orig_ext}"
+        # TXT cannot safely retain its original byte positions after
+        # de-identification and column selection, so text inputs are exported
+        # as a standard Excel workbook.
+        output_ext = ".xlsx" if ext == ".txt" else orig_ext
+        out_filename = f"Gen_{fmt_prefix}{orig_base}_{scheme_display}{output_ext}"
         out_path = os.path.join(os.path.dirname(file_path), out_filename)
         
-        if ext == ".xlsx": df.to_excel(out_path, index=False)
+        if output_ext == ".xlsx": df.to_excel(out_path, index=False)
         else: df.to_csv(out_path, index=False, encoding="utf-8-sig")
         
         preview_data = []

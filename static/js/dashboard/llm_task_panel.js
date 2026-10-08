@@ -9,6 +9,21 @@
   const taskTypes = taskPanel?.dataset.llmTaskType === 'comparison_report' ? ['comparison_report'] : ['chart', 'annual_report'];
   const taskList = taskPanel?.querySelector('#llmTaskList');
 
+  const confirmTaskDeletion = async (count) => {
+    if (!window.Swal) return false;
+    const result = await window.Swal.fire({
+      icon: 'warning',
+      title: count === 1 ? '確定要刪除這筆紀錄嗎？' : `確定要刪除 ${count} 筆紀錄嗎？`,
+      text: '刪除後無法復原。',
+      showCancelButton: true,
+      confirmButtonText: '確認刪除',
+      cancelButtonText: '取消',
+      confirmButtonColor: '#dc3545',
+      reverseButtons: true,
+    });
+    return result.isConfirmed;
+  };
+
   const formatDate = (text) => {
     if (!text) return '尚未開始';
     const date = new Date(text);
@@ -45,7 +60,10 @@
       const response = await fetch('/api/llm-tasks?limit=50');
       const payload = await response.json();
       if (response.ok && payload.success) {
-        tasks = (payload.tasks || []).filter((task) => taskTypes.includes(value(task, 'TaskType')));
+        tasks = (payload.tasks || []).filter((task) => (
+          taskTypes.includes(value(task, 'TaskType'))
+          && value(task, 'InsightModule') !== 'indicators'
+        ));
       }
     } catch (e) {}
     render();
@@ -72,8 +90,9 @@
     });
     taskPanel.querySelector('#btnBatchDelete').addEventListener('click', async () => {
       const ids = [...taskList.querySelectorAll('.task-cb:checked')].map((item) => item.value);
-      if (!ids.length || !confirm(`確定要刪除 ${ids.length} 筆工作任務嗎？`)) return;
+      if (!ids.length || !(await confirmTaskDeletion(ids.length))) return;
       await Promise.all(ids.map((id) => fetch(`/api/llm-tasks/${encodeURIComponent(id)}`, { method: 'DELETE' })));
+      ids.forEach((id) => selectedTaskIds.delete(id));
       await load();
     });
     taskList.addEventListener('change', (event) => {
@@ -85,8 +104,9 @@
       if (!button) return;
       if (button.matches('.llm-preview')) preview(button.dataset.id, button.dataset.type);
       if (button.matches('.llm-export')) window.location.assign('/dashboard-preview/' + encodeURIComponent(button.dataset.id) + '?export=1');
-      if (button.matches('.llm-row-delete') && confirm('確定要刪除此工作任務嗎？')) {
+      if (button.matches('.llm-row-delete') && await confirmTaskDeletion(1)) {
         await fetch(`/api/llm-tasks/${encodeURIComponent(button.dataset.id)}`, { method: 'DELETE' });
+        selectedTaskIds.delete(button.dataset.id);
         await load();
       }
     });

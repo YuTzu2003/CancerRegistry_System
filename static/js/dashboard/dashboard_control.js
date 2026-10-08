@@ -37,10 +37,10 @@
             window.dashboardSelectedCancerTitle = '全癌別';
             selectedValues.push('All_Cancers');
         } else if (specificSelectedCount > 0) {
-            const groupNodes = document.querySelectorAll('.cancer-cb-group:not([data-group="All_Cancers"])');
+            const groupNodes = document.querySelectorAll('.cancer-cb-group:not([data-group="All_Cancers"]), .cancer-cb-subgroup');
             const groupedNames = [];
             groupNodes.forEach(group => {
-               if(group.checked) {
+               if(group.checked && !hasCheckedAncestor(group)) {
                    const label = group.nextElementSibling.textContent.replace('(全選)', '').trim();
                    groupedNames.push(label.replace(/\s*\([^)]*\)/g, '').replace(/\s+[A-Za-z][A-Za-z0-9\s,./&+-]*$/g, '').trim());
                } 
@@ -69,18 +69,14 @@
     if (isAllSelected || (specificSelectedCount === leafNodes.length && leafNodes.length > 0)) {
         displayCancerKeys.push('All_Cancers');
     } else {
-        const selectedGroups = new Set();
-        document.querySelectorAll('.cancer-cb-group:not([data-group="All_Cancers"])').forEach(group => {
-            if (group.checked) {
-                selectedGroups.add(group.dataset.group);
+        document.querySelectorAll('.cancer-cb-group:not([data-group="All_Cancers"]), .cancer-cb-subgroup').forEach(group => {
+            if (group.checked && !hasCheckedAncestor(group)) {
                 displayCancerKeys.push(group.dataset.group);
             }
         });
         leafNodes.forEach(node => {
             if (!node.checked) return;
-            const parentKey = node.dataset.parent;
-            const grandparentKey = node.dataset.grandparent;
-            if (!selectedGroups.has(parentKey) && !selectedGroups.has(grandparentKey)) {
+            if (!hasCheckedAncestor(node)) {
                 displayCancerKeys.push(node.value);
             }
         });
@@ -114,11 +110,64 @@
   }
 
   /* ── 癌別選擇事件綁定 ── */
+  function descendantLeaves(groupId) {
+      const leaves = [];
+      const pending = [groupId];
+      const seen = new Set();
+
+      while (pending.length) {
+          const currentId = pending.shift();
+          if (seen.has(currentId)) continue;
+          seen.add(currentId);
+
+          document.querySelectorAll(`.cancer-cb-leaf[data-parent="${currentId}"]`).forEach(leaf => leaves.push(leaf));
+          document.querySelectorAll(`.cancer-cb-subgroup[data-parent="${currentId}"]`).forEach(subgroup => {
+              pending.push(subgroup.dataset.group);
+          });
+      }
+
+      return leaves;
+  }
+
+  function descendantSubgroups(groupId) {
+      const subgroups = [];
+      const pending = [groupId];
+      const seen = new Set();
+
+      while (pending.length) {
+          const currentId = pending.shift();
+          if (seen.has(currentId)) continue;
+          seen.add(currentId);
+
+          document.querySelectorAll(`.cancer-cb-subgroup[data-parent="${currentId}"]`).forEach(subgroup => {
+              subgroups.push(subgroup);
+              pending.push(subgroup.dataset.group);
+          });
+      }
+
+      return subgroups;
+  }
+
+  function hasCheckedAncestor(node) {
+      let parentId = node.dataset.parent;
+      const seen = new Set();
+
+      while (parentId && !seen.has(parentId)) {
+          seen.add(parentId);
+          const parent = document.getElementById(`chk_group_${parentId}`);
+          if (!parent) return false;
+          if (parent.checked) return true;
+          parentId = parent.dataset.parent;
+      }
+
+      return false;
+  }
+
   function updateParentCheckboxes() {
       document.querySelectorAll('.cancer-cb-subgroup').forEach(subgroup => {
           const groupId = subgroup.getAttribute('data-group');
-          const leaves = document.querySelectorAll(`.cancer-cb-leaf[data-parent="${groupId}"]`);
-          const checkedLeaves = Array.from(leaves).filter(l => l.checked);
+          const leaves = descendantLeaves(groupId);
+          const checkedLeaves = leaves.filter(l => l.checked);
           subgroup.checked = leaves.length > 0 && checkedLeaves.length === leaves.length;
           subgroup.indeterminate = checkedLeaves.length > 0 && checkedLeaves.length < leaves.length;
       });
@@ -127,10 +176,10 @@
           const groupId = group.getAttribute('data-group');
           if (groupId === 'All_Cancers') return;
           
-          const leavesAndSubgroups = document.querySelectorAll(`.cancer-cb-leaf[data-parent="${groupId}"], .cancer-cb-leaf[data-grandparent="${groupId}"]`);
-          const checkedItems = Array.from(leavesAndSubgroups).filter(l => l.checked);
-          group.checked = leavesAndSubgroups.length > 0 && checkedItems.length === leavesAndSubgroups.length;
-          group.indeterminate = checkedItems.length > 0 && checkedItems.length < leavesAndSubgroups.length;
+          const leaves = descendantLeaves(groupId);
+          const checkedLeaves = leaves.filter(l => l.checked);
+          group.checked = leaves.length > 0 && checkedLeaves.length === leaves.length;
+          group.indeterminate = checkedLeaves.length > 0 && checkedLeaves.length < leaves.length;
       });
       
       const allCancersGroup = document.querySelector('.cancer-cb-group[data-group="All_Cancers"]');
@@ -165,8 +214,8 @@
                   badgeSpan.innerHTML = '';
               }
           } else {
-              const leaves = document.querySelectorAll(`.cancer-cb-leaf[data-parent="${targetId}"], .cancer-cb-leaf[data-grandparent="${targetId}"]`);
-              const checkedCount = Array.from(leaves).filter(l => l.checked).length;
+              const leaves = descendantLeaves(targetId);
+              const checkedCount = leaves.filter(l => l.checked).length;
               if (checkedCount === 0) {
                   badgeSpan.innerHTML = '';
               } else if (checkedCount === leaves.length && leaves.length > 0) {
@@ -191,7 +240,7 @@
                 cb.indeterminate = false;
             });
         } else {
-            document.querySelectorAll(`.cancer-cb-leaf[data-parent="${groupId}"], .cancer-cb-leaf[data-grandparent="${groupId}"], .cancer-cb-subgroup[data-parent="${groupId}"]`).forEach(cb => {
+            [...descendantLeaves(groupId), ...descendantSubgroups(groupId)].forEach(cb => {
                 cb.checked = isChecked;
                 cb.indeterminate = false;
             });
@@ -199,8 +248,9 @@
     } else if (target.classList.contains('cancer-cb-subgroup')) {
         const groupId = target.getAttribute('data-group');
         const isChecked = target.checked;
-        document.querySelectorAll(`.cancer-cb-leaf[data-parent="${groupId}"]`).forEach(cb => {
+        [...descendantLeaves(groupId), ...descendantSubgroups(groupId)].forEach(cb => {
             cb.checked = isChecked;
+            cb.indeterminate = false;
         });
     }
     
@@ -1214,6 +1264,46 @@ function initDashboardControl() {
       });
   }
 
+  const btnExportPbip = document.getElementById('btnExportPbip');
+  if (btnExportPbip) {
+      btnExportPbip.addEventListener('click', async function() {
+          const fileId = document.querySelector('#dashFileListBody tr.table-active')?.dataset.fileId || '';
+          const yearStart = document.getElementById('filterYearStart')?.value.trim() || '';
+          const yearEnd = document.getElementById('filterYearEnd')?.value.trim() || '';
+          const behavior = document.getElementById('filterBehavior')?.value || '';
+          const cancers = Array.from(window.selectedCancers || []);
+          const analysisItems = Array.from(document.querySelectorAll('.item-checkbox:checked')).map(item => item.value);
+          const supported = new Set(['性別年齡分佈', '年齡中位數', '可分析個案與確診個案']);
+          if (!fileId || !yearStart || !yearEnd || !behavior || cancers.length === 0 || analysisItems.length === 0) {
+              utils.alert('請先完成檔案、年度、性態碼、癌別及分析主題選擇。', 'warning');
+              return;
+          }
+          if (analysisItems.some(item => !supported.has(item))) {
+              utils.alert('目前 Power BI 公版只支援：性別年齡分佈、年齡中位數、可分析個案與確診個案。', 'warning');
+              return;
+          }
+          btnExportPbip.disabled = true;
+          window.utils?.showLoading?.('正在篩選資料並產生 Power BI 專案，請稍候…');
+          try {
+              const response = await fetch('/api/dashboard/export_pbip', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({file_id: fileId, cancers, year_start: yearStart, year_end: yearEnd,
+                                        behavior, analysis_items: analysisItems})
+              });
+              const result = await response.json();
+              if (!response.ok || !result.ok) throw new Error(result.error || 'Power BI 專案產生失敗');
+              window.location.assign(result.download_url);
+              utils.alert(`已產生 ${result.pages} 頁圖表、${result.rows} 筆資料的 Power BI 專案。解壓後開啟 PBIP，重新整理並另存為 PBIX。`, 'success');
+          } catch (error) {
+              utils.alert(`無法產生 Power BI 專案：${error.message}`, 'error');
+          } finally {
+              window.utils?.hideLoading?.();
+              btnExportPbip.disabled = false;
+          }
+      });
+  }
+
   const btnRunQuery = document.getElementById('btnRunQuery');
   if (btnRunQuery) {
       btnRunQuery.addEventListener('click', async function() {
@@ -1648,9 +1738,15 @@ function initDashboardControl() {
   const fileInput = document.getElementById('dashFileInput');
   const inputFormatChips = document.querySelectorAll('#dashboardInputScheme .naming-chip');
   const inputFieldList = document.getElementById('dashboardInputFieldList');
+  const selectAllExtraFieldsBtn = document.getElementById('btnSelectAllDashboardExtras');
+  const clearAllExtraFieldsBtn = document.getElementById('btnClearAllDashboardExtras');
   const previewInputBtn = document.getElementById('btnPreviewDashboardInput');
   const inputSettings = document.getElementById('dashboardInputSettings');
   const uploadButton = document.getElementById('btnDashUpload');
+  const dashboardFormatOptions = document.getElementById('dashboardFormatOptions');
+  const dashboardTxtOptions = document.getElementById('dashboardTxtOptions');
+  const dashboardFormatSelect = document.getElementById('dashboardFormatSelect');
+  const dashboardTxtHasHeader = document.getElementById('dashboardTxtHasHeader');
   let dashboardInputPreview = null;
   let dashboardInputPreviewLoading = false;
   let dashboardInputPreviewRequestId = 0;
@@ -1658,26 +1754,68 @@ function initDashboardControl() {
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
   })[char]);
 
+  const dashboardExtraFieldCheckboxes = () => Array.from(
+      inputFieldList?.querySelectorAll('.dashboard-extra-field-checkbox') || []
+  );
+
+  const isDashboardTxtUpload = () => {
+      const selectedFile = fileInput?.files?.[0];
+      return Boolean(selectedFile && selectedFile.name.toLowerCase().endsWith('.txt'));
+  };
+
+  const dashboardFormatReady = () => Boolean(dashboardFormatSelect?.value);
+
+  const setDashboardExtraFieldsChecked = checked => {
+      dashboardExtraFieldCheckboxes().forEach(checkbox => {
+          checkbox.checked = checked;
+          checkbox.closest('.field-chip')?.classList.toggle('selected', checked);
+      });
+      syncDashboardExtraFieldControls();
+  };
+
+  const syncDashboardExtraFieldControls = () => {
+      const checkboxes = dashboardExtraFieldCheckboxes();
+      const selectedCount = checkboxes.filter(checkbox => checkbox.checked).length;
+      const hasUnmatchedFields = checkboxes.length > 0;
+      if (selectAllExtraFieldsBtn) selectAllExtraFieldsBtn.disabled = !hasUnmatchedFields || selectedCount === checkboxes.length;
+      if (clearAllExtraFieldsBtn) clearAllExtraFieldsBtn.disabled = !hasUnmatchedFields || selectedCount === 0;
+  };
+
   const syncDashboardInputFormat = () => {
       const hasSelectedFile = Boolean(fileInput?.files?.length);
+      const isTxtUpload = isDashboardTxtUpload();
+      const settingsReady = hasSelectedFile && dashboardFormatReady();
+      dashboardFormatOptions?.classList.toggle('d-none', !hasSelectedFile);
+      dashboardTxtOptions?.classList.toggle('d-none', !isTxtUpload);
+      if (dashboardFormatSelect) dashboardFormatSelect.disabled = !hasSelectedFile;
+      if (dashboardTxtHasHeader) dashboardTxtHasHeader.disabled = !isTxtUpload;
       inputFormatChips.forEach(chip => {
           const input = chip.querySelector('input[type="radio"]');
-          if (input) input.disabled = !hasSelectedFile;
+          if (input) input.disabled = !settingsReady;
           chip.classList.toggle('selected', Boolean(input?.checked));
       });
       const hasSelectedScheme = Boolean(document.querySelector('input[name="dashboardInputScheme"]:checked'));
       const previewReady = Boolean(dashboardInputPreview) && !dashboardInputPreviewLoading;
-      if (previewInputBtn) previewInputBtn.disabled = !(hasSelectedFile && hasSelectedScheme && previewReady);
-      if (uploadButton) uploadButton.disabled = !(hasSelectedFile && hasSelectedScheme && previewReady);
-      inputSettings?.classList.toggle('is-disabled', !hasSelectedFile);
-      inputSettings?.classList.toggle('d-none', !hasSelectedFile);
-      inputSettings?.setAttribute('aria-disabled', String(!hasSelectedFile));
+      if (previewInputBtn) previewInputBtn.disabled = !(hasSelectedFile && hasSelectedScheme && dashboardFormatReady() && previewReady);
+      if (uploadButton) uploadButton.disabled = !(hasSelectedFile && hasSelectedScheme && dashboardFormatReady() && previewReady);
+      syncDashboardExtraFieldControls();
+      inputSettings?.classList.toggle('is-disabled', !settingsReady);
+      inputSettings?.classList.toggle('d-none', !settingsReady);
+      inputSettings?.setAttribute('aria-disabled', String(!settingsReady));
   };
 
   const loadDashboardInputPreview = async () => {
       const selectedFile = fileInput?.files?.[0];
       const inputScheme = document.querySelector('input[name="dashboardInputScheme"]:checked')?.value;
       if (!selectedFile || !inputScheme) return;
+
+      if (!dashboardFormatReady()) {
+          if (inputFieldList) {
+              inputFieldList.innerHTML = '<span class="field-chip disabled"><i class="bi bi-info-circle"></i> 請先選擇申報欄位格式</span>';
+          }
+          syncDashboardInputFormat();
+          return;
+      }
 
       dashboardInputPreview = null;
       dashboardInputPreviewLoading = true;
@@ -1690,6 +1828,8 @@ function initDashboardControl() {
       const previewData = new FormData();
       previewData.set('file', selectedFile);
       previewData.set('input_scheme', inputScheme);
+      previewData.set('format_id', dashboardFormatSelect?.value || '');
+      previewData.set('txt_has_header', dashboardTxtHasHeader?.checked ? 'true' : 'false');
       try {
           const response = await fetch('/dashboard/input-preview', { method: 'POST', body: previewData });
           const data = await response.json();
@@ -1706,6 +1846,7 @@ function initDashboardControl() {
               inputFieldList.querySelectorAll('.dashboard-extra-field-checkbox').forEach(checkbox => {
                   checkbox.addEventListener('change', () => {
                       checkbox.closest('.field-chip')?.classList.toggle('selected', checkbox.checked);
+                      syncDashboardExtraFieldControls();
                   });
               });
           }
@@ -1728,6 +1869,21 @@ function initDashboardControl() {
           loadDashboardInputPreview();
       });
   });
+  dashboardFormatSelect?.addEventListener('change', () => {
+      dashboardInputPreview = null;
+      syncDashboardInputFormat();
+      if (dashboardFormatReady()) {
+          inputSettings?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      loadDashboardInputPreview();
+  });
+  dashboardTxtHasHeader?.addEventListener('change', () => {
+      dashboardInputPreview = null;
+      syncDashboardInputFormat();
+      loadDashboardInputPreview();
+  });
+  selectAllExtraFieldsBtn?.addEventListener('click', () => setDashboardExtraFieldsChecked(true));
+  clearAllExtraFieldsBtn?.addEventListener('click', () => setDashboardExtraFieldsChecked(false));
   syncDashboardInputFormat();
 
   fileInput?.addEventListener('change', () => {
@@ -1744,12 +1900,12 @@ function initDashboardControl() {
           if (defaultChineseScheme) defaultChineseScheme.checked = true;
       }
       if (inputFieldList) {
-          inputFieldList.innerHTML = selectedFile
+        inputFieldList.innerHTML = selectedFile
             ? `<span class="field-chip disabled"><i class="bi bi-file-earmark-excel"></i> 已選擇 ${escapeDashboardInputHtml(selectedFile.name)}，請選擇欄位命名來源</span>`
             : '<span class="field-chip disabled"><i class="bi bi-asterisk"></i> 請先選擇檔案</span>';
       }
       syncDashboardInputFormat();
-      if (selectedFile) {
+      if (selectedFile && dashboardFormatReady()) {
           inputSettings?.scrollIntoView({ behavior: 'smooth', block: 'start' });
           loadDashboardInputPreview();
       }
@@ -1767,8 +1923,13 @@ function initDashboardControl() {
             .then(() => fileInput?.click());
           return;
       }
+      if (!dashboardFormatReady()) {
+          Swal.fire({ icon: 'warning', title: '請先選擇申報欄位格式', confirmButtonColor: '#2563eb' });
+          return;
+      }
       const selectedLabel = document.querySelector('input[name="dashboardInputScheme"]:checked')
         ?.closest('.naming-chip')?.querySelector('.nc-title')?.textContent?.trim() || '';
+      const selectedFormatLabel = dashboardFormatSelect?.selectedOptions?.[0]?.textContent?.trim() || '';
       if (!dashboardInputPreview) {
           Swal.fire({ icon: 'warning', title: '欄位尚未完成辨識', confirmButtonColor: '#2563eb' });
           return;
@@ -1784,7 +1945,7 @@ function initDashboardControl() {
       Swal.fire({
           title: '輸入檔案預覽',
           width: 900,
-          html: `<div class="text-start mb-3"><strong>檔案：</strong>${escapeDashboardInputHtml(selectedFile.name)}<span class="mx-2">｜</span><strong>命名來源：</strong>${escapeDashboardInputHtml(selectedLabel)}</div><div class="table-responsive" style="max-height:420px"><table class="table table-sm table-bordered align-middle mb-0"><thead class="table-light sticky-top"><tr><th>原始欄位</th><th style="width:45px"></th><th>標準欄位</th><th style="width:90px">狀態</th></tr></thead><tbody>${previewRows}</tbody></table></div>`,
+          html: `<div class="text-start mb-3"><strong>檔案：</strong>${escapeDashboardInputHtml(selectedFile.name)}<span class="mx-2">｜</span><strong>申報格式：</strong>${escapeDashboardInputHtml(selectedFormatLabel)}<span class="mx-2">｜</span><strong>欄位體系：</strong>${escapeDashboardInputHtml(selectedLabel)}</div><div class="table-responsive" style="max-height:420px"><table class="table table-sm table-bordered align-middle mb-0"><thead class="table-light sticky-top"><tr><th>原始欄位</th><th style="width:45px"></th><th>轉換後欄位</th><th style="width:90px">狀態</th></tr></thead><tbody>${previewRows}</tbody></table></div>`,
           confirmButtonColor: '#2563eb'
       });
   });
@@ -1803,8 +1964,12 @@ function initDashboardControl() {
           }
           
           const ext = fileInput.files[0].name.split('.').pop().toLowerCase();
-          if (ext !== 'xls' && ext !== 'xlsx') {
-            Swal.fire({ icon: 'error', title: '格式錯誤', text: '僅接受 .xls 或 .xlsx 檔案', allowOutsideClick: false, confirmButtonColor: '#2563eb' });
+          if (!['txt', 'csv', 'xls', 'xlsx'].includes(ext)) {
+            Swal.fire({ icon: 'error', title: '格式錯誤', text: '僅接受 .txt、.csv、.xls 或 .xlsx 檔案', allowOutsideClick: false, confirmButtonColor: '#2563eb' });
+            return;
+          }
+          if (!dashboardFormatSelect?.value) {
+            Swal.fire({ icon: 'warning', title: '請先選擇申報欄位格式', allowOutsideClick: false, confirmButtonColor: '#2563eb' });
             return;
           }
           if (!dashboardInputPreview) {
@@ -1818,6 +1983,8 @@ function initDashboardControl() {
           
           const uploadData = new FormData(form);
           uploadData.set('input_scheme', inputScheme);
+          uploadData.set('format_id', dashboardFormatSelect?.value || '');
+          uploadData.set('txt_has_header', dashboardTxtHasHeader?.checked ? 'true' : 'false');
           uploadData.set('extra_fields', JSON.stringify(Array.from(document.querySelectorAll('.dashboard-extra-field-checkbox:checked')).map(input => input.value)));
           fetch('/dashboard/upload', { method: 'POST', body: uploadData })
             .then(r => r.json())

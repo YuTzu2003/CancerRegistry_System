@@ -41,9 +41,9 @@ def parse_date(value: Any) -> date | None:
     digits = "".join(character for character in text if character.isdigit())
     if digits in INVALID_DATE_VALUES or len(digits) != 8:
         return None
-    # 登錄日期的月碼或日碼為 99 時，仍可納入指標判定；以一日代替。
+    # 未知月份無法推導日期；未知日期則以該月第一日代替。
     if digits[4:6] == "99":
-        digits = f"{digits[:4]}01{digits[6:]}"
+        return None
     if digits[6:8] == "99":
         digits = f"{digits[:6]}01"
     try:
@@ -99,10 +99,14 @@ def evaluate_rule(record: Record, rule: RuleConfig) -> bool:
 
     # 數值與文字比對運算子
     if operation == "equals":
-        return to_int(record.get(rule["field"])) == to_int(rule["value"])
+        value = to_int(record.get(rule["field"]))
+        expected = to_int(rule["value"])
+        return value is not None and expected is not None and value == expected
 
     if operation == "text_equals":
-        return normalize_text(record.get(rule["field"])) == normalize_text(rule["value"])
+        value = normalize_text(record.get(rule["field"]))
+        expected = normalize_text(rule["value"])
+        return value is not None and expected is not None and value == expected
 
     if operation == "text_in":
         value = normalize_text(record.get(rule["field"]))
@@ -318,14 +322,21 @@ def evaluate_rule(record: Record, rule: RuleConfig) -> bool:
 # ---------------------------------------------------------------------------
 # 單筆紀錄規則判定與多筆資料指標統計
 # ---------------------------------------------------------------------------
+def _get_cancer_rules(cancer_type: str) -> dict[int, dict[str, Any]]:
+    """從目前的癌別目錄取得規則，避免沿用舊版全域常數。"""
+    from modules.blueprint.indicators.catalog import CANCER_SPECS, get_indicator_rules
+
+    cancer_rules = get_indicator_rules(cancer_type)
+    if not cancer_rules:
+        available = ", ".join(CANCER_SPECS)
+        raise ValueError(f"不支援的癌別：{cancer_type!r}；可用癌別：{available}")
+    return cancer_rules
+
+
 def evaluate_record(record: Record, cancer_type: str) -> dict[int, dict[str, Any]]:
     """依指定癌別，判斷單筆資料是否符合各指標的分母及分子。"""
-    if cancer_type not in INDICATOR_RULES:
-        available = ", ".join(INDICATOR_RULES)
-        raise ValueError(f"不支援的癌別：{cancer_type!r}；可用癌別：{available}")
-
     results: dict[int, dict[str, Any]] = {}
-    cancer_rules = INDICATOR_RULES[cancer_type]
+    cancer_rules = _get_cancer_rules(cancer_type)
 
     for indicator_number, indicator in cancer_rules.items():
         denominator = evaluate_rule(record, indicator["denominator"])
@@ -362,10 +373,7 @@ def evaluate_record(record: Record, cancer_type: str) -> dict[int, dict[str, Any
 
 def calculate_indicator_summary(records: list[Record], cancer_type: str) -> dict[int, dict[str, Any]]:
     """依癌別統計多筆資料的分子數、分母數與指標比率。"""
-    if cancer_type not in INDICATOR_RULES:
-        raise ValueError(f"不支援的癌別：{cancer_type!r}")
-
-    cancer_rules = INDICATOR_RULES[cancer_type]
+    cancer_rules = _get_cancer_rules(cancer_type)
     summary = {
         number: {
             "indicator_number": number,

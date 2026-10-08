@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
-import json
+import logging
 from typing import Mapping, Sequence
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
@@ -79,46 +79,31 @@ def request_llm_chat(messages: Sequence[Mapping[str, str]], *, temperature: floa
     if settings.provider == "azure":
         return request_azure_responses(settings, messages, temperature=temperature)
     client, model = get_llm_client(settings)
-    response = client.chat.completions.create(model=model,messages=list(messages),temperature=temperature,timeout=settings.timeout_seconds,)
-    content = response.choices[0].message.content
-    if not content:
-        raise ValueError("LLM response is empty")
-    return content
-
-
-def request_azure_responses(settings: LLMSettings, messages: Sequence[Mapping[str, str]], *, temperature: float) -> str:
-    payload = {
-        "model": settings.model,
-        "input": [
-            {
-                "role": message["role"],
-                "content": [{"type": "input_text", "text": message["content"]}],
-            }
-            for message in messages
-        ],
-        "temperature": temperature,
-        "stream": False,
-    }
-    url = urlsplit(settings.azure_responses_url)
-    query = dict(parse_qsl(url.query))
-    query["api-version"] = "2025-03-01-preview"
-    request = Request(
-        urlunsplit((url.scheme, url.netloc, url.path, urlencode(query), url.fragment)),
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json", "Accept": "application/json", "api-key": settings.azure_api_key},
-        method="POST",
-    )
-    with urlopen(request, timeout=settings.timeout_seconds) as response:
-        body = json.loads(response.read().decode("utf-8"))
-    content = body.get("output_text")
-    if not content:
-        content = "".join(
-            item.get("text", "")
-            for output in body.get("output", [])
-            if output.get("type") == "message"
-            for item in output.get("content", [])
-            if item.get("type") == "output_text"
+    last_finish_reason = None
+    for attempt in range(2):
+        response = client.chat.completions.create(
+            model=model,
+            messages=list(messages),
+            temperature=temperature,
+            timeout=settings.timeout_seconds,
         )
-    if not content:
-        raise ValueError("Azure Responses API response is empty")
-    return content
+        choices = getattr(response, "choices", None) or []
+        if choices:
+            last_finish_reason = getattr(choices[0], "finish_reason", None)
+            content = getattr(getattr(choices[0], "message", None), "content", None)
+            if isinstance(content, str) and content.strip():
+                return content
+            if isinstance(content, list):
+                parts = []
+                for item in content:
+                    text = item.get("text") if isinstance(item, Mapping) else getattr(item, "text", None)
+                    if text:
+                        parts.append(str(text))
+                if "".join(parts).strip():
+                    return "".join(parts)
+        logging.warning(
+            "LLM returned empty content (attempt %s/2, finish_reason=%r)",
+            attempt + 1,
+            last_finish_reason,
+        )
+    raise ValueError(f"LLM response is empty (finish_reason={last_finish_reason!r})")

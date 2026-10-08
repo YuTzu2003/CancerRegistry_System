@@ -3,6 +3,25 @@
   const $  = (sel, ctx = document) => ctx.querySelector(sel);
   const $$ = (sel, ctx = document) => Array.from(ctx.querySelectorAll(sel));
   let currentJobId = null;
+  const cleanExtraFieldCheckboxes = () => $$('#outputFieldList input[type="checkbox"]');
+  const selectAllCleanExtrasBtn = $('#btnSelectAllCleanExtras');
+  const clearAllCleanExtrasBtn = $('#btnClearAllCleanExtras');
+
+  function syncCleanExtraFieldControls() {
+    const checkboxes = cleanExtraFieldCheckboxes();
+    const selectedCount = checkboxes.filter(checkbox => checkbox.checked).length;
+    const hasUnmatchedFields = checkboxes.length > 0;
+    if (selectAllCleanExtrasBtn) selectAllCleanExtrasBtn.disabled = !hasUnmatchedFields || selectedCount === checkboxes.length;
+    if (clearAllCleanExtrasBtn) clearAllCleanExtrasBtn.disabled = !hasUnmatchedFields || selectedCount === 0;
+  }
+
+  function setCleanExtraFieldsChecked(checked) {
+    cleanExtraFieldCheckboxes().forEach(checkbox => {
+      checkbox.checked = checked;
+      checkbox.closest('.field-chip')?.classList.toggle('selected', checked);
+    });
+    syncCleanExtraFieldControls();
+  }
 
   // Step控制
   function setStep(n) {
@@ -91,6 +110,91 @@
   const fileChosen = $('#fileChosen');
   const fileName = $('#fileName');
   const dropZone = $('#dropZone');
+  const reviewedDataCheck = $('#checkReviewedData');
+  const reviewRecordList = $('#reviewRecordList');
+  const reviewDedupState = $('#reviewDedupState');
+  const reviewRecordModal = $('#reviewRecordModal');
+  let reviewRecordData = [];
+
+  async function loadReviewRecords() {
+    if (!reviewRecordList || reviewRecordList.dataset.loaded === 'true') return;
+    const response = await fetch('/api/review-records');
+    const result = await response.json();
+    if (!response.ok || !result.ok) throw new Error(result.error || '無法取得資料審核紀錄');
+
+    reviewRecordData = result.records;
+    reviewRecordList.replaceChildren();
+    if (!result.records.length) reviewRecordList.textContent = '目前沒有可供比對的資料審核紀錄。';
+    result.records.forEach((record) => {
+      const label = document.createElement('label');
+      label.className = 'review-record-item';
+      const input = document.createElement('input');
+      input.className = 'form-check-input review-record-check';
+      input.type = 'checkbox';
+      input.value = record.job_id;
+      const fileName = document.createElement('span');
+      fileName.className = 'review-record-file';
+      fileName.textContent = record.file_name;
+      const metadata = document.createElement('span');
+      metadata.className = 'review-record-meta';
+      [`格式 ${record.format}`, `版本 ${record.version}`, `${record.total_count} 筆`].forEach((value) => {
+        const tag = document.createElement('span');
+        tag.className = 'review-record-tag';
+        tag.textContent = value;
+        metadata.append(tag);
+      });
+      const time = document.createElement('span');
+      time.className = 'review-record-time';
+      time.textContent = record.created_at;
+      label.append(input, fileName, metadata, time);
+      reviewRecordList.append(label);
+    });
+    reviewRecordList.dataset.loaded = 'true';
+  }
+
+  function selectedReviewRecordIds() {
+    return $$('.review-record-check:checked').map((input) => input.value);
+  }
+
+  function renderSelectedReviewRecords() {
+    const selectedIds = new Set(selectedReviewRecordIds());
+    const selectedRecords = reviewRecordData.filter((record) => selectedIds.has(record.job_id));
+    const selectedText = `${selectedRecords.length} 筆紀錄已選取`;
+    if (reviewDedupState) reviewDedupState.textContent = selectedText;
+  }
+
+  function cancelReviewRecordSelection() {
+    $$('.review-record-check').forEach((input) => { input.checked = false; });
+    if (reviewedDataCheck) reviewedDataCheck.checked = false;
+    if (reviewDedupState) reviewDedupState.textContent = '未選取';
+    if (reviewRecordModal) reviewRecordModal.hidden = true;
+  }
+
+  reviewedDataCheck?.addEventListener('change', async () => {
+    if (!reviewedDataCheck.checked) {
+      cancelReviewRecordSelection();
+      return;
+    }
+    if (reviewedDataCheck.checked) {
+      try {
+        await loadReviewRecords();
+        reviewRecordModal.hidden = false;
+      } catch (error) {
+        cancelReviewRecordSelection();
+        utils.alert(error.message, 'error');
+      }
+    }
+  });
+
+  $('#btnCancelReviewRecords')?.addEventListener('click', cancelReviewRecordSelection);
+  $('#btnCancelReviewRecordsFooter')?.addEventListener('click', cancelReviewRecordSelection);
+  $('#btnConfirmReviewRecords')?.addEventListener('click', () => {
+    if (selectedReviewRecordIds().length === 0) {
+      return utils.alert('請至少選取一筆資料審核紀錄。', 'warning');
+    }
+    renderSelectedReviewRecords();
+    reviewRecordModal.hidden = true;
+  });
 
   function updateFilePreview() {
     const f = fileInput.files?.[0];
@@ -126,11 +230,20 @@
     if ($('#analysisEmpty')) $('#analysisEmpty').hidden = false;
     if ($('#cleaningAlertContainer')) $('#cleaningAlertContainer').innerHTML = '';
     if ($('#dateErrorEditor')) $('#dateErrorEditor').innerHTML = '';
+    if (reviewedDataCheck) reviewedDataCheck.checked = false;
+    if (reviewRecordModal) reviewRecordModal.hidden = true;
+    if (reviewRecordList) {
+      reviewRecordList.replaceChildren();
+      delete reviewRecordList.dataset.loaded;
+    }
+    if (reviewDedupState) reviewDedupState.textContent = '未選取';
+    reviewRecordData = [];
 
     const list = $('#outputFieldList');
     if (list) {
       list.innerHTML = '<span class="field-chip disabled"><i class="bi bi-asterisk"></i> 尚未載入欄位，清洗完成後自動帶入</span>';
     }
+    syncCleanExtraFieldControls();
   
     if ($('#analysisByField tbody')) $('#analysisByField tbody').innerHTML = '';
     if ($('#analysisByType tbody')) $('#analysisByType tbody').innerHTML = '';
@@ -163,10 +276,14 @@
     const file = fileInput.files?.[0];
 
     const errors = [];
+    const selectedReviewRecords = $$('.review-record-check:checked').map((input) => input.value);
     if (!formatId) errors.push('請選擇參考資料格式');
     if (!file) errors.push('請上傳檔案');
+    if (reviewedDataCheck?.checked && selectedReviewRecords.length === 0) {
+      errors.push('請至少選取一筆資料審核紀錄。');
+    }
 
-    if (errors.length === 2) {
+    if (errors.length > 1) {
       return utils.alert('請選擇參考資料格式及上傳檔案', 'warning');
     } else if (errors.length === 1) {
       return utils.alert(errors[0], 'warning');
@@ -187,6 +304,7 @@
     
     const convertTxt = $('#checkConvertTxt')?.checked;
     formData.append('convert_txt', convertTxt ? 'true' : 'false');
+    selectedReviewRecords.forEach((jobId) => formData.append('review_job_ids', jobId));
 
     try {
       const response = await fetch('/api/cleanJob', { method: 'POST', body: formData });
@@ -349,18 +467,22 @@
             </button>
           </div>
         `;
+        if (data.reviewed_duplicate_count || data.excluded_duplicate_count) {
+          const reviewedDuplicateCount = data.reviewed_duplicate_count || data.excluded_duplicate_count;
+          alertContainer.insertAdjacentHTML('beforeend', `<div class="alert alert-light border shadow-sm mt-2">已重新檢查已清洗過資料 ${reviewedDuplicateCount} 筆，這些資料不納入本次統計，並保留於清洗結果最後方（E:資料已清洗過）。</div>`);
+        }
       } else {
+        const reviewedDuplicateCount = data.reviewed_duplicate_count || data.excluded_duplicate_count || 0;
         alertContainer.innerHTML = `
           <div class="alert alert-light border shadow-sm mt-3" role="alert">
-            <i class="bi bi-check-circle-fill text-success me-2"></i>資料清洗並存檔完成！
+            <i class="bi bi-check-circle-fill text-success me-2"></i>資料清洗並存檔完成！${reviewedDuplicateCount ? `<br><span class="ms-4">已重新檢查已清洗過資料 ${reviewedDuplicateCount} 筆，這些資料不納入本次統計，並保留於清洗結果最後方（E:資料已清洗過）。</span>` : ''}
           </div>`;
         if (window.autoHideAlerts) window.autoHideAlerts();
       }
     }
 
-    if ((data.date_errors || []).length > 0) {
-      renderDateErrorEditor(data.date_errors || [], data.date_error_limit || 3);
-    }
+    // 新檔案清洗成功時，即使沒有日期錯誤，也要清掉前一份檔案的日期錯誤內容。
+    renderDateErrorEditor(data.date_errors || [], data.date_error_limit || 3);
 
     const s = data.stats || {};
 
@@ -388,6 +510,11 @@
           <td><span class="badge-soft gray">${escapeHtml(r.format || '—')}</span></td>
           <td style="text-align:right;">${r.errors ?? 0}</td>
         </tr>`).join('');
+    } else {
+      // 新檔案沒有錯誤時，不保留前一份檔案的欄位明細。
+      fieldWrap.hidden = true;
+      fieldEmpty.hidden = false;
+      $('#analysisByField tbody').innerHTML = '';
     }
 
     // 清洗結果分析(右側)
@@ -418,6 +545,11 @@
             <td style="text-align:right;">${r.ratio ?? '—'}</td>
           </tr>`;
       }).join('');
+    } else {
+      // 新檔案沒有分析資料時，切回空白狀態，避免顯示上一份檔案的結果。
+      $('#analysisContent').hidden = true;
+      $('#analysisEmpty').hidden = false;
+      $('#analysisByType tbody').innerHTML = '';
     }
   }
 
@@ -614,22 +746,30 @@
           info.innerHTML = '<span class="text-muted">體系無匹配欄位</span>';
         }
 
+        const matchedCount = data.mapped?.length || 0;
+        const unmatchedCount = data.unmapped?.length || 0;
+        const matchedSummary = `<span class="field-chip disabled"><i class="bi bi-check-circle text-success"></i> 已匹配 ${matchedCount}／${matchedCount + unmatchedCount} 個欄位</span>`;
+
         // 未匹配的欄位
         if (data.unmapped && data.unmapped.length > 0) {
-          list.innerHTML = data.unmapped.map(f => `
+          list.innerHTML = matchedSummary + data.unmapped.map(f => `
             <label class="field-chip">
               <input type="checkbox" value="${escapeHtml(f.key)}" checked />${escapeHtml(f.label)}
             </label>`).join('');
           
           $$('#outputFieldList .field-chip input').forEach(cb => {
             const chip = cb.closest('.field-chip');
-            const sync = () => chip.classList.toggle('selected', cb.checked);
+            const sync = () => {
+              chip.classList.toggle('selected', cb.checked);
+              syncCleanExtraFieldControls();
+            };
             cb.addEventListener('change', sync); 
             sync();
           });
         } else {
-          list.innerHTML = '<span class="text-muted" style="font-size:12px;">無額外欄位</span>';
+          list.innerHTML = `${matchedSummary}<span class="field-chip disabled"><i class="bi bi-check2 text-success"></i> 無未匹配欄位</span>`;
         }
+        syncCleanExtraFieldControls();
       }
     } catch (err) {
       console.error('Categorization failed', err);
@@ -646,7 +786,10 @@
   }
   
   $$('#namingScheme input[type="radio"]').forEach(r => r.addEventListener('change', syncNamingSelection));
+  selectAllCleanExtrasBtn?.addEventListener('click', () => setCleanExtraFieldsChecked(true));
+  clearAllCleanExtrasBtn?.addEventListener('click', () => setCleanExtraFieldsChecked(false));
   syncNamingSelection();
+  syncCleanExtraFieldControls();
 
   // 下載清洗結果 
   $('#btnDownloadCleaned')?.addEventListener('click', () => {

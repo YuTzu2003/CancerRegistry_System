@@ -6,7 +6,7 @@ import stat
 import zipfile
 from flask import Blueprint, flash, jsonify, redirect, render_template, request, send_file, session, url_for
 from modules.services.auth import login_required, admin_required
-from modules.blueprint.clean import categorize_fields_logic,export_logic,preview_logic,get_formats_logic,add_format_logic,manage_format_logic,clean_job_logic,get_date_errors_logic,update_date_error_logic,download_file_logic
+from modules.blueprint.clean import categorize_fields_logic,export_logic,preview_logic,get_formats_logic,add_format_logic,manage_format_logic,clean_job_logic,get_date_errors_logic,update_date_error_logic,download_file_logic,get_review_records_logic
 from modules.services.db import get_conn
 
 clean_bp = Blueprint('clean', __name__, template_folder='../blueprint/clean/templates')
@@ -67,7 +67,13 @@ def api_clean():
     convert_txt_flag = request.form.get("convert_txt") == "true"
     uploaded_file = request.files.get("data_file")
 
-    res, status = clean_job_logic(user_id, format_id, convert_txt_flag, uploaded_file)
+    res, status = clean_job_logic(user_id, format_id, convert_txt_flag, uploaded_file, request.form.getlist("review_job_ids"))
+    return jsonify(res), status
+
+@clean_bp.route("/api/review-records")
+@login_required
+def api_review_records():
+    res, status = get_review_records_logic(session.get("id"))
     return jsonify(res), status
 
 @clean_bp.route("/api/date_errors", methods=["POST"])
@@ -131,12 +137,12 @@ def history():
     user_id = session.get("id")
     conn = get_conn()
     cursor = conn.cursor()
-    cursor.execute("""SELECT Job.JobID,Job.UserID,DataFormat.FmtName,DataFormat.Version,Job.DQI,Job.CreatedAt,Job.TotalCount
+    cursor.execute("""SELECT Job.JobID,Job.UserID,Job.FileName,DataFormat.FmtName,DataFormat.Version,Job.DQI,Job.CreatedAt,Job.TotalCount
                       FROM DataFormat RIGHT JOIN Job ON DataFormat.FmtID = Job.FmtID
                       WHERE Job.UserID = ? ORDER BY Job.CreatedAt DESC""", (user_id,))
     history_data = []
     for row in cursor.fetchall():
-        history_data.append({"JobID": row.JobID, "UserID": row.UserID, "FmtName": row.FmtName, "Version": row.Version,"DQI": f"{row.DQI:.2f}%", "CreatedAt": row.CreatedAt.strftime("%Y/%m/%d") if row.CreatedAt else "—", "TotalCount": row.TotalCount})
+        history_data.append({"JobID": row.JobID, "ShortJobID": str(row.JobID)[-5:], "UserID": row.UserID, "FileName": row.FileName, "FmtName": row.FmtName, "Version": row.Version,"DQI": f"{row.DQI:.2f}%", "CreatedAt": row.CreatedAt.strftime("%Y/%m/%d") if row.CreatedAt else "—", "TotalCount": row.TotalCount})
     conn.close()
     return render_template("history.html", active="history", history=history_data)
 
@@ -194,7 +200,7 @@ def detail_history(job_id):
     user_id = session.get("id")
     conn = get_conn()
     cursor = conn.cursor()
-    cursor.execute("""SELECT Job.JobID,DataFormat.FmtName,DataFormat.Version,Job.TotalCount,Job.CompletenessScore,Job.CorrectScore,Job.ConsistencyScore,Job.DQI,Job.Path,Job.CreatedAt
+    cursor.execute("""SELECT Job.JobID,Job.FileName,DataFormat.FmtName,DataFormat.Version,Job.TotalCount,Job.CompletenessScore,Job.CorrectScore,Job.ConsistencyScore,Job.DQI,Job.Path,Job.CreatedAt
                       FROM DataFormat RIGHT JOIN Job ON DataFormat.FmtID = Job.FmtID WHERE Job.JobID = ? AND Job.UserID = ?""", (job_id, user_id))
     row = cursor.fetchone()
     if not row:
