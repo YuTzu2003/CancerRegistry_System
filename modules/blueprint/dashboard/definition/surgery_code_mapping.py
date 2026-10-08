@@ -1,5 +1,7 @@
 """讀取附錄 B 手術術式對照，並依 ``SurgeryRank`` 選擇個案的最高階術式。"""
 
+import re
+
 from modules.services.db import get_conn
 
 
@@ -15,10 +17,40 @@ def _clean(value):
 def normalize_surgery_code(value):
     """Normalize numeric and alpha-numeric registry operation codes."""
     text = _clean(value).upper()
+    # Do not pass alpha-numeric Appendix-B codes such as ``2E0`` through
+    # ``float``: Python interprets it as scientific notation (2e0 -> 2).
+    if not re.fullmatch(r"\d+(?:\.0+)?", text):
+        return text
     try:
         return str(int(float(text)))
     except (TypeError, ValueError):
         return text
+
+
+def surgery_code_variants(value):
+    """Return every source code represented by one stored mapping value.
+
+    Appendix-B entries may use a numeric range, alternative newer codes, or
+    alpha-numeric values such as ``2M/2M0`` in one displayed row.  Preserve
+    that human-readable value in the database but expand it for matching.
+    """
+    text = _clean(value).upper()
+    if not text:
+        return set()
+
+    variants = set()
+    for part in re.split(r"[|/,]+", text):
+        part = part.strip()
+        range_match = re.fullmatch(r"(\d+)\s*-\s*(\d+)", part)
+        if range_match:
+            start, end = (int(item) for item in range_match.groups())
+            if start <= end and end - start <= 99:
+                variants.update(str(code) for code in range(start, end + 1))
+                continue
+        code = normalize_surgery_code(part)
+        if code:
+            variants.add(code)
+    return variants
 
 
 def get_surgery_code_rules(manual_key):
@@ -57,10 +89,10 @@ def select_highest_ranked_surgery(optype_o, optype_h, rules):
         for rule in rules:
             if str(rule.get("RowType") or "").lower() != "code":
                 continue
-            rule_codes = {
-                normalize_surgery_code(rule.get("CodeShort")),
-                normalize_surgery_code(rule.get("CodeLong")),
-            }
+            rule_codes = (
+                surgery_code_variants(rule.get("CodeShort"))
+                | surgery_code_variants(rule.get("CodeLong"))
+            )
             if code in rule_codes:
                 try:
                     rank = float(rule.get("SurgeryRank"))
@@ -79,12 +111,12 @@ def format_surgery_code(value, width):
 
 def surgery_display_name(rule):
     """Return the display name without the code prefix repeated in the table."""
-    import re
     short_code = format_surgery_code(rule.get("CodeShort"), 2)
     long_code = format_surgery_code(rule.get("CodeLong"), 3)
     text = str(rule.get("DisplayText_en") or "").strip()
-    if short_code and long_code:
-        text = re.sub(rf"^{re.escape(short_code)}/{re.escape(long_code)}\s*", "", text)
+    code = f"{short_code}/{long_code}" if short_code and long_code else short_code or long_code
+    if code:
+        text = re.sub(rf"^{re.escape(code)}\s*", "", text)
     return text
 
 # Some dashboard cancer selections are analytic subtypes that share one
@@ -100,6 +132,10 @@ SURGERY_MANUAL_KEY_ALIASES = {
     "Cervix_invasive": "Cervix_Uteri",
     "Bladder_in_situ": "Bladder",
     "Bladder_invasive": "Bladder",
+    "Breast_Female": "Breast",
+    "Breast_Male": "Breast",
+    "Breast_in_situ": "Breast",
+    "Breast_invasive": "Breast",
 }
 
 
