@@ -57,8 +57,7 @@ def create_app():
 
     @flask_app.context_processor
     def inject_template_settings():
-        model = BaseConfig.MODEL
-        return {"llm_model": model}
+        return {"llm_model": BaseConfig.MODEL}
 
     return flask_app, app_env, app_debug
 
