@@ -1,8 +1,8 @@
 from __future__ import annotations
 from dataclasses import dataclass
+import json
 import logging
 from typing import Mapping, Sequence
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
 from openai import OpenAI
 from modules.config import BaseConfig
@@ -107,3 +107,42 @@ def request_llm_chat(messages: Sequence[Mapping[str, str]], *, temperature: floa
             last_finish_reason,
         )
     raise ValueError(f"LLM response is empty (finish_reason={last_finish_reason!r})")
+
+
+def request_azure_responses(settings: LLMSettings,messages: Sequence[Mapping[str, str]],*,temperature: float,) -> str:
+    payload = {
+        "model": settings.model,
+        "input": [
+            {
+                "role": message["role"],
+                "content": [{"type": "input_text", "text": message["content"]}],
+            }
+            for message in messages
+        ],
+        "temperature": temperature,
+        "stream": False,
+    }
+    request = Request(
+        settings.azure_responses_url or "",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "api-key": settings.azure_api_key or "",
+        },
+        method="POST",
+    )
+    with urlopen(request, timeout=settings.timeout_seconds) as response:
+        body = json.loads(response.read().decode("utf-8"))
+    content = body.get("output_text")
+    if not content:
+        content = "".join(
+            item.get("text", "")
+            for output in body.get("output", [])
+            if output.get("type") == "message"
+            for item in output.get("content", [])
+            if item.get("type") == "output_text"
+        )
+    if not content:
+        raise ValueError("Azure Responses API response is empty")
+    return content
