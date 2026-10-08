@@ -903,3 +903,21 @@
   font-size: 14px;
   font-weight: 400;
 }
+
+.stage-surgery-table {
+  table-layout: fixed;
+}
+
+.stage-surgery-table th:first-child,
+.stage-surgery-table td:first-child {
+  width: 50%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.4;
+}
+
+.stage-surgery-table th:not(:first-child),
+.stage-surgery-table td:not(:first-child) {
+  white-space: nowrap;
+}
