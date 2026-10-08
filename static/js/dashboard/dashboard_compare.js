@@ -363,6 +363,14 @@
 
   function updateSelectionSummary() {
     const sameFile = Boolean(mainFile.value) && mainFile.value === targetFile.value;
+    const setSummaryValue = (id, value, isSelected) => {
+      const element = document.getElementById(id);
+      if (!element) return;
+      element.textContent = value;
+      element.classList.toggle('fw-medium', isSelected);
+      element.classList.toggle('text-dark', isSelected);
+      element.classList.toggle('text-muted', !isSelected);
+    };
     const formatDataSelection = (fileSelect, yearSelect, yearEndSelect, includeFileName) => {
       if (!fileSelect.value && !yearSelect.value) return '尚未選擇';
       const fileText = fileSelect.selectedOptions[0]?.textContent?.trim() || '尚未選擇檔案';
@@ -387,13 +395,18 @@
       ...selectedCompareItemsForGroups(['treatment', 'cross_year'])
     ];
 
-    document.getElementById('summaryCompareMode').textContent = selectedCompareMode() === 'range' ? '年度區間比較' : '單一年度比較';
-    document.getElementById('summaryMainData').textContent = formatDataSelection(mainFile, mainYear, mainYearEnd, !sameFile);
-    document.getElementById('summaryTargetData').textContent = formatDataSelection(targetFile, targetYear, targetYearEnd, !sameFile);
-    document.getElementById('summaryBehavior').textContent = behaviorText || '尚未選擇';
-    document.getElementById('summaryCancer').textContent = cancerText;
-    document.getElementById('summaryModeAi').textContent = modeAi.selectedOptions[0]?.textContent?.trim() || '平穩客觀';
-    document.getElementById('summaryItems').textContent = summaryItems.length ? summaryItems.join('、') : '尚未選擇';
+    const hasCompleteDataSelection = (fileSelect, yearSelect, yearEndSelect) => Boolean(
+      fileSelect.value
+      && yearSelect.value
+      && (selectedCompareMode() !== 'range' || yearEndSelect.value)
+    );
+    setSummaryValue('summaryCompareMode', selectedCompareMode() === 'range' ? '年度區間比較' : '單一年度比較', true);
+    setSummaryValue('summaryMainData', formatDataSelection(mainFile, mainYear, mainYearEnd, !sameFile), hasCompleteDataSelection(mainFile, mainYear, mainYearEnd));
+    setSummaryValue('summaryTargetData', formatDataSelection(targetFile, targetYear, targetYearEnd, !sameFile), hasCompleteDataSelection(targetFile, targetYear, targetYearEnd));
+    setSummaryValue('summaryBehavior', behaviorText || '尚未選擇', Boolean(behavior.value));
+    setSummaryValue('summaryCancer', cancerText, selectedCancerValues().length > 0);
+    setSummaryValue('summaryModeAi', modeAi.selectedOptions[0]?.textContent?.trim() || '平穩客觀', Boolean(modeAi.value));
+    setSummaryValue('summaryItems', summaryItems.length ? summaryItems.join('、') : '尚未選擇', summaryItems.length > 0);
   }
 
   function updateTopicCounts() {

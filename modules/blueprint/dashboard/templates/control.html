@@ -15,14 +15,12 @@
               <p class="text-secondary small mb-3">支援 TXT、CSV、XLS、XLSX；請選擇資料所屬的申報欄位格式</p>
               <input type="file" class="form-control form-control-sm mx-auto" id="dashFileInput" name="file" accept=".txt,.csv,.xls,.xlsx" style="max-width: 280px; font-size: 13px;">
               <div id="dashboardFormatOptions" class="d-none w-100 mt-3 text-start mx-auto" style="max-width: 280px;">
-                <label for="dashboardFormatSelect" class="form-label small fw-semibold mb-1">申報欄位格式</label>
                 <select id="dashboardFormatSelect" name="format_id" class="form-select form-select-sm" disabled>
                   <option value="">請選擇格式</option>
                   {% for f in formats %}
                     <option value="{{ f.id }}">{{ f.name }}欄位（{{ f.version }}）</option>
                   {% endfor %}
                 </select>
-                <div class="form-text small">用於統一改版欄位名稱與判斷正式申報欄位。</div>
               </div>
               <div id="dashboardTxtOptions" class="d-none w-100 mt-2 text-start mx-auto" style="max-width: 280px;">
                 <div class="form-check mt-2">
@@ -101,8 +99,8 @@
   <div class="section-body">
     <div style="margin-bottom: 18px;">
       <div class="d-flex justify-content-between align-items-center mb-2">
-        <div style="font-size: 13px; font-weight: 600; color: var(--gray-700);">輸入欄位命名來源
-          <span class="hint" style="font-weight: 400; margin-left: 6px;">選擇輸入資料欄位標頭採用的命名來源</span>
+        <div style="font-size: 13px; font-weight: 600; color: var(--gray-700);">輸出欄位命名體系
+          <span class="hint" style="font-weight: 400; margin-left: 6px;">系統會自動辨識上傳欄位，並轉換為選擇的欄位體系</span>
         </div>
       </div>
       <div class="naming-grid" id="dashboardInputScheme">
@@ -123,7 +121,7 @@
         </div>
         <div class="d-flex align-items-center gap-2">
           <button type="button" class="btn btn-sm btn-outline-secondary" id="btnSelectAllDashboardExtras" disabled>全選</button>
-          <button type="button" class="btn btn-sm btn-outline-secondary" id="btnClearAllDashboardExtras" disabled>全不選</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="btnClearAllDashboardExtras" disabled>清除</button>
         </div>
       </div>
       <div class="field-chiplist" id="dashboardInputFieldList">

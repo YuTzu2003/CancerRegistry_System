@@ -5,6 +5,8 @@
 
 {% block extra_head %}
 <script src="/static/vendor/echarts/echarts.min.js"></script>
+<link rel="stylesheet" href="/static/css/dashboard/dashboard.css">
+<link rel="stylesheet" href="/static/css/dashboard/control.css">
 <link rel="stylesheet" href="/static/css/dashboard/dashboard_compare.css?v=20260801-stage-card-compact">
 <style>
   .indicators-step { border: 1px solid var(--gray-200); border-radius: 12px; background: var(--white); margin-bottom: 18px; overflow: hidden; }
@@ -34,6 +36,8 @@
   .indicators-preview-head { align-items: center; display: flex; justify-content: space-between; margin-bottom: 8px; }
   .indicators-file-count { color: var(--gray-500); font-size: 12px; }
   .indicators-file-list { background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: 8px; max-height: 300px; min-height: 92px; overflow-y: auto; padding: 8px; }
+  .file-list-card .indicators-file-list { background: var(--white); border: 0; border-radius: 0; max-height: none; min-height: 178px; padding: 8px; }
+  .file-list-card .indicators-file-empty { min-height: 160px; }
   .indicators-file-empty { color: var(--gray-500); display: grid; font-size: 12px; gap: 3px; min-height: 66px; place-content: center; text-align: center; }
   .indicators-file-empty-title { color: var(--gray-700); font-size: 14px; font-weight: 700; }
   .indicators-file-item { align-items: center; border: 1px solid transparent; border-radius: 7px; display: grid; gap: 11px; grid-template-columns: 38px minmax(0, 1fr) auto; min-height: 66px; padding: 8px; transition: background-color 150ms ease, border-color 150ms ease; }
@@ -60,6 +64,8 @@
   .indicators-cancer-option { align-items: center; border: 1px solid var(--gray-200); border-radius: 8px; display: flex; gap: 9px; margin: 0; padding: 10px 12px; }
   .indicators-cancer-option:has(input:checked) { background: #f0fdf4; border-color: #86efac; }
   .indicators-cancer-option small { color: var(--gray-500); }
+  .indicators-cancer-actions { align-items: flex-end; align-self: stretch; display: flex; gap: 8px; justify-content: flex-end; }
+  .indicators-cancer-actions .btn { align-items: center; display: inline-flex; font-size: 14px; justify-content: center; min-width: 72px; padding: 7px 15px; text-align: center; }
   .indicators-result-empty { border: 1px dashed var(--gray-300); border-radius: 8px; color: var(--gray-600); padding: 28px 18px; text-align: center; }
   .indicators-result { background: transparent; border: 0; padding: 0; }
   .indicators-cancer-tabs { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 10px; }
@@ -84,22 +90,73 @@
   .indicators-chart { display: grid; gap: 10px; height: auto; margin-top: 8px; width: 100%; }
   .indicator-kpi-card { background: var(--white); border: 1px solid var(--gray-300); border-top: 4px solid #166C7A; border-radius: 7px; overflow: hidden; }
   .indicator-kpi-head { align-items: center; background: #eef6f7; display: flex; gap: 14px; justify-content: space-between; padding: 8px 12px; }
+  .indicator-kpi-card.is-success { border-top-color: #45a9a6; }
+  .indicator-kpi-card.is-success .indicator-kpi-head { background: #e8f6f5; }
+  .indicator-kpi-card.is-warning { border-top-color: #b4232c; }
+  .indicator-kpi-card.is-warning .indicator-kpi-head { background: #fdebec; }
   .indicator-kpi-title { color: var(--gray-800); font-size: 14px; font-weight: 700; min-width: 0; }
   .indicator-kpi-meta { align-items: center; color: var(--gray-700); display: flex; flex: 0 0 auto; font-size: 12px; gap: 14px; white-space: nowrap; }
+  .indicator-threshold-editor { align-items: center; display: inline-flex; gap: 5px; }
+  .indicator-threshold-operator { font-size: 12px; padding: 2px 22px 2px 6px; width: 64px; }
+  .indicator-threshold-value { font-size: 12px; padding: 2px 6px; width: 76px; }
+  .indicator-threshold-save { font-size: 12px; line-height: 1.2; padding: 3px 8px; }
   .indicator-kpi-status { align-items: center; background: var(--gray-100); border-radius: 999px; color: var(--gray-600); display: inline-flex; font-weight: 700; gap: 4px; padding: 3px 8px; }
   .indicator-kpi-status.is-success { background: #eaf7ef; color: #237a45; }
   .indicator-kpi-status.is-warning { background: #fcebec; color: #a7373d; }
   .indicator-kpi-body { padding: 5px 12px 3px; }
-  .indicator-kpi-gauge { height: 76px; width: 100%; }
+  .indicator-kpi-gauge { height: 84px; width: 100%; }
   .indicators-chart-heading { color: #111827; margin: 16px 0 6px; text-align: center; }
   .indicators-chart-title { font-size: 18px; font-weight: 700; }
   .indicators-chart-source { color: var(--gray-500); font-size: 12px; font-weight: 400; }
   .indicators-chart-caption { color: #111827; font-weight: 500; margin-top: 8px; text-align: center; }
-  .indicators-export-option { border: 1px solid var(--gray-200); border-radius: 8px; padding: 12px; }
-  .indicators-export-option .form-check { align-items: baseline; display: flex; gap: 8px; margin: 0; padding-left: 0; }
-  .indicators-export-option .form-check-input { flex: 0 0 auto; margin: 0; }
-  .indicators-export-option .form-check-label { display: grid; gap: 1px; }
-  .indicators-export-hint { color: var(--muted); display: block; font-size: 13px; font-weight: 400; line-height: 1.35; }
+  .indicators-ai-narrative { background: rgba(209, 231, 221, .5); border: 1px solid #a3cfbb; border-radius: 7px; margin-top: 16px; padding: 16px; }
+  .indicators-ai-narrative-head { align-items: center; display: flex; justify-content: space-between; margin-bottom: 8px; }
+  .indicators-ai-narrative-title { color: #212529; font-size: 14px; font-weight: 700; margin: 0; }
+  .indicators-ai-narrative-text { color: #212529; font-size: 14px; line-height: 1.7; white-space: pre-wrap; }
+  .indicators-ai-narrative-text.is-threshold-hint { color: #64748b; }
+  .indicators-ai-narrative.is-error { background: #fcebec; border-color: #e8a8ad; }
+  .indicators-ai-regenerate { background: transparent; border: 1px solid #495057; color: #212529; font-size: 12px; font-weight: 500; }
+  .indicators-ai-regenerate:disabled { border-color: #495057; color: #212529; opacity: 1; }
+  .indicators-export-option {
+    align-items: center;
+    background: #fff;
+    border: 1px solid var(--gray-200);
+    border-radius: 10px;
+    color: var(--text);
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 14px;
+    min-height: 112px;
+    padding: 18px 20px;
+    text-align: left;
+    transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+    width: 100%;
+  }
+  .indicators-export-option:not(:disabled):hover {
+    border-color: var(--accent);
+    box-shadow: 0 6px 18px rgba(15, 118, 110, .1);
+    transform: translateY(-1px);
+  }
+  .indicators-export-icon {
+    align-items: center;
+    background: #edf8f7;
+    border-radius: 10px;
+    color: var(--accent-strong);
+    display: inline-flex;
+    font-size: 22px;
+    height: 46px;
+    justify-content: center;
+    width: 46px;
+  }
+  .indicators-export-copy { display: grid; gap: 5px; min-width: 0; }
+  .indicators-export-title { font-size: 16px; font-weight: 700; }
+  .indicators-export-hint { color: var(--muted); display: block; font-size: 13px; font-weight: 400; line-height: 1.45; }
+  .indicators-export-action { color: var(--accent-strong); font-size: 13px; font-weight: 700; white-space: nowrap; }
+  .indicators-export-option.is-basic .indicators-export-icon { background: #eef2ff; color: #4338ca; }
+  .indicators-export-option.is-excel .indicators-export-icon { background: #ecfdf3; color: #15803d; }
+  #indicatorsExportStep.is-disabled .indicators-step-body { opacity: 1; }
+  #indicatorsExportStep.is-disabled .indicators-export-option,
+  #indicatorsExportStep.is-disabled button { opacity: .5; }
   @media (max-width: 991.98px) {
     .indicators-upload-layout { grid-template-columns: 1fr; }
     .indicators-upload-pane + .indicators-upload-pane { border-left: 0; border-top: 1px solid var(--gray-200); padding-left: 0; padding-top: 20px; }
@@ -122,30 +179,62 @@
   </div>
 </div>
 
-<section class="indicators-step">
-  <div class="indicators-step-title"><span class="indicators-step-marker" aria-hidden="true"></span><span>資料上傳</span><span class="hint mb-0">請自行上傳 Excel 或 CSV 檔案；不自動帶入年報分析資料</span></div>
-  <div class="indicators-step-body">
-    <div class="indicators-upload-layout">
-      <div class="indicators-upload-pane">
-        <label for="indicatorsFile" class="form-label fw-semibold">匯入原始資料</label>
-        <input id="indicatorsFile" class="form-control" type="file" accept=".xlsx,.xls,.csv" multiple>
-        <div class="mt-3 text-end">
-          <button id="uploadIndicatorsFile" class="btn btn-success" type="button" disabled><i class="bi bi-upload me-1"></i>上傳資料</button>
+<section class="card-flat" style="margin-bottom: 22px;">
+  <div class="section-head d-flex justify-content-between align-items-center">
+    <div class="d-flex align-items-center gap-2"><h2 class="mb-0"><span class="dot" style="background:var(--warning)"></span> 資料檔案上傳</h2></div>
+  </div>
+  <div class="section-body">
+    <div class="upload-grid">
+      <div id="indicatorsUploadPanel" class="dashboard-upload-panel">
+        <div class="upload-container-box d-flex flex-column justify-content-center">
+          <div class="p-4 border rounded-3 text-center upload-input-zone">
+            <h6 class="fw-semibold text-dark mb-1">選擇監測指標資料檔</h6>
+            <p class="text-secondary small mb-3">支援 TXT、CSV、XLS、XLSX；選擇後請設定申報欄位格式。</p>
+            <input id="indicatorsFile" class="form-control form-control-sm mx-auto" type="file" accept=".xlsx,.xls,.csv,.txt" multiple style="max-width: 280px; font-size: 13px;">
+            <div id="indicatorsFormatOptions" class="d-none w-100 mt-3 text-start mx-auto" style="max-width: 280px;">
+              <select id="indicatorsFormatSelect" class="form-select form-select-sm" disabled>
+                <option value="">請選擇申報欄位格式</option>
+                {% for format in formats %}<option value="{{ format.id }}">{{ format.name }}（{{ format.version }}）</option>{% endfor %}
+              </select>
+            </div>
+            <div id="indicatorsTxtOptions" class="d-none w-100 mt-2 text-start mx-auto">
+              <div class="form-check mt-2"><input id="indicatorsTxtHasHeader" class="form-check-input" type="checkbox" disabled><label for="indicatorsTxtHasHeader" class="form-check-label small">TXT 第一列為欄位名稱</label></div>
+            </div>
+          </div>
         </div>
       </div>
-      <div class="indicators-upload-pane">
-        <div class="indicators-preview-head">
-          <span class="fw-semibold">檔案清單</span>
-          <span id="indicatorsFileCount" class="indicators-file-count">0 個檔案</span>
-        </div>
-        <div id="indicatorsFileList" class="indicators-file-list" aria-live="polite">
-          <div class="indicators-file-empty"><span class="indicators-file-empty-title">尚未選擇檔案</span><span>選擇 Excel 或 CSV 後，在此顯示檔案資訊</span></div>
+      <div>
+        <div class="file-list-card">
+          <div class="file-list-header"><h6 class="mb-0 fw-bold text-dark d-flex align-items-center gap-2"><i class="bi bi-folder2-open text-primary"></i>檔案清單</h6><span id="indicatorsFileCount" class="text-secondary" style="font-size: 12px;">0 個檔案</span></div>
+          <div class="file-list-container"><div id="indicatorsFileList" class="indicators-file-list" aria-live="polite"><div class="indicators-file-empty"><span class="indicators-file-empty-title">尚未選擇檔案</span><span>請選擇 Excel、CSV 或 TXT 後加入檔案清單</span></div></div></div>
         </div>
       </div>
     </div>
   </div>
 </section>
 
+<section id="indicatorsInputSettings" class="card-flat dashboard-input-settings is-disabled d-none" aria-disabled="true" style="margin-bottom: 22px;">
+  <div class="section-head"><h2><span class="dot" style="background: var(--warning);"></span> 資料欄位辨識設定</h2></div>
+  <div class="section-body">
+    <div style="margin-bottom: 18px;">
+      <div class="d-flex justify-content-between align-items-center mb-2"><div style="font-size: 13px; font-weight: 600; color: var(--gray-700);">選擇欄位體系<span class="hint" style="font-weight: 400; margin-left: 6px;">系統將依選擇的欄位名稱辨識資料。</span></div></div>
+      <div class="naming-grid" id="indicatorsInputScheme">
+        <label class="naming-chip"><input type="radio" name="indicatorsInputScheme" value="original" disabled><span class="nc-mark"></span><span class="nc-body"><span class="nc-title">原始欄位名稱</span><span class="nc-desc">欄位已是系統標準名稱</span></span></label>
+        <label class="naming-chip"><input type="radio" name="indicatorsInputScheme" value="field_name_zh" disabled><span class="nc-mark"></span><span class="nc-body"><span class="nc-title">中文欄位名稱</span><span class="nc-desc">依中文欄位名稱辨識</span></span></label>
+        <label class="naming-chip"><input type="radio" name="indicatorsInputScheme" value="field_name_en" disabled><span class="nc-mark"></span><span class="nc-body"><span class="nc-title">英文欄位名稱</span><span class="nc-desc">依英文欄位名稱辨識</span></span></label>
+        <label class="naming-chip"><input type="radio" name="indicatorsInputScheme" value="ntu_yunlin" disabled><span class="nc-mark"></span><span class="nc-body"><span class="nc-title">臺大雲林欄位名稱</span><span class="nc-desc">依臺大雲林資料欄位辨識</span></span></label>
+        <label class="naming-chip"><input type="radio" name="indicatorsInputScheme" value="ntu_system" disabled><span class="nc-mark"></span><span class="nc-body"><span class="nc-title">臺大系統欄位名稱</span><span class="nc-desc">依臺大系統匯出欄位辨識</span></span></label>
+        <label class="naming-chip"><input type="radio" name="indicatorsInputScheme" value="taiwan_cancer_registry" disabled><span class="nc-mark"></span><span class="nc-body"><span class="nc-title">台灣癌症登記欄位</span><span class="nc-desc">依癌症登記申報欄位辨識</span></span></label>
+        <label class="naming-chip"><input type="radio" name="indicatorsInputScheme" value="AI_module" disabled><span class="nc-mark"></span><span class="nc-body"><span class="nc-title">AI 模組欄位</span><span class="nc-desc">依系統 AI 模組匯出欄位辨識</span></span></label>
+      </div>
+    </div>
+    <div>
+      <div class="d-flex justify-content-between align-items-center mb-2"><div style="font-size: 13px; font-weight: 600; color: var(--gray-700);">未匹配欄位處理<span class="hint" style="font-weight: 400; margin-left: 6px;">勾選的欄位會一併保留於資料檔。</span></div><div class="d-flex align-items-center gap-2"><button id="btnSelectAllIndicatorExtras" class="btn btn-sm btn-outline-secondary" type="button" disabled>全選</button><button id="btnClearAllIndicatorExtras" class="btn btn-sm btn-outline-secondary" type="button" disabled>清除</button></div></div>
+      <div id="indicatorsInputFieldList" class="field-chiplist"><span class="field-chip disabled"><i class="bi bi-asterisk"></i> 請先選擇檔案</span></div>
+    </div>
+    <div class="d-flex justify-content-end gap-2 mt-3 pt-3" style="border-top:1px solid var(--border);"><button id="btnPreviewIndicatorsInput" class="btn btn-light" type="button" disabled><i class="bi bi-eye"></i> 預覽</button><button id="uploadIndicatorsFile" class="btn btn-primary d-flex align-items-center justify-content-center gap-2" type="button" disabled><i class="bi bi-upload"></i> 確認匯入</button></div>
+  </div>
+</section>
 <section id="indicatorsYearStep" class="indicators-step indicators-year-step is-disabled" aria-disabled="true">
   <div class="indicators-step-title"><span class="indicators-step-marker" aria-hidden="true"></span>年度與敘述風格</div>
   <div class="indicators-step-body">
@@ -167,6 +256,10 @@
       {% for value, zh, en in [('Oral_Cavity','口腔癌','Oral Cavity'),('Esophagus','食道癌','Esophagus'),('Stomach','胃癌','Stomach'),('Pancreas','胰臟癌','Pancreas'),('Colon_Rectum','結腸、直腸癌','Colon / Rectum'),('Liver','肝癌','Liver'),('Breast','乳癌','Breast'),('Lung','肺癌','Lung'),('Cervix_Uteri','子宮頸癌','Cervix Uteri'),('Corpus_Uteri','子宮體癌','Corpus Uteri'),('Ovary','卵巢癌','Ovary'),('Prostate','攝護腺癌','Prostate'),('Bladder','膀胱癌','Bladder')] %}
       <label class="indicators-cancer-option"><input class="form-check-input indicators-cancer" type="checkbox" value="{{ value }}" disabled><span>{{ zh }}<br><small>{{ en }}</small></span></label>
       {% endfor %}
+      <div class="indicators-cancer-actions" aria-label="癌別批次選擇">
+        <button id="selectAllIndicatorCancers" class="btn btn-outline-primary btn-sm" type="button" aria-controls="indicatorsCancerGrid" disabled>全選</button>
+        <button id="clearAllIndicatorCancers" class="btn btn-outline-secondary btn-sm" type="button" aria-controls="indicatorsCancerGrid" disabled>清除</button>
+      </div>
     </div>
   </div>
 </section>
@@ -174,19 +267,45 @@
 <section id="indicatorsPreviewStep" class="indicators-step is-disabled" aria-disabled="true">
   <div class="indicators-step-title"><span class="indicators-step-marker" aria-hidden="true"></span><span>監測指標內容</span><span class="hint mb-0">分子件數為符合指標分子定義的案件數；分母件數為符合指標分母定義的案件數；監測結果(%)為分子件數／分母件數</span><button id="analyzeIndicators" class="btn btn-success btn-sm ms-auto" type="button" disabled><i class="bi bi-play-fill me-1"></i>開始分析</button></div>
   <div class="indicators-step-body">
-    <div id="indicatorsPreview" class="indicators-result-empty">請先上傳資料、選擇診斷年度與癌別</div>
+    <div id="indicatorsPreview" class="indicators-result-empty" data-can-manage-thresholds="{{ 'true' if can_manage_thresholds else 'false' }}">請先上傳資料、選擇診斷年度與癌別</div>
   </div>
 </section>
 
 <section id="indicatorsExportStep" class="indicators-step is-disabled" aria-disabled="true">
-  <div class="indicators-step-title"><span class="indicators-step-marker" aria-hidden="true"></span>指標合併檔下載</div>
+  <div class="indicators-step-title"><span class="indicators-step-marker" aria-hidden="true"></span>選擇匯出方式</div>
   <div class="indicators-step-body">
     <div class="row g-3">
-      <div class="col-md-4"><div class="indicators-export-option"><div class="form-check"><input class="form-check-input" type="checkbox" id="exportWithNarrative" disabled><label class="form-check-label" for="exportWithNarrative"><span>產生文字分析並下載</span><span class="indicators-export-hint">可選 Word、PDF 或兩者；包含監測表、圖表與 AI 文字分析</span></label></div></div></div>
-      <div class="col-md-4"><div class="indicators-export-option"><div class="form-check"><input class="form-check-input" type="checkbox" id="exportWithoutNarrative" disabled><label class="form-check-label" for="exportWithoutNarrative"><span>不產生文字分析，直接下載</span><span class="indicators-export-hint">僅包含監測表與圖表</span></label></div></div></div>
-      <div class="col-md-4"><div class="indicators-export-option"><div class="form-check"><input class="form-check-input" type="checkbox" id="exportIndicatorsExcel" disabled><label class="form-check-label" for="exportIndicatorsExcel"><span>匯出資料（Excel）</span><span class="indicators-export-hint">保留原始資料，並在右側加入每項指標的分子／分母判定欄位</span></label></div></div></div>
+      <div class="col-12">
+        <button class="indicators-export-option" id="exportWithNarrative" type="button" disabled>
+          <span class="indicators-export-icon"><i class="bi bi-file-earmark-text"></i></span>
+          <span class="indicators-export-copy">
+            <span class="indicators-export-title">完整監測指標報告</span>
+            <span class="indicators-export-hint">包含監測表、圖表與語言模型敘述，可預覽並下載 PDF 或 Word</span>
+          </span>
+          <span class="indicators-export-action">前往預覽與匯出 <i class="bi bi-arrow-right ms-1"></i></span>
+        </button>
+      </div>
+      <div class="col-12">
+        <button class="indicators-export-option is-basic" id="exportWithoutNarrative" type="button" disabled>
+          <span class="indicators-export-icon"><i class="bi bi-file-earmark-bar-graph"></i></span>
+          <span class="indicators-export-copy">
+            <span class="indicators-export-title">基本監測指標報告</span>
+            <span class="indicators-export-hint">僅包含監測表與圖表，可直接預覽並下載 PDF 或 Word</span>
+          </span>
+          <span class="indicators-export-action">前往預覽與匯出 <i class="bi bi-arrow-right ms-1"></i></span>
+        </button>
+      </div>
+      <div class="col-12">
+        <button class="indicators-export-option is-excel" id="exportIndicatorsExcel" type="button" disabled>
+          <span class="indicators-export-icon"><i class="bi bi-file-earmark-spreadsheet"></i></span>
+          <span class="indicators-export-copy">
+            <span class="indicators-export-title">匯出監測指標資料 Excel</span>
+            <span class="indicators-export-hint">保留原始資料，並加入各項指標的分子、分母及判定結果欄位</span>
+          </span>
+          <span class="indicators-export-action">下載 Excel <i class="bi bi-download ms-1"></i></span>
+        </button>
+      </div>
     </div>
-    <div class="mt-3 text-end"><button id="downloadIndicators" class="btn btn-outline-dark" type="button" disabled><i class="bi bi-download me-1"></i>下載指標合併檔</button></div>
   </div>
 </section>
 {% endblock %}
@@ -194,12 +313,25 @@
 {% block extra_scripts %}
 <script>
 (() => {
+  const returnStateStorageKey = 'indicators_return_state_v1';
   const fileInput = document.getElementById('indicatorsFile');
   const uploadButton = document.getElementById('uploadIndicatorsFile');
+  const previewInputButton = document.getElementById('btnPreviewIndicatorsInput');
+  const inputSettings = document.getElementById('indicatorsInputSettings');
+  const inputFormatOptions = document.getElementById('indicatorsFormatOptions');
+  const inputFormatSelect = document.getElementById('indicatorsFormatSelect');
+  const txtOptions = document.getElementById('indicatorsTxtOptions');
+  const txtHasHeader = document.getElementById('indicatorsTxtHasHeader');
+  const inputFormatChips = document.querySelectorAll('#indicatorsInputScheme .naming-chip');
+  const inputFieldList = document.getElementById('indicatorsInputFieldList');
+  const selectAllExtraFieldsButton = document.getElementById('btnSelectAllIndicatorExtras');
+  const clearAllExtraFieldsButton = document.getElementById('btnClearAllIndicatorExtras');
   const startSelect = document.getElementById('indicatorsYearStart');
   const endSelect = document.getElementById('indicatorsYearEnd');
   const narrativeStyle = document.getElementById('indicatorsNarrativeStyle');
   const cancerInputs = [...document.querySelectorAll('.indicators-cancer')];
+  const selectAllCancerButton = document.getElementById('selectAllIndicatorCancers');
+  const clearAllCancerButton = document.getElementById('clearAllIndicatorCancers');
   const preview = document.getElementById('indicatorsPreview');
   const analyzeButton = document.getElementById('analyzeIndicators');
   const fileList = document.getElementById('indicatorsFileList');
@@ -208,8 +340,11 @@
   const cancerStep = document.getElementById('indicatorsCancerStep');
   const previewStep = document.getElementById('indicatorsPreviewStep');
   const exportStep = document.getElementById('indicatorsExportStep');
-  const exportInputs = [...exportStep.querySelectorAll('input[type="checkbox"]')];
-  const downloadButton = document.getElementById('downloadIndicators');
+  const reportExportButton = document.getElementById('exportWithNarrative');
+  const basicReportExportButton = document.getElementById('exportWithoutNarrative');
+  const excelExportButton = document.getElementById('exportIndicatorsExcel');
+  const exportButtons = [reportExportButton, basicReportExportButton, excelExportButton].filter(Boolean);
+  const canManageThresholds = preview.dataset.canManageThresholds === 'true';
   let uploaded = false;
   let previewGenerated = false;
   let availableYears = [];
@@ -218,11 +353,55 @@
   let loadedFileId = null;
   let nextFileId = 1;
   let uploadInProgress = false;
+  let indicatorInputPreview = null;
+  let indicatorInputPreviewLoading = false;
+  let indicatorInputPreviewRequestId = 0;
   let indicatorChartInstances = [];
   let activePreviewCancerKey = null;
   let previewRequestId = 0;
   let previewInFlight = false;
+  let currentIndicatorReports = [];
+  const indicatorNarrativeCache = new Map();
+  const indicatorNarrativePending = new Set();
+  const indicatorNarrativeCurrentKeys = new Map();
   const customYearControls = new Map();
+
+  const saveIndicatorsReturnState = () => {
+    const selectedEntry = fileEntries.find((entry) => entry.id === selectedFileId);
+    const state = {
+      version: 1,
+      sourceFileId: selectedEntry?.serverId || null,
+      yearStart: startSelect.value,
+      yearEnd: endSelect.value,
+      narrativeStyle: narrativeStyle.value,
+      cancers: cancerInputs.filter((input) => input.checked).map((input) => input.value),
+      reports: currentIndicatorReports,
+      narratives: [...indicatorNarrativeCache.entries()],
+      activeCancerKey: activePreviewCancerKey,
+      scrollY: window.scrollY,
+      savedAt: Date.now()
+    };
+    sessionStorage.setItem(returnStateStorageKey, JSON.stringify(state));
+  };
+
+  const consumeIndicatorsReturnState = () => {
+    try {
+      const raw = sessionStorage.getItem(returnStateStorageKey);
+      if (!raw) return null;
+      sessionStorage.removeItem(returnStateStorageKey);
+      const state = JSON.parse(raw);
+      if (state?.version !== 1 || !Array.isArray(state.reports) || !state.reports.length) return null;
+      return state;
+    } catch (error) {
+      sessionStorage.removeItem(returnStateStorageKey);
+      console.error('無法還原監測指標查詢狀態：', error);
+      return null;
+    }
+  };
+
+  window.addEventListener('pageshow', (event) => {
+    if (event.persisted) sessionStorage.removeItem(returnStateStorageKey);
+  });
 
   const disposeIndicatorCharts = () => {
     indicatorChartInstances.forEach((chart) => chart.dispose());
@@ -320,8 +499,9 @@
     previewRequestId += 1;
     disposeIndicatorCharts();
     activePreviewCancerKey = null;
+    currentIndicatorReports = [];
+    indicatorNarrativeCurrentKeys.clear();
     previewGenerated = false;
-    exportInputs.forEach((input) => { input.checked = false; });
     preview.className = 'indicators-result-empty';
     preview.textContent = '請先上傳資料、選擇診斷年度與癌別。';
   };
@@ -340,10 +520,11 @@
     setStepState(cancerStep, yearsSelected, !yearsSelected);
     setStepState(previewStep, cancerSelected, !cancerSelected);
     analyzeButton.disabled = !cancerSelected || previewInFlight;
-    setStepState(exportStep, cancerSelected, !cancerSelected);
+    setStepState(exportStep, previewGenerated, !previewGenerated);
     cancerInputs.forEach((input) => { input.disabled = !yearsSelected; });
-    exportInputs.forEach((input) => { input.disabled = !cancerSelected; });
-    downloadButton.disabled = !previewGenerated || !exportInputs.some((input) => input.checked);
+    selectAllCancerButton.disabled = !yearsSelected || cancerInputs.every((input) => input.checked);
+    clearAllCancerButton.disabled = !yearsSelected || !cancerInputs.some((input) => input.checked);
+    exportButtons.forEach((button) => { button.disabled = !previewGenerated; });
   };
 
   const resetAnalysisState = () => {
@@ -406,10 +587,115 @@
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
+  const selectedIndicatorInput = () => fileEntries.find((entry) => entry.id === selectedFileId);
+  const selectedInputScheme = () => document.querySelector('input[name="indicatorsInputScheme"]:checked')?.value || '';
+  const indicatorExtraFieldCheckboxes = () => Array.from(
+    inputFieldList?.querySelectorAll('.indicators-extra-field-checkbox') || []
+  );
+  const isSelectedInputTxt = () => selectedIndicatorInput()?.file.name.toLowerCase().endsWith('.txt') || false;
+  const inputFormatReady = () => Boolean(inputFormatSelect?.value);
+
+  const syncIndicatorExtraFieldControls = () => {
+    const checkboxes = indicatorExtraFieldCheckboxes();
+    const selectedCount = checkboxes.filter((checkbox) => checkbox.checked).length;
+    if (selectAllExtraFieldsButton) selectAllExtraFieldsButton.disabled = !checkboxes.length || selectedCount === checkboxes.length;
+    if (clearAllExtraFieldsButton) clearAllExtraFieldsButton.disabled = !checkboxes.length || selectedCount === 0;
+  };
+
+  const setIndicatorExtraFieldsChecked = (checked) => {
+    indicatorExtraFieldCheckboxes().forEach((checkbox) => {
+      checkbox.checked = checked;
+      checkbox.closest('.field-chip')?.classList.toggle('selected', checked);
+    });
+    syncIndicatorExtraFieldControls();
+  };
+
+  const syncIndicatorInputSettings = () => {
+    const entry = selectedIndicatorInput();
+    const hasLocalFile = Boolean(entry && !entry.serverId);
+    const settingsReady = hasLocalFile && inputFormatReady();
+    const previewReady = Boolean(indicatorInputPreview) && !indicatorInputPreviewLoading;
+    inputSettings?.classList.toggle('d-none', !hasLocalFile);
+    inputSettings?.classList.toggle('is-disabled', !settingsReady);
+    inputSettings?.setAttribute('aria-disabled', String(!settingsReady));
+    inputFormatOptions?.classList.toggle('d-none', !hasLocalFile);
+    if (inputFormatSelect) inputFormatSelect.disabled = !hasLocalFile;
+    txtOptions?.classList.toggle('d-none', !isSelectedInputTxt());
+    if (txtHasHeader) txtHasHeader.disabled = !isSelectedInputTxt();
+    inputFormatChips.forEach((chip) => {
+      const input = chip.querySelector('input[type="radio"]');
+      if (input) input.disabled = !settingsReady;
+      chip.classList.toggle('selected', Boolean(input?.checked));
+    });
+    uploadButton.disabled = !(hasLocalFile && inputFormatReady() && selectedInputScheme() && previewReady && !uploadInProgress);
+    if (previewInputButton) previewInputButton.disabled = !(hasLocalFile && inputFormatReady() && selectedInputScheme() && previewReady && !uploadInProgress);
+    syncIndicatorExtraFieldControls();
+  };
+
+  const resetIndicatorInputPreview = (message = '請先選擇檔案格式與欄位命名方式') => {
+    indicatorInputPreviewRequestId += 1;
+    indicatorInputPreview = null;
+    indicatorInputPreviewLoading = false;
+    if (inputFieldList) {
+      inputFieldList.innerHTML = `<span class="field-chip disabled"><i class="bi bi-info-circle"></i> ${message}</span>`;
+    }
+    syncIndicatorInputSettings();
+  };
+
+  const loadIndicatorInputPreview = async () => {
+    const entry = selectedIndicatorInput();
+    const inputScheme = selectedInputScheme();
+    if (!entry || entry.serverId || !inputScheme || !inputFormatReady()) return;
+
+    indicatorInputPreview = null;
+    indicatorInputPreviewLoading = true;
+    const requestId = ++indicatorInputPreviewRequestId;
+    if (inputFieldList) {
+      inputFieldList.innerHTML = '<span class="field-chip disabled"><span class="spinner-border spinner-border-sm me-1"></span> 正在辨識欄位</span>';
+    }
+    syncIndicatorInputSettings();
+
+    const formData = new FormData();
+    formData.set('file', entry.file);
+    formData.set('input_scheme', inputScheme);
+    formData.set('format_id', inputFormatSelect.value);
+    formData.set('txt_has_header', txtHasHeader?.checked ? 'true' : 'false');
+    try {
+      const response = await fetch('/api/indicators/input-preview', { method: 'POST', body: formData });
+      const result = await response.json();
+      if (requestId !== indicatorInputPreviewRequestId) return;
+      if (!response.ok || !result.ok) throw new Error(result.error || '欄位辨識失敗');
+      indicatorInputPreview = result;
+      const unmatched = result.columns.filter((column) => !column.matched);
+      const summary = `<span class="field-chip disabled"><i class="bi bi-check-circle text-success"></i> 已匹配 ${result.matched_count}／${result.total_count} 個欄位</span>`;
+      const unmatchedChips = unmatched.length
+        ? unmatched.map((column) => `<label class="field-chip selected"><input type="checkbox" class="indicators-extra-field-checkbox" value="${escapeHtml(column.original)}" checked><span>${escapeHtml(column.original)}</span></label>`).join('')
+        : '<span class="field-chip disabled"><i class="bi bi-check2 text-success"></i> 無未匹配欄位</span>';
+      if (inputFieldList) {
+        inputFieldList.innerHTML = summary + unmatchedChips;
+        inputFieldList.querySelectorAll('.indicators-extra-field-checkbox').forEach((checkbox) => {
+          checkbox.addEventListener('change', () => {
+            checkbox.closest('.field-chip')?.classList.toggle('selected', checkbox.checked);
+            syncIndicatorExtraFieldControls();
+          });
+        });
+      }
+    } catch (error) {
+      if (requestId !== indicatorInputPreviewRequestId) return;
+      if (inputFieldList) {
+        inputFieldList.innerHTML = `<span class="field-chip disabled text-danger"><i class="bi bi-x-circle"></i> ${escapeHtml(error.message || '欄位辨識失敗')}</span>`;
+      }
+    } finally {
+      if (requestId !== indicatorInputPreviewRequestId) return;
+      indicatorInputPreviewLoading = false;
+      syncIndicatorInputSettings();
+    }
+  };
+
   const renderFileList = () => {
     if (!fileEntries.length) {
       fileCount.textContent = '0 個檔案';
-      fileList.innerHTML = '<div class="indicators-file-empty"><span class="indicators-file-empty-title">尚未選擇檔案</span><span>選擇 Excel 或 CSV 後，將在此顯示檔案資訊。</span></div>';
+      fileList.innerHTML = '<div class="indicators-file-empty"><span class="indicators-file-empty-title">尚未選擇檔案</span><span>選擇 Excel、CSV 或 TXT 後，將在此顯示檔案資訊。</span></div>';
       return;
     }
     const statuses = {
@@ -444,26 +730,26 @@
     const entry = fileEntries.find((item) => item.id === entryId);
     if (entry && entry.id === loadedFileId && entry.years?.length) {
       applySourceToAnalysis(entry);
-      uploadButton.disabled = true;
+      resetIndicatorInputPreview('已上傳的資料可直接進行分析');
       renderFileList();
       return;
     }
     if (!entry) {
       resetAnalysisState();
-      uploadButton.disabled = true;
+      resetIndicatorInputPreview();
       renderFileList();
       return;
     }
     if (!entry.serverId) {
       resetAnalysisState();
-      uploadButton.disabled = false;
+      resetIndicatorInputPreview('請選擇申報欄位格式與欄位命名方式');
       renderFileList();
       return;
     }
 
     resetAnalysisState();
     uploadInProgress = true;
-    uploadButton.disabled = true;
+    resetIndicatorInputPreview('正在載入已上傳資料');
     renderFileList();
     try {
       const source = await fetchJson(`/api/indicators/source/${encodeURIComponent(entry.serverId)}/activate`, { method: 'POST' });
@@ -478,7 +764,7 @@
       resetAnalysisState();
     } finally {
       uploadInProgress = false;
-      uploadButton.disabled = Boolean(entry.serverId);
+      syncIndicatorInputSettings();
       renderFileList();
     }
   };
@@ -496,8 +782,13 @@
       fileEntries.push(newestEntry);
     });
     fileInput.value = '';
-    if (newestEntry) void activateFileEntry(newestEntry.id);
-    else renderFileList();
+    if (newestEntry) {
+      const defaultChineseScheme = document.querySelector('input[name="indicatorsInputScheme"][value="field_name_zh"]');
+      if (defaultChineseScheme) defaultChineseScheme.checked = true;
+      void activateFileEntry(newestEntry.id);
+    } else {
+      renderFileList();
+    }
   });
 
   fileList.addEventListener('click', async (event) => {
@@ -536,6 +827,36 @@
       }
     }
   });
+  inputFormatChips.forEach((chip) => {
+    chip.querySelector('input[type="radio"]')?.addEventListener('change', () => {
+      resetIndicatorInputPreview();
+      void loadIndicatorInputPreview();
+    });
+  });
+  inputFormatSelect?.addEventListener('change', () => {
+    resetIndicatorInputPreview();
+    void loadIndicatorInputPreview();
+  });
+  txtHasHeader?.addEventListener('change', () => {
+    resetIndicatorInputPreview();
+    void loadIndicatorInputPreview();
+  });
+  selectAllExtraFieldsButton?.addEventListener('click', () => setIndicatorExtraFieldsChecked(true));
+  clearAllExtraFieldsButton?.addEventListener('click', () => setIndicatorExtraFieldsChecked(false));
+  previewInputButton?.addEventListener('click', () => {
+    const entry = selectedIndicatorInput();
+    if (!entry || !indicatorInputPreview) return;
+    const retainedFields = new Set(indicatorExtraFieldCheckboxes()
+      .filter((checkbox) => checkbox.checked)
+      .map((checkbox) => checkbox.value));
+    const rows = indicatorInputPreview.columns.map((column) => `<tr><td class="text-start">${escapeHtml(column.original)}</td><td class="text-start">${escapeHtml(column.normalized)}</td><td class="text-center">${column.matched ? '<span class="text-success">已匹配</span>' : retainedFields.has(column.original) ? '<span class="text-warning">保留</span>' : '<span class="text-secondary">略過</span>'}</td></tr>`).join('');
+    Swal.fire({
+      title: '欄位辨識預覽',
+      width: 860,
+      html: `<div class="text-start mb-3"><strong>檔案：</strong>${escapeHtml(entry.file.name)}<span class="mx-2">｜</span><strong>欄位體系：</strong>${escapeHtml(document.querySelector('input[name="indicatorsInputScheme"]:checked')?.closest('.naming-chip')?.querySelector('.nc-title')?.textContent || '')}</div><div class="table-responsive" style="max-height:420px"><table class="table table-sm table-bordered align-middle mb-0"><thead class="table-light sticky-top"><tr><th>原始欄位</th><th>轉換後欄位</th><th style="width:90px">處理方式</th></tr></thead><tbody>${rows}</tbody></table></div>`,
+      confirmButtonColor: '#2563eb',
+    });
+  });
   startSelect.addEventListener('change', populateEndYears);
   endSelect.addEventListener('change', () => {
     cancerInputs.forEach((input) => { input.checked = false; });
@@ -546,12 +867,22 @@
     resetPreviewResult();
     updateReadyState();
   }));
+  const setAllCancerSelections = (checked) => {
+    const changed = cancerInputs.some((input) => input.checked !== checked);
+    cancerInputs.forEach((input) => { input.checked = checked; });
+    if (changed) resetPreviewResult();
+    updateReadyState();
+  };
+  selectAllCancerButton.addEventListener('click', () => setAllCancerSelections(true));
+  clearAllCancerButton.addEventListener('click', () => setAllCancerSelections(false));
   analyzeButton.addEventListener('click', () => { void generateIndicatorsPreview(); });
-  exportInputs.forEach(input => input.addEventListener('change', updateReadyState));
-
+  narrativeStyle.addEventListener('change', () => {
+    if (currentIndicatorReports.length) renderIndicatorsPreview({ ok: true, reports: currentIndicatorReports });
+  });
   uploadButton.addEventListener('click', async () => {
     const entry = fileEntries.find((item) => item.id === selectedFileId);
-    if (!entry || entry.serverId || uploadInProgress) return;
+    const inputScheme = selectedInputScheme();
+    if (!entry || entry.serverId || uploadInProgress || !inputScheme || !inputFormatReady() || !indicatorInputPreview) return;
     const file = entry.file;
     uploadInProgress = true;
     uploadButton.disabled = true;
@@ -561,6 +892,12 @@
     renderFileList();
     const formData = new FormData();
     formData.append('file', file);
+    formData.set('input_scheme', inputScheme);
+    formData.set('format_id', inputFormatSelect.value);
+    formData.set('txt_has_header', txtHasHeader?.checked ? 'true' : 'false');
+    formData.set('extra_fields', JSON.stringify(indicatorExtraFieldCheckboxes()
+      .filter((checkbox) => checkbox.checked)
+      .map((checkbox) => checkbox.value)));
     try {
       const result = await fetchJson('/api/indicators/upload', { method: 'POST', body: formData });
       const years = result.years || [];
@@ -588,7 +925,7 @@
       entry.yearRange = '';
     } finally {
       uploadInProgress = false;
-      uploadButton.disabled = Boolean(entry.serverId) || !fileEntries.some((item) => item.id === selectedFileId);
+      syncIndicatorInputSettings();
       renderFileList();
       updateReadyState();
     }
@@ -598,9 +935,218 @@
     '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
   }[character]));
 
+  const indicatorThresholdState = (indicator) => {
+    if (indicator.calculation_available === false) return '尚未建立規則';
+    const percentage = indicator.percentage == null ? null : Number(indicator.percentage);
+    if (!Number.isFinite(percentage)) return '無法計算';
+    const targetRaw = indicator.target_value;
+    if (targetRaw === null || targetRaw === undefined || String(targetRaw).trim() === '' || !Number.isFinite(Number(targetRaw))) {
+      return '待設定閾值';
+    }
+    const target = Number(targetRaw);
+    const defaultOperator = indicator.direction === 'negative' ? '<=' : '>=';
+    const requestedOperator = String(indicator.target_operator || defaultOperator);
+    const operator = ['>=', '>', '<=', '<', '='].includes(requestedOperator) ? requestedOperator : defaultOperator;
+    const met = {
+      '>=': percentage >= target,
+      '>': percentage > target,
+      '<=': percentage <= target,
+      '<': percentage < target,
+      '=': percentage === target
+    }[operator];
+    return met ? '達標' : '未達標';
+  };
+
+  const indicatorNarrativeContext = (report, cancerName) => ({
+    cancer: cancerName,
+    period: `${startSelect.value}–${endSelect.value}`,
+    eligible_case_count: Number(report.input_count || 0),
+    included_case_count: Number(report.included_count || 0),
+    exclusions: report.global_exclusions?.excluded_by_reason || {},
+    indicators: (report.indicators || []).map((indicator) => {
+      const targetRaw = indicator.target_value;
+      const hasTarget = targetRaw !== null
+        && targetRaw !== undefined
+        && String(targetRaw).trim() !== ''
+        && Number.isFinite(Number(targetRaw));
+      const defaultOperator = indicator.direction === 'negative' ? '<=' : '>=';
+      const operator = ['>=', '>', '<=', '<', '='].includes(String(indicator.target_operator || defaultOperator))
+        ? String(indicator.target_operator || defaultOperator)
+        : defaultOperator;
+      return {
+        indicator_no: indicator.id,
+        indicator_name: indicator.name,
+        indicator_direction: indicator.direction === 'negative' ? '負向指標' : indicator.direction === 'positive' ? '正向指標' : '未設定',
+        selection_reason: indicator.selection_reason || '',
+        numerator: indicator.calculation_available === false ? null : Number(indicator.numerator || 0),
+        denominator: indicator.calculation_available === false ? null : Number(indicator.denominator || 0),
+        percentage: indicator.percentage == null ? null : Number(indicator.percentage),
+        threshold: hasTarget ? `${operator}${Number(targetRaw)}%` : '尚未設定',
+        threshold_status: indicatorThresholdState(indicator)
+      };
+    })
+  });
+
+  const indicatorNarrativeKey = (report, cancerName) => JSON.stringify({
+    mode: narrativeStyle.value || 'balanced',
+    data: indicatorNarrativeContext(report, cancerName)
+  });
+
+  const indicatorHasConfiguredThreshold = (indicator) => {
+    const target = indicator?.target_value;
+    return target !== null
+      && target !== undefined
+      && String(target).trim() !== ''
+      && Number.isFinite(Number(target));
+  };
+
+  const indicatorThresholdsComplete = (report) => (
+    Array.isArray(report?.indicators)
+    && report.indicators.length > 0
+    && report.indicators.every(indicatorHasConfiguredThreshold)
+  );
+
+  const indicatorNarrativeMarkup = (report, cancerName) => {
+    const cancerKey = String(report.cancer_key || '');
+    const cacheKey = indicatorNarrativeKey(report, cancerName);
+    indicatorNarrativeCurrentKeys.set(cancerKey, cacheKey);
+    const cachedText = indicatorNarrativeCache.get(cacheKey);
+    const pending = indicatorNarrativePending.has(cacheKey);
+    const thresholdsComplete = indicatorThresholdsComplete(report);
+    const text = cachedText || (!thresholdsComplete
+      ? '請先完成此癌別所有監測指標的閾值設定'
+      : pending ? '正在產生語言模型敘述，請稍候…' : '閾值已設定完成，請按「產生敘述」');
+    const actionLabel = cachedText ? '重新產生敘述' : '產生敘述';
+    return `<section class="indicators-ai-narrative" data-indicators-ai-narrative="${escapeHtml(cancerKey)}" aria-live="polite">
+      <div class="indicators-ai-narrative-head">
+        <h6 class="indicators-ai-narrative-title">語言模型敘述</h6>
+        <button type="button" class="btn btn-sm indicators-ai-regenerate" data-regenerate-indicators-narrative="${escapeHtml(cancerKey)}"${pending || !thresholdsComplete ? ' disabled' : ''}>${actionLabel}</button>
+      </div>
+      <div class="indicators-ai-narrative-text${!cachedText && !pending && !thresholdsComplete ? ' is-threshold-hint' : ''}">${escapeHtml(text)}</div>
+    </section>`;
+  };
+
+  const findIndicatorNarrativeBox = (cancerKey) => [...preview.querySelectorAll('[data-indicators-ai-narrative]')]
+    .find((element) => element.dataset.indicatorsAiNarrative === String(cancerKey));
+
+  const setIndicatorNarrativeState = (cancerKey, cacheKey, text, { error = false, pending = false, generated = false } = {}) => {
+    if (indicatorNarrativeCurrentKeys.get(String(cancerKey)) !== cacheKey) return;
+    const box = findIndicatorNarrativeBox(cancerKey);
+    if (!box) return;
+    box.classList.toggle('is-error', error);
+    const textElement = box.querySelector('.indicators-ai-narrative-text');
+    const button = box.querySelector('[data-regenerate-indicators-narrative]');
+    if (textElement) {
+      textElement.textContent = text;
+      textElement.classList.remove('is-threshold-hint');
+    }
+    if (button) {
+      button.disabled = pending;
+      if (generated) button.textContent = '重新產生敘述';
+    }
+  };
+
+  const waitForIndicatorNarrativeTask = async (taskId, itemMap) => {
+    const terminalStatuses = new Set(['completed', 'partial_failed', 'failed', 'cancelled']);
+    for (let attempt = 0; attempt < 400; attempt += 1) {
+      await new Promise((resolve) => window.setTimeout(resolve, 3000));
+      let data;
+      try {
+        const response = await fetch(`/api/llm-tasks/${encodeURIComponent(taskId)}`);
+        data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.error || '無法取得語言模型任務狀態。');
+      } catch (error) {
+        if (attempt < 399) continue;
+        itemMap.forEach(({ cancerKey, cacheKey }) => {
+          indicatorNarrativePending.delete(cacheKey);
+          setIndicatorNarrativeState(cancerKey, cacheKey, error.message || '無法取得語言模型敘述。', { error: true });
+        });
+        return;
+      }
+
+      const completedItems = new Set();
+      (data.task?.result || []).forEach((row) => {
+        const item = itemMap.get(String(row.custom_id || row.item_id || ''));
+        if (!item) return;
+        completedItems.add(item.cacheKey);
+        const result = row.result || {};
+        indicatorNarrativePending.delete(item.cacheKey);
+        if (result.success) {
+          const text = result.insights?.['zh-TW'] || result.insight || '語言模型未回傳分析內容。';
+          indicatorNarrativeCache.set(item.cacheKey, text);
+          setIndicatorNarrativeState(item.cancerKey, item.cacheKey, text, { generated: true });
+        } else {
+          setIndicatorNarrativeState(item.cancerKey, item.cacheKey, `語言模型敘述產生失敗：${result.error || '請稍後再試。'}`, { error: true });
+        }
+      });
+
+      const status = String(data.task?.Status || data.task?.status || '');
+      if (!terminalStatuses.has(status)) continue;
+      itemMap.forEach(({ cancerKey, cacheKey }) => {
+        if (completedItems.has(cacheKey)) return;
+        indicatorNarrativePending.delete(cacheKey);
+        setIndicatorNarrativeState(cancerKey, cacheKey, status === 'cancelled' ? '語言模型敘述任務已取消。' : '語言模型敘述產生失敗，請重新產生。', { error: true });
+      });
+      return;
+    }
+  };
+
+  const queueIndicatorNarratives = async (reports, cancerLabels, { forceCancerKeys = new Set() } = {}) => {
+    const timestamp = Date.now();
+    const itemMap = new Map();
+    const items = [];
+    reports.forEach((report, index) => {
+      if (!report.indicators?.length) return;
+      if (!indicatorThresholdsComplete(report)) return;
+      const cancerKey = String(report.cancer_key || '');
+      const cancerName = cancerLabels[cancerKey] || cancerKey;
+      const cacheKey = indicatorNarrativeKey(report, cancerName);
+      const force = forceCancerKeys.has(cancerKey);
+      if (!force && (indicatorNarrativeCache.has(cacheKey) || indicatorNarrativePending.has(cacheKey))) return;
+      if (force) indicatorNarrativeCache.delete(cacheKey);
+      indicatorNarrativePending.add(cacheKey);
+      setIndicatorNarrativeState(cancerKey, cacheKey, '正在產生語言模型敘述，請稍候…', { pending: true });
+      const itemId = `indicators-${timestamp}-${index + 1}`;
+      itemMap.set(itemId, { cancerKey, cacheKey });
+      items.push({
+        item_id: itemId,
+        field_key: `${cancerName}監測指標分析`,
+        data: indicatorNarrativeContext(report, cancerName)
+      });
+    });
+    if (!items.length) return;
+
+    try {
+      const result = await fetchJson('/api/indicators/narrative-job', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items,
+          mode_ai: narrativeStyle.value || 'balanced',
+          year_start: startSelect.value,
+          year_end: endSelect.value,
+          force: forceCancerKeys.size > 0
+        })
+      });
+      window.dispatchEvent(new CustomEvent('llm-task-created'));
+      const currentItems = [...itemMap.values()];
+      const taskItemIds = Array.isArray(result.item_ids) && result.item_ids.length === currentItems.length
+        ? result.item_ids
+        : [...itemMap.keys()];
+      const resumedItemMap = new Map(taskItemIds.map((itemId, index) => [String(itemId), currentItems[index]]));
+      void waitForIndicatorNarrativeTask(result.task_id, resumedItemMap);
+    } catch (error) {
+      itemMap.forEach(({ cancerKey, cacheKey }) => {
+        indicatorNarrativePending.delete(cacheKey);
+        setIndicatorNarrativeState(cancerKey, cacheKey, `無法建立語言模型敘述：${error.message || '請稍後再試。'}`, { error: true });
+      });
+    }
+  };
+
   const loadStoredSources = async () => {
     try {
       const result = await fetchJson('/api/indicators/sources');
+      const returnState = consumeIndicatorsReturnState();
       (result.sources || []).forEach((source) => {
         if (fileEntries.some((entry) => entry.serverId === source.file_id)) return;
         const extension = source.filename.includes('.') ? source.filename.split('.').pop().toUpperCase() : '檔案';
@@ -616,14 +1162,47 @@
           years: [...years]
         });
       });
-      const activeEntry = fileEntries.find((entry) => entry.serverId === result.active_file_id);
+      const activeEntry = fileEntries.find((entry) => (
+        entry.serverId === (returnState?.sourceFileId || result.active_file_id)
+      ));
       if (activeEntry) {
         selectedFileId = activeEntry.id;
         loadedFileId = activeEntry.id;
         applySourceToAnalysis(activeEntry);
       }
-      uploadButton.disabled = true;
+      syncIndicatorInputSettings();
       renderFileList();
+      if (returnState && activeEntry) {
+        const startYear = String(returnState.yearStart || '');
+        const endYear = String(returnState.yearEnd || '');
+        if ([...startSelect.options].some((option) => option.value === startYear)) {
+          startSelect.value = startYear;
+        }
+        const eligibleYears = startYear
+          ? availableYears.filter((year) => Number(year) >= Number(startYear))
+          : availableYears;
+        endSelect.innerHTML = `<option value="">尚未選擇</option>${eligibleYears.map((year) => `<option value="${year}">${year}</option>`).join('')}`;
+        if ([...endSelect.options].some((option) => option.value === endYear)) {
+          endSelect.value = endYear;
+        }
+        if ([...narrativeStyle.options].some((option) => option.value === returnState.narrativeStyle)) {
+          narrativeStyle.value = returnState.narrativeStyle;
+        }
+        const selectedCancers = new Set(returnState.cancers || []);
+        cancerInputs.forEach((input) => { input.checked = selectedCancers.has(input.value); });
+        indicatorNarrativeCache.clear();
+        (returnState.narratives || []).forEach(([key, value]) => {
+          if (key && String(value || '').trim()) indicatorNarrativeCache.set(String(key), String(value));
+        });
+        currentIndicatorReports = returnState.reports;
+        activePreviewCancerKey = returnState.activeCancerKey || null;
+        renderIndicatorsPreview({ ok: true, reports: currentIndicatorReports });
+        previewGenerated = true;
+        updateReadyState();
+        window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+          window.scrollTo({ top: Number(returnState.scrollY || 0), behavior: 'auto' });
+        }));
+      }
     } catch (error) {
       console.error('無法載入指標檔案清單：', error);
     }
@@ -680,7 +1259,9 @@
           && String(targetRaw).trim() !== ''
           && Number.isFinite(Number(targetRaw));
         const target = hasTarget ? Math.min(100, Math.max(0, Number(targetRaw))) : null;
-        const operator = String(indicator.target_operator || (direction === 'negative' ? '<=' : '>='));
+        const defaultOperator = direction === 'negative' ? '<=' : '>=';
+        const requestedOperator = String(indicator.target_operator || defaultOperator);
+        const operator = ['>=', '>', '<=', '<', '='].includes(requestedOperator) ? requestedOperator : defaultOperator;
         const meetsTarget = !hasTarget || percentage == null ? null : ({
           '>=': percentage >= target,
           '>': percentage > target,
@@ -689,10 +1270,20 @@
           '=': percentage === target
         }[operator] ?? (direction === 'negative' ? percentage <= target : percentage >= target));
         const rateLabel = !calculationAvailable ? '尚未建立規則' : percentage == null ? '無法計算' : `${percentage}%`;
-        const targetLabel = hasTarget ? `${escapeHtml(operator)}${Number(target).toLocaleString()}%` : '尚未設定';
+        const targetLabel = hasTarget ? `${operator}${Number(target).toLocaleString()}%` : '尚未設定';
         const statusClass = meetsTarget == null ? '' : meetsTarget ? 'is-success' : 'is-warning';
         const statusIcon = meetsTarget == null ? 'bi-dash-circle' : meetsTarget ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill';
-        const statusLabel = !calculationAvailable ? '尚未建立規則' : meetsTarget == null ? '待設定門檻' : meetsTarget ? '達標' : '未達標';
+        const statusLabel = !calculationAvailable ? '尚未建立規則' : meetsTarget == null ? '待設定閾值' : meetsTarget ? '達標' : '未達標';
+        const thresholdMarkup = canManageThresholds ? `<span class="indicator-threshold-editor">
+          <span>閾值：</span>
+          <select class="form-select form-select-sm indicator-threshold-operator" data-threshold-operator aria-label="指標 ${escapeHtml(indicator.id)} 閾值比較方式">
+            ${['>=', '>', '<=', '<', '='].map((value) => `<option value="${escapeHtml(value)}"${value === operator ? ' selected' : ''}>${escapeHtml(value)}</option>`).join('')}
+          </select>
+          <input class="form-control form-control-sm indicator-threshold-value" data-threshold-value type="number" min="0" max="100" step="0.1" value="${hasTarget ? escapeHtml(target) : ''}" placeholder="0–100" aria-label="指標 ${escapeHtml(indicator.id)} 閾值百分比">
+          <span>%</span>
+          <button class="btn btn-outline-secondary btn-sm indicator-threshold-save" type="button" data-save-threshold data-cancer-key="${escapeHtml(report.cancer_key)}" data-indicator-no="${escapeHtml(indicator.id)}">儲存</button>
+          <button class="btn btn-outline-danger btn-sm indicator-threshold-save" type="button" data-clear-threshold data-cancer-key="${escapeHtml(report.cancer_key)}" data-indicator-no="${escapeHtml(indicator.id)}"${hasTarget ? '' : ' disabled'}>清除</button>
+        </span>` : `<span>閾值：<strong>${escapeHtml(targetLabel)}</strong></span>`;
         return {
           indicator,
           percentage,
@@ -704,12 +1295,12 @@
           targetLabel,
           rateLabel,
           meetsTarget,
-          html: `<article class="indicator-kpi-card">
+          html: `<article class="indicator-kpi-card${statusClass ? ` ${statusClass}` : ''}">
           <div class="indicator-kpi-head">
             <div class="indicator-kpi-title">[指標 ${escapeHtml(indicator.id)}] ${escapeHtml(indicator.name)}</div>
             <div class="indicator-kpi-meta">
               <span>表現：<strong>${escapeHtml(rateLabel)}</strong>（${numerator == null ? '-' : numerator.toLocaleString()}/${denominator == null ? '-' : denominator.toLocaleString()}）</span>
-              <span>門檻：<strong>${targetLabel}</strong></span>
+              ${thresholdMarkup}
               <span class="indicator-kpi-status ${statusClass}"><i class="bi ${statusIcon}" aria-hidden="true"></i>${statusLabel}</span>
             </div>
           </div>
@@ -725,17 +1316,19 @@
         const gaugeElement = container.querySelector(`[data-kpi-gauge="${indicatorIndex}"]`);
         if (!gaugeElement) return;
         const chart = echarts.init(gaugeElement);
-        const barColor = item.meetsTarget == null ? '#45a9a6' : item.meetsTarget ? '#2f9e62' : '#d97706';
+        const barColor = item.meetsTarget == null ? '#64748B' : item.meetsTarget ? '#45a9a6' : '#dc3545';
+        const isZeroRate = item.percentage === 0;
+        const isFullRate = item.percentage === 100;
         chart.setOption({
           animationDuration: 450,
           aria: {
             enabled: true,
-            description: `指標 ${item.indicator.id}，監測結果 ${item.rateLabel}，分子 ${item.numerator == null ? '-' : item.numerator} 筆，分母 ${item.denominator == null ? '-' : item.denominator} 筆，門檻 ${item.hasTarget ? item.targetLabel : '尚未設定'}`
+            description: `指標 ${item.indicator.id}，監測結果 ${item.rateLabel}，分子 ${item.numerator == null ? '-' : item.numerator} 筆，分母 ${item.denominator == null ? '-' : item.denominator} 筆，閾值 ${item.hasTarget ? item.targetLabel : '尚未設定'}`
           },
-          grid: { left: 4, right: 12, top: 28, bottom: 22 },
+          grid: { left: 4, right: 24, top: 24, bottom: 30 },
           tooltip: {
             trigger: 'item',
-            formatter: () => `<strong>指標 ${escapeHtml(item.indicator.id)}｜${escapeHtml(item.indicator.name)}</strong><br>監測結果 ${escapeHtml(item.rateLabel)}<br>分子 ${item.numerator == null ? '-' : item.numerator.toLocaleString()} 筆／分母 ${item.denominator == null ? '-' : item.denominator.toLocaleString()} 筆<br>門檻 ${item.targetLabel}`
+            formatter: () => `<strong>指標 ${escapeHtml(item.indicator.id)}｜${escapeHtml(item.indicator.name)}</strong><br>監測結果 ${escapeHtml(item.rateLabel)}<br>分子 ${item.numerator == null ? '-' : item.numerator.toLocaleString()} 筆／分母 ${item.denominator == null ? '-' : item.denominator.toLocaleString()} 筆<br>閾值 ${escapeHtml(item.targetLabel)}`
           },
           xAxis: {
             type: 'value',
@@ -760,9 +1353,10 @@
             data: [{ value: item.safePercentage, itemStyle: { color: barColor } }],
             label: {
               show: item.percentage != null,
-              position: 'top',
-              align: item.safePercentage === 0 ? 'left' : 'center',
-              offset: item.safePercentage === 0 ? [3, 0] : [0, 0],
+              position: isZeroRate ? 'left' : 'right',
+              align: isZeroRate ? 'left' : isFullRate ? 'right' : 'center',
+              distance: 0,
+              offset: isZeroRate ? [4, -16] : isFullRate ? [-4, -16] : [0, 24],
               color: '#374151',
               fontSize: 11,
               fontWeight: 700,
@@ -771,13 +1365,17 @@
             markLine: item.hasTarget ? {
               silent: true,
               symbol: ['none', 'none'],
-              lineStyle: { color: '#d89a18', width: 3 },
+              lineStyle: { color: '#d89a18', type: 'solid', width: 3 },
               label: {
                 show: true,
+                align: item.target >= 95 ? 'right' : item.target <= 5 ? 'left' : 'center',
                 color: '#8a6200',
+                distance: 4,
                 fontSize: 10,
-                formatter: `門檻 ${item.targetLabel}`,
-                position: 'insideEndTop'
+                formatter: `閾值 ${item.targetLabel}`,
+                position: 'end',
+                rotate: 0,
+                verticalAlign: 'bottom'
               },
               data: [{ xAxis: item.target }]
             } : undefined
@@ -786,17 +1384,246 @@
         indicatorChartInstances.push(chart);
       });
     });
+    if (canManageThresholds) {
+      preview.querySelectorAll('[data-save-threshold], [data-clear-threshold]').forEach((button) => {
+        button.addEventListener('click', async () => {
+          const editor = button.closest('.indicator-threshold-editor');
+          const valueInput = editor?.querySelector('[data-threshold-value]');
+          const operatorInput = editor?.querySelector('[data-threshold-operator]');
+          const clearThreshold = button.hasAttribute('data-clear-threshold');
+          if (!valueInput || !operatorInput || (!clearThreshold && !valueInput.reportValidity())) return;
+          const actionButtons = [...editor.querySelectorAll('button')];
+          const initialDisabledStates = actionButtons.map((actionButton) => actionButton.disabled);
+          actionButtons.forEach((actionButton) => { actionButton.disabled = true; });
+          button.textContent = clearThreshold ? '清除中' : '儲存中';
+          try {
+            const result = await fetchJson('/api/indicators/thresholds', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                cancer_key: button.dataset.cancerKey,
+                indicator_no: button.dataset.indicatorNo,
+                target_value: clearThreshold ? '' : valueInput.value.trim(),
+                target_operator: operatorInput.value
+              })
+            });
+            const report = reports.find((item) => String(item.cancer_key) === String(result.cancer_key));
+            const indicator = report?.indicators?.find((item) => Number(item.id) === Number(result.indicator_no));
+            if (indicator) {
+              indicator.target_value = result.target_value;
+              indicator.target_operator = result.target_operator;
+            }
+            renderIndicatorsPreview({ ok: true, reports });
+          } catch (error) {
+            actionButtons.forEach((actionButton, index) => { actionButton.disabled = initialDisabledStates[index]; });
+            button.textContent = clearThreshold ? '清除' : '儲存';
+            window.alert(error.message || (clearThreshold ? '閾值清除失敗。' : '閾值儲存失敗。'));
+          }
+        });
+      });
+      preview.querySelectorAll('.indicator-threshold-editor').forEach((editor) => {
+        const saveButton = editor.querySelector('[data-save-threshold]');
+        editor.querySelectorAll('[data-threshold-operator], [data-threshold-value]').forEach((control) => {
+          control.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter') return;
+            event.preventDefault();
+            if (saveButton && !saveButton.disabled) saveButton.click();
+          });
+        });
+      });
+    }
   };
 
   window.addEventListener('resize', () => {
     indicatorChartInstances.forEach((chart) => chart.resize());
   });
 
+  const loadExportImage = (source) => new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('無法建立監測指標圖表預覽。'));
+    image.src = source;
+  });
+
+  const wrapExportTitle = (context, text, maxWidth) => {
+    const lines = [];
+    let line = '';
+    [...String(text || '')].forEach((character) => {
+      const candidate = `${line}${character}`;
+      if (line && context.measureText(candidate).width > maxWidth) {
+        lines.push(line);
+        line = character;
+      } else {
+        line = candidate;
+      }
+    });
+    if (line) lines.push(line);
+    return lines.length ? lines : [''];
+  };
+
+  const buildIndicatorsExportChart = async (report, reportIndex) => {
+    const container = preview.querySelector(`[data-indicators-chart="${reportIndex}"]`);
+    if (!container || typeof echarts === 'undefined') return '';
+    const gauges = [...container.querySelectorAll('[data-kpi-gauge]')];
+    if (!gauges.length) {
+      const chart = echarts.getInstanceByDom(container);
+      return chart?.getDataURL({ type: 'png', pixelRatio: 1, backgroundColor: '#ffffff' }) || '';
+    }
+
+    const rows = [];
+    for (let index = 0; index < gauges.length; index += 1) {
+      const chart = echarts.getInstanceByDom(gauges[index]);
+      if (!chart) continue;
+      const source = chart.getDataURL({ type: 'png', pixelRatio: 1, backgroundColor: '#ffffff' });
+      rows.push({
+        title: `[指標 ${report.indicators[index]?.id ?? index + 1}] ${report.indicators[index]?.name || ''}`,
+        image: await loadExportImage(source)
+      });
+    }
+    if (!rows.length) return '';
+
+    const width = Math.max(...rows.map((row) => row.image.naturalWidth), 800);
+    const measuringCanvas = document.createElement('canvas');
+    const measuringContext = measuringCanvas.getContext('2d');
+    measuringContext.font = '700 14px sans-serif';
+    rows.forEach((row) => {
+      row.titleLines = wrapExportTitle(measuringContext, row.title, width - 24);
+      row.titleHeight = Math.max(32, row.titleLines.length * 20 + 10);
+    });
+    const height = rows.reduce((sum, row) => sum + row.titleHeight + row.image.naturalHeight + 8, 0);
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext('2d');
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, width, height);
+    context.fillStyle = '#1f2937';
+    context.font = '700 14px sans-serif';
+    context.textBaseline = 'top';
+    let y = 8;
+    rows.forEach((row) => {
+      row.titleLines.forEach((line, lineIndex) => context.fillText(line, 12, y + lineIndex * 20));
+      y += row.titleHeight;
+      context.drawImage(row.image, 0, y, row.image.naturalWidth, row.image.naturalHeight);
+      y += row.image.naturalHeight + 8;
+    });
+    return canvas.toDataURL('image/png');
+  };
+
+  const buildIndicatorsExportChartHtml = (report, chartTitle) => {
+    const cards = (report.indicators || []).map((indicator) => {
+      const calculationAvailable = indicator.calculation_available !== false;
+      const percentageValue = indicator.percentage == null ? null : Number(indicator.percentage);
+      const percentage = Number.isFinite(percentageValue) ? percentageValue : null;
+      const safePercentage = percentage == null ? 0 : Math.min(100, Math.max(0, percentage));
+      const numerator = calculationAvailable ? Number(indicator.numerator || 0) : null;
+      const denominator = calculationAvailable ? Number(indicator.denominator || 0) : null;
+      const direction = String(indicator.direction || 'positive');
+      const targetValue = indicator.target_value;
+      const hasTarget = targetValue !== null
+        && targetValue !== undefined
+        && String(targetValue).trim() !== ''
+        && Number.isFinite(Number(targetValue));
+      const target = hasTarget ? Math.min(100, Math.max(0, Number(targetValue))) : null;
+      const defaultOperator = direction === 'negative' ? '<=' : '>=';
+      const requestedOperator = String(indicator.target_operator || defaultOperator);
+      const operator = ['>=', '>', '<=', '<', '='].includes(requestedOperator) ? requestedOperator : defaultOperator;
+      const meetsTarget = !hasTarget || percentage == null ? null : ({
+        '>=': percentage >= target,
+        '>': percentage > target,
+        '<=': percentage <= target,
+        '<': percentage < target,
+        '=': percentage === target
+      }[operator] ?? (direction === 'negative' ? percentage <= target : percentage >= target));
+      const rateLabel = !calculationAvailable ? '尚未建立規則' : percentage == null ? '無法計算' : `${percentage}%`;
+      const targetLabel = hasTarget ? `${operator}${Number(target).toLocaleString()}%` : '尚未設定';
+      const statusClass = meetsTarget == null ? 'is-neutral' : meetsTarget ? 'is-success' : 'is-warning';
+      const statusLabel = !calculationAvailable ? '尚未建立規則' : meetsTarget == null ? '待設定閾值' : meetsTarget ? '達標' : '未達標';
+      const statusSymbol = meetsTarget == null ? '－' : meetsTarget ? '✓' : '▲';
+      const valuePositionClass = percentage === 0 ? ' is-zero' : percentage === 100 ? ' is-full' : '';
+      const valuePositionStyle = percentage !== 0 && percentage !== 100 ? `left:${safePercentage}%;` : '';
+      return `<article class="indicator-export-card ${statusClass}">
+        <div class="indicator-export-head">
+          <div class="indicator-export-title">[指標 ${escapeHtml(indicator.id)}] ${escapeHtml(indicator.name)}</div>
+          <div class="indicator-export-meta">
+            <span>表現：<strong>${escapeHtml(rateLabel)}</strong>（${numerator == null ? '-' : numerator.toLocaleString()}/${denominator == null ? '-' : denominator.toLocaleString()}）</span>
+            <span>閾值：<strong>${escapeHtml(targetLabel)}</strong></span>
+            <span class="indicator-export-status">${statusSymbol} ${escapeHtml(statusLabel)}</span>
+          </div>
+        </div>
+        <div class="indicator-export-body">
+          <div class="indicator-export-track"><span class="indicator-export-fill" style="width:${safePercentage}%;"></span></div>
+          ${hasTarget ? `<span class="indicator-export-threshold-label" style="left:${target}%;">閾值 ${escapeHtml(targetLabel)}</span><span class="indicator-export-threshold-line" style="left:${target}%;"></span>` : ''}
+          ${percentage == null ? '' : `<span class="indicator-export-value${valuePositionClass}" style="${valuePositionStyle}">${escapeHtml(rateLabel)}</span>`}
+          <span class="indicator-export-axis is-left">0</span><span class="indicator-export-axis is-right">100%</span>
+        </div>
+      </article>`;
+    }).join('');
+    if (!cards) return '';
+    const safeChartTitle = escapeHtml(chartTitle);
+    return `<section class="indicator-export-chart-block">
+      <div class="indicator-export-chart-heading">
+        <div class="indicator-export-chart-title">${safeChartTitle}</div>
+        <div class="indicator-export-chart-source">資料來源：癌症登記資料庫</div>
+      </div>
+      <div class="indicator-export-chart">${cards}</div>
+      <div class="indicator-export-chart-caption">圖、${safeChartTitle}
+        <div class="indicator-export-chart-caption-source">資料來源：癌症登記資料庫</div>
+      </div>
+    </section>`;
+  };
+
+  const indicatorsExportWarning = '請先產生語言模型敘述，再進行預覽或下載!!';
+  const getIndicatorsExportCancerLabels = () => Object.fromEntries(cancerInputs.map((input) => [
+    input.value, input.parentElement.querySelector('span').childNodes[0].textContent.trim()
+  ]));
+  const hasMissingIndicatorsNarrative = () => {
+    const cancerLabels = getIndicatorsExportCancerLabels();
+    return indicatorNarrativePending.size > 0 || currentIndicatorReports.some((report) => {
+      if (!report.indicators?.length) return false;
+      const cancerKey = String(report.cancer_key || '');
+      const cancerName = cancerLabels[cancerKey] || cancerKey;
+      return !String(indicatorNarrativeCache.get(indicatorNarrativeKey(report, cancerName)) || '').trim();
+    });
+  };
+
+  const prepareIndicatorsExportData = async ({ includeNarrative = true } = {}) => {
+    const cancerLabels = getIndicatorsExportCancerLabels();
+    if (includeNarrative && hasMissingIndicatorsNarrative()) throw new Error(indicatorsExportWarning);
+
+    await document.fonts?.ready;
+    const items = [];
+    for (let reportIndex = 0; reportIndex < currentIndicatorReports.length; reportIndex += 1) {
+      const report = currentIndicatorReports[reportIndex];
+      const cancerKey = String(report.cancer_key || '');
+      const cancerName = cancerLabels[cancerKey] || cancerKey;
+      const panel = preview.querySelector(`[data-indicators-cancer-panel="${CSS.escape(cancerKey)}"]`);
+      const table = panel?.querySelector('.indicators-result-table')?.cloneNode(true);
+      if (table) table.classList.add('annual-report-table', 'indicator-export-table');
+      const cacheKey = indicatorNarrativeKey(report, cancerName);
+      const chartTitle = `${startSelect.value}–${endSelect.value}年${cancerName}監測指標分析圖`;
+      items.push({
+        id: `indicator-report-${cancerKey || reportIndex + 1}`,
+        title: `${startSelect.value}–${endSelect.value}年${cancerName}監測指標分析`,
+        tableHtml: table?.outerHTML || '',
+        chartHtml: buildIndicatorsExportChartHtml(report, chartTitle),
+        chartImage: await buildIndicatorsExportChart(report, reportIndex),
+        chartCaption: `圖、${chartTitle}`,
+        llmText: includeNarrative ? indicatorNarrativeCache.get(cacheKey) || '' : '',
+        includeAi: includeNarrative,
+        exportKind: 'indicators',
+        narrativeHeading: '語言模型敘述'
+      });
+    }
+    return items;
+  };
+
   const renderIndicatorsPreview = (result) => {
     const cancerLabels = Object.fromEntries(cancerInputs.map((input) => [
       input.value, input.parentElement.querySelector('span').childNodes[0].textContent.trim()
     ]));
     const reports = result.reports || [];
+    currentIndicatorReports = reports;
     const availableKeys = reports.map(report => String(report.cancer_key || ''));
     if (!availableKeys.includes(activePreviewCancerKey)) activePreviewCancerKey = availableKeys[0] || null;
     const tabs = reports.length ? `<div class="indicators-cancer-tabs" role="tablist" aria-label="癌別切換">
@@ -851,6 +1678,7 @@
         <td>${indicator.calculation_available === false ? '-' : Number(indicator.denominator || 0).toLocaleString()}</td>
         <td>${indicator.calculation_available === false ? '尚未建立規則' : indicator.percentage == null ? '-' : `${escapeHtml(indicator.percentage)}%`}</td>
       </tr>`).join('');
+      const narrative = indicatorNarrativeMarkup(report, cancerName);
       return `<div class="indicators-cancer-panel" data-indicators-cancer-panel="${escapeHtml(cancerKey)}"><div class="indicators-report-card mb-4">
         ${warnings}
         ${calculationNotice}
@@ -865,11 +1693,23 @@
           <div>圖、${escapeHtml(startSelect.value)}–${escapeHtml(endSelect.value)}年${escapeHtml(cancerName)}監測指標分析圖</div>
           <div class="text-muted fw-normal" style="font-size: 0.85em;">資料來源：癌症登記資料庫</div>
         </div>
+        ${narrative}
       </div></div>`;
     }).join('');
     preview.className = 'indicators-result';
     preview.innerHTML = `${tabs}${panels}`;
     renderIndicatorCharts(reports);
+    preview.querySelectorAll('[data-regenerate-indicators-narrative]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const cancerKey = String(button.dataset.regenerateIndicatorsNarrative || '');
+        const report = reports.find((item) => String(item.cancer_key || '') === cancerKey);
+        if (!report) return;
+        const cancerName = cancerLabels[cancerKey] || cancerKey;
+        const cacheKey = indicatorNarrativeKey(report, cancerName);
+        const forceCancerKeys = indicatorNarrativeCache.has(cacheKey) ? new Set([cancerKey]) : new Set();
+        void queueIndicatorNarratives([report], cancerLabels, { forceCancerKeys });
+      });
+    });
     const activateCancer = (cancerKey) => {
       activePreviewCancerKey = cancerKey;
       preview.querySelectorAll('[data-indicators-cancer-tab]').forEach((button) => {
@@ -919,6 +1759,84 @@
       if (requestId === previewRequestId) updateReadyState();
     }
   };
+
+  const openIndicatorsReportExport = async (button, mode) => {
+    const includeNarrative = mode === 'complete';
+    if (!previewGenerated) {
+      updateReadyState();
+      await window.utils?.alert?.('請先完成監測指標分析。', 'warning');
+      return;
+    }
+    if (includeNarrative && hasMissingIndicatorsNarrative()) {
+      updateReadyState();
+      await window.utils?.alert?.(indicatorsExportWarning, 'warning');
+      return;
+    }
+    button.disabled = true;
+    window.utils?.showLoading?.(includeNarrative ? '正在準備完整監測指標報告…' : '正在準備基本監測指標報告…');
+    try {
+      const items = await prepareIndicatorsExportData({ includeNarrative });
+      localStorage.setItem('indicators_export_data', JSON.stringify({ version: 2, mode, items }));
+      saveIndicatorsReturnState();
+      window.location.href = '/indicators/export-report';
+    } catch (error) {
+      updateReadyState();
+      await window.utils?.alert?.(error.message || '無法準備監測指標匯出內容。', 'error');
+    } finally {
+      button.disabled = false;
+      window.utils?.hideLoading?.();
+    }
+  };
+
+  reportExportButton?.addEventListener('click', (event) => {
+    void openIndicatorsReportExport(event.currentTarget, 'complete');
+  });
+
+  basicReportExportButton?.addEventListener('click', (event) => {
+    void openIndicatorsReportExport(event.currentTarget, 'basic');
+  });
+
+  excelExportButton?.addEventListener('click', async (event) => {
+    if (!previewGenerated) {
+      updateReadyState();
+      await window.utils?.alert?.('請先完成監測指標分析。', 'warning');
+      return;
+    }
+    const button = event.currentTarget;
+    const cancers = cancerInputs.filter(input => input.checked).map(input => input.value);
+    button.disabled = true;
+    window.utils?.showLoading?.('正在產生監測指標資料 Excel…');
+    try {
+      const response = await fetch('/api/indicators/export-excel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          year_start: startSelect.value,
+          year_end: endSelect.value,
+          cancers
+        })
+      });
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        throw new Error(result.error || 'Excel 匯出失敗。');
+      }
+      const blob = await response.blob();
+      const downloadUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = 'indicators_data.xlsx';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+      await window.utils?.alert?.(error.message || 'Excel 匯出失敗。', 'error');
+    } finally {
+      button.disabled = false;
+      window.utils?.hideLoading?.();
+      updateReadyState();
+    }
+  });
 })();
 </script>
 {% endblock %}

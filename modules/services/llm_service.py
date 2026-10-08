@@ -1,5 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
+import logging
 from typing import Mapping, Sequence
 from openai import OpenAI
 from modules.config import BaseConfig
@@ -63,8 +64,31 @@ def check_llm_readiness() -> None:
 def request_llm_chat(messages: Sequence[Mapping[str, str]], *, temperature: float) -> str:
     settings = get_llm_settings()
     client, model = get_llm_client(settings)
-    response = client.chat.completions.create(model=model,messages=list(messages),temperature=temperature,timeout=settings.timeout_seconds,)
-    content = response.choices[0].message.content
-    if not content:
-        raise ValueError("LLM response is empty")
-    return content
+    last_finish_reason = None
+    for attempt in range(2):
+        response = client.chat.completions.create(
+            model=model,
+            messages=list(messages),
+            temperature=temperature,
+            timeout=settings.timeout_seconds,
+        )
+        choices = getattr(response, "choices", None) or []
+        if choices:
+            last_finish_reason = getattr(choices[0], "finish_reason", None)
+            content = getattr(getattr(choices[0], "message", None), "content", None)
+            if isinstance(content, str) and content.strip():
+                return content
+            if isinstance(content, list):
+                parts = []
+                for item in content:
+                    text = item.get("text") if isinstance(item, Mapping) else getattr(item, "text", None)
+                    if text:
+                        parts.append(str(text))
+                if "".join(parts).strip():
+                    return "".join(parts)
+        logging.warning(
+            "LLM returned empty content (attempt %s/2, finish_reason=%r)",
+            attempt + 1,
+            last_finish_reason,
+        )
+    raise ValueError(f"LLM response is empty (finish_reason={last_finish_reason!r})")

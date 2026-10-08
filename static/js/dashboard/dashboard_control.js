@@ -1945,7 +1945,7 @@ function initDashboardControl() {
       Swal.fire({
           title: '輸入檔案預覽',
           width: 900,
-          html: `<div class="text-start mb-3"><strong>檔案：</strong>${escapeDashboardInputHtml(selectedFile.name)}<span class="mx-2">｜</span><strong>申報格式：</strong>${escapeDashboardInputHtml(selectedFormatLabel)}<span class="mx-2">｜</span><strong>命名來源：</strong>${escapeDashboardInputHtml(selectedLabel)}</div><div class="table-responsive" style="max-height:420px"><table class="table table-sm table-bordered align-middle mb-0"><thead class="table-light sticky-top"><tr><th>原始欄位</th><th style="width:45px"></th><th>標準欄位</th><th style="width:90px">狀態</th></tr></thead><tbody>${previewRows}</tbody></table></div>`,
+          html: `<div class="text-start mb-3"><strong>檔案：</strong>${escapeDashboardInputHtml(selectedFile.name)}<span class="mx-2">｜</span><strong>申報格式：</strong>${escapeDashboardInputHtml(selectedFormatLabel)}<span class="mx-2">｜</span><strong>欄位體系：</strong>${escapeDashboardInputHtml(selectedLabel)}</div><div class="table-responsive" style="max-height:420px"><table class="table table-sm table-bordered align-middle mb-0"><thead class="table-light sticky-top"><tr><th>原始欄位</th><th style="width:45px"></th><th>轉換後欄位</th><th style="width:90px">狀態</th></tr></thead><tbody>${previewRows}</tbody></table></div>`,
           confirmButtonColor: '#2563eb'
       });
   });

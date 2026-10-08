@@ -60,7 +60,10 @@
       const response = await fetch('/api/llm-tasks?limit=50');
       const payload = await response.json();
       if (response.ok && payload.success) {
-        tasks = (payload.tasks || []).filter((task) => taskTypes.includes(value(task, 'TaskType')));
+        tasks = (payload.tasks || []).filter((task) => (
+          taskTypes.includes(value(task, 'TaskType'))
+          && value(task, 'InsightModule') !== 'indicators'
+        ));
       }
     } catch (e) {}
     render();

@@ -20,6 +20,7 @@ SCHEME_INDEX = {
 SEQUENCE_PATTERN = re.compile(r"^\d+(?:\.\d+)*$")
 SEQUENCE_NAME_PATTERN = re.compile(r"^(\d+(?:\.\d+)*)\s*(.+)$")
 TEXT_INPUT_ENCODINGS = ("utf-8-sig", "utf-8", "cp950", "big5hkscs", "big5", "gb18030")
+CSV_ENCODINGS = ("utf-8-sig", "utf-8", "cp950", "big5")
 FIXED_WIDTH_TEXT_ENCODINGS = ("utf-8-sig", "cp950", "big5hkscs", "big5")
 FORMAT_SPECIFIC_FIELD_NAMES = {
     "50": {"7.6": "其他因子6"},
@@ -48,6 +49,32 @@ def _reset_source(file_source):
     """Return a source to its beginning when it is an uploaded binary stream."""
     if hasattr(file_source, "seek"):
         file_source.seek(0)
+
+
+def read_csv_with_encoding(file_source, **kwargs):
+    """Read a CSV using the encodings commonly produced by cancer registries."""
+    if kwargs.get("encoding"):
+        return pd.read_csv(file_source, **kwargs)
+
+    last_error = None
+    initial_position = None
+    if hasattr(file_source, "tell") and hasattr(file_source, "seek"):
+        try:
+            initial_position = file_source.tell()
+        except (OSError, ValueError):
+            initial_position = None
+
+    for encoding in CSV_ENCODINGS:
+        if initial_position is not None:
+            file_source.seek(initial_position)
+        try:
+            return pd.read_csv(file_source, encoding=encoding, **kwargs)
+        except UnicodeError as error:
+            last_error = error
+
+    if last_error:
+        raise last_error
+    return pd.read_csv(file_source, **kwargs)
 
 
 def _first_line_bytes(file_source):
@@ -301,17 +328,24 @@ def _compact(value):
     return re.sub(r"\s+", "", _text(value)).casefold()
 
 
-def _maps_for_scheme(rows, input_scheme, format_specific_names=None):
+def _maps_for_scheme(rows, output_scheme, format_specific_names=None):
     format_specific_names = format_specific_names or {}
-    by_sequence = {
-        row[0]: f"{row[0]}{format_specific_names.get(row[0], row[1])}"
-        for row in rows
-    }
+    if output_scheme not in INPUT_SCHEMES:
+        raise ValueError("請選擇正確的欄位命名體系。")
+
+    output_headers = {}
     alias_map = {}
-    indexes = range(1, 7) if input_scheme == "original" else (SCHEME_INDEX[input_scheme],)
     for row in rows:
-        canonical = by_sequence[row[0]]
-        for index in indexes:
+        sequence = row[0]
+        if output_scheme == "original":
+            output_headers[sequence] = ""
+        else:
+            target_name = _text(row[SCHEME_INDEX[output_scheme]])
+            if output_scheme == "field_name_zh" and target_name:
+                target_name = format_specific_names.get(sequence, target_name)
+            output_headers[sequence] = f"{sequence}{target_name}" if target_name else None
+
+        for index in range(1, 7):
             aliases = [_text(row[index])]
             if row[0] in {"4.2.1.8", "7.6"} and "/" in aliases[0]:
                 aliases.extend(part.strip() for part in aliases[0].split("/") if part.strip())
@@ -320,46 +354,48 @@ def _maps_for_scheme(rows, input_scheme, format_specific_names=None):
             for alias in aliases:
                 compact_alias = _compact(alias)
                 if compact_alias:
-                    alias_map.setdefault(compact_alias, canonical)
-    return by_sequence, alias_map
+                    alias_map.setdefault(compact_alias, sequence)
+    return output_headers, alias_map
 
 
-def _normalize_headers(headers, input_scheme, rows, format_specific_names=None):
+def _normalize_headers(headers, output_scheme, rows, format_specific_names=None):
     empty_positions = [str(index + 1) for index, header in enumerate(headers) if not _text(header)]
     if empty_positions:
         raise ValueError(f"第一列表頭不可為空白（第 {', '.join(empty_positions)} 欄）。")
 
-    by_sequence, alias_map = _maps_for_scheme(rows, input_scheme, format_specific_names)
+    output_headers, alias_map = _maps_for_scheme(rows, output_scheme, format_specific_names)
     normalized = []
+    matched = []
     unknown_sequences = []
     for header in headers:
         text = _text(header)
         sequence_match = SEQUENCE_NAME_PATTERN.fullmatch(text)
+        sequence = None
 
         # 三種輸入形式都會自動辨識：僅序號、序號＋名稱、僅名稱。
         if SEQUENCE_PATTERN.fullmatch(text):
             sequence = _normalize_sequence(text)
-            canonical = by_sequence.get(sequence)
-            if not canonical:
+            if sequence not in output_headers:
                 unknown_sequences.append(text)
-                canonical = text
         elif sequence_match:
             sequence = _normalize_sequence(sequence_match.group(1))
-            canonical = by_sequence.get(sequence)
-            if not canonical:
+            if sequence not in output_headers:
                 unknown_sequences.append(sequence)
-                canonical = text
         else:
             # 未匹配的純名稱視為額外欄位並原樣保留。
-            canonical = alias_map.get(_compact(text), text)
-        normalized.append(canonical)
+            sequence = alias_map.get(_compact(text))
+        is_matched = sequence in output_headers and (
+            output_scheme == "original" or bool(output_headers[sequence])
+        )
+        normalized.append(text if not is_matched or output_scheme == "original" else output_headers[sequence])
+        matched.append(is_matched)
 
     if unknown_sequences:
         shown = ", ".join(dict.fromkeys(unknown_sequences[:5]))
         raise ValueError(f"找不到以下欄位序號的名稱對照：{shown}")
     if len(set(normalized)) != len(normalized):
         raise ValueError("欄位名稱轉換後出現重複欄位，請確認第一列表頭與命名來源。")
-    return normalized
+    return normalized, matched
 
 
 def _write_headers(
@@ -428,7 +464,7 @@ def validate_and_normalize_dashboard_upload(
         raise ValueError("第一列沒有可辨識的欄位表頭。")
     rows = _load_field_map(connection_factory)
     format_specific_names = _format_specific_sequence_names(connection_factory, format_id)
-    normalized_headers = _normalize_headers(
+    normalized_headers, header_matches = _normalize_headers(
         headers,
         input_scheme,
         rows,
@@ -437,13 +473,10 @@ def validate_and_normalize_dashboard_upload(
     keep_indexes = None
     if extra_fields is not None:
         retained_extra_fields = {_text(field) for field in extra_fields}
-        canonical_headers = set(
-            _maps_for_scheme(rows, input_scheme, format_specific_names)[0].values()
-        )
         keep_indexes = [
             index
-            for index, (original, normalized) in enumerate(zip(headers, normalized_headers))
-            if original != normalized or normalized in canonical_headers or original in retained_extra_fields
+            for index, (original, matched) in enumerate(zip(headers, header_matches))
+            if matched or original in retained_extra_fields
         ]
         normalized_headers = [normalized_headers[index] for index in keep_indexes]
         if not normalized_headers:
@@ -481,21 +514,18 @@ def preview_dashboard_upload(
         raise ValueError("第一列沒有可辨識的欄位表頭。")
     rows = _load_field_map(connection_factory)
     format_specific_names = _format_specific_sequence_names(connection_factory, format_id)
-    normalized_headers = _normalize_headers(
+    normalized_headers, header_matches = _normalize_headers(
         headers,
         input_scheme,
         rows,
         format_specific_names,
     )
-    canonical_headers = set(
-        _maps_for_scheme(rows, input_scheme, format_specific_names)[0].values()
-    )
     columns = []
-    for original, normalized in zip(headers, normalized_headers):
+    for original, normalized, matched in zip(headers, normalized_headers, header_matches):
         columns.append({
             "original": original,
             "normalized": normalized,
-            "matched": original != normalized or normalized in canonical_headers,
+            "matched": matched,
         })
     matched_count = sum(1 for column in columns if column["matched"])
     return {

@@ -1,5 +1,6 @@
 import os
 import io
+import html
 import zipfile
 import base64
 from PIL import Image, ImageStat
@@ -8,6 +9,8 @@ from docx import Document
 from docx.shared import Pt, Inches, RGBColor
 from docx.enum.section import WD_ORIENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 from playwright.sync_api import sync_playwright
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
@@ -50,7 +53,31 @@ def _split_tall_chart_at_blank_rows(image_bytes, max_height_ratio=0.62):
         chunks.append(buffer.getvalue())
     return chunks
 
-def generate_export_files(format_pdf, format_word, charts_data, output_dir, export_language="zh-TW"):
+def _style_indicator_narrative_cell(cell):
+    tc_pr = cell._tc.get_or_add_tcPr()
+    shading = OxmlElement("w:shd")
+    shading.set(qn("w:fill"), "E9F5F0")
+    tc_pr.append(shading)
+
+    borders = OxmlElement("w:tcBorders")
+    for edge in ("top", "left", "bottom", "right"):
+        border = OxmlElement(f"w:{edge}")
+        border.set(qn("w:val"), "single")
+        border.set(qn("w:sz"), "6")
+        border.set(qn("w:color"), "A3CFBB")
+        borders.append(border)
+    tc_pr.append(borders)
+
+    margins = OxmlElement("w:tcMar")
+    for edge in ("top", "left", "bottom", "right"):
+        margin = OxmlElement(f"w:{edge}")
+        margin.set(qn("w:w"), "130")
+        margin.set(qn("w:type"), "dxa")
+        margins.append(margin)
+    tc_pr.append(margins)
+
+
+def generate_export_files(format_pdf, format_word, charts_data, output_dir, export_language="zh-TW", filename_base="export_report"):
     os.makedirs(output_dir, exist_ok=True)
     insight_heading = "AI-generated narrative:" if export_language == "en" else "AI 分析敘述："
     html_content = """
@@ -67,6 +94,23 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir, expo
             .annual-report-table th, .annual-report-table td { 
                 border: 1px solid #ccc; padding: 4px; text-align: center; vertical-align: middle;
             }
+            .indicator-export-table { table-layout: fixed; }
+            .indicator-export-table th:nth-child(1),
+            .indicator-export-table td:nth-child(1) { width: 8%; white-space: nowrap; word-break: keep-all; }
+            .indicator-export-table th:nth-child(2),
+            .indicator-export-table td:nth-child(2) { width: 6%; white-space: nowrap; }
+            .indicator-export-table th:nth-child(3),
+            .indicator-export-table td:nth-child(3) { width: 17%; }
+            .indicator-export-table th:nth-child(4),
+            .indicator-export-table td:nth-child(4),
+            .indicator-export-table th:nth-child(5),
+            .indicator-export-table td:nth-child(5) { width: 22%; }
+            .indicator-export-table th:nth-child(6),
+            .indicator-export-table td:nth-child(6),
+            .indicator-export-table th:nth-child(7),
+            .indicator-export-table td:nth-child(7) { width: 7%; white-space: nowrap; }
+            .indicator-export-table th:nth-child(8),
+            .indicator-export-table td:nth-child(8) { width: 11%; white-space: nowrap; }
             /* Keep the histology table consistent in Chinese and English exports. */
             .annual-histology-table { table-layout: fixed; }
             .annual-histology-table .annual-histology-name-col,
@@ -93,6 +137,61 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir, expo
             .stage-export-chart-caption { margin-top: 4px; font-size: 12px; font-weight: bold; text-align: center; }
             .stage-export-chart-note { margin-top: 5px; margin-bottom: 12px; font-size: 10px; line-height: 1.45; text-align: left; }
             .chart-img { max-width: 100%; height: auto; margin-bottom: 15px; display: block; }
+            .word-only-chart, .word-only-caption { display: none !important; }
+            .indicator-export-chart-block {
+                break-inside: avoid; page-break-inside: avoid;
+            }
+            .indicator-export-chart-heading { margin: 0 0 7px; text-align: center; }
+            .indicator-export-chart-title { color: #111827; font-size: 15px; font-weight: 700; }
+            .indicator-export-chart-source { color: #6b7280; font-size: 9px; margin-top: 3px; }
+            .indicator-export-chart { display: grid; gap: 6px; margin: 6px 0 4px; }
+            .indicator-export-chart-caption { color: #111827; font-size: 11px; font-weight: 700; margin-top: 7px; text-align: center; }
+            .indicator-export-chart-caption-source { color: #6b7280; font-size: 8px; font-weight: 400; margin-top: 2px; }
+            .indicator-export-card {
+                border: 1px solid #d1d5db; border-top: 3px solid #64748b; border-radius: 7px;
+                box-sizing: border-box; overflow: hidden; break-inside: avoid; page-break-inside: avoid;
+            }
+            .indicator-export-card.is-success { border-top-color: #45a9a6; }
+            .indicator-export-card.is-warning { border-top-color: #b4232c; }
+            .indicator-export-head {
+                align-items: center; background: #f1f5f9; display: flex; gap: 12px;
+                justify-content: space-between; min-height: 23px; padding: 3px 8px;
+            }
+            .indicator-export-card.is-success .indicator-export-head { background: #e8f6f5; }
+            .indicator-export-card.is-warning .indicator-export-head { background: #fdebec; }
+            .indicator-export-title { color: #1f2937; font-size: 10px; font-weight: 700; min-width: 0; }
+            .indicator-export-meta {
+                align-items: center; color: #374151; display: flex; flex: 0 0 auto;
+                font-size: 8px; gap: 10px; white-space: nowrap;
+            }
+            .indicator-export-status { font-weight: 700; }
+            .indicator-export-card.is-success .indicator-export-status { color: #15803d; }
+            .indicator-export-card.is-warning .indicator-export-status { color: #b4232c; }
+            .indicator-export-body { height: 36px; position: relative; }
+            .indicator-export-track {
+                background: #e5e7eb; height: 8px; left: 8px; overflow: hidden;
+                position: absolute; right: 16px; top: 13px;
+            }
+            .indicator-export-fill { background: #64748b; display: block; height: 100%; }
+            .indicator-export-card.is-success .indicator-export-fill { background: #45a9a6; }
+            .indicator-export-card.is-warning .indicator-export-fill { background: #dc3545; }
+            .indicator-export-threshold-line {
+                background: #d89a18; height: 20px; position: absolute; top: 7px;
+                transform: translateX(-1px); width: 2px;
+            }
+            .indicator-export-threshold-label {
+                color: #8a6200; font-size: 7px; font-weight: 700; position: absolute;
+                top: -1px; transform: translateX(-50%); white-space: nowrap;
+            }
+            .indicator-export-value {
+                color: #374151; font-size: 8px; font-weight: 700; position: absolute;
+                top: 23px; transform: translateX(-50%); white-space: nowrap;
+            }
+            .indicator-export-value.is-zero { left: 8px; top: 0; transform: none; }
+            .indicator-export-value.is-full { right: 16px; top: 0; transform: none; }
+            .indicator-export-axis { bottom: -1px; color: #6b7280; font-size: 7px; position: absolute; }
+            .indicator-export-axis.is-left { left: 8px; }
+            .indicator-export-axis.is-right { right: 16px; }
             .chart-img-wrapper.tall-chart { break-before: page; }
             .tall-chart .chart-img-page {
                 height: 18cm;
@@ -121,6 +220,13 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir, expo
                 break-inside: avoid;
                 page-break-inside: avoid;
             }
+            .indicator-export-narrative {
+                background: #e9f5f0; border: 1px solid #a3cfbb; border-radius: 7px;
+                box-sizing: border-box; color: #111827; font-size: 11px; line-height: 1.7;
+                margin-top: 12px; padding: 11px 14px;
+            }
+            .indicator-export-narrative-title { font-size: 11px; font-weight: 700; margin-bottom: 5px; }
+            .indicator-export-narrative-text { white-space: pre-wrap; }
             .text-center { text-align: center !important; }
             .text-start { text-align: left !important; }
             .text-end { text-align: right !important; }
@@ -150,6 +256,7 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir, expo
                 
         # Image
         if chart.get('includeChart', True):
+            chart_html = chart.get('chartHtml', '')
             b64_image = chart.get('chartImage', '')
             if b64_image and b64_image.startswith('data:image'):
                 header, encoded = b64_image.split(",", 1)
@@ -159,6 +266,9 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir, expo
                                else [image_bytes])
                 image_bytes_map[str(idx)] = image_parts
                 wrapper_class = "chart-img-wrapper tall-chart" if len(image_parts) > 1 else "chart-img-wrapper"
+                if chart_html:
+                    html_content += chart_html
+                    wrapper_class += " word-only-chart"
                 html_content += f'<div class="{wrapper_class}">'
                 for part_idx, part in enumerate(image_parts):
                     part_b64 = base64.b64encode(part).decode("ascii")
@@ -170,29 +280,74 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir, expo
                 chart_caption = chart.get('chartCaption', '')
                 chart_note = chart.get('chartNote', '')
                 if chart_caption:
-                    html_content += f'<div class="stage-export-chart-caption">{chart_caption}</div>'
+                    caption_class = "stage-export-chart-caption word-only-caption" if chart_html else "stage-export-chart-caption"
+                    html_content += f'<div class="{caption_class}">{chart_caption}</div>'
                 if chart_note:
                     html_content += f'<div class="stage-export-chart-note">{chart_note}</div>'
+            elif chart_html:
+                html_content += chart_html
                 
         # LLM text
         if chart.get('includeAi', True):
             llm_text = chart.get('llmText', '')
             if llm_text:
-                html_content += f'<div class="llm-text"><strong>{insight_heading}</strong><br/>{llm_text}</div>'
+                if chart.get('exportKind') == 'indicators':
+                    narrative_heading = chart.get('narrativeHeading') or '語言模型敘述'
+                    html_content += (
+                        '<div class="llm-text indicator-export-narrative">'
+                        f'<div class="indicator-export-narrative-title">{html.escape(str(narrative_heading))}</div>'
+                        f'<div class="indicator-export-narrative-text">{html.escape(str(llm_text))}</div>'
+                        '</div>'
+                    )
+                else:
+                    html_content += f'<div class="llm-text"><strong>{insight_heading}</strong><br/>{llm_text}</div>'
         html_content += '</div>'    
     html_content += "</body></html>"
     
     pdf_bytes = None
     docx_bytes = None
+    indicator_word_images = {}
+    needs_indicator_word_images = format_word and any(
+        chart.get("exportKind") == "indicators" and chart.get("includeChart", True) and chart.get("chartHtml")
+        for chart in charts_data
+    )
     
-    # 1. Generate PDF
-    if format_pdf:
+    # 1. Generate PDF and pixel-identical indicator charts for Word.
+    if format_pdf or needs_indicator_word_images:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
+            page = browser.new_page(viewport={"width": 1600, "height": 1200}, device_scale_factor=1.5)
             page.set_content(html_content, wait_until="networkidle")
             page.emulate_media(media="print")
-            pdf_bytes = page.pdf(format="A4", landscape=True, print_background=True)
+            if needs_indicator_word_images:
+                word_chart_style = page.add_style_tag(content="""
+                    .indicator-export-chart-heading { margin-bottom: 10px !important; }
+                    .indicator-export-chart-title { font-size: 20px !important; }
+                    .indicator-export-chart-source { font-size: 11px !important; margin-top: 4px !important; }
+                    .indicator-export-chart { gap: 8px !important; margin-top: 8px !important; }
+                    .indicator-export-head { min-height: 31px !important; padding: 5px 10px !important; }
+                    .indicator-export-title { font-size: 13px !important; }
+                    .indicator-export-meta { font-size: 11px !important; gap: 12px !important; }
+                    .indicator-export-body { height: 50px !important; }
+                    .indicator-export-track { height: 11px !important; top: 18px !important; }
+                    .indicator-export-threshold-line { height: 28px !important; top: 9px !important; width: 3px !important; }
+                    .indicator-export-threshold-label { font-size: 10px !important; top: -1px !important; }
+                    .indicator-export-value { font-size: 11px !important; top: 32px !important; }
+                    .indicator-export-value.is-zero,
+                    .indicator-export-value.is-full { top: 0 !important; }
+                    .indicator-export-axis { font-size: 9px !important; }
+                    .indicator-export-chart-caption { font-size: 15px !important; margin-top: 10px !important; }
+                    .indicator-export-chart-caption-source { font-size: 10px !important; margin-top: 3px !important; }
+                """)
+                for idx, chart in enumerate(charts_data):
+                    if chart.get("exportKind") != "indicators" or not chart.get("includeChart", True):
+                        continue
+                    chart_block = page.locator(f"#section-{idx} .indicator-export-chart-block")
+                    if chart_block.count():
+                        indicator_word_images[str(idx)] = chart_block.screenshot(type="png")
+                word_chart_style.evaluate("node => node.remove()")
+            if format_pdf:
+                pdf_bytes = page.pdf(format="A4", landscape=True, print_background=True)
             browser.close()
             
     # 2. Generate Word
@@ -212,6 +367,8 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir, expo
             
             sections = soup.find_all('div', class_='chart-section')
             for sec_idx, sec in enumerate(sections):
+                chart_data = charts_data[sec_idx] if sec_idx < len(charts_data) else {}
+                is_indicator_export = chart_data.get('exportKind') == 'indicators'
                 if sec_idx > 0:
                     doc.add_page_break()
                     
@@ -365,8 +522,15 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir, expo
                             for run in note_paragraph.runs:
                                 run.font.size = Pt(8)
                                             
+                indicator_word_image = indicator_word_images.get(str(sec_idx))
                 img_nodes = sec.find_all('img', class_='chart-img')
-                if img_nodes:
+                if indicator_word_image:
+                    image_paragraph = doc.add_paragraph()
+                    image_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    image_paragraph.paragraph_format.space_before = Pt(5)
+                    image_paragraph.paragraph_format.space_after = Pt(5)
+                    image_paragraph.add_run().add_picture(io.BytesIO(indicator_word_image), width=Inches(10.65))
+                elif img_nodes:
                     idx_str = img_nodes[0].get('data-idx')
                     image_parts = image_bytes_map.get(idx_str, [])
                     for part_idx, image_part in enumerate(image_parts):
@@ -376,7 +540,7 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir, expo
                         doc.add_picture(io.BytesIO(image_part), width=Inches(9.0))
 
                 chart_caption_node = sec.find('div', class_='stage-export-chart-caption')
-                if chart_caption_node:
+                if chart_caption_node and not indicator_word_image:
                     caption_paragraph = doc.add_paragraph(chart_caption_node.get_text(separator=' ').strip())
                     caption_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
                     caption_paragraph.paragraph_format.space_before = Pt(2)
@@ -396,12 +560,32 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir, expo
                         
                 llm_node = sec.find('div', class_='llm-text')
                 if llm_node:
-                    doc.add_paragraph()
-                    # Split by newlines so Word formats paragraphs properly
-                    lines = llm_node.text.strip().split('\n')
-                    for line in lines:
-                        if line.strip():
-                            doc.add_paragraph(line.strip())
+                    if is_indicator_export:
+                        doc.add_paragraph().paragraph_format.space_after = Pt(0)
+                        narrative_table = doc.add_table(rows=1, cols=1)
+                        narrative_table.autofit = True
+                        narrative_cell = narrative_table.cell(0, 0)
+                        _style_indicator_narrative_cell(narrative_cell)
+                        title_text = chart_data.get('narrativeHeading') or '語言模型敘述'
+                        title_paragraph = narrative_cell.paragraphs[0]
+                        title_paragraph.paragraph_format.space_after = Pt(4)
+                        title_run = title_paragraph.add_run(str(title_text))
+                        title_run.bold = True
+                        title_run.font.size = Pt(10)
+                        narrative_text = str(chart_data.get('llmText') or '').strip()
+                        text_paragraph = narrative_cell.add_paragraph(narrative_text)
+                        text_paragraph.paragraph_format.space_before = Pt(0)
+                        text_paragraph.paragraph_format.space_after = Pt(0)
+                        text_paragraph.paragraph_format.line_spacing = 1.25
+                        for run in text_paragraph.runs:
+                            run.font.size = Pt(10)
+                    else:
+                        doc.add_paragraph()
+                        # Split by newlines so Word formats paragraphs properly
+                        lines = llm_node.text.strip().split('\n')
+                        for line in lines:
+                            if line.strip():
+                                doc.add_paragraph(line.strip())
                     
             docx_buffer = io.BytesIO()
             doc.save(docx_buffer)
@@ -414,13 +598,13 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir, expo
         zip_buffer = io.BytesIO()
         with zipfile.ZipFile(zip_buffer, 'w') as zf:
             if pdf_bytes:
-                zf.writestr("export_report.pdf", pdf_bytes)
+                zf.writestr(f"{filename_base}.pdf", pdf_bytes)
             if docx_bytes:
-                zf.writestr("export_report.docx", docx_bytes)
+                zf.writestr(f"{filename_base}.docx", docx_bytes)
         zip_buffer.seek(0)
-        return zip_buffer, "application/zip", "export_report.zip"
+        return zip_buffer, "application/zip", f"{filename_base}.zip"
     elif format_pdf and pdf_bytes:
-        return io.BytesIO(pdf_bytes), "application/pdf", "export_report.pdf"
+        return io.BytesIO(pdf_bytes), "application/pdf", f"{filename_base}.pdf"
     elif format_word and docx_bytes:
-        return io.BytesIO(docx_bytes), "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "export_report.docx"
+        return io.BytesIO(docx_bytes), "application/vnd.openxmlformats-officedocument.wordprocessingml.document", f"{filename_base}.docx"
     return None, None, None

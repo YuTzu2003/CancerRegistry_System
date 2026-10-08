@@ -746,9 +746,13 @@
           info.innerHTML = '<span class="text-muted">體系無匹配欄位</span>';
         }
 
+        const matchedCount = data.mapped?.length || 0;
+        const unmatchedCount = data.unmapped?.length || 0;
+        const matchedSummary = `<span class="field-chip disabled"><i class="bi bi-check-circle text-success"></i> 已匹配 ${matchedCount}／${matchedCount + unmatchedCount} 個欄位</span>`;
+
         // 未匹配的欄位
         if (data.unmapped && data.unmapped.length > 0) {
-          list.innerHTML = data.unmapped.map(f => `
+          list.innerHTML = matchedSummary + data.unmapped.map(f => `
             <label class="field-chip">
               <input type="checkbox" value="${escapeHtml(f.key)}" checked />${escapeHtml(f.label)}
             </label>`).join('');
@@ -763,7 +767,7 @@
             sync();
           });
         } else {
-          list.innerHTML = '<span class="text-muted" style="font-size:12px;">無未匹配欄位</span>';
+          list.innerHTML = `${matchedSummary}<span class="field-chip disabled"><i class="bi bi-check2 text-success"></i> 無未匹配欄位</span>`;
         }
         syncCleanExtraFieldControls();
       }
