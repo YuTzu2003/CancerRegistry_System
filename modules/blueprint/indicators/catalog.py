@@ -110,6 +110,27 @@ CANCER_SPECS: dict[str, CancerSpec] = {
     ),
 }
 
+CANCER_LABELS_ZH: dict[str, str] = {
+    "Oral_Cavity": "口腔癌",
+    "Esophagus": "食道癌",
+    "Stomach": "胃癌",
+    "Pancreas": "胰臟癌",
+    "Colon_Rectum": "結腸、直腸癌",
+    "Liver": "肝癌",
+    "Breast": "乳癌",
+    "Lung": "肺癌",
+    "Cervix_Uteri": "子宮頸癌",
+    "Corpus_Uteri": "子宮體癌",
+    "Ovary": "卵巢癌",
+    "Prostate": "攝護腺癌",
+    "Bladder": "膀胱癌",
+}
+
+
+def get_cancer_label(cancer_key: str) -> str:
+    key = str(cancer_key or "")
+    return CANCER_LABELS_ZH.get(key, key)
+
 
 def get_indicator_rules(cancer_key: str) -> dict:
     spec = CANCER_SPECS.get(str(cancer_key or ""))

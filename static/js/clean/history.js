@@ -6,6 +6,7 @@ function openDetail(jobId) {
                 const data = res.data;
                 document.getElementById('detail-jobId').innerText = data.JobID || '無資料';
                 document.getElementById('detail-createdAt').innerText = data.CreatedAt || '-';
+                document.getElementById('detail-fileName').innerText = data.FileName || '—';
                 
                 // 格式名稱
                 const fmtDisplay = (data.FmtName && data.Version) ? `${data.FmtName}欄位(${data.Version})`:(data.FmtName || '未指定');

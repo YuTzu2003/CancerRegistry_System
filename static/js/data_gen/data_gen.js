@@ -260,10 +260,18 @@ function renderExtraFields(analyzedColumns, selectedScheme) {
         return !targetName || targetName.trim() === '';
     }).sort((left, right) => (left.source_index ?? Number.MAX_SAFE_INTEGER) - (right.source_index ?? Number.MAX_SAFE_INTEGER));
 
+    const matchedSummary = document.createElement('span');
+    matchedSummary.className = 'field-chip disabled';
+    matchedSummary.innerHTML = `<i class="bi bi-check-circle text-success"></i> 已匹配 ${analyzedColumns.length - extraCols.length}／${analyzedColumns.length} 個欄位`;
+    outputFieldList.replaceChildren(matchedSummary);
+
     if (extraCols.length === 0) {
-        outputFieldList.innerHTML = '<span class="text-muted small">所有欄位皆已正確匹配，無未匹配欄位。</span>';
+        const noUnmatched = document.createElement('span');
+        noUnmatched.className = 'field-chip disabled';
+        noUnmatched.innerHTML = '<i class="bi bi-check2 text-success"></i> 無未匹配欄位';
+        outputFieldList.appendChild(noUnmatched);
     } else {
-        outputFieldList.replaceChildren(...extraCols.map(col => {
+        outputFieldList.append(...extraCols.map(col => {
             const label = document.createElement('label');
             label.className = 'field-chip selected';
             const input = document.createElement('input');
