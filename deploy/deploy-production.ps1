@@ -128,6 +128,23 @@ else {
 
 Write-Host "Phase: registering and starting Web and LLM worker tasks."
 & (Join-Path $PSScriptRoot "stop-production.ps1")
+
+$occupiedBackends = @()
+for ($attempt = 1; $attempt -le 10; $attempt++) {
+    $occupiedBackends = @()
+    for ($index = 0; $index -lt $workerCount; $index++) {
+        $port = $backendBasePort + $index
+        if (Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue) {
+            $occupiedBackends += $port
+        }
+    }
+    if ($occupiedBackends.Count -eq 0) { break }
+    Start-Sleep -Seconds 1
+}
+if ($occupiedBackends.Count -gt 0) {
+    throw "Backend port(s) $($occupiedBackends -join ', ') are still in use. Stop every manually started start-production.ps1 window, then run deployment again."
+}
+
 & (Join-Path $PSScriptRoot "register-autostart.ps1")
 Get-ScheduledTask -TaskName "CancerRegistrySystem-??" -ErrorAction Stop | ForEach-Object { Start-ScheduledTask -TaskName $_.TaskName }
 Get-ScheduledTask -TaskName "CancerRegistrySystem-LLM-??" -ErrorAction Stop | ForEach-Object { Start-ScheduledTask -TaskName $_.TaskName }
