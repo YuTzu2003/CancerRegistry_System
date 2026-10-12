@@ -205,19 +205,17 @@ def _detect_text_file_format(file_path):
     return used_encoding, delimiter
 
 
-CSV_TEXT_ENCODINGS = ("utf-8-sig", "cp950", "big5hkscs", "big5", "gb18030")
+# CSV 與固定長度 TXT 採用相同的兩段式規則：
+# 1. UTF-8；2. Windows 傳統中文（Big5 系列）。
+# Windows 的 ``mbcs`` 會使用目前系統的 ANSI 字碼頁，可保留 CP950
+# 使用者自訂區的顯示字元（例如院內舊檔中顯示為私用字的姓名）。
+# 非 Windows 環境沒有 ``mbcs``，才退回標準 Big5。
+LEGACY_TRADITIONAL_CHINESE_ENCODING = "mbcs" if os.name == "nt" else "big5"
+CSV_TEXT_ENCODINGS = ("utf-8-sig", LEGACY_TRADITIONAL_CHINESE_ENCODING)
 
 
 def _csv_reader_encoding(source_encoding):
-    """Return the decoder used to read a recognized CSV source encoding.
-
-    Python's ``cp950`` codec does not cover every character in the Windows
-    CP950 user-defined area.  On Windows, ``mbcs`` uses the operating system's
-    native ANSI code page, which is how users normally open these CP950 CSV
-    files and preserves those characters for the Excel cleaning result.
-    """
-    if source_encoding == "cp950" and os.name == "nt":
-        return "mbcs"
+    """Return the decoder selected by the shared text-encoding policy."""
     return source_encoding
 
 
@@ -255,11 +253,10 @@ def _csv_header_match_score(headers, fmt_name):
 def _read_csv_with_supported_encoding(file_path, fmt_name):
     """Read a CSV without silently dropping unsupported characters.
 
-    Encoding selection uses the header row only.  Patient content, including
-    the name field, never affects the choice.  A legacy CP950 CSV may contain
-    a single difficult character: selecting GB18030 merely because it can
-    decode that character would corrupt the known registry headers and every
-    other Chinese field.
+    Encoding selection uses the header row only. Patient content, including
+    the name field, never affects the choice. CSV and fixed-width TXT share
+    the same UTF-8 / Windows traditional-Chinese fallback policy so the same
+    source bytes do not receive a different name display merely by file type.
     """
     with open(file_path, "rb") as source:
         content_bytes = source.read()
@@ -559,7 +556,10 @@ def load_field_spec(fmt_val):
         
     return field_spec
 
-FIXED_WIDTH_TEXT_ENCODINGS = ("utf-8-sig", "cp950", "big5hkscs", "big5")
+FIXED_WIDTH_TEXT_ENCODINGS = (
+    "utf-8-sig",
+    LEGACY_TRADITIONAL_CHINESE_ENCODING,
+)
 
 
 def _decode_error_count(value, encoding):
