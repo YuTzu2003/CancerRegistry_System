@@ -15,7 +15,16 @@ const loadingOverlay = document.getElementById('loadingOverlay');
 
 let currentColumns = [];
 let downloadUrl = '';
+let downloadFilename = '';
 let selectedUploadFile = null;
+
+function clearGeneratedDownload() {
+    if (downloadUrl) {
+        URL.revokeObjectURL(downloadUrl);
+    }
+    downloadUrl = '';
+    downloadFilename = '';
+}
 
 function extraFieldCheckboxes() {
     return Array.from(document.querySelectorAll('#outputFieldList .extra-field-checkbox'));
@@ -310,22 +319,40 @@ async function generateMockData() {
     loadingOverlay.style.display = 'flex';
     
     try {
-        const resp = await fetch('/api/data_gen/process', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
+        if (!selectedUploadFile) {
+            throw new Error('請重新上傳檔案');
+        }
+
+        const formData = new FormData();
+        formData.append('file', selectedUploadFile);
+        formData.append('txt_has_header', selectedUploadFile.name.toLowerCase().endsWith('.txt') && txtHasHeader.checked ? 'true' : 'false');
+        formData.append('options', JSON.stringify({
                 format_id: formatId,
-                date_cols: dateCols, 
+                date_cols: dateCols,
                 extra_cols: extraCols,
                 special_configs: specialConfigs,
                 naming_scheme: namingScheme
-            })
+        }));
+
+        const resp = await fetch('/api/data_gen/process', {
+            method: 'POST',
+            body: formData,
         });
         const res = await resp.json();
         loadingOverlay.style.display = 'none';
 
         if (res.ok) {
-            downloadUrl = res.download_url;
+            clearGeneratedDownload();
+            const binary = atob(res.download_data || '');
+            const bytes = new Uint8Array(binary.length);
+            for (let index = 0; index < binary.length; index += 1) {
+                bytes[index] = binary.charCodeAt(index);
+            }
+            const mimeType = (res.download_filename || '').toLowerCase().endsWith('.csv')
+                ? 'text/csv;charset=utf-8'
+                : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+            downloadUrl = URL.createObjectURL(new Blob([bytes], { type: mimeType }));
+            downloadFilename = res.download_filename || '去個資化結果.xlsx';
             renderPreview(res.preview, res.headers);
             resultSection.style.display = 'block';
             resultSection.scrollIntoView({ behavior: 'smooth' });
@@ -381,7 +408,11 @@ function renderPreview(data, headers) {
 
 function downloadResult() {
     if (downloadUrl) {
-        window.location.href = downloadUrl;
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = downloadFilename || '去個資化結果.xlsx';
+        link.click();
+        window.setTimeout(clearGeneratedDownload, 1000);
     }
 }
 
@@ -403,7 +434,7 @@ function resetUpload() {
     if (analyzeFileBtn) analyzeFileBtn.style.display = 'none';
     
     currentColumns = [];
-    downloadUrl = '';
+    clearGeneratedDownload();
     selectedUploadFile = null;
     document.getElementById('dateFields').innerHTML = '';
     document.getElementById('specialFields').innerHTML = '';
@@ -423,3 +454,5 @@ function resetUpload() {
         defaultRadio.closest('.naming-chip').classList.add('selected');
     }
 }
+
+window.addEventListener('pagehide', clearGeneratedDownload);
