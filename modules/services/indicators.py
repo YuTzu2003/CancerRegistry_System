@@ -360,6 +360,37 @@ def delete_indicators_source(file_id):
     return jsonify({"ok": True})
 
 
+@indicators_bp.route("/api/indicators/sources", methods=["DELETE"])
+@login_required
+def batch_delete_indicators_sources():
+    payload = request.get_json(silent=True) or {}
+    file_ids = payload.get("file_ids") or []
+    if not isinstance(file_ids, list):
+        return jsonify({"ok": False, "error": "刪除項目格式不正確。"}), 400
+
+    selected_ids = {str(file_id).strip() for file_id in file_ids if str(file_id).strip()}
+    if not selected_ids:
+        return jsonify({"ok": False, "error": "請先勾選欲刪除的檔案。"}), 400
+
+    sources = _stored_sources()
+    selected_sources = [source for source in sources if source["file_id"] in selected_ids]
+    if not selected_sources:
+        return jsonify({"ok": False, "error": "找不到指定的檔案。"}), 404
+
+    try:
+        for source in selected_sources:
+            _delete_source_file(source)
+    except OSError as exc:
+        return jsonify({"ok": False, "error": f"無法刪除檔案：{exc}"}), 500
+
+    deleted_ids = {source["file_id"] for source in selected_sources}
+    session["indicators_sources"] = [source for source in sources if source["file_id"] not in deleted_ids]
+    active_source = session.get("indicators_source") or {}
+    if active_source.get("file_id") in deleted_ids:
+        session.pop("indicators_source", None)
+    return jsonify({"ok": True, "deleted": len(deleted_ids)})
+
+
 @indicators_bp.route("/api/indicators/thresholds", methods=["POST"])
 @position_required(
     *INDICATOR_THRESHOLD_EDITOR_POSITIONS,
