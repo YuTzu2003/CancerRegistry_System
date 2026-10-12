@@ -30,9 +30,14 @@ $publicUri = "http://127.0.0.1:${publicPort}/health"
 Write-Host "IIS + ARR: $publicUri"
 try { Invoke-RestMethod -Uri $publicUri -TimeoutSec 3 -ErrorAction Stop | ConvertTo-Json -Compress } catch { $failed = $true; Write-Host "Unavailable: $($_.Exception.Message)" -ForegroundColor Red }
 Get-Website -Name "CancerRegistrySystem" -ErrorAction SilentlyContinue | Select-Object Name,State,PhysicalPath
-Get-ScheduledTask -TaskName "CancerRegistrySystem-??" -ErrorAction SilentlyContinue | Select-Object TaskName,State
+$webTasks = @(Get-ScheduledTask -TaskName "CancerRegistrySystem-??" -ErrorAction SilentlyContinue)
+$webTasks | Select-Object TaskName,State
 Get-ScheduledTask -TaskName "CancerRegistrySystem-LLM-??" -ErrorAction SilentlyContinue | Select-Object TaskName,State
 Get-ScheduledTask -TaskName "CancerRegistrySystem-01" -ErrorAction SilentlyContinue | Get-ScheduledTaskInfo | Select-Object LastRunTime,LastTaskResult
+if ($webTasks.Count -ne $workerCount -or @($webTasks | Where-Object State -ne "Running").Count -gt 0) {
+    $failed = $true
+    Write-Host "Web scheduled-task count or state is invalid." -ForegroundColor Red
+}
 if (@(Get-ScheduledTask -TaskName "CancerRegistrySystem-LLM-??" -ErrorAction SilentlyContinue).Count -ne $llmWorkerCount) {
     $failed = $true
     Write-Host "LLM scheduled-task count does not match LLM_WORKERS." -ForegroundColor Red
