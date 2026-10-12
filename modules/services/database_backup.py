@@ -21,8 +21,14 @@ def run_database_backup():
     try:
         BACKUP_DIRECTORY.mkdir(parents=True, exist_ok=True)
         connection = get_conn()
+        connection.rollback()
         connection.autocommit = True
         cursor = connection.cursor()
+        cursor.execute("SET IMPLICIT_TRANSACTIONS OFF")
+        cursor.execute("SELECT @@TRANCOUNT")
+        transaction_count = int(cursor.fetchone()[0])
+        if transaction_count:
+            raise RuntimeError(f"Database backup requires no active transaction (@@TRANCOUNT={transaction_count})")
         cursor.execute("SELECT DB_NAME()")
         database_name = str(cursor.fetchone()[0])
         safe_database_name = database_name.replace("]", "]]")

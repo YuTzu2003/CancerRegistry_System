@@ -14,8 +14,10 @@ import re
 import json
 import logging
 import uuid
+import hashlib
 import threading
 import shutil
+import time
 from pathlib import Path
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 import pandas as pd
@@ -73,6 +75,33 @@ def _get_owned_dashboard_file(file_id, user_id):
     if not row:
         return None
     return {"name": str(row[0]), "storage_path": str(row[1])}
+
+def _get_dashboard_file_by_id(file_id, user_id):
+    conn = get_conn()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT DisplayName FROM dbo.DashboardFile WHERE FileID = ? AND UserID = ?",
+            (str(file_id), str(user_id)),
+        )
+        row = cursor.fetchone()
+        return str(row[0]) if row else None
+    finally:
+        conn.close()
+
+def _dashboard_upload_id(file_storage, user_id, input_scheme, format_id, extra_fields, txt_has_header):
+    digest = hashlib.sha256()
+    stream = file_storage.stream
+    stream.seek(0)
+    for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+        digest.update(chunk)
+    stream.seek(0)
+    options = json.dumps(
+        {"input_scheme": input_scheme, "format_id": format_id, "extra_fields": extra_fields, "txt_has_header": txt_has_header},
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, f"dashboard-upload:{user_id}:{digest.hexdigest()}:{options}"))
 
 def _get_cancer_name_translations():
     translations = {"All_Cancers": {"zh": "全癌別", "en": "All cancers"}}
@@ -145,11 +174,16 @@ def dashboard_upload():
     if not filename.strip() or filename == f".{ext}":
         filename = f"uploaded_file.{ext}"
     user_id = session.get("id")
-    file_id = str(uuid.uuid4())
+    file_id = _dashboard_upload_id(f, user_id, input_scheme, format_id, extra_fields, txt_has_header)
+    existing_name = _get_dashboard_file_by_id(file_id, user_id)
+    if existing_name:
+        logging.info("Dashboard upload retry returned existing file %s for user %s", file_id, user_id)
+        return jsonify({"ok": True, "filename": existing_name, "file_id": file_id, "deduplicated": True})
     storage_name = f"{file_id}{os.path.splitext(filename)[1].lower()}"
     storage_path = _dashboard_storage_path(file_id, storage_name)
     save_path = _absolute_dashboard_path(storage_path)
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    started_at = time.monotonic()
     f.save(save_path)
     try:
         normalized_path = validate_and_normalize_dashboard_upload(
@@ -177,7 +211,7 @@ def dashboard_upload():
         if os.path.isfile(save_path):
             os.remove(save_path)
         raise
-    logging.info(f"Dashboard upload: {filename} saved for user {user_id}")
+    logging.info("Dashboard upload: %s saved for user %s in %.2fs", filename, user_id, time.monotonic() - started_at)
     return jsonify({"ok": True, "filename": filename, "file_id": file_id})
 
 @dashboard_bp.route("/dashboard/input-preview", methods=["POST"])
@@ -252,7 +286,19 @@ def dashboard_delete():
     fpath = _absolute_dashboard_path(owned_file["storage_path"])
     if not os.path.isfile(fpath):
         return jsonify({"ok": False, "error": "檔案不存在"}), 404
-    os.remove(fpath)
+    last_error = None
+    for attempt in range(3):
+        try:
+            os.remove(fpath)
+            last_error = None
+            break
+        except PermissionError as error:
+            last_error = error
+            if attempt < 2:
+                time.sleep(0.5)
+    if last_error:
+        logging.warning("Dashboard delete deferred because file remains locked: %s", fpath)
+        return jsonify({"ok": False, "error": "檔案目前正由其他程式使用，請關閉 Excel 或稍候再試。"}), 409
     try:
         os.rmdir(os.path.dirname(fpath))
     except OSError:
