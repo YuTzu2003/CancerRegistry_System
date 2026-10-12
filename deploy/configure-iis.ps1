@@ -106,6 +106,8 @@ if ($farmConfig -like "*$farmMarker*") {
 & $appCmd set config -section:webFarms ("/-`"[name='{0}']`"" -f $farmName) /commit:apphost 2>$null | Out-Null
 & $appCmd set config -section:webFarms ("/+`"[name='{0}']`"" -f $farmName) /commit:apphost
 if ($LASTEXITCODE -ne 0) { throw "Could not create ARR Server Farm $farmName." }
+& $appCmd set config -section:webFarms ("/[name='{0}'].applicationRequestRouting.protocol.timeout:00:10:00" -f $farmName) /commit:apphost
+if ($LASTEXITCODE -ne 0) { throw "Could not configure ARR proxy timeout for $farmName." }
 for ($index = 0; $index -lt $workerCount; $index++) {
     $address = "127.0.0.$($index + 1)"
     $port = $backendBasePort + $index
