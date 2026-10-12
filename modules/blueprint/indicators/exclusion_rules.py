@@ -49,6 +49,13 @@ def _find_column(columns, code=None, aliases=()):
                 return original
     return None
 
+
+def _normalize_registry_date(value) -> str:
+    """Normalize registry dates such as ``0000/00/00`` to ``00000000``."""
+    digits = re.sub(r"\D", "", _clean_code(value))
+    return digits[:8].zfill(8) if digits else ""
+
+
 # ---------------------------------------------------------------------------
 # 日期排序與期別嚴重度比序輔助函式
 # ---------------------------------------------------------------------------

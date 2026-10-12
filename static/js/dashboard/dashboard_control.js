@@ -1945,7 +1945,7 @@ function initDashboardControl() {
       Swal.fire({
           title: '輸入檔案預覽',
           width: 900,
-          html: `<div class="text-start mb-3"><strong>檔案：</strong>${escapeDashboardInputHtml(selectedFile.name)}<span class="mx-2">｜</span><strong>申報格式：</strong>${escapeDashboardInputHtml(selectedFormatLabel)}<span class="mx-2">｜</span><strong>命名來源：</strong>${escapeDashboardInputHtml(selectedLabel)}</div><div class="table-responsive" style="max-height:420px"><table class="table table-sm table-bordered align-middle mb-0"><thead class="table-light sticky-top"><tr><th>原始欄位</th><th style="width:45px"></th><th>標準欄位</th><th style="width:90px">狀態</th></tr></thead><tbody>${previewRows}</tbody></table></div>`,
+          html: `<div class="text-start mb-3"><strong>檔案：</strong>${escapeDashboardInputHtml(selectedFile.name)}<span class="mx-2">｜</span><strong>申報格式：</strong>${escapeDashboardInputHtml(selectedFormatLabel)}<span class="mx-2">｜</span><strong>欄位體系：</strong>${escapeDashboardInputHtml(selectedLabel)}</div><div class="table-responsive" style="max-height:420px"><table class="table table-sm table-bordered align-middle mb-0"><thead class="table-light sticky-top"><tr><th>原始欄位</th><th style="width:45px"></th><th>轉換後欄位</th><th style="width:90px">狀態</th></tr></thead><tbody>${previewRows}</tbody></table></div>`,
           confirmButtonColor: '#2563eb'
       });
   });
@@ -1987,7 +1987,16 @@ function initDashboardControl() {
           uploadData.set('txt_has_header', dashboardTxtHasHeader?.checked ? 'true' : 'false');
           uploadData.set('extra_fields', JSON.stringify(Array.from(document.querySelectorAll('.dashboard-extra-field-checkbox:checked')).map(input => input.value)));
           fetch('/dashboard/upload', { method: 'POST', body: uploadData })
-            .then(r => r.json())
+            .then(async response => {
+              const contentType = response.headers.get('content-type') || '';
+              const body = contentType.includes('application/json') ? await response.json() : null;
+              if (!response.ok || !body) {
+                const error = new Error(`HTTP ${response.status}`);
+                error.status = response.status;
+                throw error;
+              }
+              return body;
+            })
             .then(data => {
               if (data.ok) {
                 Swal.fire({ icon: 'success', title: '匯入成功', text: `${data.filename} 已匯入`, allowOutsideClick: false, confirmButtonColor: '#2563eb' })
@@ -1996,8 +2005,17 @@ function initDashboardControl() {
                 Swal.fire({ icon: 'error', title: '匯入失敗', text: data.error || '未知錯誤', allowOutsideClick: false, confirmButtonColor: '#2563eb' });
               }
             })
-            .catch(() => {
-              Swal.fire({ icon: 'error', title: '匯入失敗', allowOutsideClick: false, confirmButtonColor: '#2563eb' });
+            .catch(error => {
+              const uncertain = error.status === 502 || error.status === 504 || error instanceof TypeError;
+              Swal.fire({
+                icon: 'error',
+                title: uncertain ? '匯入結果未確認' : '匯入失敗',
+                text: uncertain
+                  ? '伺服器未能回傳結果。請先重新整理檔案清單確認，不要立即重複匯入；重新送出相同檔案時系統會保留同一筆紀錄。'
+                  : `匯入失敗：${error.message || '未知錯誤'}`,
+                allowOutsideClick: false,
+                confirmButtonColor: '#2563eb'
+              });
             })
             .finally(() => {
               btn.disabled = false;

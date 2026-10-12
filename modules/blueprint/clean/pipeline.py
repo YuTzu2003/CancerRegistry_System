@@ -15,6 +15,7 @@ from modules.blueprint.clean.cleaner import cleanValidate
 from openpyxl import load_workbook, Workbook
 from openpyxl.utils import get_column_letter
 from modules.blueprint.clean.field_mapping import detect_system, get_field_map, validate_and_rename_headers, validate_and_unify_headers_in_file
+from modules.blueprint.clean.dedup_records import DUPLICATE_COMPARISON_FIELDS, append_reviewed_rows_to_cleaning_result, get_duplicate_comparison_columns, get_selected_review_duplicate_keys, normalize_duplicate_value
 from modules.blueprint.clean.text_converter import convert_txt_to_excel
 from modules.blueprint.clean.rules.validate import validate_date_rules
 
@@ -839,7 +840,7 @@ def export_logic(job_id, user_id, scheme, selected_fields):
 
         for c_idx, (orig_col_idx, _) in enumerate(output_cols, start=1):
             if orig_col_idx is not None:
-                new_ws.column_dimensions[get_column_letter(c_idx)].width =                     ws.column_dimensions[get_column_letter(orig_col_idx)].width
+                new_ws.column_dimensions[get_column_letter(c_idx)].width =  ws.column_dimensions[get_column_letter(orig_col_idx)].width
             else:
                 new_ws.column_dimensions[get_column_letter(c_idx)].width = 15
 
@@ -1010,7 +1011,7 @@ def manage_format_logic(method, fmt_id, name, version, updated):
     conn.close()
     return {"ok": True}, 200
 
-def clean_job_logic(user_id, format_id, convert_txt_flag, uploaded_file):
+def clean_job_logic(user_id, format_id, convert_txt_flag, uploaded_file, review_job_ids=None):
     if not format_id or not uploaded_file or uploaded_file.filename == '': 
         return {"ok": False, "error": "未選擇檔案"}, 400
     
@@ -1031,6 +1032,9 @@ def clean_job_logic(user_id, format_id, convert_txt_flag, uploaded_file):
     # Excel 沒有可沿用的原始文字編碼，依系統匯出資料的 UTF-8 表示檢核；
     # CSV 與固定長度 TXT 則在後續改用實際偵測到的來源編碼。
     value_encoding = "utf-8"
+    review_job_ids = review_job_ids or []
+    excluded_duplicate_count = 0
+    reviewed_rows = pd.DataFrame()
 
     if file_ext == '.txt':
         uploaded_file.seek(0)
@@ -1203,17 +1207,69 @@ def clean_job_logic(user_id, format_id, convert_txt_flag, uploaded_file):
             json.dump(orig_headers, f_orig, ensure_ascii=False)
 
         validate_and_unify_headers_in_file(process_path, fmt_name)
+
+        if review_job_ids:
+            input_df = pd.read_excel(process_path, dtype=str)
+            input_columns = get_duplicate_comparison_columns(fmt_name, input_df.columns)
+            reference_keys = get_selected_review_duplicate_keys(user_id, review_job_ids)
+            duplicate_rows = input_df.apply(
+                lambda row: all(normalize_duplicate_value(row[input_columns[field_name]]) for field_name in DUPLICATE_COMPARISON_FIELDS)
+                and tuple(normalize_duplicate_value(row[input_columns[field_name]]) for field_name in DUPLICATE_COMPARISON_FIELDS) in reference_keys,
+                axis=1,
+            )
+            reviewed_rows = input_df.loc[duplicate_rows].copy()
+            input_df = input_df.loc[~duplicate_rows].copy()
+            excluded_duplicate_count = len(reviewed_rows)
+            reviewed_rows.to_excel(os.path.join(project_folder, "reviewed_duplicates.xlsx"), index=False)
+            input_df.to_excel(process_path, index=False)
         
         _create_working_file(process_path, working_file)
-        stats, alias_mapping, sorted_df, sorted_mask = cleanValidate(
-            process_path,
-            out_path,
-            rep_path,
-            f"fmt_{fmt_name}",
-            version,
-            rev_date,
-            value_encoding=value_encoding,
-        )
+        if review_job_ids and excluded_duplicate_count and pd.read_excel(process_path, dtype=str).empty:
+            sorted_df = pd.read_excel(process_path, dtype=str)
+            sorted_mask = pd.DataFrame("", index=sorted_df.index, columns=sorted_df.columns)
+            sorted_df["錯誤註記說明(A:遺漏值 B:格式不符 C:邏輯錯誤 D:完全正確)"] = ""
+            sorted_df.to_excel(out_path, index=False, engine="openpyxl")
+            report = Workbook()
+            report.active.title = "資料清洗報告"
+            report.active.append(["資料總件數", 0])
+            report.save(rep_path)
+            report.close()
+            stats = {
+                "total": 0,
+                "error_rows": 0,
+                "completeness": 0,
+                "correctness": 0,
+                "consistency": 0,
+                "quality_score": 0,
+                "missing_cells": 0,
+                "format_cells": 0,
+                "logic_cells": 0,
+            }
+            alias_mapping = {}
+        else:
+            stats, alias_mapping, sorted_df, sorted_mask = cleanValidate(
+                process_path,
+                out_path,
+                rep_path,
+                f"fmt_{fmt_name}",
+                version,
+                rev_date,
+                value_encoding=value_encoding,
+            )
+        if not reviewed_rows.empty:
+            reviewed_input_file = os.path.join(project_folder, "reviewed_duplicates.xlsx")
+            reviewed_output_file = os.path.join(project_folder, "reviewed_duplicates_checked.xlsx")
+            reviewed_report_file = os.path.join(project_folder, "reviewed_duplicates_checked_report.xlsx")
+            cleanValidate(
+                reviewed_input_file,
+                reviewed_output_file,
+                reviewed_report_file,
+                f"fmt_{fmt_name}",
+                version,
+                rev_date,
+                value_encoding=value_encoding,
+            )
+            append_reviewed_rows_to_cleaning_result(out_path, reviewed_output_file)
         date_errors = _build_date_errors(sorted_df, sorted_mask, alias_mapping, date_error_file)
         cursor.execute("INSERT INTO Job ([JobID],[UserID],[FmtID],[FileName],[TotalCount],[CompletenessScore],[CorrectScore],[ConsistencyScore],[DQI],[Path]) VALUES (?,?,?,?,?,?,?,?,?,?)",
                         (JobID, user_id, format_id, filename, int(stats['total']), float(stats['completeness']), float(stats['correctness']), float(stats['consistency']), float(stats['quality_score']), project_folder))
@@ -1279,7 +1335,10 @@ def clean_job_logic(user_id, format_id, convert_txt_flag, uploaded_file):
         "output_fields": output_fields,
         "date_error_limit": DATE_ERROR_LIMIT,
         "date_error_count": date_error_count,
-        "date_errors": date_errors
+        "date_errors": date_errors,
+        "excluded_duplicate_count": excluded_duplicate_count,
+        "skipped_cleaning_count": 0,
+        "reviewed_duplicate_count": excluded_duplicate_count,
     }, 200
 
 
@@ -1348,6 +1407,14 @@ def update_date_error_logic(job_id, user_id, row_index, updates):
         _sync_working_file_to_source_files(working_file,source_file,converted_file,fmt_name)
         stats, alias_mapping, sorted_df, sorted_mask = run_clean_validate_with_clean_log(
             working_file,cleaned_file,report_file,f"fmt_{fmt_name}",version,rev_date)
+        reviewed_records_file = os.path.join(project_path, "reviewed_duplicates.xlsx")
+        if os.path.exists(reviewed_records_file):
+            reviewed_output_file = os.path.join(project_path, "reviewed_duplicates_checked.xlsx")
+            reviewed_report_file = os.path.join(project_path, "reviewed_duplicates_checked_report.xlsx")
+            run_clean_validate_with_clean_log(
+                reviewed_records_file, reviewed_output_file, reviewed_report_file, f"fmt_{fmt_name}", version, rev_date
+            )
+            append_reviewed_rows_to_cleaning_result(cleaned_file, reviewed_output_file)
         date_errors = _build_date_errors(sorted_df, sorted_mask, alias_mapping, date_error_file)
         date_error_count = len(date_errors)
 
@@ -1440,4 +1507,3 @@ def download_file_logic(file_type, job_id, user_id):
         return {"send_file": True, "path": os.path.abspath(file_path), "download_name": display_name if display_name else target_filename}, 200
     except Exception as e:
         return {"ok": False, "error": str(e)}, 500
-
