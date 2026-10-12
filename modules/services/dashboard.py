@@ -275,17 +275,13 @@ def dashboard_year_range():
         logging.error(f"Error reading dashboard year range: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
 
-@dashboard_bp.route("/dashboard/delete", methods=["POST"])
-@login_required
-def dashboard_delete():
-    data = request.json or {}
-    file_id = data.get("file_id", "")
-    owned_file = _get_owned_dashboard_file(file_id, session.get("id"))
+def _delete_owned_dashboard_file(file_id, user_id):
+    owned_file = _get_owned_dashboard_file(file_id, user_id)
     if not owned_file:
-        return jsonify({"ok": False, "error": "未指定檔案名稱"}), 400
+        return False, "找不到指定檔案。"
     fpath = _absolute_dashboard_path(owned_file["storage_path"])
     if not os.path.isfile(fpath):
-        return jsonify({"ok": False, "error": "檔案不存在"}), 404
+        return False, "檔案不存在。"
     last_error = None
     for attempt in range(3):
         try:
@@ -298,18 +294,53 @@ def dashboard_delete():
                 time.sleep(0.5)
     if last_error:
         logging.warning("Dashboard delete deferred because file remains locked: %s", fpath)
-        return jsonify({"ok": False, "error": "檔案目前正由其他程式使用，請關閉 Excel 或稍候再試。"}), 409
+        return False, "檔案目前正由其他程式使用，請關閉 Excel 或稍候再試。"
     try:
         os.rmdir(os.path.dirname(fpath))
     except OSError:
         pass
     conn = get_conn()
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM dbo.DashboardFile WHERE FileID = ? AND UserID = ?", (str(file_id), str(session.get("id"))))
+    cursor.execute("DELETE FROM dbo.DashboardFile WHERE FileID = ? AND UserID = ?", (str(file_id), str(user_id)))
     conn.commit()
     conn.close()
     logging.info(f"Dashboard delete: {file_id}")
+    return True, None
+
+
+@dashboard_bp.route("/dashboard/delete", methods=["POST"])
+@login_required
+def dashboard_delete():
+    data = request.json or {}
+    file_id = data.get("file_id", "")
+    ok, error = _delete_owned_dashboard_file(file_id, session.get("id"))
+    if not ok:
+        return jsonify({"ok": False, "error": error}), 400
     return jsonify({"ok": True})
+
+
+@dashboard_bp.route("/dashboard/delete-batch", methods=["POST"])
+@login_required
+def dashboard_batch_delete():
+    data = request.json or {}
+    file_ids = data.get("file_ids") or []
+    if not isinstance(file_ids, list):
+        return jsonify({"ok": False, "error": "刪除項目格式不正確。"}), 400
+
+    unique_file_ids = list(dict.fromkeys(str(file_id).strip() for file_id in file_ids if str(file_id).strip()))
+    if not unique_file_ids:
+        return jsonify({"ok": False, "error": "請先勾選欲刪除的檔案。"}), 400
+
+    deleted = 0
+    failures = []
+    for file_id in unique_file_ids:
+        ok, error = _delete_owned_dashboard_file(file_id, session.get("id"))
+        if ok:
+            deleted += 1
+        else:
+            failures.append(error)
+
+    return jsonify({"ok": not failures, "deleted": deleted, "error": "；".join(dict.fromkeys(failures)) if failures else None})
 
 @dashboard_bp.route("/api/chart_insight", methods=["POST"])
 @login_required

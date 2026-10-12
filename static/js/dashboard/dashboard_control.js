@@ -1156,7 +1156,7 @@ function initDashboardControl() {
       const row = e.target.closest('#dashFileListBody tr');
       if (!row) return;
       if (!row.querySelector('a')) return;
-      if (e.target.closest('.btn-del-file')) return;                 
+      if (e.target.closest('.btn-del-file, .dashboard-file-select')) return;
       
       e.preventDefault();
       const fileRows = document.querySelectorAll('#dashFileListBody tr');
@@ -2025,7 +2025,62 @@ function initDashboardControl() {
       });
   }
 
-  /* ── 檔案刪除邏輯 ── */
+  /* ── 檔案勾選與刪除邏輯 ── */
+  const dashboardFileCheckboxes = () => Array.from(document.querySelectorAll('.dashboard-file-select'));
+  const syncDashboardFileBulkActions = () => {
+      const checkboxes = dashboardFileCheckboxes();
+      const checkedCount = checkboxes.filter((checkbox) => checkbox.checked).length;
+      const selectAll = document.getElementById('dashboardSelectAllFiles');
+      const batchDeleteButton = document.getElementById('btnBatchDeleteDashboardFiles');
+      if (selectAll) {
+          selectAll.checked = checkboxes.length > 0 && checkedCount === checkboxes.length;
+          selectAll.indeterminate = checkedCount > 0 && checkedCount < checkboxes.length;
+      }
+      if (batchDeleteButton) batchDeleteButton.disabled = checkedCount === 0;
+  };
+
+  document.getElementById('dashboardSelectAllFiles')?.addEventListener('change', (event) => {
+      dashboardFileCheckboxes().forEach((checkbox) => { checkbox.checked = event.target.checked; });
+      syncDashboardFileBulkActions();
+  });
+  document.addEventListener('change', (event) => {
+      if (event.target.matches('.dashboard-file-select')) syncDashboardFileBulkActions();
+  });
+  document.getElementById('btnBatchDeleteDashboardFiles')?.addEventListener('click', () => {
+      const fileIds = dashboardFileCheckboxes().filter((checkbox) => checkbox.checked).map((checkbox) => checkbox.value);
+      if (!fileIds.length) return;
+      Swal.fire({
+          title: '確定刪除？',
+          text: `將刪除 ${fileIds.length} 個檔案，此動作無法復原。`,
+          icon: 'warning',
+          showCancelButton: true,
+          allowOutsideClick: false,
+          confirmButtonColor: '#dc2626',
+          cancelButtonText: '取消',
+          confirmButtonText: '刪除'
+      }).then((result) => {
+          if (!result.isConfirmed) return;
+          fetch('/dashboard/delete-batch', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ file_ids: fileIds })
+          })
+          .then((response) => response.json())
+          .then((data) => {
+              if (data.deleted) {
+                  const title = data.ok ? '已刪除' : '部分檔案未刪除';
+                  const text = data.ok ? `已刪除 ${data.deleted} 個檔案。` : data.error || '部分檔案無法刪除。';
+                  Swal.fire({ icon: data.ok ? 'success' : 'warning', title, text, confirmButtonColor: '#2563eb' })
+                      .then(() => location.reload());
+              } else {
+                  Swal.fire({ icon: 'error', title: '刪除失敗', text: data.error || '未知錯誤', confirmButtonColor: '#2563eb' });
+              }
+          })
+          .catch(() => Swal.fire({ icon: 'error', title: '刪除失敗', text: '無法連線至伺服器，請稍後再試。', confirmButtonColor: '#2563eb' }));
+      });
+  });
+  syncDashboardFileBulkActions();
+
   document.addEventListener('click', function(e) {
       const btn = e.target.closest('.btn-del-file');
       if (!btn) return;

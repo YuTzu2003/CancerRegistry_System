@@ -40,7 +40,7 @@
   .file-list-card .indicators-file-empty { min-height: 160px; }
   .indicators-file-empty { color: var(--gray-500); display: grid; font-size: 12px; gap: 3px; min-height: 66px; place-content: center; text-align: center; }
   .indicators-file-empty-title { color: var(--gray-700); font-size: 14px; font-weight: 700; }
-  .indicators-file-item { align-items: center; border: 1px solid transparent; border-radius: 7px; display: grid; gap: 11px; grid-template-columns: 38px minmax(0, 1fr) auto; min-height: 66px; padding: 8px; transition: background-color 150ms ease, border-color 150ms ease; }
+  .indicators-file-item { align-items: center; border: 1px solid transparent; border-radius: 7px; display: grid; gap: 11px; grid-template-columns: 22px 38px minmax(0, 1fr) auto; min-height: 66px; padding: 8px; transition: background-color 150ms ease, border-color 150ms ease; }
   .indicators-file-item + .indicators-file-item { margin-top: 4px; }
   .indicators-file-item.is-selected { background: #eef6f7; border-color: #b9dadd; }
   .indicators-file-icon { align-items: center; background: #e8f3f4; border-radius: 7px; color: #166C7A; display: flex; font-size: 18px; height: 38px; justify-content: center; width: 38px; }
@@ -55,6 +55,7 @@
   .indicators-file-select.is-selected { border-color: #87bdc3; color: #166C7A; font-weight: 700; }
   .indicators-file-delete { align-items: center; background: transparent; border: 0; border-radius: 6px; color: var(--gray-500); display: inline-flex; height: 29px; justify-content: center; padding: 0; width: 29px; }
   .indicators-file-delete:hover { background: #fcebec; color: #b4232c; }
+  .indicators-file-bulk-actions { align-items: center; display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
   .indicators-year-range { align-items: end; display: grid; gap: 10px; grid-template-columns: minmax(130px, 180px) 24px minmax(130px, 180px); justify-content: start; }
   .indicators-year-controls { align-items: end; display: flex; flex-wrap: wrap; gap: 18px; }
   .indicators-narrative-group { flex: 0 0 243px; max-width: 243px; width: 243px; }
@@ -162,6 +163,8 @@
     .indicators-upload-pane + .indicators-upload-pane { border-left: 0; border-top: 1px solid var(--gray-200); padding-left: 0; padding-top: 20px; }
   }
   @media (max-width: 575.98px) {
+    .indicators-file-item { align-items: start; grid-template-columns: 22px 38px minmax(0, 1fr); }
+    .indicators-file-actions { grid-column: 3; justify-content: flex-start; }
     .indicators-year-range { grid-template-columns: 1fr; }
     .indicators-year-separator { height: auto; }
     .indicators-narrative-group { flex: 1 1 100%; max-width: 100%; width: 100%; }
@@ -205,7 +208,7 @@
       </div>
       <div>
         <div class="file-list-card">
-          <div class="file-list-header"><h6 class="mb-0 fw-bold text-dark d-flex align-items-center gap-2"><i class="bi bi-folder2-open text-primary"></i>檔案清單</h6><span id="indicatorsFileCount" class="text-secondary" style="font-size: 12px;">0 個檔案</span></div>
+          <div class="file-list-header"><h6 class="mb-0 fw-bold text-dark d-flex align-items-center gap-2"><i class="bi bi-folder2-open text-primary"></i>檔案清單</h6><div class="indicators-file-bulk-actions"><span id="indicatorsFileCount" class="text-secondary" style="font-size: 12px;">0 個檔案</span><label class="form-check m-0"><input id="indicatorSelectAllFiles" class="form-check-input" type="checkbox" aria-label="全選檔案"></label><button id="btnBatchDeleteIndicatorFiles" class="btn btn-sm btn-outline-danger" type="button" disabled>刪除勾選項目</button></div></div>
           <div class="file-list-container"><div id="indicatorsFileList" class="indicators-file-list" aria-live="polite"><div class="indicators-file-empty"><span class="indicators-file-empty-title">尚未選擇檔案</span><span>請選擇 Excel、CSV 或 TXT 後加入檔案清單</span></div></div></div>
         </div>
       </div>
@@ -336,6 +339,8 @@
   const analyzeButton = document.getElementById('analyzeIndicators');
   const fileList = document.getElementById('indicatorsFileList');
   const fileCount = document.getElementById('indicatorsFileCount');
+  const selectAllIndicatorFilesCheckbox = document.getElementById('indicatorSelectAllFiles');
+  const batchDeleteIndicatorFilesButton = document.getElementById('btnBatchDeleteIndicatorFiles');
   const yearStep = document.getElementById('indicatorsYearStep');
   const cancerStep = document.getElementById('indicatorsCancerStep');
   const previewStep = document.getElementById('indicatorsPreviewStep');
@@ -693,6 +698,12 @@
   };
 
   const renderFileList = () => {
+    const selectedForDeletionCount = fileEntries.filter((entry) => entry.selectedForDeletion).length;
+    const allSelectedForDeletion = fileEntries.length > 0 && selectedForDeletionCount === fileEntries.length;
+    selectAllIndicatorFilesCheckbox.disabled = uploadInProgress || !fileEntries.length;
+    selectAllIndicatorFilesCheckbox.checked = allSelectedForDeletion;
+    selectAllIndicatorFilesCheckbox.indeterminate = selectedForDeletionCount > 0 && !allSelectedForDeletion;
+    batchDeleteIndicatorFilesButton.disabled = uploadInProgress || selectedForDeletionCount === 0;
     if (!fileEntries.length) {
       fileCount.textContent = '0 個檔案';
       fileList.innerHTML = '<div class="indicators-file-empty"><span class="indicators-file-empty-title">尚未選擇檔案</span><span>選擇 Excel、CSV 或 TXT 後，將在此顯示檔案資訊。</span></div>';
@@ -714,6 +725,7 @@
       const metadataLine = entry.yearRange ? `${metadata} · 診斷年度範圍 ${entry.yearRange}` : metadata;
       const disabled = uploadInProgress ? ' disabled' : '';
       return `<div class="indicators-file-item${selected ? ' is-selected' : ''}">
+        <div class="form-check m-0"><input class="form-check-input indicators-file-select" type="checkbox" data-file-action="mark-delete" data-file-id="${entry.id}" aria-label="選取 ${escapeHtml(file.name)}"${entry.selectedForDeletion ? ' checked' : ''}${disabled}></div>
         <div class="indicators-file-icon"><i class="bi bi-folder2-open" aria-hidden="true"></i></div>
         <div class="overflow-hidden"><div class="indicators-file-name" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</div><div class="indicators-file-meta">${escapeHtml(metadataLine)}</div></div>
         <div class="indicators-file-actions">
@@ -778,7 +790,7 @@
         newestEntry = existing;
         return;
       }
-      newestEntry = { id: nextFileId++, key, file, serverId: null, state: 'ready', detail: '', yearRange: '', years: [] };
+      newestEntry = { id: nextFileId++, key, file, serverId: null, state: 'ready', detail: '', yearRange: '', years: [], selectedForDeletion: false };
       fileEntries.push(newestEntry);
     });
     fileInput.value = '';
@@ -797,6 +809,11 @@
     const entryId = Number(actionButton.dataset.fileId);
     const entryIndex = fileEntries.findIndex((entry) => entry.id === entryId);
     if (entryIndex < 0) return;
+    if (actionButton.dataset.fileAction === 'mark-delete') {
+      fileEntries[entryIndex].selectedForDeletion = actionButton.checked;
+      renderFileList();
+      return;
+    }
     if (actionButton.dataset.fileAction === 'select') {
       await activateFileEntry(entryId);
       return;
@@ -825,6 +842,44 @@
       } else {
         renderFileList();
       }
+    }
+  });
+  const deleteIndicatorEntries = async (entries) => {
+    const serverIds = entries.map((entry) => entry.serverId).filter(Boolean);
+    if (serverIds.length) {
+      await fetchJson('/api/indicators/sources', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file_ids: serverIds })
+      });
+    }
+    const entryIds = new Set(entries.map((entry) => entry.id));
+    for (let index = fileEntries.length - 1; index >= 0; index -= 1) {
+      if (entryIds.has(fileEntries[index].id)) fileEntries.splice(index, 1);
+    }
+    if (entryIds.has(loadedFileId)) loadedFileId = null;
+    if (entryIds.has(selectedFileId)) await activateFileEntry(fileEntries[0]?.id ?? null);
+    else renderFileList();
+  };
+  selectAllIndicatorFilesCheckbox.addEventListener('change', () => {
+    fileEntries.forEach((entry) => { entry.selectedForDeletion = selectAllIndicatorFilesCheckbox.checked; });
+    renderFileList();
+  });
+  batchDeleteIndicatorFilesButton.addEventListener('click', async () => {
+    const entries = fileEntries.filter((entry) => entry.selectedForDeletion);
+    if (!entries.length) return;
+    const result = await Swal.fire({ title: '確定刪除？', text: `將刪除 ${entries.length} 個檔案，此動作無法復原。`, icon: 'warning', showCancelButton: true, allowOutsideClick: false, confirmButtonColor: '#dc2626', cancelButtonText: '取消', confirmButtonText: '刪除' });
+    if (!result.isConfirmed) return;
+    uploadInProgress = true;
+    renderFileList();
+    try {
+      await deleteIndicatorEntries(entries);
+      Swal.fire({ icon: 'success', title: '已刪除', text: `已刪除 ${entries.length} 個檔案。`, confirmButtonColor: '#2563eb' });
+    } catch (error) {
+      Swal.fire({ icon: 'error', title: '刪除失敗', text: error.message || '無法刪除檔案。', confirmButtonColor: '#2563eb' });
+    } finally {
+      uploadInProgress = false;
+      renderFileList();
     }
   });
   inputFormatChips.forEach((chip) => {
@@ -1159,7 +1214,8 @@
           state: 'success',
           detail: `${extension} · ${formatFileSize(Number(source.file_size || 0))} · ${Number(source.record_count || 0).toLocaleString()} 筆資料`,
           yearRange: years.length ? `${years[0]}–${years[years.length - 1]}` : '',
-          years: [...years]
+          years: [...years],
+          selectedForDeletion: false
         });
       });
       const activeEntry = fileEntries.find((entry) => (

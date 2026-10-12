@@ -694,7 +694,6 @@ def process_file_logic(
             "ok": True, 
             "preview": preview_data, 
             "headers": final_col_order, 
-            "download_url": "/api/data_gen/download",
             "out_path": out_path
         }, 200
 
