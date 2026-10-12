@@ -21,7 +21,12 @@ Start-Sleep -Seconds 30
 
 while ($true) {
     Add-Content -LiteralPath $logFile -Value "[$(Get-Date -Format o)] Starting Waitress on ${ListenAddress}:${Port}."
-    & $startupScript -Port $Port -ListenAddress $ListenAddress *>> $logFile
-    Add-Content -LiteralPath $logFile -Value "[$(Get-Date -Format o)] Waitress exited with code $LASTEXITCODE; restarting in 10 seconds."
+    try {
+        & $startupScript -Port $Port -ListenAddress $ListenAddress *>> $logFile
+        Add-Content -LiteralPath $logFile -Value "[$(Get-Date -Format o)] Waitress stopped; restarting in 10 seconds."
+    }
+    catch {
+        Add-Content -LiteralPath $logFile -Value "[$(Get-Date -Format o)] Waitress failed: $($_.Exception.Message); restarting in 10 seconds."
+    }
     Start-Sleep -Seconds 10
 }
