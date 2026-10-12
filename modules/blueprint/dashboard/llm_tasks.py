@@ -15,7 +15,7 @@ from pathlib import Path
 TASK_ROOT = Path(__file__).resolve().parents[3] / 'tasks' / 'dashboard'
 LEGACY_TASK_ROOT = Path(__file__).resolve().parents[3] / 'tasks' / 'llm_tasks'
 SENSITIVE_KEYS = {'api_key', 'authorization', 'password', 'token', 'patient_name', 'patient_id', 'medical_record_number'}
-TASK_TYPES = {'chart', 'compare', 'annual_report', 'comparison_report'}
+TASK_TYPES = {'chart', 'compare', 'annual_report', 'comparison_report', 'indicator_report'}
 COMPLETED_STATUSES = {'completed', 'partial_failed', 'failed'}
 MAX_BATCH_ITEM_ATTEMPTS = 3
 CANCELLED_TASK_ROOT = TASK_ROOT / '.cancelled'
@@ -131,7 +131,7 @@ def _batched_task_status(inputs, outputs, expected_ids=None):
 
 
 def _resolved_task_status(task_type, status, inputs, outputs, payload=None):
-    if task_type in {'annual_report', 'comparison_report'} and status == 'completed':
+    if task_type in {'annual_report', 'comparison_report', 'indicator_report'} and status == 'completed':
         expected_ids = [
             item.get('item_id') for item in (payload or {}).get('items', [])
             if item.get('item_id')
@@ -163,8 +163,11 @@ def _run_batched_item(handler, item, is_cancelled=None):
     }
 
 
-def _insight_handler(task_type):
+def _insight_handler(task_type, payload=None):
     """Load prompt handlers only after the Dashboard task module is initialized."""
+    if isinstance(payload, dict) and payload.get('insight_module') == 'indicators':
+        from modules.blueprint.indicators.reply import get_indicator_insight_logic
+        return get_indicator_insight_logic
     from modules.blueprint.dashboard.reply import get_chart_insight_logic, get_compare_insight_logic
     return get_chart_insight_logic if task_type in {'chart', 'annual_report'} else get_compare_insight_logic
 
@@ -179,12 +182,12 @@ def create_llm_task(owner_id, task_type, payload):
 
     task_id = str(uuid.uuid4())
     payload = _safe(payload)
-    batched = task_type in {'annual_report', 'comparison_report'}
+    batched = task_type in {'annual_report', 'comparison_report', 'indicator_report'}
     progress_total = max(len(payload.get('items', [])), 1) if batched else 1
     _write_task_data(task_type, task_id, {'PayloadJson': payload, 'ProgressCurrent': 0})
 
     if batched:
-        insight_type = 'chart_insight' if task_type == 'annual_report' else 'compare_insight'
+        insight_type = 'compare_insight' if task_type == 'comparison_report' else 'chart_insight'
         for item in payload.get('items', []):
             _write(task_type, task_id, 'input.jsonl', {
                 'custom_id': item['item_id'], 'method': 'POST', 'url': '/v1/chat/completions',
@@ -221,6 +224,9 @@ def _task(cursor, row):
     task['ProgressCurrent'] = task_data.get('ProgressCurrent', 0)
     task['DocumentLabel'] = payload.get('_document_label', '')
     task['TaskTitle'] = payload.get('job_title') or payload.get('field_key') or payload.get('analysis_item') or 'LLM 分析'
+    items = payload.get('items') if isinstance(payload.get('items'), list) else []
+    first_item = items[0] if items and isinstance(items[0], dict) else {}
+    task['InsightModule'] = payload.get('insight_module') or first_item.get('insight_module') or 'dashboard'
     task['result'] = outputs
     return task
 
@@ -247,6 +253,32 @@ def get_llm_task(task_id, owner_id):
         )
         row = cursor.fetchone()
         return _task(cursor, row) if row else None
+    finally:
+        conn.close()
+
+
+def find_reusable_llm_task(owner_id, task_type, request_key):
+    """Return the newest matching queued, running, or completed task."""
+    if not request_key:
+        return None
+    conn = get_conn()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """SELECT TOP (50) TaskID,TaskType,Status,ProgressTotal,WorkerID,CreatedAt,CompletedAt
+               FROM dbo.LLMTaskWorker
+               WHERE OwnerID=? AND TaskType=? AND Status IN ('queued','running','completed')
+               ORDER BY CreatedAt DESC""",
+            (str(owner_id), str(task_type)),
+        )
+        for row in cursor.fetchall():
+            task = _task(cursor, row)
+            if task.get('Status') not in {'queued', 'running', 'completed'}:
+                continue
+            payload = _read_task_data(task['TaskType'], task['TaskID']).get('PayloadJson') or {}
+            if payload.get('_request_key') == request_key:
+                return task
+        return None
     finally:
         conn.close()
 
@@ -317,15 +349,15 @@ def process_next_llm_task(worker_id):
     try:
         if _is_cancelled(task_id):
             return {'task_id': task_id, 'status': 'cancelled'}
-        if task_type in {'annual_report', 'comparison_report'}:
+        if task_type in {'annual_report', 'comparison_report', 'indicator_report'}:
             retry_path = _dir(task_type, task_id) / 'retry.jsonl'
             retrying = retry_path.exists()
             requests = _rows(task_type, task_id, 'retry.jsonl' if retrying else 'input.jsonl')
-            handler = _insight_handler(task_type)
             for request in requests:
                 if _is_cancelled(task_id):
                     return {'task_id': task_id, 'status': 'cancelled'}
                 item = request['body']['payload']
+                handler = _insight_handler(task_type, item)
                 result = _run_batched_item(handler, item, lambda: _is_cancelled(task_id))
                 if result.get('cancelled'):
                     return {'task_id': task_id, 'status': 'cancelled'}
@@ -349,7 +381,7 @@ def process_next_llm_task(worker_id):
             _update(task_id, status=status)
             return {'task_id': task_id, 'status': status}
 
-        handler = _insight_handler(task_type)
+        handler = _insight_handler(task_type, task['payload'])
         result = handler(task['payload'])
         if _is_cancelled(task_id):
             return {'task_id': task_id, 'status': 'cancelled'}

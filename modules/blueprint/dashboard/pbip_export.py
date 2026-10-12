@@ -110,7 +110,7 @@ def create_filtered_pbip(source_path, output_dir, *, cancers, year_start, year_e
     if not topics or unknown:
         raise PbipExportError("目前 PBIP 公版只支援：" + "、".join(TOPIC_PAGES))
     selected_pages = {TOPIC_PAGES[topic] for topic in topics}
-    template = Path(os.getenv("PBI_PROJECT_TEMPLATE_PATH", r"D:\PBIShare\powerbi_dataset.pbip"))
+    template = Path(os.getenv("PBI_PROJECT_TEMPLATE_PATH"))
     if not template.is_file():
         raise PbipExportError(f"找不到 PBIP 公版：{template}")
 

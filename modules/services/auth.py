@@ -132,6 +132,25 @@ def admin_required(func):
     return decorated_function
 
 
+def position_required(*allowed_positions, error_message=None):
+    allowed = frozenset(str(position) for position in allowed_positions)
+
+    def decorator(func):
+        @wraps(func)
+        def decorated_function(*args, **kwargs):
+            user = current_session_user()
+            if not user or user.Position not in allowed:
+                message = error_message or '權限不足，無法執行此操作'
+                if _wants_json_response():
+                    return jsonify({'ok': False, 'error': message}), 403
+                flash(message, 'danger')
+                return redirect(url_for('index'))
+            return func(*args, **kwargs)
+        return decorated_function
+
+    return decorator
+
+
 def _fetch_user(*, user_id=None, db_id=None):
     if not user_id and not db_id:
         return None

@@ -43,6 +43,7 @@
         <tr>
           <th style="width: 40px;"><input type="checkbox" id="selectAll" class="form-check-input"></th>
           <th>審核編號</th>
+          <th>檔案名稱</th>
           <th>審核日期</th>
           <th>資料格式</th>
           <th>資料品質</th>
@@ -53,7 +54,8 @@
         {% for item in history %}
         <tr class="history-row" data-date="{{ item.CreatedAt }}" data-format="{{ item.FmtName }}">
           <td><input type="checkbox" class="row-checkbox form-check-input" value="{{ item.JobID }}"></td>
-          <td>{{item.JobID}}</td>
+          <td class="text-nowrap small fw-bold">{{item.ShortJobID}}</td>
+          <td class="text-break" style="min-width: 180px; max-width: 320px;">{{item.FileName or '—'}}</td>
           <td>{{item.CreatedAt}}</td>
           <td>{{item.FmtName}}欄位({{item.Version}})</td>
           <td style="color:red;font-weight: bold;">{{item.DQI}}</td>
@@ -99,6 +101,10 @@
           <div class="col-md-6">
             <p class="text-muted mb-1 small">審核日期</p>
             <p class="fw-bold" id="detail-createdAt">-</p>
+          </div>
+          <div class="col-md-12">
+            <p class="text-muted mb-1 small">檔案名稱</p>
+            <p class="fw-bold text-break mb-0" id="detail-fileName">-</p>
           </div>
           <div class="col-md-6">
             <p class="text-muted mb-1 small">資料格式</p>
