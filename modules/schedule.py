@@ -1,7 +1,8 @@
 import atexit
 import logging
 from datetime import datetime
-from apscheduler.schedulers.background import BackgroundScheduler,EVENT_JOB_MISSED
+from apscheduler.events import EVENT_JOB_MISSED
+from apscheduler.schedulers.background import BackgroundScheduler
 from modules.config import BaseConfig
 from modules.services.database_backup import run_database_backup
 from modules.services.home import refresh_twcr_updates
