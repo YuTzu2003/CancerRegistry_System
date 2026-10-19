@@ -2,6 +2,7 @@ import logging
 import os
 import re
 import shutil
+from copy import copy
 import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
@@ -76,7 +77,9 @@ def append_reviewed_rows_to_cleaning_result(output_file, reviewed_output_file):
                 source_cell = reviewed_row[source_column - 1]
                 cell.value = source_cell.value
                 cell.number_format = source_cell.number_format
-            cell.fill = reviewed_record_fill
+                cell.fill = copy(source_cell.fill) if source_cell.fill.fill_type else reviewed_record_fill
+            else:
+                cell.fill = reviewed_record_fill
 
         marker_cell = worksheet.cell(row=excel_row, column=marker_column)
         marker_text = str(marker_cell.value or "").strip()
