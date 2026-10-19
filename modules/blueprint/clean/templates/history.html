@@ -106,6 +106,10 @@
             <p class="text-muted mb-1 small">檔案名稱</p>
             <p class="fw-bold text-break mb-0" id="detail-fileName">-</p>
           </div>
+          <div class="col-md-12" id="detail-excludedReviewSection" hidden>
+            <p class="text-muted mb-1 small">排除過濾檔案</p>
+            <ul class="fw-bold text-break mb-0 ps-3" id="detail-excludedReviewNames"></ul>
+          </div>
           <div class="col-md-6">
             <p class="text-muted mb-1 small">資料格式</p>
             <p class="fw-bold text-primary" id="detail-fmtName">-</p>
@@ -143,5 +147,5 @@
   </div>
 </div>
 
-<script src="/static/js/clean/history.js"></script>
+<script src="/static/js/clean/history.js?v=20261019-excluded-review-names"></script>
 {% endblock %}
