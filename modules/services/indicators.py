@@ -30,6 +30,16 @@ MAX_SESSION_SOURCES = 10
 INDICATOR_NARRATIVE_PROMPT_VERSION = "2026-09-30-concise-status-summary-v10"
 INDICATOR_THRESHOLD_EDITOR_POSITIONS = frozenset({"Admin", "Doctor", "Ctr"})
 
+def _indicators_excel_download_name(cancers):
+    labels = []
+    for cancer in cancers:
+        label = get_cancer_label(cancer)
+        safe_label = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', "_", str(label)).strip(" ._")
+        if safe_label and safe_label not in labels:
+            labels.append(safe_label)
+    suffix = "_".join(labels) or "未指定癌別"
+    return f"indicators_data_{suffix}.xlsx"
+
 def _read_uploaded_file(path, extension, nrows=5000):
     options = {"dtype": str}
     if nrows is not None:
@@ -208,7 +218,7 @@ def export_indicators_excel():
             file_obj,
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             as_attachment=True,
-            download_name="indicators_data.xlsx",
+            download_name=_indicators_excel_download_name(cancers),
         )
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400

@@ -1631,7 +1631,14 @@
       const downloadUrl = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = downloadUrl;
-      link.download = 'indicators_data.xlsx';
+      const disposition = response.headers.get('Content-Disposition') || '';
+      const encodedFilename = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+      const plainFilename = disposition.match(/filename="?([^";]+)"?/i)?.[1];
+      try {
+        link.download = encodedFilename ? decodeURIComponent(encodedFilename) : (plainFilename || 'indicators_data.xlsx');
+      } catch (_error) {
+        link.download = plainFilename || 'indicators_data.xlsx';
+      }
       document.body.appendChild(link);
       link.click();
       link.remove();
