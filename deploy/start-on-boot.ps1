@@ -7,18 +7,11 @@ param(
 
 $ErrorActionPreference = "Stop"
 $projectRoot = Split-Path -Parent $PSScriptRoot
-$python = Join-Path $projectRoot ".venv\Scripts\python.exe"
+$startupScript = Join-Path $PSScriptRoot "start-production.ps1"
 $logDirectory = Join-Path $projectRoot "tasks\logs"
 $logFile = Join-Path $logDirectory ("cancer-registry-{0}.log" -f $Port)
-if (-not (Test-Path -LiteralPath $python)) {
-    throw "Python environment not found. Run uv sync first."
-}
-
-$envLine = Get-Content -LiteralPath (Join-Path $projectRoot ".env") |
-    Where-Object { $_ -match '^APP_ENV=' } |
-    Select-Object -Last 1
-if ($envLine -ne "APP_ENV=production") {
-    throw "Set APP_ENV=production in .env before enabling automatic startup."
+if (-not (Test-Path -LiteralPath $startupScript)) {
+    throw "Startup script was not found."
 }
 
 New-Item -ItemType Directory -Force -Path $logDirectory | Out-Null
@@ -26,8 +19,14 @@ Set-Location -LiteralPath $projectRoot
 # Let IIS, SQL Server, and network services complete their boot sequence.
 Start-Sleep -Seconds 30
 
-$env:APP_ENV = "production"
-$env:WAITRESS_HOST = $ListenAddress
-$env:WAITRESS_PORT = "$Port"
-& $python app.py *>> $logFile
-exit $LASTEXITCODE
+while ($true) {
+    Add-Content -LiteralPath $logFile -Value "[$(Get-Date -Format o)] Starting Waitress on ${ListenAddress}:${Port}."
+    try {
+        & $startupScript -Port $Port -ListenAddress $ListenAddress *>> $logFile
+        Add-Content -LiteralPath $logFile -Value "[$(Get-Date -Format o)] Waitress stopped; restarting in 10 seconds."
+    }
+    catch {
+        Add-Content -LiteralPath $logFile -Value "[$(Get-Date -Format o)] Waitress failed: $($_.Exception.Message); restarting in 10 seconds."
+    }
+    Start-Sleep -Seconds 10
+}

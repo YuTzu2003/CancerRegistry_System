@@ -14,5 +14,13 @@ Set-Location -LiteralPath $projectRoot
 $env:APP_ENV = "production"
 $env:WAITRESS_HOST = $ListenAddress
 $env:WAITRESS_PORT = "$Port"
+$env:PYTHONFAULTHANDLER = "1"
+$env:PYTHONIOENCODING = "utf-8"
+$env:PYTHONUNBUFFERED = "1"
+$ErrorActionPreference = "Continue"
 & $python app.py
-exit $LASTEXITCODE
+$pythonExitCode = $LASTEXITCODE
+$ErrorActionPreference = "Stop"
+if ($pythonExitCode -ne 0) {
+    throw "Waitress exited with code $pythonExitCode."
+}

@@ -15,7 +15,7 @@ from modules.blueprint.clean.cleaner import cleanValidate
 from openpyxl import load_workbook, Workbook
 from openpyxl.utils import get_column_letter
 from modules.blueprint.clean.field_mapping import detect_system, get_field_map, validate_and_rename_headers, validate_and_unify_headers_in_file
-from modules.blueprint.clean.dedup_records import DUPLICATE_COMPARISON_FIELDS, append_reviewed_rows_to_cleaning_result, get_duplicate_comparison_columns, get_selected_review_duplicate_keys, normalize_duplicate_value
+from modules.blueprint.clean.dedup_records import DUPLICATE_COMPARISON_FIELDS, append_reviewed_rows_to_cleaning_result, get_duplicate_comparison_columns, get_selected_review_duplicate_keys, get_selected_review_file_names, normalize_duplicate_value
 from modules.blueprint.clean.text_converter import convert_txt_to_excel
 from modules.blueprint.clean.rules.validate import validate_date_rules
 
@@ -1035,6 +1035,7 @@ def clean_job_logic(user_id, format_id, convert_txt_flag, uploaded_file, review_
     review_job_ids = review_job_ids or []
     excluded_duplicate_count = 0
     reviewed_rows = pd.DataFrame()
+    excluded_review_names = []
 
     if file_ext == '.txt':
         uploaded_file.seek(0)
@@ -1212,6 +1213,7 @@ def clean_job_logic(user_id, format_id, convert_txt_flag, uploaded_file, review_
             input_df = pd.read_excel(process_path, dtype=str)
             input_columns = get_duplicate_comparison_columns(fmt_name, input_df.columns)
             reference_keys = get_selected_review_duplicate_keys(user_id, review_job_ids)
+            excluded_review_names = get_selected_review_file_names(user_id, review_job_ids)
             duplicate_rows = input_df.apply(
                 lambda row: all(normalize_duplicate_value(row[input_columns[field_name]]) for field_name in DUPLICATE_COMPARISON_FIELDS)
                 and tuple(normalize_duplicate_value(row[input_columns[field_name]]) for field_name in DUPLICATE_COMPARISON_FIELDS) in reference_keys,
@@ -1271,8 +1273,8 @@ def clean_job_logic(user_id, format_id, convert_txt_flag, uploaded_file, review_
             )
             append_reviewed_rows_to_cleaning_result(out_path, reviewed_output_file)
         date_errors = _build_date_errors(sorted_df, sorted_mask, alias_mapping, date_error_file)
-        cursor.execute("INSERT INTO Job ([JobID],[UserID],[FmtID],[FileName],[TotalCount],[CompletenessScore],[CorrectScore],[ConsistencyScore],[DQI],[Path]) VALUES (?,?,?,?,?,?,?,?,?,?)",
-                        (JobID, user_id, format_id, filename, int(stats['total']), float(stats['completeness']), float(stats['correctness']), float(stats['consistency']), float(stats['quality_score']), project_folder))
+        cursor.execute("INSERT INTO Job ([JobID],[UserID],[FmtID],[FileName],[TotalCount],[CompletenessScore],[CorrectScore],[ConsistencyScore],[DQI],[Path],[ExcludedReviewNames]) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                        (JobID, user_id, format_id, filename, int(stats['total']), float(stats['completeness']), float(stats['correctness']), float(stats['consistency']), float(stats['quality_score']), project_folder, json.dumps(excluded_review_names, ensure_ascii=False) if excluded_review_names else None))
         conn.commit()
     except ValueError as e:
         if conn and not conn.closed: conn.close()

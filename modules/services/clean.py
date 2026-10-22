@@ -1,5 +1,6 @@
 import datetime
 import io
+import json
 import os
 import shutil
 import stat
@@ -200,7 +201,7 @@ def detail_history(job_id):
     user_id = session.get("id")
     conn = get_conn()
     cursor = conn.cursor()
-    cursor.execute("""SELECT Job.JobID,Job.FileName,DataFormat.FmtName,DataFormat.Version,Job.TotalCount,Job.CompletenessScore,Job.CorrectScore,Job.ConsistencyScore,Job.DQI,Job.Path,Job.CreatedAt
+    cursor.execute("""SELECT Job.JobID,Job.FileName,DataFormat.FmtName,DataFormat.Version,Job.TotalCount,Job.CompletenessScore,Job.CorrectScore,Job.ConsistencyScore,Job.DQI,Job.Path,Job.CreatedAt,Job.ExcludedReviewNames
                       FROM DataFormat RIGHT JOIN Job ON DataFormat.FmtID = Job.FmtID WHERE Job.JobID = ? AND Job.UserID = ?""", (job_id, user_id))
     row = cursor.fetchone()
     if not row:
@@ -209,6 +210,7 @@ def detail_history(job_id):
     data = dict(zip([c[0] for c in cursor.description], row))
     if isinstance(data['CreatedAt'], datetime.datetime):
         data['CreatedAt'] = data['CreatedAt'].strftime("%Y/%m/%d %H:%M:%S")
+    data['ExcludedReviewNames'] = json.loads(data['ExcludedReviewNames']) if data['ExcludedReviewNames'] else []
     conn.close()
     return jsonify({"ok": True, "data": data})
 

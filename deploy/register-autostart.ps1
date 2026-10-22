@@ -8,7 +8,7 @@ if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administra
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $envFile = Join-Path $projectRoot ".env"
-$startupScript = Join-Path $PSScriptRoot "start-on-boot.ps1"
+$startupScript = Join-Path $PSScriptRoot "start-production.ps1"
 $llmStartupScript = Join-Path $PSScriptRoot "start-llm-on-boot.ps1"
 $powershell = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
 if (-not (Test-Path -LiteralPath $envFile)) { throw ".env was not found." }
@@ -36,7 +36,9 @@ $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoi
 $settings.ExecutionTimeLimit = "PT0S"
 $settings.RestartCount = 3
 $settings.RestartInterval = "PT1M"
-$taskPrincipal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
+$taskUser = $identity.Name
+$taskPrincipal = New-ScheduledTaskPrincipal -UserId $taskUser -LogonType S4U -RunLevel Highest
+Write-Host "Scheduled tasks will run as $taskUser using S4U."
 
 for ($index = 0; $index -lt $workerCount; $index++) {
     $port = $backendBasePort + $index

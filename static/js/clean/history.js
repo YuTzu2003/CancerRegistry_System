@@ -7,6 +7,16 @@ function openDetail(jobId) {
                 document.getElementById('detail-jobId').innerText = data.JobID || '無資料';
                 document.getElementById('detail-createdAt').innerText = data.CreatedAt || '-';
                 document.getElementById('detail-fileName').innerText = data.FileName || '—';
+                const excludedReviewNames = Array.isArray(data.ExcludedReviewNames) ? data.ExcludedReviewNames : [];
+                const excludedReviewNamesElement = document.getElementById('detail-excludedReviewNames');
+                const excludedReviewSection = document.getElementById('detail-excludedReviewSection');
+                excludedReviewNamesElement.replaceChildren();
+                excludedReviewNames.forEach((name) => {
+                    const item = document.createElement('li');
+                    item.textContent = name;
+                    excludedReviewNamesElement.append(item);
+                });
+                excludedReviewSection.hidden = excludedReviewNames.length === 0;
                 
                 // 格式名稱
                 const fmtDisplay = (data.FmtName && data.Version) ? `${data.FmtName}欄位(${data.Version})`:(data.FmtName || '未指定');
