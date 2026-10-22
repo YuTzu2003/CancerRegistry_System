@@ -14,8 +14,10 @@
   .review-dedup-copy { display: block !important; flex: 1 1 auto; min-width: 0; }
   .review-dedup-copy strong { display: block; font-size: 14px; line-height: 1.3; }
   .review-dedup-copy span { display: block; margin-top: 2px; color: var(--gray-600); font-size: 12px; }
-  .review-dedup-state { display: block !important; flex: 0 0 auto; margin-left: auto; color: var(--gray-600); font-size: 12px; white-space: nowrap; }
-  .review-dedup-toggle:has(input:checked) .review-dedup-state { color: #333; font-weight: 600; }
+  .review-dedup-summary { margin-top: 8px; padding: 9px 11px; border: 1px solid var(--border); border-radius: 7px; background: var(--gray-50); }
+  .review-dedup-summary-title { margin-bottom: 4px; color: var(--gray-700); font-size: 12px; font-weight: 600; }
+  .review-dedup-summary-list { margin: 0; padding-left: 18px; color: var(--gray-600); font-size: 12px; }
+  .review-dedup-summary-list li + li { margin-top: 3px; }
   .review-record-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .review-record-item { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; grid-template-areas: "check file time" "check meta time"; column-gap: 10px; row-gap: 3px; align-items: center; min-width: 0; margin: 0; padding: 10px 11px; border: 1px solid #dedede; border-radius: 7px; background: #fff; color: var(--gray-800); cursor: pointer; transition: border-color .15s ease, background .15s ease; }
   .review-record-item:hover { border-color: #999; }
@@ -161,8 +163,11 @@
               <span class="review-dedup-copy">
                 <div>排除已清洗過資料</div>
               </span>
-              <span class="review-dedup-state" id="reviewDedupState">未選取</span>
             </label>
+            <div class="review-dedup-summary" id="reviewDedupSummary" hidden>
+              <div class="review-dedup-summary-title" id="reviewDedupSummaryTitle"></div>
+              <ul class="review-dedup-summary-list" id="reviewDedupSummaryList"></ul>
+            </div>
           </div>
         </div>
         <div class="form-field">
@@ -495,5 +500,5 @@
   <div class="text-muted small mt-1">這可能需要幾秒鐘的時間</div>
 </div>
   
-<script src="/static/js/clean/clean.js?v=20261008-refresh-result-panels"></script>
+<script src="/static/js/clean/clean.js?v=20261019-refresh-review-records"></script>
 {% endblock %}

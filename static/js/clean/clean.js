@@ -112,13 +112,15 @@
   const dropZone = $('#dropZone');
   const reviewedDataCheck = $('#checkReviewedData');
   const reviewRecordList = $('#reviewRecordList');
-  const reviewDedupState = $('#reviewDedupState');
+  const reviewDedupSummary = $('#reviewDedupSummary');
+  const reviewDedupSummaryTitle = $('#reviewDedupSummaryTitle');
+  const reviewDedupSummaryList = $('#reviewDedupSummaryList');
   const reviewRecordModal = $('#reviewRecordModal');
   let reviewRecordData = [];
 
   async function loadReviewRecords() {
-    if (!reviewRecordList || reviewRecordList.dataset.loaded === 'true') return;
-    const response = await fetch('/api/review-records');
+    if (!reviewRecordList) return;
+    const response = await fetch('/api/review-records', { cache: 'no-store' });
     const result = await response.json();
     if (!response.ok || !result.ok) throw new Error(result.error || '無法取得資料審核紀錄');
 
@@ -149,7 +151,6 @@
       label.append(input, fileName, metadata, time);
       reviewRecordList.append(label);
     });
-    reviewRecordList.dataset.loaded = 'true';
   }
 
   function selectedReviewRecordIds() {
@@ -159,14 +160,27 @@
   function renderSelectedReviewRecords() {
     const selectedIds = new Set(selectedReviewRecordIds());
     const selectedRecords = reviewRecordData.filter((record) => selectedIds.has(record.job_id));
-    const selectedText = `${selectedRecords.length} 筆紀錄已選取`;
-    if (reviewDedupState) reviewDedupState.textContent = selectedText;
+    if (!reviewDedupSummary || !reviewDedupSummaryTitle || !reviewDedupSummaryList) return;
+
+    reviewDedupSummaryList.replaceChildren();
+    if (!selectedRecords.length) {
+      reviewDedupSummary.hidden = true;
+      return;
+    }
+
+    reviewDedupSummaryTitle.textContent = `排除資料依據（${selectedRecords.length} 個檔案）`;
+    selectedRecords.forEach((record) => {
+      const item = document.createElement('li');
+      item.textContent = `【${record.file_name}】格式 ${record.format}│版本 ${record.version}│${record.total_count} 筆`;
+      reviewDedupSummaryList.append(item);
+    });
+    reviewDedupSummary.hidden = false;
   }
 
   function cancelReviewRecordSelection() {
     $$('.review-record-check').forEach((input) => { input.checked = false; });
     if (reviewedDataCheck) reviewedDataCheck.checked = false;
-    if (reviewDedupState) reviewDedupState.textContent = '未選取';
+    renderSelectedReviewRecords();
     if (reviewRecordModal) reviewRecordModal.hidden = true;
   }
 
@@ -234,9 +248,8 @@
     if (reviewRecordModal) reviewRecordModal.hidden = true;
     if (reviewRecordList) {
       reviewRecordList.replaceChildren();
-      delete reviewRecordList.dataset.loaded;
     }
-    if (reviewDedupState) reviewDedupState.textContent = '未選取';
+    renderSelectedReviewRecords();
     reviewRecordData = [];
 
     const list = $('#outputFieldList');
@@ -398,6 +411,9 @@
     if (data.job_id || data.project_id) {
       currentJobId = data.job_id || data.project_id;
     }
+    if (data.ok) {
+      cancelReviewRecordSelection();
+    }
 
     // 預設切換至中文欄位名稱
     const zhRadio = $('input[name="nameScheme"][value="field_name_zh"]');
@@ -445,6 +461,9 @@
     if (alertContainer && data.ok) {
       const dateErrorCount = data.date_error_count || 0;
       const dateErrorLimit = data.date_error_limit || 3;
+      const reviewedDuplicateCount = Number(data.reviewed_duplicate_count ?? data.excluded_duplicate_count ?? 0);
+      const hasReviewedDuplicates = reviewedDuplicateCount > 0;
+      const hasNoNewRecords = Number(data.stats?.total ?? 0) === 0;
 
       if (dateErrorCount > 0) {
         alertContainer.innerHTML = `
@@ -467,17 +486,23 @@
             </button>
           </div>
         `;
-        if (data.reviewed_duplicate_count || data.excluded_duplicate_count) {
-          const reviewedDuplicateCount = data.reviewed_duplicate_count || data.excluded_duplicate_count;
+        if (hasReviewedDuplicates) {
           alertContainer.insertAdjacentHTML('beforeend', `<div class="alert alert-light border shadow-sm mt-2">已重新檢查已清洗過資料 ${reviewedDuplicateCount} 筆，這些資料不納入本次統計，並保留於清洗結果最後方（E:資料已清洗過）。</div>`);
         }
       } else {
-        const reviewedDuplicateCount = data.reviewed_duplicate_count || data.excluded_duplicate_count || 0;
         alertContainer.innerHTML = `
           <div class="alert alert-light border shadow-sm mt-3" role="alert">
-            <i class="bi bi-check-circle-fill text-success me-2"></i>資料清洗並存檔完成！${reviewedDuplicateCount ? `<br><span class="ms-4">已重新檢查已清洗過資料 ${reviewedDuplicateCount} 筆，這些資料不納入本次統計，並保留於清洗結果最後方（E:資料已清洗過）。</span>` : ''}
+            <i class="bi bi-check-circle-fill text-success me-2"></i>資料清洗並存檔完成！${hasReviewedDuplicates ? `<br><span class="ms-4">已重新檢查已清洗過資料 ${reviewedDuplicateCount} 筆，這些資料不納入本次統計，並保留於清洗結果最後方（E:資料已清洗過）。</span>` : ''}
           </div>`;
-        if (window.autoHideAlerts) window.autoHideAlerts();
+      }
+
+      if (hasReviewedDuplicates && hasNoNewRecords && window.Swal) {
+        Swal.fire({
+          icon: 'info',
+          title: '偵測到已清洗過的重複資料',
+          text: `已排除 ${reviewedDuplicateCount} 筆重複資料，並保留於清洗結果最後方。本次統計不包含這些資料；若全部資料皆重複，清洗結果為 0 筆屬正常現象。`,
+          confirmButtonColor: '#2563eb'
+        });
       }
     }
 

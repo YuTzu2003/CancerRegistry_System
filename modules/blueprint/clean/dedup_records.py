@@ -77,7 +77,7 @@ def append_reviewed_rows_to_cleaning_result(output_file, reviewed_output_file):
                 source_cell = reviewed_row[source_column - 1]
                 cell.value = source_cell.value
                 cell.number_format = source_cell.number_format
-                cell.fill = copy(source_cell.fill) if source_cell.fill.fill_type == "solid" else reviewed_record_fill
+                cell.fill = copy(source_cell.fill) if source_cell.fill.fill_type else reviewed_record_fill
             else:
                 cell.fill = reviewed_record_fill
 
@@ -158,3 +158,22 @@ def get_selected_review_duplicate_keys(user_id, review_job_ids):
         reference_columns = get_duplicate_comparison_columns(record.FmtName, reference_df.columns)
         reference_keys.update(get_duplicate_keys(reference_df, reference_columns))
     return reference_keys
+
+
+def get_selected_review_file_names(user_id, review_job_ids):
+    unique_job_ids = list(dict.fromkeys(job_id for job_id in review_job_ids if job_id))
+    if not unique_job_ids:
+        return []
+
+    conn = get_conn()
+    cursor = conn.cursor()
+    placeholders = ", ".join("?" for job_id in unique_job_ids)
+    cursor.execute(
+        f"""SELECT Job.FileName FROM Job
+            WHERE Job.UserID = ? AND Job.CreatedAt >= DATEADD(month, -3, GETDATE())
+            AND Job.JobID IN ({placeholders})""",
+        [user_id, *unique_job_ids],
+    )
+    file_names = [str(row.FileName) for row in cursor.fetchall()]
+    conn.close()
+    return file_names
