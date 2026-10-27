@@ -1,6 +1,5 @@
 from __future__ import annotations
 from dataclasses import dataclass
-import json
 import logging
 from typing import Mapping, Sequence
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -83,7 +82,12 @@ def request_llm_chat(messages: Sequence[Mapping[str, str]], *, temperature: floa
     client, model = get_llm_client(settings)
     last_finish_reason = None
     for attempt in range(2):
-        response = client.chat.completions.create(model=model,messages=list(messages),temperature=temperature,timeout=settings.timeout_seconds,)
+        response = client.chat.completions.create(
+            model=model,
+            messages=list(messages),
+            temperature=temperature,
+            timeout=settings.timeout_seconds,
+        )
         choices = getattr(response, "choices", None) or []
         if choices:
             last_finish_reason = getattr(choices[0], "finish_reason", None)
@@ -98,48 +102,9 @@ def request_llm_chat(messages: Sequence[Mapping[str, str]], *, temperature: floa
                         parts.append(str(text))
                 if "".join(parts).strip():
                     return "".join(parts)
-        logging.warning("LLM returned empty content (attempt %s/2, finish_reason=%r)",attempt + 1, last_finish_reason,)
-    raise ValueError(f"LLM response is empty (finish_reason={last_finish_reason!r})")
-
-def request_azure_responses(settings: LLMSettings,messages: Sequence[Mapping[str, str]],*,temperature: float,) -> str:
-    payload = {
-        "model": settings.model,
-        "input": [
-            {
-                "role": message["role"],
-                "content": [{"type": "input_text", "text": message["content"]}],
-            }
-            for message in messages
-        ],
-        "temperature": temperature,
-        "stream": False,
-    }
-    url = urlsplit(settings.azure_responses_url or "")
-    query = dict(parse_qsl(url.query))
-    if settings.azure_api_version:
-        query["api-version"] = settings.azure_api_version
-    request_url = urlunsplit((url.scheme, url.netloc, url.path, urlencode(query), url.fragment))
-    request = Request(
-        request_url,
-        data=json.dumps(payload).encode("utf-8"),
-        headers={
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "api-key": settings.azure_api_key or "",
-        },
-        method="POST",
-    )
-    with urlopen(request, timeout=settings.timeout_seconds) as response:
-        body = json.loads(response.read().decode("utf-8"))
-    content = body.get("output_text")
-    if not content:
-        content = "".join(
-            item.get("text", "")
-            for output in body.get("output", [])
-            if output.get("type") == "message"
-            for item in output.get("content", [])
-            if item.get("type") == "output_text"
+        logging.warning(
+            "LLM returned empty content (attempt %s/2, finish_reason=%r)",
+            attempt + 1,
+            last_finish_reason,
         )
-    if not content:
-        raise ValueError("Azure Responses API response is empty")
-    return content
+    raise ValueError(f"LLM response is empty (finish_reason={last_finish_reason!r})")

@@ -19,21 +19,7 @@ SCHEME_INDEX = {
 }
 SEQUENCE_PATTERN = re.compile(r"^\d+(?:\.\d+)*$")
 SEQUENCE_NAME_PATTERN = re.compile(r"^(\d+(?:\.\d+)*)\s*(.+)$")
-TEXT_INPUT_ENCODINGS = ("utf-8-sig", "utf-8", "cp950", "big5hkscs", "big5", "gb18030")
 CSV_ENCODINGS = ("utf-8-sig", "utf-8", "cp950", "big5")
-FIXED_WIDTH_TEXT_ENCODINGS = ("utf-8-sig", "cp950", "big5hkscs", "big5")
-FORMAT_SPECIFIC_FIELD_NAMES = {
-    "50": {"7.6": "其他因子6"},
-    "114": {"4.2.1.8": "未放射治療原因"},
-    "115": {
-        "4.2.1.8": "放射治療執行狀態",
-        "7.6": "首次治療前生活功能狀態評估",
-    },
-    "129": {
-        "4.2.1.8": "放射治療執行狀態",
-        "7.6": "首次治療前生活功能狀態評估",
-    },
-}
 
 
 def _text(value):
@@ -43,12 +29,6 @@ def _text(value):
 def _normalize_sequence(value):
     text = _text(value)
     return text[:-2] if text.endswith(".0") else text
-
-
-def _reset_source(file_source):
-    """Return a source to its beginning when it is an uploaded binary stream."""
-    if hasattr(file_source, "seek"):
-        file_source.seek(0)
 
 
 def read_csv_with_encoding(file_source, **kwargs):
@@ -77,208 +57,7 @@ def read_csv_with_encoding(file_source, **kwargs):
     return pd.read_csv(file_source, **kwargs)
 
 
-def _first_line_bytes(file_source):
-    if isinstance(file_source, (str, os.PathLike)):
-        with open(file_source, "rb") as source:
-            return source.readline()
-
-    _reset_source(file_source)
-    first_line = file_source.readline()
-    _reset_source(file_source)
-    return first_line
-
-
-def _read_delimited_or_fixed_width_text(file_source, extension, nrows=None):
-    """Read headered CSV/TXT uploads and preserve their source text encoding.
-
-    TXT may be comma/tab/semicolon delimited or a headered fixed-width export.
-    Headerless registry TXT is intentionally not accepted here: the annual report
-    importer has no selected registry format with which to split those records.
-    """
-    first_line = _first_line_bytes(file_source)
-    delimiter = next((token for token in (b"\t", b",", b";") if token in first_line), None)
-    options = {"dtype": str}
-    if nrows is not None:
-        options["nrows"] = nrows
-
-    read_errors = []
-    for encoding in TEXT_INPUT_ENCODINGS:
-        try:
-            _reset_source(file_source)
-            if delimiter is not None:
-                dataframe = pd.read_csv(file_source, sep=delimiter.decode("ascii"), encoding=encoding, **options)
-            elif extension == "txt":
-                dataframe = pd.read_fwf(file_source, encoding=encoding, **options)
-            else:
-                dataframe = pd.read_csv(file_source, encoding=encoding, **options)
-
-            if dataframe.shape[1] <= 1:
-                raise ValueError("找不到可辨識的欄位分隔方式")
-            return dataframe
-        except UnicodeDecodeError as error:
-            read_errors.append(f"{encoding}: {error}")
-        except pd.errors.EmptyDataError as error:
-            raise ValueError("上傳檔案沒有可辨識的欄位資料。") from error
-        except pd.errors.ParserError as error:
-            raise ValueError("文字檔欄位格式無法辨識，請確認欄位以 Tab、逗號、分號或固定寬度排列。") from error
-
-    supported = "、".join(TEXT_INPUT_ENCODINGS)
-    raise ValueError(f"無法辨識文字檔編碼，請另存為 {supported} 後再上傳。")
-
-
-def _read_source_bytes(file_source):
-    """Read an uploaded stream or saved file without changing its final position."""
-    if isinstance(file_source, (str, os.PathLike)):
-        with open(file_source, "rb") as source:
-            return source.read()
-
-    _reset_source(file_source)
-    content = file_source.read()
-    _reset_source(file_source)
-    return content
-
-
-def _load_registry_format_name(connection_factory, format_id):
-    if not format_id:
-        raise ValueError("請先選擇 TXT 的申報欄位格式。")
-    if connection_factory is None:
-        raise ValueError("系統無法取得申報欄位格式。")
-
-    connection = connection_factory()
-    try:
-        cursor = connection.cursor()
-        cursor.execute("SELECT [FmtName] FROM [DataFormat] WHERE [FmtID] = ?", (format_id,))
-        row = cursor.fetchone()
-        if not row or not row[0]:
-            raise ValueError("找不到所選的申報欄位格式，請重新選擇。")
-        return str(row[0]).strip().replace("fmt_", "")
-    finally:
-        connection.close()
-
-
-def _format_specific_field_names(fmt_name):
-    return FORMAT_SPECIFIC_FIELD_NAMES.get(str(fmt_name).replace("fmt_", ""), {})
-
-
-def _format_specific_sequence_names(connection_factory, format_id):
-    if not format_id:
-        return {}
-    return _format_specific_field_names(
-        _load_registry_format_name(connection_factory, format_id)
-    )
-
-
-def _load_fixed_width_field_spec(connection_factory, fmt_name):
-    """Load the same fixed-byte field positions used by the data-cleaning module."""
-    if connection_factory is None:
-        raise ValueError("系統無法取得申報欄位格式。")
-
-    connection = connection_factory()
-    try:
-        cursor = connection.cursor()
-        cursor.execute(
-            """SELECT [ChineseName], [Start], [End]
-               FROM [CancerRegistry_Fields]
-               WHERE [fmt] = ?
-               ORDER BY [Start]""",
-            (fmt_name,),
-        )
-        field_rows = cursor.fetchall()
-        cursor.execute("SELECT [序號], [中文欄位名稱] FROM [CancerRegistry_FieldMap]")
-        map_rows = cursor.fetchall()
-    finally:
-        connection.close()
-
-    name_to_sequence = {
-        _text(row[1]): _normalize_sequence(row[0])
-        for row in map_rows
-        if _text(row[0]) and _text(row[1])
-    }
-    format_specific_names = _format_specific_field_names(fmt_name)
-    return [
-        (
-            f"{name_to_sequence.get(_text(name), '')}{format_specific_names.get(name_to_sequence.get(_text(name), ''), _text(name))}",
-            int(start),
-            int(end),
-        )
-        for name, start, end in field_rows
-    ]
-
-
-def _decode_error_count(value, encoding):
-    return value.decode(encoding, errors="replace").count("\ufffd")
-
-
-def _detect_fixed_width_encoding(content_bytes):
-    if content_bytes.startswith(b"\xef\xbb\xbf"):
-        return "utf-8-sig"
-    return min(
-        FIXED_WIDTH_TEXT_ENCODINGS,
-        key=lambda encoding: _decode_error_count(content_bytes[:65536], encoding),
-    )
-
-
-def _parse_fixed_width_line(line_bytes, field_spec, encoding):
-    return {
-        name: line_bytes[start - 1:end].decode(encoding, errors="replace").strip()
-        for name, start, end in field_spec
-    }
-
-
-def _read_fixed_width_registry_text(file_source, format_id, connection_factory):
-    """Split a headerless registry TXT by the selected byte-position format."""
-    fmt_name = _load_registry_format_name(connection_factory, format_id)
-    field_spec = _load_fixed_width_field_spec(connection_factory, fmt_name)
-    if not field_spec:
-        raise ValueError(f"找不到 {fmt_name} 格式的欄位定義。")
-
-    content = _read_source_bytes(file_source)
-    lines = [line for line in content.splitlines() if line.strip()]
-    if not lines:
-        raise ValueError("上傳檔案沒有可辨識的欄位資料。")
-
-    expected_length = field_spec[-1][2]
-    mismatches = []
-    for line_number, line in enumerate(lines, start=1):
-        if len(line) != expected_length:
-            mismatches.append(
-                f"第 {line_number} 行：實際 {len(line)} bytes，預期 {expected_length} bytes"
-            )
-            if len(mismatches) == 3:
-                break
-    if mismatches:
-        detail = "；".join(mismatches)
-        raise ValueError(f"固定欄位 TXT 長度與所選 {fmt_name} 格式不符：{detail}")
-
-    encoding = _detect_fixed_width_encoding(content)
-    records = [_parse_fixed_width_line(line, field_spec, encoding) for line in lines]
-    return pd.DataFrame(records, columns=[field[0] for field in field_spec])
-
-
-def _read_upload_dataframe(
-    file_source,
-    extension,
-    *,
-    format_id=None,
-    txt_has_header=False,
-    connection_factory=None,
-    nrows=None,
-):
-    extension = str(extension or "").lower().lstrip(".")
-    if extension == "xlsx":
-        return pd.read_excel(file_source, nrows=nrows)
-    if extension == "xls":
-        return pd.read_excel(file_source, nrows=nrows)
-    if extension == "csv":
-        return _read_delimited_or_fixed_width_text(file_source, extension, nrows=nrows)
-    if extension == "txt":
-        if txt_has_header:
-            return _read_delimited_or_fixed_width_text(file_source, extension, nrows=nrows)
-        return _read_fixed_width_registry_text(file_source, format_id, connection_factory)
-    raise ValueError("僅接受 .txt、.csv、.xls 或 .xlsx 格式。")
-
-
-def _read_headers(file_path, extension, *, format_id=None, txt_has_header=False, connection_factory=None):
+def _read_headers(file_path, extension):
     extension = str(extension or "").lower().lstrip(".")
     if extension == "xlsx":
         workbook = load_workbook(file_path, read_only=True, data_only=True)
@@ -287,17 +66,8 @@ def _read_headers(file_path, extension, *, format_id=None, txt_has_header=False,
         finally:
             workbook.close()
     try:
-        return [
-            _text(value)
-            for value in _read_upload_dataframe(
-                file_path,
-                extension,
-                format_id=format_id,
-                txt_has_header=txt_has_header,
-                connection_factory=connection_factory,
-                nrows=0,
-            ).columns
-        ]
+        reader = read_csv_with_encoding if extension == "csv" else pd.read_excel
+        return [_text(value) for value in reader(file_path, nrows=0).columns]
     except ImportError as error:
         raise ValueError("舊式 .xls 檔案需要額外讀取元件，請先另存為 .xlsx 後再上傳。") from error
 
@@ -425,13 +195,8 @@ def _write_headers(
             workbook.close()
         return file_path
 
-    dataframe = _read_upload_dataframe(
-        file_path,
-        extension,
-        format_id=format_id,
-        txt_has_header=txt_has_header,
-        connection_factory=connection_factory,
-    )
+    reader = read_csv_with_encoding if extension == "csv" else pd.read_excel
+    dataframe = reader(file_path)
     if keep_indexes is not None:
         dataframe = dataframe.iloc[:, keep_indexes]
     dataframe.columns = headers

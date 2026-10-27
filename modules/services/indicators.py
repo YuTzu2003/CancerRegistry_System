@@ -11,17 +11,13 @@ from werkzeug.utils import secure_filename
 from modules.services.auth import login_required, position_required
 from modules.services.audit import write_audit_log
 from modules.services.db import get_conn
-from modules.blueprint.dashboard.input_format import (
-    preview_dashboard_upload,
-    read_csv_with_encoding,
-    validate_and_normalize_dashboard_upload,
-)
-from modules.blueprint.clean.pipeline import get_formats_logic
+from modules.blueprint.dashboard.input_format import read_csv_with_encoding, validate_and_normalize_dashboard_upload
 from modules.blueprint.dashboard.llm_tasks import create_llm_task, find_reusable_llm_task, get_llm_task_payload
 from modules.blueprint.indicators.analysis import build_indicators_export_frame, run_indicators_analysis
 from modules.blueprint.indicators.catalog import get_cancer_label, get_indicator_rules
 from modules.blueprint.indicators.excel_export import create_indicators_excel
 from modules.blueprint.indicators.export_report import generate_indicator_export_files
+from modules.blueprint.indicators.text_input import convert_indicator_txt_to_excel
 
 indicators_bp = Blueprint("indicators",__name__,template_folder="../blueprint/indicators/templates",)
 
@@ -33,6 +29,16 @@ CANONICAL_HEADER_PATTERN = re.compile(r"^\d+(?:\.\d+)*(?:$|[^0-9.])")
 MAX_SESSION_SOURCES = 10
 INDICATOR_NARRATIVE_PROMPT_VERSION = "2026-09-30-concise-status-summary-v10"
 INDICATOR_THRESHOLD_EDITOR_POSITIONS = frozenset({"Admin", "Doctor", "Ctr"})
+
+def _indicators_excel_download_name(cancers):
+    labels = []
+    for cancer in cancers:
+        label = get_cancer_label(cancer)
+        safe_label = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', "_", str(label)).strip(" ._")
+        if safe_label and safe_label not in labels:
+            labels.append(safe_label)
+    suffix = "_".join(labels) or "未指定癌別"
+    return f"indicators_data_{suffix}.xlsx"
 
 def _read_uploaded_file(path, extension, nrows=5000):
     options = {"dtype": str}
@@ -123,7 +129,6 @@ def indicators():
         "indicators.html",
         active="indicators",
         can_manage_thresholds=session.get("position") in INDICATOR_THRESHOLD_EDITOR_POSITIONS,
-        formats=get_formats_logic(),
     )
 
 @indicators_bp.route("/monitoring")
@@ -213,7 +218,7 @@ def export_indicators_excel():
             file_obj,
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             as_attachment=True,
-            download_name="indicators_data.xlsx",
+            download_name=_indicators_excel_download_name(cancers),
         )
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
@@ -234,19 +239,6 @@ def upload_indicators_source():
     if extension not in ALLOWED_EXTENSIONS:
         return jsonify({"ok": False, "error": "請上傳 Excel、CSV 或 TXT 檔案。"}), 400
 
-    input_scheme = str(request.form.get("input_scheme", "")).strip()
-    format_id = str(request.form.get("format_id", "")).strip()
-    txt_has_header = str(request.form.get("txt_has_header", "")).strip().lower() == "true"
-    if not format_id:
-        return jsonify({"ok": False, "error": "請選擇申報欄位格式。"}), 400
-    extra_fields_raw = request.form.get("extra_fields")
-    try:
-        extra_fields = json.loads(extra_fields_raw) if extra_fields_raw is not None else None
-    except json.JSONDecodeError:
-        return jsonify({"ok": False, "error": "未匹配欄位設定格式不正確。"}), 400
-    if extra_fields is not None and not isinstance(extra_fields, list):
-        return jsonify({"ok": False, "error": "未匹配欄位設定格式不正確。"}), 400
-
     sources = _stored_sources()
     if len(sources) >= MAX_SESSION_SOURCES:
         return jsonify({"ok": False, "error": f"檔案清單最多保留 {MAX_SESSION_SOURCES} 個檔案，請先刪除不需要的檔案。"}), 400
@@ -259,6 +251,19 @@ def upload_indicators_source():
     try:
         os.makedirs(folder, exist_ok=True)
         uploaded_file.save(stored_path)
+        if extension == ".txt":
+            converted_path = os.path.join(folder, f"{os.path.splitext(safe_name)[0]}.xlsx")
+            stored_path = convert_indicator_txt_to_excel(
+                stored_path,
+                converted_path,
+                connection_factory=get_conn,
+            )
+            if not stored_path or not os.path.isfile(stored_path):
+                raise ValueError(
+                    "無法辨識 TXT 格式；固定欄寬資料僅支援格式 42、45、114、115、129，"
+                    "其他 TXT 請提供表頭並使用 Tab、逗號、分號或直線分隔欄位。"
+                )
+            extension = ".xlsx"
         stored_path = validate_and_normalize_dashboard_upload(
             stored_path,
             extension.lstrip("."),
@@ -358,37 +363,6 @@ def delete_indicators_source(file_id):
     if active_source.get("file_id") == file_id:
         session.pop("indicators_source", None)
     return jsonify({"ok": True})
-
-
-@indicators_bp.route("/api/indicators/sources", methods=["DELETE"])
-@login_required
-def batch_delete_indicators_sources():
-    payload = request.get_json(silent=True) or {}
-    file_ids = payload.get("file_ids") or []
-    if not isinstance(file_ids, list):
-        return jsonify({"ok": False, "error": "刪除項目格式不正確。"}), 400
-
-    selected_ids = {str(file_id).strip() for file_id in file_ids if str(file_id).strip()}
-    if not selected_ids:
-        return jsonify({"ok": False, "error": "請先勾選欲刪除的檔案。"}), 400
-
-    sources = _stored_sources()
-    selected_sources = [source for source in sources if source["file_id"] in selected_ids]
-    if not selected_sources:
-        return jsonify({"ok": False, "error": "找不到指定的檔案。"}), 404
-
-    try:
-        for source in selected_sources:
-            _delete_source_file(source)
-    except OSError as exc:
-        return jsonify({"ok": False, "error": f"無法刪除檔案：{exc}"}), 500
-
-    deleted_ids = {source["file_id"] for source in selected_sources}
-    session["indicators_sources"] = [source for source in sources if source["file_id"] not in deleted_ids]
-    active_source = session.get("indicators_source") or {}
-    if active_source.get("file_id") in deleted_ids:
-        session.pop("indicators_source", None)
-    return jsonify({"ok": True, "deleted": len(deleted_ids)})
 
 
 @indicators_bp.route("/api/indicators/thresholds", methods=["POST"])

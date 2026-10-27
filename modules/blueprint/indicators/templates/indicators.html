@@ -182,34 +182,24 @@
   </div>
 </div>
 
-<section class="card-flat" style="margin-bottom: 22px;">
-  <div class="section-head d-flex justify-content-between align-items-center">
-    <div class="d-flex align-items-center gap-2"><h2 class="mb-0"><span class="dot" style="background:var(--warning)"></span> 資料檔案上傳</h2></div>
-  </div>
-  <div class="section-body">
-    <div class="upload-grid">
-      <div id="indicatorsUploadPanel" class="dashboard-upload-panel">
-        <div class="upload-container-box d-flex flex-column justify-content-center">
-          <div class="p-4 border rounded-3 text-center upload-input-zone">
-            <h6 class="fw-semibold text-dark mb-1">選擇監測指標資料檔</h6>
-            <p class="text-secondary small mb-3">支援 TXT、CSV、XLS、XLSX；選擇後請設定申報欄位格式。</p>
-            <input id="indicatorsFile" class="form-control form-control-sm mx-auto" type="file" accept=".xlsx,.xls,.csv,.txt" multiple style="max-width: 280px; font-size: 13px;">
-            <div id="indicatorsFormatOptions" class="d-none w-100 mt-3 text-start mx-auto" style="max-width: 280px;">
-              <select id="indicatorsFormatSelect" class="form-select form-select-sm" disabled>
-                <option value="">請選擇申報欄位格式</option>
-                {% for format in formats %}<option value="{{ format.id }}">{{ format.name }}（{{ format.version }}）</option>{% endfor %}
-              </select>
-            </div>
-            <div id="indicatorsTxtOptions" class="d-none w-100 mt-2 text-start mx-auto">
-              <div class="form-check mt-2"><input id="indicatorsTxtHasHeader" class="form-check-input" type="checkbox" disabled><label for="indicatorsTxtHasHeader" class="form-check-label small">TXT 第一列為欄位名稱</label></div>
-            </div>
-          </div>
+<section class="indicators-step">
+  <div class="indicators-step-title"><span class="indicators-step-marker" aria-hidden="true"></span><span>資料上傳</span><span class="hint mb-0">請自行上傳 Excel、CSV 或 TXT 檔案；不自動帶入年報分析資料</span></div>
+  <div class="indicators-step-body">
+    <div class="indicators-upload-layout">
+      <div class="indicators-upload-pane">
+        <label for="indicatorsFile" class="form-label fw-semibold">匯入原始資料</label>
+        <input id="indicatorsFile" class="form-control" type="file" accept=".xlsx,.xls,.csv,.txt" multiple>
+        <div class="mt-3 text-end">
+          <button id="uploadIndicatorsFile" class="btn btn-success" type="button" disabled><i class="bi bi-upload me-1"></i>上傳資料</button>
         </div>
       </div>
-      <div>
-        <div class="file-list-card">
-          <div class="file-list-header"><h6 class="mb-0 fw-bold text-dark d-flex align-items-center gap-2"><i class="bi bi-folder2-open text-primary"></i>檔案清單</h6><div class="indicators-file-bulk-actions"><span id="indicatorsFileCount" class="text-secondary" style="font-size: 12px;">0 個檔案</span><label class="form-check m-0"><input id="indicatorSelectAllFiles" class="form-check-input" type="checkbox" aria-label="全選檔案"></label><button id="btnBatchDeleteIndicatorFiles" class="btn btn-sm btn-outline-danger" type="button" disabled>刪除勾選項目</button></div></div>
-          <div class="file-list-container"><div id="indicatorsFileList" class="indicators-file-list" aria-live="polite"><div class="indicators-file-empty"><span class="indicators-file-empty-title">尚未選擇檔案</span><span>請選擇 Excel、CSV 或 TXT 後加入檔案清單</span></div></div></div>
+      <div class="indicators-upload-pane">
+        <div class="indicators-preview-head">
+          <span class="fw-semibold">檔案清單</span>
+          <span id="indicatorsFileCount" class="indicators-file-count">0 個檔案</span>
+        </div>
+        <div id="indicatorsFileList" class="indicators-file-list" aria-live="polite">
+          <div class="indicators-file-empty"><span class="indicators-file-empty-title">尚未選擇檔案</span><span>選擇 Excel、CSV 或 TXT 後，在此顯示檔案資訊</span></div>
         </div>
       </div>
     </div>
@@ -795,8 +785,6 @@
     });
     fileInput.value = '';
     if (newestEntry) {
-      const defaultChineseScheme = document.querySelector('input[name="indicatorsInputScheme"][value="field_name_zh"]');
-      if (defaultChineseScheme) defaultChineseScheme.checked = true;
       void activateFileEntry(newestEntry.id);
     } else {
       renderFileList();
@@ -1880,7 +1868,14 @@
       const downloadUrl = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = downloadUrl;
-      link.download = 'indicators_data.xlsx';
+      const disposition = response.headers.get('Content-Disposition') || '';
+      const encodedFilename = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+      const plainFilename = disposition.match(/filename="?([^";]+)"?/i)?.[1];
+      try {
+        link.download = encodedFilename ? decodeURIComponent(encodedFilename) : (plainFilename || 'indicators_data.xlsx');
+      } catch (_error) {
+        link.download = plainFilename || 'indicators_data.xlsx';
+      }
       document.body.appendChild(link);
       link.click();
       link.remove();
