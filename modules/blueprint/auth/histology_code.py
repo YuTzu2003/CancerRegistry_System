@@ -2,8 +2,8 @@ from zipfile import BadZipFile
 from datetime import datetime
 from uuid import UUID, uuid4
 from flask import flash, redirect, render_template, request, session, url_for
-from openpyxl import load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
+from modules.blueprint.auth.excel_import import load_import_workbook
 from modules.blueprint.auth.key_access import data_update_key_required
 from modules.services.auth import auth_bp, login_required
 from modules.services.db import get_conn
@@ -172,7 +172,7 @@ def _insert_mapping_rows(columns, rows):
         conn.close()
 
 def _read_import_rows(uploaded_file):
-    workbook = load_workbook(uploaded_file, read_only=True, data_only=True)
+    workbook = load_import_workbook(uploaded_file)
     try:
         worksheet = workbook.active
         headers = tuple(cell.value for cell in next(worksheet.iter_rows(max_row=1)))
@@ -495,8 +495,8 @@ def import_histology_code_mapping():
     if not uploaded_file or not uploaded_file.filename:
         flash("請選擇組織型態表 Excel 檔案。", "danger")
         return _return_to_mapping()
-    if not uploaded_file.filename.lower().endswith(".xlsx"):
-        flash("僅接受 .xlsx 格式的組織型態表。", "danger")
+    if not uploaded_file.filename.lower().endswith((".xls", ".xlsx")):
+        flash("僅接受 .xls 或 .xlsx 格式的組織型態表。", "danger")
         return _return_to_mapping()
 
     try:

@@ -52,8 +52,8 @@ def analyze_file():
     if not filename.strip():
         filename = "uploaded_file"
     extension = os.path.splitext(filename)[1].lower()
-    if extension not in {".txt", ".csv", ".xlsx"}:
-        return jsonify({"ok": False, "error": "僅接受 .txt、.csv 或 .xlsx 格式"}), 400
+    if extension not in {".txt", ".csv", ".xls", ".xlsx"}:
+        return jsonify({"ok": False, "error": "僅接受txt、csv、xls、xlsx 格式"}), 400
     format_id = request.form.get("format_id")
     txt_has_header = request.form.get("txt_has_header") == "true" if extension == ".txt" else None
         

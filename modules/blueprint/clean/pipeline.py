@@ -1138,6 +1138,16 @@ def clean_job_logic(user_id, format_id, convert_txt_flag, uploaded_file, review_
     uploaded_file.close()
     process_path = path
 
+    if file_ext == '.xls':
+        try:
+            temp_xlsx = f"{project_folder}/{base_name}.xlsx"
+            pd.read_excel(path, dtype=str).to_excel(temp_xlsx, index=False)
+            process_path = temp_xlsx
+        except (OSError, ValueError, ImportError) as e:
+            if conn and not conn.closed:
+                conn.close()
+            return {"ok": False, "error": f"XLS 讀取失敗: {str(e)}"}, 400
+
     if file_ext == '.csv':
         try:
             df_csv, csv_encoding = _read_csv_with_supported_encoding(path, fmt_name)
