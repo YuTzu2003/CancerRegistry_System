@@ -267,8 +267,11 @@ def upload_indicators_source():
         stored_path = validate_and_normalize_dashboard_upload(
             stored_path,
             extension.lstrip("."),
-            "original",
+            input_scheme,
             connection_factory=get_conn,
+            extra_fields=extra_fields,
+            format_id=format_id,
+            txt_has_header=txt_has_header,
         )
         extension = os.path.splitext(stored_path)[1].lower()
         dataframe = _read_uploaded_file(stored_path, extension, nrows=None)
@@ -297,6 +300,34 @@ def upload_indicators_source():
     session["indicators_sources"] = sources
     session["indicators_source"] = source
     return jsonify({"ok": True, **_source_response(source)})
+
+
+@indicators_bp.route("/api/indicators/input-preview", methods=["POST"])
+@login_required
+def preview_indicators_input():
+    uploaded_file = request.files.get("file")
+    if not uploaded_file or not uploaded_file.filename:
+        return jsonify({"ok": False, "error": "請選擇檔案。"}), 400
+    extension = uploaded_file.filename.rsplit(".", 1)[-1].lower() if "." in uploaded_file.filename else ""
+    if extension not in {"txt", "csv", "xls", "xlsx"}:
+        return jsonify({"ok": False, "error": "僅支援 .txt、.csv、.xls 或 .xlsx 檔案。"}), 400
+    input_scheme = str(request.form.get("input_scheme", "")).strip()
+    format_id = str(request.form.get("format_id", "")).strip()
+    txt_has_header = str(request.form.get("txt_has_header", "")).strip().lower() == "true"
+    if not format_id:
+        return jsonify({"ok": False, "error": "請選擇申報欄位格式。"}), 400
+    try:
+        result = preview_dashboard_upload(
+            uploaded_file.stream,
+            extension,
+            input_scheme,
+            get_conn,
+            format_id=format_id,
+            txt_has_header=txt_has_header,
+        )
+        return jsonify({"ok": True, **result})
+    except ValueError as error:
+        return jsonify({"ok": False, "error": str(error)}), 400
 
 @indicators_bp.route("/api/indicators/sources", methods=["GET"])
 @login_required

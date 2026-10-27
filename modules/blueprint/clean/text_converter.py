@@ -3,7 +3,7 @@ import os
 
 def convert_txt_to_excel(input_path, output_path):
     delimiters = ['\t', ',', ';']
-    encodings = ['utf-8', 'big5', 'utf-16', 'gbk']
+    encodings = ['utf-8-sig', 'cp950', 'big5hkscs', 'big5', 'utf-16', 'gbk']
     
     df = None
     for encoding in encodings:

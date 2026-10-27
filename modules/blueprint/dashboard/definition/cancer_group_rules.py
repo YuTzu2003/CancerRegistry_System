@@ -111,8 +111,8 @@ COLON_AND_RECTUM_ANUS = solid_rule(
         ),
         subgroup(
             "Rectum",
-            "直腸癌",
-            "Rectum",
+            "直腸癌(含 RS Colon)",
+            "Rectum (including RS Colon)",
             site_prefixes=["C19", "C20"]
         ),
         subgroup(

@@ -85,6 +85,13 @@ if ($databaseUri -match 'ODBC\+Driver\+18' -and -not $driver18) { throw "SQLALCH
 if ($databaseUri -match 'ODBC\+Driver\+17' -and -not $driver17) { throw "SQLALCHEMY_DATABASE_URI requires ODBC Driver 17, but it is not installed." }
 
 Set-Location -LiteralPath $projectRoot
+$runtimeDirectory = Join-Path $projectRoot "tasks"
+New-Item -ItemType Directory -Path $runtimeDirectory -Force | Out-Null
+& icacls.exe $runtimeDirectory /grant '*S-1-5-18:(OI)(CI)M' /T /C | Out-Null
+if ($LASTEXITCODE -ne 0) {
+    throw "Could not grant the scheduled-task SYSTEM account modify access to the tasks directory."
+}
+
 Write-Host "Phase: synchronizing Python dependencies."
 & uv sync
 if ($LASTEXITCODE -ne 0) { throw "uv sync failed." }
@@ -121,6 +128,23 @@ else {
 
 Write-Host "Phase: registering and starting Web and LLM worker tasks."
 & (Join-Path $PSScriptRoot "stop-production.ps1")
+
+$occupiedBackends = @()
+for ($attempt = 1; $attempt -le 10; $attempt++) {
+    $occupiedBackends = @()
+    for ($index = 0; $index -lt $workerCount; $index++) {
+        $port = $backendBasePort + $index
+        if (Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue) {
+            $occupiedBackends += $port
+        }
+    }
+    if ($occupiedBackends.Count -eq 0) { break }
+    Start-Sleep -Seconds 1
+}
+if ($occupiedBackends.Count -gt 0) {
+    throw "Backend port(s) $($occupiedBackends -join ', ') are still in use. Stop every manually started start-production.ps1 window, then run deployment again."
+}
+
 & (Join-Path $PSScriptRoot "register-autostart.ps1")
 Get-ScheduledTask -TaskName "CancerRegistrySystem-??" -ErrorAction Stop | ForEach-Object { Start-ScheduledTask -TaskName $_.TaskName }
 Get-ScheduledTask -TaskName "CancerRegistrySystem-LLM-??" -ErrorAction Stop | ForEach-Object { Start-ScheduledTask -TaskName $_.TaskName }
@@ -139,7 +163,10 @@ for ($attempt = 1; $attempt -le 30; $attempt++) {
     if ($allHealthy) { break }
     Start-Sleep -Seconds 2
 }
-if (-not $allHealthy) { throw "One or more Waitress workers did not become ready. Read tasks\\logs\\cancer-registry-*.log" }
+if (-not $allHealthy) {
+    $taskResult = (Get-ScheduledTaskInfo -TaskName "CancerRegistrySystem-01" -ErrorAction SilentlyContinue).LastTaskResult
+    throw "One or more Waitress workers did not become ready. CancerRegistrySystem-01 result: $taskResult. Read tasks\\logs\\cancer-registry-*.log"
+}
 if (-not (Test-Health "http://127.0.0.1:${publicPort}/health")) { throw "IIS + ARR did not become ready on public port $publicPort." }
 if (@(Get-ScheduledTask -TaskName "CancerRegistrySystem-LLM-??" -ErrorAction Stop).Count -ne $llmWorkerCount) { throw "Not every LLM worker scheduled task was registered." }
 Test-DatabaseConnection

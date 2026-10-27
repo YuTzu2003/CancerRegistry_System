@@ -3,10 +3,15 @@ import re
 from datetime import datetime
 
 # 驗證
-def validate_cell(val, rule):
+def validate_cell(val, rule, value_encoding=None):
     if pd.isna(val):
         val = ""
     val = str(val).strip()
+
+    # 姓名欄位僅供辨識。來源中的難字、亂碼或特殊字元不應阻斷其他欄位清洗；
+    # 但姓名完全未填仍應列為缺漏資料。
+    if rule.get('skip_validation'):
+        return bool(val)
 
     # 雲林台大專屬格式處理(吃檳榔和吸菸欄位)
     if rule.get('digit') is True:
@@ -34,6 +39,21 @@ def validate_cell(val, rule):
 
     if 'max_length' in rule and len(val) > rule['max_length']:
         return False
+
+    # 固定長度申報格式的欄位長度是「資料位元組」而不是畫面上的字數。
+    # 實際上限依選定格式的欄位定義而定；中文、英文所占字數不同。
+    # 若來源字元無法由偵測到的編碼還原，保留其固定欄位位置，且不以該字元
+    # 觸發姓名格式錯誤，避免難字造成後續資料被誤判。
+    if 'max_bytes' in rule and '\ufffd' not in val:
+        encoding = value_encoding or rule.get('byte_encoding', 'utf-8')
+        try:
+            byte_length = len(val.encode(encoding, errors='strict'))
+        except UnicodeEncodeError:
+            if not rule.get('skip_byte_length_when_unencodable', False):
+                return False
+        else:
+            if byte_length > rule['max_bytes']:
+                return False
 
     has_content_rule = False
     passed_content_rule = False
@@ -84,8 +104,15 @@ def validate_cell(val, rule):
 
     if 'is_date' in rule:
         check_val = val
-        if len(check_val) == 8 and check_val.endswith('99'):
-            check_val = check_val[:-2] + '15'
+        if len(check_val) == 8 and check_val.isdigit():
+            year, month, day = check_val[:4], check_val[4:6], check_val[6:8]
+            if month == '99':
+                # 月份未知時只驗證年份；01/01 僅供 datetime 驗證使用，
+                # 不會改寫原始資料，也不代表實際日期為 1 月 1 日。
+                check_val = year + '0101'
+            elif day == '99':
+                # 日期未知時只驗證年月；15 日僅供 datetime 驗證使用。
+                check_val = year + month + '15'
         try:
             datetime.strptime(check_val, '%Y%m%d')
         except ValueError:
@@ -122,6 +149,10 @@ def compare_cancer_date(date1, date2):
     if d1 is None or d2 is None:
         return None
 
+    # 只要其中一個日期的 MM 是 99，就只比較 CCYY。
+    if d1[4:6] == '99' or d2[4:6] == '99':
+        return d1[:4] <= d2[:4]
+
     # 只要其中一個日期的 DD 是 99，就只比較 CCYYMM
     if d1[6:8] == '99' or d2[6:8] == '99':
         return d1[:6] <= d2[:6]
@@ -155,7 +186,6 @@ def validate_date_rules(row, alias_mapping):
         ('最初診斷日期', '<=', '其他治療開始日期', '最初診斷日期不可晚於其他治療開始日期'),
         ('最初診斷日期', '<=', '首次復發或癌症狀態追蹤日期', '最初診斷日期不可晚於首次復發或癌症狀態追蹤日期'),
         ('最初診斷日期', '<=', '最後聯絡或死亡日期', '最初診斷日期不可晚於最後聯絡或死亡日期'),        
-        ('首次就診日期', '<=', '首次復發或癌症狀態追蹤日期', '首次就診日期不可晚於首次復發或癌症狀態追蹤日期'),
         ('首次就診日期', '<=', '最後聯絡或死亡日期', '首次就診日期不可晚於最後聯絡或死亡日期'),
         ('首次療程開始日期', '<=', '首次手術日期', '首次療程開始日期不可晚於首次手術日期'),
         ('首次療程開始日期', '<=', '原發部位最確切的手術切除日期', '首次療程開始日期不可晚於原發部位最確切的手術切除日期'),
@@ -169,8 +199,13 @@ def validate_date_rules(row, alias_mapping):
         ('首次療程開始日期', '<=', '申報醫院標靶治療開始日期', '首次療程開始日期不可晚於申報醫院標靶治療開始日期'),
         ('首次療程開始日期', '<=', '其他治療開始日期', '首次療程開始日期不可晚於其他治療開始日期'),
         ('首次療程開始日期', '<=', '首次復發或癌症狀態追蹤日期', '首次療程開始日期不可晚於首次復發或癌症狀態追蹤日期'),
-        ('首次療程開始日期', '<=', '最後聯絡 or 死亡日期', '首次療程開始日期不或晚於最後聯絡 or 死亡日期'),
+        ('首次療程開始日期', '<=', '最後聯絡或死亡日期', '首次療程開始日期不可晚於最後聯絡或死亡日期'),
         ('放射治療開始日期', '<=', '放射治療結束日期', '放射治療開始日期不可晚於放射治療結束日期'),
+    ]
+
+    # 個案分類為 3 時，不檢查首次就診至首次復發／癌症狀態追蹤日期的先後關係。
+    DATE_RULES_EXCEPT_CLASS_3 = [
+        ('首次就診日期', '<=', '首次復發或癌症狀態追蹤日期', '首次就診日期不可晚於首次復發或癌症狀態追蹤日期'),
     ]
 
     DATE_RULES_ONLY_CLASS_1 = [
@@ -197,6 +232,8 @@ def validate_date_rules(row, alias_mapping):
     active_rules = list(DATE_RULES_COMMON)
     if class_val == '1':
         active_rules.extend(DATE_RULES_ONLY_CLASS_1)
+    if class_val != '3':
+        active_rules.extend(DATE_RULES_EXCEPT_CLASS_3)
 
     for d1_field, op, d2_field, error_msg in active_rules:
         if d1_field in std_row and d2_field in std_row:
@@ -239,8 +276,8 @@ def validate_date_rules(row, alias_mapping):
 
     return list(error_fields), errors
 
-def check_error_type(val, rule):
-    is_valid = validate_cell(val, rule)
+def check_error_type(val, rule, value_encoding=None):
+    is_valid = validate_cell(val, rule, value_encoding=value_encoding)
     if is_valid:
         return ""  
     

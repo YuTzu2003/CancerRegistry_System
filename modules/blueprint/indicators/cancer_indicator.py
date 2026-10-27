@@ -126,7 +126,6 @@ ORAL_CANCER_RULES: dict[int, dict[str, Any]] = {
             ],
         },
     },
-    #看到這-----
     5: {
         "name": "第一個口腔癌淋巴結病理檢查 15 顆(含)以上的比率。",
         "type": "positive",
@@ -171,7 +170,7 @@ ORAL_CANCER_RULES: dict[int, dict[str, Any]] = {
 """
 ESOPHAGEAL_CANCER_RULES: dict[int, dict[str, Any]] = {
     1: {
-        "name": "食道癌手術切除標本切除端無殘餘侵襲性癌細胞（R0切除）的比率",
+        "name": "食道癌病人手術切除標本切除端無殘餘侵襲性癌細胞(R0 切除)的比率。",
         "type": "positive",
         "denominator": {
             "op": "all",
@@ -189,7 +188,7 @@ ESOPHAGEAL_CANCER_RULES: dict[int, dict[str, Any]] = {
         },
     },
     2: {
-        "name": "食道切除標本淋巴結病理檢查15顆以上的比率",
+        "name": "食道切除標本淋巴結病理檢查 15 顆(含)以上的比率。",
         "type": "positive",
         "denominator": {
             "op": "all",
@@ -211,7 +210,7 @@ ESOPHAGEAL_CANCER_RULES: dict[int, dict[str, Any]] = {
         },
     },
     3: {
-        "name": "接受食道切除手術後30天內死亡的比率",
+        "name": "接受食道切除手術的病患於術後 30 天內死亡的比率。",
         "type": "negative",
         "denominator": {
             "op": "all",
@@ -236,7 +235,7 @@ ESOPHAGEAL_CANCER_RULES: dict[int, dict[str, Any]] = {
         },
     },
     4: {
-        "name": "指定臨床分期接受食道切除手術前引導性化學及放射治療的比率",
+        "name": "cT4N0M0 or cTanyN1-3M0 接受食道切除手術的病患有接受引導性化放療的比率",
         "type": "positive",
         "denominator": {
             "op": "all",
@@ -246,7 +245,7 @@ ESOPHAGEAL_CANCER_RULES: dict[int, dict[str, Any]] = {
                 {
                     "op": "any",
                     "rules": [
-                        # A：cT4N0M0。
+                        # A：cT4N0M0定義
                         {
                             "op": "all",
                             "rules": [
@@ -255,7 +254,7 @@ ESOPHAGEAL_CANCER_RULES: dict[int, dict[str, Any]] = {
                                 {"op": "first_char_in", "field": "3.6", "values": ["0"]},
                             ],
                         },
-                        # B：cTanyN1-3M0。
+                        # B：cTanyN1-3M0定義
                         {
                             "op": "all",
                             "rules": [

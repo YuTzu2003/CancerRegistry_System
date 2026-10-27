@@ -363,6 +363,14 @@
 
   function updateSelectionSummary() {
     const sameFile = Boolean(mainFile.value) && mainFile.value === targetFile.value;
+    const setSummaryValue = (id, value, isSelected) => {
+      const element = document.getElementById(id);
+      if (!element) return;
+      element.textContent = value;
+      element.classList.toggle('fw-medium', isSelected);
+      element.classList.toggle('text-dark', isSelected);
+      element.classList.toggle('text-muted', !isSelected);
+    };
     const formatDataSelection = (fileSelect, yearSelect, yearEndSelect, includeFileName) => {
       if (!fileSelect.value && !yearSelect.value) return '尚未選擇';
       const fileText = fileSelect.selectedOptions[0]?.textContent?.trim() || '尚未選擇檔案';
@@ -387,13 +395,18 @@
       ...selectedCompareItemsForGroups(['treatment', 'cross_year'])
     ];
 
-    document.getElementById('summaryCompareMode').textContent = selectedCompareMode() === 'range' ? '年度區間比較' : '單一年度比較';
-    document.getElementById('summaryMainData').textContent = formatDataSelection(mainFile, mainYear, mainYearEnd, !sameFile);
-    document.getElementById('summaryTargetData').textContent = formatDataSelection(targetFile, targetYear, targetYearEnd, !sameFile);
-    document.getElementById('summaryBehavior').textContent = behaviorText || '尚未選擇';
-    document.getElementById('summaryCancer').textContent = cancerText;
-    document.getElementById('summaryModeAi').textContent = modeAi.selectedOptions[0]?.textContent?.trim() || '平穩客觀';
-    document.getElementById('summaryItems').textContent = summaryItems.length ? summaryItems.join('、') : '尚未選擇';
+    const hasCompleteDataSelection = (fileSelect, yearSelect, yearEndSelect) => Boolean(
+      fileSelect.value
+      && yearSelect.value
+      && (selectedCompareMode() !== 'range' || yearEndSelect.value)
+    );
+    setSummaryValue('summaryCompareMode', selectedCompareMode() === 'range' ? '年度區間比較' : '單一年度比較', true);
+    setSummaryValue('summaryMainData', formatDataSelection(mainFile, mainYear, mainYearEnd, !sameFile), hasCompleteDataSelection(mainFile, mainYear, mainYearEnd));
+    setSummaryValue('summaryTargetData', formatDataSelection(targetFile, targetYear, targetYearEnd, !sameFile), hasCompleteDataSelection(targetFile, targetYear, targetYearEnd));
+    setSummaryValue('summaryBehavior', behaviorText || '尚未選擇', Boolean(behavior.value));
+    setSummaryValue('summaryCancer', cancerText, selectedCancerValues().length > 0);
+    setSummaryValue('summaryModeAi', modeAi.selectedOptions[0]?.textContent?.trim() || '平穩客觀', Boolean(modeAi.value));
+    setSummaryValue('summaryItems', summaryItems.length ? summaryItems.join('、') : '尚未選擇', summaryItems.length > 0);
   }
 
   function updateTopicCounts() {
@@ -2152,7 +2165,7 @@
     const caption = isEnglish()
       ? `Table. Surgical Procedure Distribution of Newly Diagnosed ${escapeHtml(reportCancerTitle(cancerTitle))} Cases by ${escapeHtml(stageSystem)} Stage, ${yearTitle}${sourceLine()}`
       : `表、${yearTitle}年新診斷${escapeHtml(reportCancerTitle(cancerTitle))}病患${escapeHtml(stageSystem)}期別與手術術式分佈${sourceLine()}`;
-    return `<div class="annual-report-table-wrap"><table class="annual-report-table"><caption class="surgery-table-caption">${caption}</caption><thead><tr><th class="text-center">${isEnglish() ? 'Surgical Codes/Surgical Procedure' : '術式編碼/術式名稱'}</th><th colspan="${Math.max(stages.length, 1)}">${escapeHtml(stageSystem)} ${isEnglish() ? 'Stage' : '期別'}</th><th rowspan="2">${isEnglish() ? 'Total' : '小計'}</th><th rowspan="2">%</th></tr><tr><th class="text-center">${isEnglish() ? '(Taiwan Cancer Registry Surgery Codes)' : '（按台灣癌症登記術式編碼分類）'}</th>${stages.map(stage => `<th>${escapeHtml(String(stage || '').replace(/^Stage\s+/i, ''))}</th>`).join('')}</tr></thead><tbody>${body}<tr class="fw-bold"><td>${isEnglish() ? 'Total' : '總計'}</td>${(item.totals || []).map(value => `<td>${value}</td>`).join('')}<td>${total}</td><td>${total ? '100.0%' : '0.0%'}</td></tr><tr><td>%</td>${(item.percentages || []).map(value => `<td>${value}%</td>`).join('')}<td>${total ? '100.0%' : '0.0%'}</td><td>-</td></tr></tbody></table></div>`;
+    return `<div class="annual-report-table-wrap"><table class="annual-report-table stage-surgery-table"><caption class="surgery-table-caption">${caption}</caption><thead><tr><th class="text-center">${isEnglish() ? 'Surgical Codes/Surgical Procedure' : '術式編碼/術式名稱'}</th><th colspan="${Math.max(stages.length, 1)}">${escapeHtml(stageSystem)} ${isEnglish() ? 'Stage' : '期別'}</th><th rowspan="2">${isEnglish() ? 'Total' : '小計'}</th><th rowspan="2">%</th></tr><tr><th class="text-center">${isEnglish() ? '(Taiwan Cancer Registry Surgery Codes)' : '（按台灣癌症登記術式編碼分類）'}</th>${stages.map(stage => `<th>${escapeHtml(String(stage || '').replace(/^Stage\s+/i, ''))}</th>`).join('')}</tr></thead><tbody>${body}<tr class="fw-bold"><td>${isEnglish() ? 'Total' : '總計'}</td>${(item.totals || []).map(value => `<td>${value}</td>`).join('')}<td>${total}</td><td>${total ? '100.0%' : '0.0%'}</td></tr><tr><td>%</td>${(item.percentages || []).map(value => `<td>${value}%</td>`).join('')}<td>${total ? '100.0%' : '0.0%'}</td><td>-</td></tr></tbody></table></div>`;
   }
 
 

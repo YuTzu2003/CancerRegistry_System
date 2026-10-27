@@ -274,31 +274,31 @@
         <div class="compare-selection-summary-list flex-grow-1" style="font-size: 14px; line-height: 2;">
           <div class="d-flex mb-2">
             <span class="text-secondary d-flex" style="width: 80px; flex-shrink: 0;"><span style="flex-grow: 1; text-align-last: justify;">比較模式</span>：</span>
-            <span id="summaryCompareMode" class="text-dark fw-medium ms-1">單一年度比較</span>
+            <span id="summaryCompareMode" class="text-dark ms-1">單一年度比較</span>
           </div>
           <div class="d-flex mb-2">
             <span class="text-secondary d-flex" style="width: 80px; flex-shrink: 0;"><span style="flex-grow: 1; text-align-last: justify;">基準期資料</span>：</span>
-            <span id="summaryMainData" class="text-dark fw-medium ms-1">尚未選擇</span>
+            <span id="summaryMainData" class="text-dark ms-1">尚未選擇</span>
           </div>
           <div class="d-flex mb-2">
             <span class="text-secondary d-flex" style="width: 80px; flex-shrink: 0;"><span style="flex-grow: 1; text-align-last: justify;">比較期資料</span>：</span>
-            <span id="summaryTargetData" class="text-dark fw-medium ms-1">尚未選擇</span>
+            <span id="summaryTargetData" class="text-dark ms-1">尚未選擇</span>
           </div>
           <div class="d-flex mb-2">
             <span class="text-secondary d-flex" style="width: 80px; flex-shrink: 0;"><span style="flex-grow: 1; text-align-last: justify;">性態碼</span>：</span>
-            <span id="summaryBehavior" class="text-dark fw-medium ms-1">尚未選擇</span>
+            <span id="summaryBehavior" class="text-dark ms-1">尚未選擇</span>
           </div>
           <div class="d-flex mb-2">
             <span class="text-secondary d-flex" style="width: 80px; flex-shrink: 0;"><span style="flex-grow: 1; text-align-last: justify;">癌別</span>：</span>
-            <span id="summaryCancer" class="text-dark fw-medium ms-1">尚未選擇</span>
+            <span id="summaryCancer" class="text-dark ms-1">尚未選擇</span>
           </div>
           <div class="d-flex mb-2">
             <span class="text-secondary d-flex" style="width: 80px; flex-shrink: 0;"><span style="flex-grow: 1; text-align-last: justify;">敘述風格</span>：</span>
-            <span id="summaryModeAi" class="text-dark fw-medium ms-1">平穩客觀</span>
+            <span id="summaryModeAi" class="text-dark ms-1">平穩客觀</span>
           </div>
           <div class="d-flex mb-2">
             <span class="text-secondary d-flex" style="width: 80px; flex-shrink: 0;"><span style="flex-grow: 1; text-align-last: justify;">分析項目</span>：</span>
-            <span id="summaryItems" class="text-dark fw-medium ms-1">尚未選擇</span>
+            <span id="summaryItems" class="text-dark ms-1">尚未選擇</span>
           </div>
         </div>
       </div>
@@ -358,6 +358,6 @@
 <script src="{{ url_for('static', filename='js/dashboard/annual_report_renderer.js') }}"></script>
 <script src="{{ url_for('static', filename='js/dashboard/dashboard_compare.js') }}"></script>
 {% if not preview_task %}
-<script src="{{ url_for('static', filename='js/dashboard/llm_task_panel.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard/llm_task_panel.js', v='20261007-swal-delete') }}"></script>
 {% endif %}
 {% endblock %}

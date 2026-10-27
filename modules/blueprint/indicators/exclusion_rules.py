@@ -49,6 +49,13 @@ def _find_column(columns, code=None, aliases=()):
                 return original
     return None
 
+
+def _normalize_registry_date(value) -> str:
+    """Normalize registry dates such as ``0000/00/00`` to ``00000000``."""
+    digits = re.sub(r"\D", "", _clean_code(value))
+    return digits[:8].zfill(8) if digits else ""
+
+
 # ---------------------------------------------------------------------------
 # 日期排序與期別嚴重度比序輔助函式
 # ---------------------------------------------------------------------------
@@ -104,7 +111,9 @@ def _annual_ajcc_stage(row, columns):
     pathology_prefix = _clean_code(row.get(columns["path_prefix"], "") if columns["path_prefix"] else "")
     pathology_stage = _clean_code(row.get(columns["path_stage"], "")).upper() if columns["path_stage"] else ""
     clinical_stage = _clean_code(row.get(columns["clinical_stage"], "")) if columns["clinical_stage"] else ""
-    surgery_date = _clean_code(row.get(columns["surgery_date"], "")) if columns["surgery_date"] else ""
+    surgery_date = _normalize_registry_date(
+        row.get(columns["surgery_date"], "") if columns["surgery_date"] else ""
+    )
 
     # Same selection order as dashboard.period_rule.ajcc_stages.
     if pathology_prefix in {"4", "6"} or surgery_date == "00000000" or pathology_stage == "BBB":

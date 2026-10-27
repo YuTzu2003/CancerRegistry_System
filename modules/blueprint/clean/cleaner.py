@@ -91,7 +91,15 @@ def annotation(row_errors):
         return "D:完全正確的資訊"
     return " ".join(codes)
 
-def cleanValidate(input_file,output_file,report_file,fmt,version,Revision_Date):
+def cleanValidate(
+    input_file,
+    output_file,
+    report_file,
+    fmt,
+    version,
+    Revision_Date,
+    value_encoding=None,
+):
     rules = FORMAT_RULES_MAP[fmt]
     file_ext = os.path.splitext(input_file)[1].lower()
     
@@ -99,7 +107,10 @@ def cleanValidate(input_file,output_file,report_file,fmt,version,Revision_Date):
         try:
             df = pd.read_csv(input_file, dtype=str, encoding='utf-8-sig')
         except UnicodeDecodeError:
-            df = pd.read_csv(input_file, dtype=str, encoding='cp950')
+            # Windows 的原生 CP950 可讀取使用者自訂區難字；Python cp950
+            # 對這些字元可能以替代字元取代。
+            fallback_encoding = 'mbcs' if os.name == 'nt' else 'cp950'
+            df = pd.read_csv(input_file, dtype=str, encoding=fallback_encoding)
     else:
         df = pd.read_excel(input_file,dtype=str)
 
@@ -119,7 +130,9 @@ def cleanValidate(input_file,output_file,report_file,fmt,version,Revision_Date):
         )
 
         if rule:
-            error_mask[col] = df[col].apply(lambda x: check_error_type(x, rule))
+            error_mask[col] = df[col].apply(
+                lambda x: check_error_type(x, rule, value_encoding=value_encoding)
+            )
 
     for idx, row in df.iterrows():
         bad_cols, msgs = validate_date_rules(row, alias_mapping)

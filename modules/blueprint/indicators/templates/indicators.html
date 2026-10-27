@@ -5,6 +5,8 @@
 
 {% block extra_head %}
 <script src="/static/vendor/echarts/echarts.min.js"></script>
+<link rel="stylesheet" href="/static/css/dashboard/dashboard.css">
+<link rel="stylesheet" href="/static/css/dashboard/control.css">
 <link rel="stylesheet" href="/static/css/dashboard/dashboard_compare.css?v=20260801-stage-card-compact">
 <style>
   .indicators-step { border: 1px solid var(--gray-200); border-radius: 12px; background: var(--white); margin-bottom: 18px; overflow: hidden; }
@@ -34,9 +36,11 @@
   .indicators-preview-head { align-items: center; display: flex; justify-content: space-between; margin-bottom: 8px; }
   .indicators-file-count { color: var(--gray-500); font-size: 12px; }
   .indicators-file-list { background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: 8px; max-height: 300px; min-height: 92px; overflow-y: auto; padding: 8px; }
+  .file-list-card .indicators-file-list { background: var(--white); border: 0; border-radius: 0; max-height: none; min-height: 178px; padding: 8px; }
+  .file-list-card .indicators-file-empty { min-height: 160px; }
   .indicators-file-empty { color: var(--gray-500); display: grid; font-size: 12px; gap: 3px; min-height: 66px; place-content: center; text-align: center; }
   .indicators-file-empty-title { color: var(--gray-700); font-size: 14px; font-weight: 700; }
-  .indicators-file-item { align-items: center; border: 1px solid transparent; border-radius: 7px; display: grid; gap: 11px; grid-template-columns: 38px minmax(0, 1fr) auto; min-height: 66px; padding: 8px; transition: background-color 150ms ease, border-color 150ms ease; }
+  .indicators-file-item { align-items: center; border: 1px solid transparent; border-radius: 7px; display: grid; gap: 11px; grid-template-columns: 22px 38px minmax(0, 1fr) auto; min-height: 66px; padding: 8px; transition: background-color 150ms ease, border-color 150ms ease; }
   .indicators-file-item + .indicators-file-item { margin-top: 4px; }
   .indicators-file-item.is-selected { background: #eef6f7; border-color: #b9dadd; }
   .indicators-file-icon { align-items: center; background: #e8f3f4; border-radius: 7px; color: #166C7A; display: flex; font-size: 18px; height: 38px; justify-content: center; width: 38px; }
@@ -51,6 +55,7 @@
   .indicators-file-select.is-selected { border-color: #87bdc3; color: #166C7A; font-weight: 700; }
   .indicators-file-delete { align-items: center; background: transparent; border: 0; border-radius: 6px; color: var(--gray-500); display: inline-flex; height: 29px; justify-content: center; padding: 0; width: 29px; }
   .indicators-file-delete:hover { background: #fcebec; color: #b4232c; }
+  .indicators-file-bulk-actions { align-items: center; display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
   .indicators-year-range { align-items: end; display: grid; gap: 10px; grid-template-columns: minmax(130px, 180px) 24px minmax(130px, 180px); justify-content: start; }
   .indicators-year-controls { align-items: end; display: flex; flex-wrap: wrap; gap: 18px; }
   .indicators-narrative-group { flex: 0 0 243px; max-width: 243px; width: 243px; }
@@ -158,6 +163,8 @@
     .indicators-upload-pane + .indicators-upload-pane { border-left: 0; border-top: 1px solid var(--gray-200); padding-left: 0; padding-top: 20px; }
   }
   @media (max-width: 575.98px) {
+    .indicators-file-item { align-items: start; grid-template-columns: 22px 38px minmax(0, 1fr); }
+    .indicators-file-actions { grid-column: 3; justify-content: flex-start; }
     .indicators-year-range { grid-template-columns: 1fr; }
     .indicators-year-separator { height: auto; }
     .indicators-narrative-group { flex: 1 1 100%; max-width: 100%; width: 100%; }
@@ -199,6 +206,28 @@
   </div>
 </section>
 
+<section id="indicatorsInputSettings" class="card-flat dashboard-input-settings is-disabled d-none" aria-disabled="true" style="margin-bottom: 22px;">
+  <div class="section-head"><h2><span class="dot" style="background: var(--warning);"></span> 資料欄位辨識設定</h2></div>
+  <div class="section-body">
+    <div style="margin-bottom: 18px;">
+      <div class="d-flex justify-content-between align-items-center mb-2"><div style="font-size: 13px; font-weight: 600; color: var(--gray-700);">選擇欄位體系<span class="hint" style="font-weight: 400; margin-left: 6px;">系統將依選擇的欄位名稱辨識資料。</span></div></div>
+      <div class="naming-grid" id="indicatorsInputScheme">
+        <label class="naming-chip"><input type="radio" name="indicatorsInputScheme" value="original" disabled><span class="nc-mark"></span><span class="nc-body"><span class="nc-title">原始欄位名稱</span><span class="nc-desc">欄位已是系統標準名稱</span></span></label>
+        <label class="naming-chip"><input type="radio" name="indicatorsInputScheme" value="field_name_zh" disabled><span class="nc-mark"></span><span class="nc-body"><span class="nc-title">中文欄位名稱</span><span class="nc-desc">依中文欄位名稱辨識</span></span></label>
+        <label class="naming-chip"><input type="radio" name="indicatorsInputScheme" value="field_name_en" disabled><span class="nc-mark"></span><span class="nc-body"><span class="nc-title">英文欄位名稱</span><span class="nc-desc">依英文欄位名稱辨識</span></span></label>
+        <label class="naming-chip"><input type="radio" name="indicatorsInputScheme" value="ntu_yunlin" disabled><span class="nc-mark"></span><span class="nc-body"><span class="nc-title">臺大雲林欄位名稱</span><span class="nc-desc">依臺大雲林資料欄位辨識</span></span></label>
+        <label class="naming-chip"><input type="radio" name="indicatorsInputScheme" value="ntu_system" disabled><span class="nc-mark"></span><span class="nc-body"><span class="nc-title">臺大系統欄位名稱</span><span class="nc-desc">依臺大系統匯出欄位辨識</span></span></label>
+        <label class="naming-chip"><input type="radio" name="indicatorsInputScheme" value="taiwan_cancer_registry" disabled><span class="nc-mark"></span><span class="nc-body"><span class="nc-title">台灣癌症登記欄位</span><span class="nc-desc">依癌症登記申報欄位辨識</span></span></label>
+        <label class="naming-chip"><input type="radio" name="indicatorsInputScheme" value="AI_module" disabled><span class="nc-mark"></span><span class="nc-body"><span class="nc-title">AI 模組欄位</span><span class="nc-desc">依系統 AI 模組匯出欄位辨識</span></span></label>
+      </div>
+    </div>
+    <div>
+      <div class="d-flex justify-content-between align-items-center mb-2"><div style="font-size: 13px; font-weight: 600; color: var(--gray-700);">未匹配欄位處理<span class="hint" style="font-weight: 400; margin-left: 6px;">勾選的欄位會一併保留於資料檔。</span></div><div class="d-flex align-items-center gap-2"><button id="btnSelectAllIndicatorExtras" class="btn btn-sm btn-outline-secondary" type="button" disabled>全選</button><button id="btnClearAllIndicatorExtras" class="btn btn-sm btn-outline-secondary" type="button" disabled>清除</button></div></div>
+      <div id="indicatorsInputFieldList" class="field-chiplist"><span class="field-chip disabled"><i class="bi bi-asterisk"></i> 請先選擇檔案</span></div>
+    </div>
+    <div class="d-flex justify-content-end gap-2 mt-3 pt-3" style="border-top:1px solid var(--border);"><button id="btnPreviewIndicatorsInput" class="btn btn-light" type="button" disabled><i class="bi bi-eye"></i> 預覽</button><button id="uploadIndicatorsFile" class="btn btn-primary d-flex align-items-center justify-content-center gap-2" type="button" disabled><i class="bi bi-upload"></i> 確認匯入</button></div>
+  </div>
+</section>
 <section id="indicatorsYearStep" class="indicators-step indicators-year-step is-disabled" aria-disabled="true">
   <div class="indicators-step-title"><span class="indicators-step-marker" aria-hidden="true"></span>年度與敘述風格</div>
   <div class="indicators-step-body">
@@ -280,6 +309,16 @@
   const returnStateStorageKey = 'indicators_return_state_v1';
   const fileInput = document.getElementById('indicatorsFile');
   const uploadButton = document.getElementById('uploadIndicatorsFile');
+  const previewInputButton = document.getElementById('btnPreviewIndicatorsInput');
+  const inputSettings = document.getElementById('indicatorsInputSettings');
+  const inputFormatOptions = document.getElementById('indicatorsFormatOptions');
+  const inputFormatSelect = document.getElementById('indicatorsFormatSelect');
+  const txtOptions = document.getElementById('indicatorsTxtOptions');
+  const txtHasHeader = document.getElementById('indicatorsTxtHasHeader');
+  const inputFormatChips = document.querySelectorAll('#indicatorsInputScheme .naming-chip');
+  const inputFieldList = document.getElementById('indicatorsInputFieldList');
+  const selectAllExtraFieldsButton = document.getElementById('btnSelectAllIndicatorExtras');
+  const clearAllExtraFieldsButton = document.getElementById('btnClearAllIndicatorExtras');
   const startSelect = document.getElementById('indicatorsYearStart');
   const endSelect = document.getElementById('indicatorsYearEnd');
   const narrativeStyle = document.getElementById('indicatorsNarrativeStyle');
@@ -290,6 +329,8 @@
   const analyzeButton = document.getElementById('analyzeIndicators');
   const fileList = document.getElementById('indicatorsFileList');
   const fileCount = document.getElementById('indicatorsFileCount');
+  const selectAllIndicatorFilesCheckbox = document.getElementById('indicatorSelectAllFiles');
+  const batchDeleteIndicatorFilesButton = document.getElementById('btnBatchDeleteIndicatorFiles');
   const yearStep = document.getElementById('indicatorsYearStep');
   const cancerStep = document.getElementById('indicatorsCancerStep');
   const previewStep = document.getElementById('indicatorsPreviewStep');
@@ -307,6 +348,9 @@
   let loadedFileId = null;
   let nextFileId = 1;
   let uploadInProgress = false;
+  let indicatorInputPreview = null;
+  let indicatorInputPreviewLoading = false;
+  let indicatorInputPreviewRequestId = 0;
   let indicatorChartInstances = [];
   let activePreviewCancerKey = null;
   let previewRequestId = 0;
@@ -538,7 +582,118 @@
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
+  const selectedIndicatorInput = () => fileEntries.find((entry) => entry.id === selectedFileId);
+  const selectedInputScheme = () => document.querySelector('input[name="indicatorsInputScheme"]:checked')?.value || '';
+  const indicatorExtraFieldCheckboxes = () => Array.from(
+    inputFieldList?.querySelectorAll('.indicators-extra-field-checkbox') || []
+  );
+  const isSelectedInputTxt = () => selectedIndicatorInput()?.file.name.toLowerCase().endsWith('.txt') || false;
+  const inputFormatReady = () => Boolean(inputFormatSelect?.value);
+
+  const syncIndicatorExtraFieldControls = () => {
+    const checkboxes = indicatorExtraFieldCheckboxes();
+    const selectedCount = checkboxes.filter((checkbox) => checkbox.checked).length;
+    if (selectAllExtraFieldsButton) selectAllExtraFieldsButton.disabled = !checkboxes.length || selectedCount === checkboxes.length;
+    if (clearAllExtraFieldsButton) clearAllExtraFieldsButton.disabled = !checkboxes.length || selectedCount === 0;
+  };
+
+  const setIndicatorExtraFieldsChecked = (checked) => {
+    indicatorExtraFieldCheckboxes().forEach((checkbox) => {
+      checkbox.checked = checked;
+      checkbox.closest('.field-chip')?.classList.toggle('selected', checked);
+    });
+    syncIndicatorExtraFieldControls();
+  };
+
+  const syncIndicatorInputSettings = () => {
+    const entry = selectedIndicatorInput();
+    const hasLocalFile = Boolean(entry && !entry.serverId);
+    const settingsReady = hasLocalFile && inputFormatReady();
+    const previewReady = Boolean(indicatorInputPreview) && !indicatorInputPreviewLoading;
+    inputSettings?.classList.toggle('d-none', !hasLocalFile);
+    inputSettings?.classList.toggle('is-disabled', !settingsReady);
+    inputSettings?.setAttribute('aria-disabled', String(!settingsReady));
+    inputFormatOptions?.classList.toggle('d-none', !hasLocalFile);
+    if (inputFormatSelect) inputFormatSelect.disabled = !hasLocalFile;
+    txtOptions?.classList.toggle('d-none', !isSelectedInputTxt());
+    if (txtHasHeader) txtHasHeader.disabled = !isSelectedInputTxt();
+    inputFormatChips.forEach((chip) => {
+      const input = chip.querySelector('input[type="radio"]');
+      if (input) input.disabled = !settingsReady;
+      chip.classList.toggle('selected', Boolean(input?.checked));
+    });
+    uploadButton.disabled = !(hasLocalFile && inputFormatReady() && selectedInputScheme() && previewReady && !uploadInProgress);
+    if (previewInputButton) previewInputButton.disabled = !(hasLocalFile && inputFormatReady() && selectedInputScheme() && previewReady && !uploadInProgress);
+    syncIndicatorExtraFieldControls();
+  };
+
+  const resetIndicatorInputPreview = (message = '請先選擇檔案格式與欄位命名方式') => {
+    indicatorInputPreviewRequestId += 1;
+    indicatorInputPreview = null;
+    indicatorInputPreviewLoading = false;
+    if (inputFieldList) {
+      inputFieldList.innerHTML = `<span class="field-chip disabled"><i class="bi bi-info-circle"></i> ${message}</span>`;
+    }
+    syncIndicatorInputSettings();
+  };
+
+  const loadIndicatorInputPreview = async () => {
+    const entry = selectedIndicatorInput();
+    const inputScheme = selectedInputScheme();
+    if (!entry || entry.serverId || !inputScheme || !inputFormatReady()) return;
+
+    indicatorInputPreview = null;
+    indicatorInputPreviewLoading = true;
+    const requestId = ++indicatorInputPreviewRequestId;
+    if (inputFieldList) {
+      inputFieldList.innerHTML = '<span class="field-chip disabled"><span class="spinner-border spinner-border-sm me-1"></span> 正在辨識欄位</span>';
+    }
+    syncIndicatorInputSettings();
+
+    const formData = new FormData();
+    formData.set('file', entry.file);
+    formData.set('input_scheme', inputScheme);
+    formData.set('format_id', inputFormatSelect.value);
+    formData.set('txt_has_header', txtHasHeader?.checked ? 'true' : 'false');
+    try {
+      const response = await fetch('/api/indicators/input-preview', { method: 'POST', body: formData });
+      const result = await response.json();
+      if (requestId !== indicatorInputPreviewRequestId) return;
+      if (!response.ok || !result.ok) throw new Error(result.error || '欄位辨識失敗');
+      indicatorInputPreview = result;
+      const unmatched = result.columns.filter((column) => !column.matched);
+      const summary = `<span class="field-chip disabled"><i class="bi bi-check-circle text-success"></i> 已匹配 ${result.matched_count}／${result.total_count} 個欄位</span>`;
+      const unmatchedChips = unmatched.length
+        ? unmatched.map((column) => `<label class="field-chip selected"><input type="checkbox" class="indicators-extra-field-checkbox" value="${escapeHtml(column.original)}" checked><span>${escapeHtml(column.original)}</span></label>`).join('')
+        : '<span class="field-chip disabled"><i class="bi bi-check2 text-success"></i> 無未匹配欄位</span>';
+      if (inputFieldList) {
+        inputFieldList.innerHTML = summary + unmatchedChips;
+        inputFieldList.querySelectorAll('.indicators-extra-field-checkbox').forEach((checkbox) => {
+          checkbox.addEventListener('change', () => {
+            checkbox.closest('.field-chip')?.classList.toggle('selected', checkbox.checked);
+            syncIndicatorExtraFieldControls();
+          });
+        });
+      }
+    } catch (error) {
+      if (requestId !== indicatorInputPreviewRequestId) return;
+      if (inputFieldList) {
+        inputFieldList.innerHTML = `<span class="field-chip disabled text-danger"><i class="bi bi-x-circle"></i> ${escapeHtml(error.message || '欄位辨識失敗')}</span>`;
+      }
+    } finally {
+      if (requestId !== indicatorInputPreviewRequestId) return;
+      indicatorInputPreviewLoading = false;
+      syncIndicatorInputSettings();
+    }
+  };
+
   const renderFileList = () => {
+    const selectedForDeletionCount = fileEntries.filter((entry) => entry.selectedForDeletion).length;
+    const allSelectedForDeletion = fileEntries.length > 0 && selectedForDeletionCount === fileEntries.length;
+    selectAllIndicatorFilesCheckbox.disabled = uploadInProgress || !fileEntries.length;
+    selectAllIndicatorFilesCheckbox.checked = allSelectedForDeletion;
+    selectAllIndicatorFilesCheckbox.indeterminate = selectedForDeletionCount > 0 && !allSelectedForDeletion;
+    batchDeleteIndicatorFilesButton.disabled = uploadInProgress || selectedForDeletionCount === 0;
     if (!fileEntries.length) {
       fileCount.textContent = '0 個檔案';
       fileList.innerHTML = '<div class="indicators-file-empty"><span class="indicators-file-empty-title">尚未選擇檔案</span><span>選擇 Excel、CSV 或 TXT 後，將在此顯示檔案資訊。</span></div>';
@@ -560,6 +715,7 @@
       const metadataLine = entry.yearRange ? `${metadata} · 診斷年度範圍 ${entry.yearRange}` : metadata;
       const disabled = uploadInProgress ? ' disabled' : '';
       return `<div class="indicators-file-item${selected ? ' is-selected' : ''}">
+        <div class="form-check m-0"><input class="form-check-input indicators-file-select" type="checkbox" data-file-action="mark-delete" data-file-id="${entry.id}" aria-label="選取 ${escapeHtml(file.name)}"${entry.selectedForDeletion ? ' checked' : ''}${disabled}></div>
         <div class="indicators-file-icon"><i class="bi bi-folder2-open" aria-hidden="true"></i></div>
         <div class="overflow-hidden"><div class="indicators-file-name" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</div><div class="indicators-file-meta">${escapeHtml(metadataLine)}</div></div>
         <div class="indicators-file-actions">
@@ -576,26 +732,26 @@
     const entry = fileEntries.find((item) => item.id === entryId);
     if (entry && entry.id === loadedFileId && entry.years?.length) {
       applySourceToAnalysis(entry);
-      uploadButton.disabled = true;
+      resetIndicatorInputPreview('已上傳的資料可直接進行分析');
       renderFileList();
       return;
     }
     if (!entry) {
       resetAnalysisState();
-      uploadButton.disabled = true;
+      resetIndicatorInputPreview();
       renderFileList();
       return;
     }
     if (!entry.serverId) {
       resetAnalysisState();
-      uploadButton.disabled = false;
+      resetIndicatorInputPreview('請選擇申報欄位格式與欄位命名方式');
       renderFileList();
       return;
     }
 
     resetAnalysisState();
     uploadInProgress = true;
-    uploadButton.disabled = true;
+    resetIndicatorInputPreview('正在載入已上傳資料');
     renderFileList();
     try {
       const source = await fetchJson(`/api/indicators/source/${encodeURIComponent(entry.serverId)}/activate`, { method: 'POST' });
@@ -610,7 +766,7 @@
       resetAnalysisState();
     } finally {
       uploadInProgress = false;
-      uploadButton.disabled = Boolean(entry.serverId);
+      syncIndicatorInputSettings();
       renderFileList();
     }
   };
@@ -624,7 +780,7 @@
         newestEntry = existing;
         return;
       }
-      newestEntry = { id: nextFileId++, key, file, serverId: null, state: 'ready', detail: '', yearRange: '', years: [] };
+      newestEntry = { id: nextFileId++, key, file, serverId: null, state: 'ready', detail: '', yearRange: '', years: [], selectedForDeletion: false };
       fileEntries.push(newestEntry);
     });
     fileInput.value = '';
@@ -641,6 +797,11 @@
     const entryId = Number(actionButton.dataset.fileId);
     const entryIndex = fileEntries.findIndex((entry) => entry.id === entryId);
     if (entryIndex < 0) return;
+    if (actionButton.dataset.fileAction === 'mark-delete') {
+      fileEntries[entryIndex].selectedForDeletion = actionButton.checked;
+      renderFileList();
+      return;
+    }
     if (actionButton.dataset.fileAction === 'select') {
       await activateFileEntry(entryId);
       return;
@@ -671,6 +832,74 @@
       }
     }
   });
+  const deleteIndicatorEntries = async (entries) => {
+    const serverIds = entries.map((entry) => entry.serverId).filter(Boolean);
+    if (serverIds.length) {
+      await fetchJson('/api/indicators/sources', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file_ids: serverIds })
+      });
+    }
+    const entryIds = new Set(entries.map((entry) => entry.id));
+    for (let index = fileEntries.length - 1; index >= 0; index -= 1) {
+      if (entryIds.has(fileEntries[index].id)) fileEntries.splice(index, 1);
+    }
+    if (entryIds.has(loadedFileId)) loadedFileId = null;
+    if (entryIds.has(selectedFileId)) await activateFileEntry(fileEntries[0]?.id ?? null);
+    else renderFileList();
+  };
+  selectAllIndicatorFilesCheckbox.addEventListener('change', () => {
+    fileEntries.forEach((entry) => { entry.selectedForDeletion = selectAllIndicatorFilesCheckbox.checked; });
+    renderFileList();
+  });
+  batchDeleteIndicatorFilesButton.addEventListener('click', async () => {
+    const entries = fileEntries.filter((entry) => entry.selectedForDeletion);
+    if (!entries.length) return;
+    const result = await Swal.fire({ title: '確定刪除？', text: `將刪除 ${entries.length} 個檔案，此動作無法復原。`, icon: 'warning', showCancelButton: true, allowOutsideClick: false, confirmButtonColor: '#dc2626', cancelButtonText: '取消', confirmButtonText: '刪除' });
+    if (!result.isConfirmed) return;
+    uploadInProgress = true;
+    renderFileList();
+    try {
+      await deleteIndicatorEntries(entries);
+      Swal.fire({ icon: 'success', title: '已刪除', text: `已刪除 ${entries.length} 個檔案。`, confirmButtonColor: '#2563eb' });
+    } catch (error) {
+      Swal.fire({ icon: 'error', title: '刪除失敗', text: error.message || '無法刪除檔案。', confirmButtonColor: '#2563eb' });
+    } finally {
+      uploadInProgress = false;
+      renderFileList();
+    }
+  });
+  inputFormatChips.forEach((chip) => {
+    chip.querySelector('input[type="radio"]')?.addEventListener('change', () => {
+      resetIndicatorInputPreview();
+      void loadIndicatorInputPreview();
+    });
+  });
+  inputFormatSelect?.addEventListener('change', () => {
+    resetIndicatorInputPreview();
+    void loadIndicatorInputPreview();
+  });
+  txtHasHeader?.addEventListener('change', () => {
+    resetIndicatorInputPreview();
+    void loadIndicatorInputPreview();
+  });
+  selectAllExtraFieldsButton?.addEventListener('click', () => setIndicatorExtraFieldsChecked(true));
+  clearAllExtraFieldsButton?.addEventListener('click', () => setIndicatorExtraFieldsChecked(false));
+  previewInputButton?.addEventListener('click', () => {
+    const entry = selectedIndicatorInput();
+    if (!entry || !indicatorInputPreview) return;
+    const retainedFields = new Set(indicatorExtraFieldCheckboxes()
+      .filter((checkbox) => checkbox.checked)
+      .map((checkbox) => checkbox.value));
+    const rows = indicatorInputPreview.columns.map((column) => `<tr><td class="text-start">${escapeHtml(column.original)}</td><td class="text-start">${escapeHtml(column.normalized)}</td><td class="text-center">${column.matched ? '<span class="text-success">已匹配</span>' : retainedFields.has(column.original) ? '<span class="text-warning">保留</span>' : '<span class="text-secondary">略過</span>'}</td></tr>`).join('');
+    Swal.fire({
+      title: '欄位辨識預覽',
+      width: 860,
+      html: `<div class="text-start mb-3"><strong>檔案：</strong>${escapeHtml(entry.file.name)}<span class="mx-2">｜</span><strong>欄位體系：</strong>${escapeHtml(document.querySelector('input[name="indicatorsInputScheme"]:checked')?.closest('.naming-chip')?.querySelector('.nc-title')?.textContent || '')}</div><div class="table-responsive" style="max-height:420px"><table class="table table-sm table-bordered align-middle mb-0"><thead class="table-light sticky-top"><tr><th>原始欄位</th><th>轉換後欄位</th><th style="width:90px">處理方式</th></tr></thead><tbody>${rows}</tbody></table></div>`,
+      confirmButtonColor: '#2563eb',
+    });
+  });
   startSelect.addEventListener('change', populateEndYears);
   endSelect.addEventListener('change', () => {
     cancerInputs.forEach((input) => { input.checked = false; });
@@ -695,7 +924,8 @@
   });
   uploadButton.addEventListener('click', async () => {
     const entry = fileEntries.find((item) => item.id === selectedFileId);
-    if (!entry || entry.serverId || uploadInProgress) return;
+    const inputScheme = selectedInputScheme();
+    if (!entry || entry.serverId || uploadInProgress || !inputScheme || !inputFormatReady() || !indicatorInputPreview) return;
     const file = entry.file;
     uploadInProgress = true;
     uploadButton.disabled = true;
@@ -705,6 +935,12 @@
     renderFileList();
     const formData = new FormData();
     formData.append('file', file);
+    formData.set('input_scheme', inputScheme);
+    formData.set('format_id', inputFormatSelect.value);
+    formData.set('txt_has_header', txtHasHeader?.checked ? 'true' : 'false');
+    formData.set('extra_fields', JSON.stringify(indicatorExtraFieldCheckboxes()
+      .filter((checkbox) => checkbox.checked)
+      .map((checkbox) => checkbox.value)));
     try {
       const result = await fetchJson('/api/indicators/upload', { method: 'POST', body: formData });
       const years = result.years || [];
@@ -732,7 +968,7 @@
       entry.yearRange = '';
     } finally {
       uploadInProgress = false;
-      uploadButton.disabled = Boolean(entry.serverId) || !fileEntries.some((item) => item.id === selectedFileId);
+      syncIndicatorInputSettings();
       renderFileList();
       updateReadyState();
     }
@@ -966,7 +1202,8 @@
           state: 'success',
           detail: `${extension} · ${formatFileSize(Number(source.file_size || 0))} · ${Number(source.record_count || 0).toLocaleString()} 筆資料`,
           yearRange: years.length ? `${years[0]}–${years[years.length - 1]}` : '',
-          years: [...years]
+          years: [...years],
+          selectedForDeletion: false
         });
       });
       const activeEntry = fileEntries.find((entry) => (
@@ -977,7 +1214,7 @@
         loadedFileId = activeEntry.id;
         applySourceToAnalysis(activeEntry);
       }
-      uploadButton.disabled = true;
+      syncIndicatorInputSettings();
       renderFileList();
       if (returnState && activeEntry) {
         const startYear = String(returnState.yearStart || '');
