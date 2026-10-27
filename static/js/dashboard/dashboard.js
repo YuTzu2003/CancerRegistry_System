@@ -263,12 +263,20 @@ window.DashboardRenderer.getSelectedYearTitle = function() {
 
 // 取得癌症標題
 window.DashboardRenderer.getSelectedCancerTitle = function() {
-        if (window.dashboardPreviewMode && window.dashboardPreviewCancerTitle) {
-            return window.dashboardPreviewCancerTitle;
-        }
         const language = window.DashboardI18n?.getLanguage();
         const cancerNameMap = window.dashboardCancerNameTranslations || {};
         const selectedKeys = window.dashboardSelectedCancerDisplayKeys || [];
+        if (window.dashboardPreviewMode && window.dashboardPreviewCancerTitle) {
+            const previewTitle = window.dashboardPreviewCancerTitle;
+            if (language !== 'en') return previewTitle;
+            const translatedKeys = selectedKeys.map(key => cancerNameMap[key]?.en).filter(Boolean);
+            if (translatedKeys.length) return translatedKeys.join(', ');
+            return previewTitle.split('、').map(name => {
+                const translation = Object.values(cancerNameMap).find(item =>
+                    item.zh === name || item.zh?.replace(/癌$/, '') === name);
+                return translation?.en || name;
+            }).join(', ');
+        }
         if (language === 'en' && selectedKeys.length > 0) {
             const translatedNames = selectedKeys
                 .map(key => cancerNameMap[key]?.en)
@@ -421,7 +429,7 @@ window.DashboardRenderer.ensureInsightsForLanguage = async function({ retry = tr
         let results = await run();
         if (retry && results.some(result => !result?.success)) results = await run();
         if (results.some(result => !result?.success)) {
-            throw new Error('部分語言模型敘述尚未準備完成');
+            throw new Error('部分分析敘述尚未準備完成');
         }
         return results;
     };
@@ -592,6 +600,12 @@ document.addEventListener('DOMContentLoaded', function() {
             const exportLanguage = window.DashboardI18n?.getLanguage() || 'zh-TW';
             const modeAi = document.getElementById('mode_ai')?.value || 'balanced';
             const generateInsights = options.generateInsights === true;
+            const getExportInsight = (fieldKey, responseText = '') => {
+                if (!fieldKey) return '';
+                if (window.dashboardPreviewMode) return window.dashboardPreviewNarratives?.[fieldKey] || '';
+                const insight = window.DashboardRenderer?.insightCache?.get(`${exportLanguage}|${modeAi}|${fieldKey}`) || responseText;
+                return insight.trim() === '定義還沒串接使用。' ? '' : insight;
+            };
             const insightFieldKeys = {
                 'chartPane-IncidenceAge': '性別與年齡分佈',
                 'chartPane-IncidenceMedian': '年齡中位數',
@@ -669,11 +683,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             const stageButton = document.getElementById('btnAiStageSummary');
                             const stageFieldKey = `${report.staging_system} ${view === 'sex' ? 'Stage Distribution by Sex' : view === 'age' ? 'Stage Distribution by Age Group' : 'Stage Distribution'}`;
                             const stageResponse = document.getElementById('llmResponseStageSummary');
-                            const stageLlmText = stageFieldKey
-                                ? (window.DashboardRenderer?.insightCache?.get(`${exportLanguage}|${modeAi}|${stageFieldKey}`)
-                                    || stageResponse?.textContent
-                                    || '')
-                                : '';
+                            const stageLlmText = getExportInsight(stageFieldKey, stageResponse?.textContent || '');
                             const tabKey = view === 'sex' ? 'stageSexTab' : view === 'age' ? 'stageAgeTab' : 'stageTab';
                             const stageTitle = exportLanguage === 'en'
                                 ? window.DashboardRenderer.t(tabKey, { system: window.DashboardRenderer.getStageSystemTitle(report.staging_system) })
@@ -735,9 +745,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 surgeryContainer?.querySelectorAll('.stage-surgery-panel') || []
                             ).find(panel => panel.dataset.stageSurgeryKey === tableKeyOf(table, surgeryIndex));
                             const fieldKey = surgeryInsightButton?.dataset.insightFieldKey || '';
-                            const llmText = fieldKey
-                                ? (window.DashboardRenderer?.insightCache?.get(`${exportLanguage}|${modeAi}|${fieldKey}`) || '')
-                                : '';
+                            const llmText = getExportInsight(fieldKey);
                             const stageSystem = table.system || (exportLanguage === 'en' ? 'Unspecified' : '未指定');
                             const title = exportLanguage === 'en'
                                 ? `${table.cancer_name_en || table.manual_key} (${stageSystem} Stage) and Surgical Procedure`
@@ -798,9 +806,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 treatmentContainer?.querySelectorAll('.stage-first-course-panel') || []
                             ).find(panel => panel.dataset.stageSystem === table.system);
                             const fieldKey = treatmentInsightButton?.dataset.insightFieldKey || '';
-                            const llmText = fieldKey
-                                ? (window.DashboardRenderer?.insightCache?.get(`${exportLanguage}|${modeAi}|${fieldKey}`) || '')
-                                : '';
+                            const llmText = getExportInsight(fieldKey);
                             const stageSystem = table.system || (exportLanguage === 'en' ? 'Unspecified' : '未指定');
                             const title = exportLanguage === 'en'
                                 ? `${table.system} Stage and First Course Treatment`
@@ -863,10 +869,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             options.onInsightComplete?.();
                         }
                         const fieldKey = insightButton?.dataset.insightFieldKey || insightFieldKeys[paneId];
-                        const cachedInsight = fieldKey
-                            ? window.DashboardRenderer?.insightCache?.get(`${exportLanguage}|${modeAi}|${fieldKey}`)
-                            : '';
-                        llmText = cachedInsight || (exportLanguage === 'en'
+                        llmText = getExportInsight(fieldKey, exportLanguage === 'en'
                             ? ''
                             : llmDiv.textContent || llmDiv.innerText);
                     }
@@ -952,7 +955,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (preparationError) {
                 if (window.utils?.hideLoading) window.utils.hideLoading();
-                const isInsightFailure = /insight generation failed/i.test(String(preparationError?.message || ''));
+                const isInsightFailure = /insigh分析敘述ration failed/i.test(String(preparationError?.message || ''));
                 utils.alert(isInsightFailure ? '語言模型敘述尚未完成；系統未建立不完整匯出，請稍後再試。' : '匯出內容準備失敗，請再試一次。', 'error');
                 return;
             }

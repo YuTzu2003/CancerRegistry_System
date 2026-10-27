@@ -152,7 +152,7 @@ def export_indicators_report():
         for chart in charts
         if isinstance(chart, dict)
     ):
-        return jsonify({"ok": False, "error": "請先產生語言模型敘述，再進行預覽或下載!!"}), 400
+        return jsonify({"ok": False, "error": "請先產生分析敘述，再進行預覽或下載!!"}), 400
     if not format_pdf and not format_word:
         return jsonify({"ok": False, "error": "請至少選擇一種匯出格式。"}), 400
 

@@ -18,7 +18,7 @@ window.DashboardI18n = (function() {
                 analyzableNote: '* 可分析個案包含：', analysisEligibleCases: '*可分析個案數', analysisEligiblePercent: '可分析個案百分比', microscopicallyConfirmedCases: '顯微鏡檢確診個案數', microscopicallyConfirmedPercent: '確診個案百分比', analysisEligibleNote: '* 可分析個案包含：', analysisEligibleClass1: 'Class1 本院診斷，並於本院接受全部或部分首次治療。', analysisEligibleClass2: 'Class2 他院診斷，於本院接受全部或部分首次治療。', histology: '組織型態', histologyDistribution: '組織型態分佈圖',
                 icdoCode: 'ICD-O編碼', people: '人數', percentage: '百分比', caseRatio: '個案比例', noData: '無資料',
                 generatingInsight: '正在產生 LLM 敘述，請稍候…', regenerateInsight: '重新產生敘述', insightFailed: '產生敘述失敗：', autoInsight: '（系統將自動產生分析敘述）',
-                llmInsight: '語言模型敘述', ineligibleCases: '不適用個案說明', warningDetails: '以下個案未納入組織型態統計：', details: '說明', confirm: '確定',
+                llmInsight: '分析敘述', ineligibleCases: '不適用個案說明', warningDetails: '以下個案未納入組織型態統計：', details: '說明', confirm: '確定',
                 histologyRuleExcluded: '{{code}} 未納入組織代碼表。', histologyRuleExcludedDetail: '請確認常見癌別、組織型態代碼與性態碼是否已匯入組織代碼表。',
                 histologyConditionMismatch: '{{code}} 不適用於此個案，組織型態與適用年度或原發部位不符，請再確認。', histologyConditionMismatchDetail: '此組織型態有特殊適用條件，請確認診斷年度與原發部位是否符合。', colonHistologyNote: '註：有一筆組織型態不適用，已排除統計（{{user}} 不符合 M8211 診斷年度規範）',
                 histologyRawReview: '請確認原始資料：{{details}}',
@@ -89,6 +89,7 @@ window.DashboardI18n = (function() {
             if (window.DashboardRenderer?.rerenderDashboardLanguage) {
                 window.DashboardRenderer.rerenderDashboardLanguage({ regenerateInsights: true });
             }
+            window.rerenderDashboardPreviewNarrative?.();
             if (window.DashboardCompare?.rerenderCompareLanguage) {
                 window.DashboardCompare.rerenderCompareLanguage();
             }

@@ -12,6 +12,7 @@
   const cancerTitle = payload.cancer_title || '癌症';
   window.dashboardPreviewYearTitle = yearTitle;
   window.dashboardPreviewCancerTitle = cancerTitle;
+  window.dashboardSelectedCancerDisplayKeys = payload.cancer_display_keys || [];
   const taskId = initialTask.TaskID || initialTask.taskId;
   const paneFor = (fieldKey) => {
     if (fieldKey.includes('Stage Distribution') || /期別分布|期別分佈/.test(fieldKey)) return '#chartPane-StageSummary';
@@ -48,9 +49,10 @@
         };
         Object.values(sections).forEach((section) => section?.classList.add('d-none'));
         sections[report.view || 'stage']?.classList.remove('d-none');
-        if (report.view === 'sex') renderer?.renderStageSexReport?.(report, yearTitle, cancerTitle);
-        else if (report.view === 'age') renderer?.renderStageAgeReport?.(report, yearTitle, cancerTitle);
-        else renderer?.renderStageDistributionReport?.(report, yearTitle, cancerTitle);
+        const displayCancerTitle = renderer?.getSelectedCancerTitle?.() || cancerTitle;
+        if (report.view === 'sex') renderer?.renderStageSexReport?.(report, yearTitle, displayCancerTitle);
+        else if (report.view === 'age') renderer?.renderStageAgeReport?.(report, yearTitle, displayCancerTitle);
+        else renderer?.renderStageDistributionReport?.(report, yearTitle, displayCancerTitle);
       }
     }
     pane?.querySelectorAll('div').forEach((element) => echarts.getInstanceByDom(element)?.resize());
@@ -59,16 +61,18 @@
   const applyNarratives = (task) => {
     currentTask = task || initialTask;
     const results = Object.fromEntries((currentTask.result || []).map((row) => [row.field_key, row.result?.insights || {}]));
-    window.dashboardPreviewNarratives = Object.fromEntries(Object.entries(results).map(([fieldKey, insights]) => [fieldKey, insights['zh-TW'] || insights.en || '']));
+    const language = window.DashboardI18n?.getLanguage() || 'zh-TW';
+    window.dashboardPreviewNarratives = Object.fromEntries(Object.entries(results).map(([fieldKey, insights]) => [fieldKey, insights[language] || '']));
     Object.entries(results).forEach(([fieldKey, insights]) => {
       const item = (payload.items || []).find((entry) => entry.field_key === fieldKey) || {};
       Object.entries(insights).forEach(([language, insight]) => window.DashboardRenderer?.insightCache?.set(`${language}|${item.mode_ai || 'balanced'}|${fieldKey}`, insight));
     });
     const item = activePreviewItem || selected[0];
     const target = item && document.getElementById(item.response);
-    if (target) target.textContent = results[item.field_key]?.['zh-TW'] || (['failed', 'partial_failed', 'completed'].includes(currentTask.Status || currentTask.status) ? '此圖表敘述未能完成。' : '正在處理中…');
+    if (target) target.textContent = results[item.field_key]?.[language] || (['failed', 'partial_failed', 'completed'].includes(currentTask.Status || currentTask.status) ? '此圖表敘述未能完成。' : '正在處理中…');
     bindRegenerateButtons(currentTask);
   };
+  window.rerenderDashboardPreviewNarrative = () => applyNarratives(currentTask);
   window.showDashboardPreviewNarrative = (fieldKey) => {
     const item = selected.find((entry) => entry.field_key === fieldKey);
     if (item) activePreviewItem = item;
@@ -138,7 +142,7 @@
   };  const render = () => {
     renderer = window.DashboardRenderer;
     if (!renderer || !window.dashboardChartInstance) return setTimeout(render, 50);
-    const year = yearTitle; const cancer = cancerTitle; window.lastChartData = chartData;
+    const year = yearTitle; const cancer = renderer.getSelectedCancerTitle(); window.lastChartData = chartData;
     renderer.renderSexAgeTable?.(chartData.genderAgeData, year, cancer); renderer.renderAgeMedianTable?.(chartData.ageMedianData, year, cancer);
     renderer.renderAnalyzableConfirmedTable?.(chartData.analyzableConfirmedData, year, cancer); renderer.renderHistologyTable?.(chartData.histologyData, year, cancer, chartData.histologyNoDataReason);
     renderer.renderDiagnosisClassificationTable?.(chartData.diagnosisClassificationData, year, cancer); renderer.renderDiagnosisClassificationChart?.(chartData.diagnosisClassificationData, year, cancer);

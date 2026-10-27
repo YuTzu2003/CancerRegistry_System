@@ -861,12 +861,12 @@
     retryButton.classList.remove('d-none');
     retryButton.disabled = isComparisonPreview && !['completed', 'partial_failed', 'failed'].includes(comparisonPreview.task.Status);
     const cacheKey = aiNarrativeCacheKey(analysisItem);
+    const requestId = ++aiNarrativeRequestId;
     if (!force && aiNarrativeCache.has(cacheKey)) {
       text.textContent = aiNarrativeCache.get(cacheKey);
       retryButton.disabled = isComparisonPreview && !['completed', 'partial_failed', 'failed'].includes(comparisonPreview.task.Status);
       return Promise.resolve(aiNarrativeCache.get(cacheKey));
     }
-    const requestId = ++aiNarrativeRequestId;
     text.innerHTML = '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>正在產生 LLM 敘述，請稍候…';
 
     return fetchAiNarrative(data, analysisItem, force)

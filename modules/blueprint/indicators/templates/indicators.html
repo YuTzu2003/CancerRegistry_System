@@ -283,7 +283,7 @@
           <span class="indicators-export-icon"><i class="bi bi-file-earmark-text"></i></span>
           <span class="indicators-export-copy">
             <span class="indicators-export-title">完整監測指標報告</span>
-            <span class="indicators-export-hint">包含監測表、圖表與語言模型敘述，可預覽並下載 PDF 或 Word</span>
+            <span class="indicators-export-hint">包含監測表、圖表與分析敘述，可預覽並下載 PDF 或 Word</span>
           </span>
           <span class="indicators-export-action">前往預覽與匯出 <i class="bi bi-arrow-right ms-1"></i></span>
         </button>
@@ -1070,11 +1070,11 @@
     const thresholdsComplete = indicatorThresholdsComplete(report);
     const text = cachedText || (!thresholdsComplete
       ? '請先完成此癌別所有監測指標的閾值設定'
-      : pending ? '正在產生語言模型敘述，請稍候…' : '閾值已設定完成，請按「產生敘述」');
+      : pending ? '正在產生分析敘述，請稍候…' : '閾值已設定完成，請按「產生敘述」');
     const actionLabel = cachedText ? '重新產生敘述' : '產生敘述';
     return `<section class="indicators-ai-narrative" data-indicators-ai-narrative="${escapeHtml(cancerKey)}" aria-live="polite">
       <div class="indicators-ai-narrative-head">
-        <h6 class="indicators-ai-narrative-title">語言模型敘述</h6>
+        <h6 class="indicators-ai-narrative-title">分析敘述</h6>
         <button type="button" class="btn btn-sm indicators-ai-regenerate" data-regenerate-indicators-narrative="${escapeHtml(cancerKey)}"${pending || !thresholdsComplete ? ' disabled' : ''}>${actionLabel}</button>
       </div>
       <div class="indicators-ai-narrative-text${!cachedText && !pending && !thresholdsComplete ? ' is-threshold-hint' : ''}">${escapeHtml(text)}</div>
@@ -1114,7 +1114,7 @@
         if (attempt < 399) continue;
         itemMap.forEach(({ cancerKey, cacheKey }) => {
           indicatorNarrativePending.delete(cacheKey);
-          setIndicatorNarrativeState(cancerKey, cacheKey, error.message || '無法取得語言模型敘述。', { error: true });
+          setIndicatorNarrativeState(cancerKey, cacheKey, error.message || '無法取得分析敘述。', { error: true });
         });
         return;
       }
@@ -1131,7 +1131,7 @@
           indicatorNarrativeCache.set(item.cacheKey, text);
           setIndicatorNarrativeState(item.cancerKey, item.cacheKey, text, { generated: true });
         } else {
-          setIndicatorNarrativeState(item.cancerKey, item.cacheKey, `語言模型敘述產生失敗：${result.error || '請稍後再試。'}`, { error: true });
+          setIndicatorNarrativeState(item.cancerKey, item.cacheKey, `分析敘述產生失敗：${result.error || '請稍後再試。'}`, { error: true });
         }
       });
 
@@ -1140,7 +1140,7 @@
       itemMap.forEach(({ cancerKey, cacheKey }) => {
         if (completedItems.has(cacheKey)) return;
         indicatorNarrativePending.delete(cacheKey);
-        setIndicatorNarrativeState(cancerKey, cacheKey, status === 'cancelled' ? '語言模型敘述任務已取消。' : '語言模型敘述產生失敗，請重新產生。', { error: true });
+        setIndicatorNarrativeState(cancerKey, cacheKey, status === 'cancelled' ? '分析敘述任務已取消。' : '分析敘述產生失敗，請重新產生。', { error: true });
       });
       return;
     }
@@ -1160,7 +1160,7 @@
       if (!force && (indicatorNarrativeCache.has(cacheKey) || indicatorNarrativePending.has(cacheKey))) return;
       if (force) indicatorNarrativeCache.delete(cacheKey);
       indicatorNarrativePending.add(cacheKey);
-      setIndicatorNarrativeState(cancerKey, cacheKey, '正在產生語言模型敘述，請稍候…', { pending: true });
+      setIndicatorNarrativeState(cancerKey, cacheKey, '正在產生分析敘述，請稍候…', { pending: true });
       const itemId = `indicators-${timestamp}-${index + 1}`;
       itemMap.set(itemId, { cancerKey, cacheKey });
       items.push({
@@ -1193,7 +1193,7 @@
     } catch (error) {
       itemMap.forEach(({ cancerKey, cacheKey }) => {
         indicatorNarrativePending.delete(cacheKey);
-        setIndicatorNarrativeState(cancerKey, cacheKey, `無法建立語言模型敘述：${error.message || '請稍後再試。'}`, { error: true });
+        setIndicatorNarrativeState(cancerKey, cacheKey, `無法建立分析敘述：${error.message || '請稍後再試。'}`, { error: true });
       });
     }
   };
@@ -1629,7 +1629,7 @@
     </section>`;
   };
 
-  const indicatorsExportWarning = '請先產生語言模型敘述，再進行預覽或下載!!';
+  const indicatorsExportWarning = '請先產生分析敘述，再進行預覽或下載!!';
   const getIndicatorsExportCancerLabels = () => Object.fromEntries(cancerInputs.map((input) => [
     input.value, input.parentElement.querySelector('span').childNodes[0].textContent.trim()
   ]));
@@ -1668,7 +1668,7 @@
         llmText: includeNarrative ? indicatorNarrativeCache.get(cacheKey) || '' : '',
         includeAi: includeNarrative,
         exportKind: 'indicators',
-        narrativeHeading: '語言模型敘述'
+        narrativeHeading: '分析敘述'
       });
     }
     return items;

@@ -82,6 +82,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const hasChart = item.chartImage && item.chartImage.trim().length > 0;
         const hasAi = item.llmText
             && item.llmText.trim().length > 0
+            && item.llmText.trim() !== '定義還沒串接使用。'
             && !item.llmText.includes('自動產生')
             && !item.llmText.includes('generate an analysis automatically');
 

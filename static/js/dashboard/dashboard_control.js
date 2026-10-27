@@ -1707,7 +1707,8 @@ function initDashboardControl() {
                               _document_label: '年報分析',
                               chart_data: chartData,
                               year_title: window.DashboardRenderer?.getSelectedYearTitle() || '',
-                              cancer_title: window.DashboardRenderer?.getSelectedCancerTitle() || ''
+                              cancer_title: window.DashboardRenderer?.getSelectedCancerTitle() || '',
+                              cancer_display_keys: window.dashboardSelectedCancerDisplayKeys || []
                           })
                       }).then(response => response.json());
                       if (!queued.success) throw new Error(queued.error || '無法建立年報工作任務');
