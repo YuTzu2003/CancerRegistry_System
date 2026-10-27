@@ -57,7 +57,7 @@
     return {
       message: failures.length
         ? `預覽已建立；另有 ${failures.length} 個檔案未建立報表。`
-        : "預覽已建立，請確認內容與警示。",
+        : "預覽已完成，請確認報表內容。",
       failures,
     };
   }

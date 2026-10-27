@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import hashlib
+import re
+import unicodedata
 from dataclasses import dataclass, replace
 from typing import Sequence
 
@@ -110,6 +112,52 @@ def _generated_title(cancer: str, staging_system: str) -> str:
     return f"{cancer_label}{staging_label}存活率"
 
 
+def _report_title_key(title: str) -> str:
+    normalized = unicodedata.normalize("NFKC", title).casefold()
+    return re.sub(r"[\s_\-－—]+", "", normalized)
+
+
+_REFERENCE_REPORT_TITLE_GROUPS = (
+    ("大腸癌-all存活率", "結腸直腸癌-all存活率"),
+    ("大腸癌-結腸癌存活率", "結腸癌存活率"),
+    ("大腸癌-直腸癌存活率", "直腸癌存活率"),
+    ("子宮頸癌FIGO分期存活率",),
+    ("子宮體癌FIGO分期存活率",),
+    ("卵巢癌FIGO分期存活率",),
+    ("女性乳癌存活率", "乳癌存活率"),
+    ("肺癌 非小細胞癌-all存活率",),
+    ("肺癌 非小細胞癌-腺癌存活率",),
+    ("肺癌 非小細胞癌-鱗狀細胞癌存活率",),
+    ("肺癌 小細胞癌存活率",),
+    ("食道癌存活率",),
+    ("肝癌BCLC分期存活率",),
+    ("胃癌存活率",),
+    ("鼻咽癌存活率",),
+    ("口腔癌存活率",),
+    ("下咽癌存活率",),
+    ("喉癌存活率",),
+    ("口咽癌_p16+存活率",),
+    ("口咽癌_p16-存活率", "口咽癌_p16-癌存活率"),
+    ("膀胱癌存活率",),
+    ("攝護腺癌存活率",),
+)
+_REFERENCE_REPORT_TITLE_RANK = {
+    _report_title_key(title): rank
+    for rank, titles in enumerate(_REFERENCE_REPORT_TITLE_GROUPS)
+    for title in titles
+}
+
+
+def _default_report_sort_key(table: ReportTable) -> tuple[int, int]:
+    return (
+        _REFERENCE_REPORT_TITLE_RANK.get(
+            _report_title_key(table.display_title),
+            len(_REFERENCE_REPORT_TITLE_GROUPS),
+        ),
+        table.sort_order,
+    )
+
+
 def _canonical_hospital(name: str) -> tuple[str, str, bool]:
     cleaned = name.strip()
     if cleaned in {"本院", "國立臺灣大學醫學院附設醫院雲林分院"}:
@@ -117,11 +165,19 @@ def _canonical_hospital(name: str) -> tuple[str, str, bool]:
     return cleaned, cleaned, False
 
 
+def _canonical_stage_key(stage: str) -> str:
+    cleaned = unicodedata.normalize("NFKC", stage).strip()
+    compact = re.sub(r"\s+", "", cleaned)
+    if compact in {"不分期別", "不分期別(含不詳)"}:
+        return "不分期別"
+    return cleaned
+
+
 def _series_signature(series: StageSeries) -> tuple[object, ...]:
     return (
         series.cancer.strip(),
         series.staging_system.strip().casefold(),
-        series.stage,
+        _canonical_stage_key(series.stage),
         series.observations,
         series.adjusted,
         series.nationwide,
@@ -164,15 +220,6 @@ def _build_hospital_value(
     missing_deaths = any(item.death_count is None for item in through_target)
     if missing_deaths or not through_target:
         death_count = None
-        issues.append(
-            ParseIssue(
-                "missing_death_count",
-                f"{series.stage} 的死亡人數不完整。",
-                IssueSeverity.WARNING,
-                workbook.source_filename,
-                table_id=table_id,
-            )
-        )
     else:
         death_count = sum(item.death_count or 0 for item in through_target)
 
@@ -244,9 +291,10 @@ def _build_tables(workbooks: Sequence[ParsedWorkbook]) -> tuple[ReportTable, ...
             if workbook.source_filename not in hospital_sources:
                 hospital_sources.append(workbook.source_filename)
             stages = hospital_stages[hospital_key]
-            existing = stages.get(series.stage)
+            stage_key = _canonical_stage_key(series.stage)
+            existing = stages.get(stage_key)
             if existing is None:
-                stages[series.stage] = (workbook, series)
+                stages[stage_key] = (workbook, series)
                 continue
             if _series_signature(existing[1]) == _series_signature(series):
                 table_issues.append(
@@ -293,7 +341,17 @@ def _build_tables(workbooks: Sequence[ParsedWorkbook]) -> tuple[ReportTable, ...
                     stage_order.append(stage)
 
         report_rows: list[ReportRow] = []
-        for stage in stage_order:
+        for stage_key in stage_order:
+            primary_stage = hospital_stages.get(primary_hospital_key, {}).get(stage_key)
+            display_stage = (
+                primary_stage[1].stage
+                if primary_stage is not None
+                else next(
+                    hospital_stages[hospital_key][stage_key][1].stage
+                    for hospital_key in hospital_order
+                    if stage_key in hospital_stages[hospital_key]
+                )
+            )
             values: list[HospitalReportValue] = []
             built: dict[
                 str,
@@ -305,7 +363,7 @@ def _build_tables(workbooks: Sequence[ParsedWorkbook]) -> tuple[ReportTable, ...
                 ],
             ] = {}
             for hospital_key in hospital_order:
-                source = hospital_stages[hospital_key].get(stage)
+                source = hospital_stages[hospital_key].get(stage_key)
                 if source is None:
                     values.append(HospitalReportValue.unavailable(hospital_key))
                     continue
@@ -333,11 +391,11 @@ def _build_tables(workbooks: Sequence[ParsedWorkbook]) -> tuple[ReportTable, ...
                 for hospital_key, (_, _, _, candidate) in built.items():
                     if hospital_key == primary_hospital_key or candidate == benchmarks:
                         continue
-                    source = hospital_stages[hospital_key][stage][0]
+                    source = hospital_stages[hospital_key][stage_key][0]
                     table_issues.append(
                         ParseIssue(
                             "benchmark_mismatch",
-                            f"{stage} 的全國或醫院層級比較值與主要醫院不同，已採用主要醫院資料。",
+                            f"{display_stage} 的全國或醫院層級比較值與主要醫院不同，已採用主要醫院資料。",
                             IssueSeverity.WARNING,
                             source.source_filename,
                             table_id=table_id,
@@ -350,7 +408,7 @@ def _build_tables(workbooks: Sequence[ParsedWorkbook]) -> tuple[ReportTable, ...
             )
             report_rows.append(
                 ReportRow(
-                    stage=stage,
+                    stage=display_stage,
                     stage_count=counts,
                     death_count=deaths,
                     hospital_values=tuple(values),
@@ -379,7 +437,11 @@ def _build_tables(workbooks: Sequence[ParsedWorkbook]) -> tuple[ReportTable, ...
                 sort_order=sort_order,
             )
         )
-    return tuple(tables)
+    ordered_tables = sorted(tables, key=_default_report_sort_key)
+    return tuple(
+        table.with_updates(sort_order=sort_order)
+        for sort_order, table in enumerate(ordered_tables)
+    )
 
 
 def build_report_batch(workbooks: Sequence[ParsedWorkbook]) -> ReportBatch:
