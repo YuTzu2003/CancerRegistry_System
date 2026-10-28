@@ -36,53 +36,83 @@
 
       <!-- 檔案列表區域 -->
       <div>
+        <style>
+          #dashboardSelectAllFiles:checked, #dashFileListBody .dashboard-file-select:checked {
+            background-color: var(--danger);
+            border-color: var(--danger);
+          }
+          #dashFileList { display: block; }
+          #dashFileListBody { display: grid; gap: 8px; padding: 10px; background: var(--gray-50); }
+          #dashFileListBody tr { display: grid; grid-template-columns: 42px minmax(0, 1fr) 160px; align-items: center; height: auto !important; min-height: 44px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--white); }
+          #dashFileListBody tr > td { min-width: 0; border: 0; background: transparent !important; box-shadow: none !important; }
+          .dashboard-file-actions { display: flex; align-items: center; gap: 12px; padding-left: 16px; border-left: 1px solid var(--border); }
+          .dashboard-file-actions .dashboard-delete-select-all, .dashboard-file-actions .dashboard-delete-cancel { display: none !important; }
+          .file-list-card.is-delete-mode .dashboard-delete-select-all, .file-list-card.is-delete-mode .dashboard-delete-cancel { display: inline-flex !important; }
+          .file-list-card:not(.is-delete-mode) .dashboard-file-actions { border-left: 0; padding-left: 0; }
+          .file-list-card:not(.is-delete-mode) #dashFileListBody tr { grid-template-columns: minmax(0, 1fr) 160px; }
+          .file-list-card:not(.is-delete-mode) #dashFileListBody .dashboard-delete-cell { display: none !important; }
+          .file-list-card.is-delete-mode #dashFileListBody tr { cursor: default; }
+          #dashFileListBody .dashboard-file-name > .d-flex { flex-wrap: wrap; min-width: 0; }
+          #dashFileListBody .dashboard-file-name .file-display-name { min-width: 0; overflow-wrap: anywhere; }
+          #dashFileListBody .dashboard-file-time { display: flex; align-items: center; justify-content: flex-end; font-size: 11px; white-space: nowrap; }
+          #dashFileListBody .dashboard-delete-cell { display: flex; align-items: center; justify-content: center; width: auto; border-right: 1px solid var(--border); background: var(--gray-50) !important; cursor: default; }
+          #dashFileListBody tr.table-active { border-color: var(--blue-500) !important; }
+          #dashFileListBody tr:focus-visible { outline: 2px solid var(--blue-500); outline-offset: -2px; }
+          #dashFileListBody #noFileRow { display: block; }
+          #dashFileListBody #noFileRow td { display: block; }
+          @container dashboard-file-list (max-width: 480px) {
+            .file-list-header { flex-wrap: wrap; gap: 12px; }
+            .dashboard-file-actions { border-left: 0; padding-left: 0; }
+            #dashFileListBody tr { grid-template-columns: 36px minmax(0, 1fr) 112px; }
+            .file-list-card:not(.is-delete-mode) #dashFileListBody tr { grid-template-columns: minmax(0, 1fr) 112px; }
+            #dashFileListBody .dashboard-file-time { font-size: 10px; }
+          }
+        </style>
         <div class="file-list-card">
           <div class="file-list-header">
-            <h6 class="mb-0 fw-bold text-dark d-flex align-items-center gap-2">
-              <i class="bi bi-folder2-open text-primary"></i>檔案清單
-              {% if uploaded_files %}
-                <span class="badge bg-secondary rounded-pill font-monospace" style="font-size: 11px;">{{ uploaded_files|length }}</span>
-              {% endif %}
-            </h6>
-            <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
-              <span class="text-secondary" style="font-size: 12px;">點選檔案進行查詢</span>
-              <button id="btnBatchDeleteDashboardFiles" class="btn btn-sm btn-outline-danger" type="button" disabled>刪除勾選項目</button>
+            <div>
+              <h6 class="mb-1 fw-bold text-dark d-flex align-items-center gap-2">
+                <i class="bi bi-folder2-open text-primary"></i>檔案清單
+                {% if uploaded_files %}
+                  <span class="badge bg-secondary rounded-pill font-monospace" style="font-size: 11px;">{{ uploaded_files|length }}</span>
+                {% endif %}
+              </h6>
+              <div id="dashboardFileListHint" class="text-secondary" style="font-size: 12px;">點選檔案列，設為分析來源</div>
+            </div>
+            <div class="dashboard-file-actions">
+              <button id="btnCancelDashboardFileDelete" class="dashboard-delete-cancel btn btn-sm btn-link text-secondary p-0" type="button">取消</button>
+              <label class="dashboard-delete-select-all d-inline-flex align-items-center gap-1 mb-0 text-danger" style="cursor: pointer; white-space: nowrap; font-size: 12px;"><input id="dashboardSelectAllFiles" class="form-check-input mt-0" type="checkbox" aria-label="全選要刪除的檔案"><span>全選</span></label>
+              <button id="btnBatchDeleteDashboardFiles" class="btn btn-sm btn-outline-danger" type="button" disabled>刪除</button>
             </div>
           </div>
           <div class="file-list-container">
             <div class="table-responsive dashboard-file-list-scroll{% if uploaded_files and uploaded_files|length > 3 %} is-scrollable{% endif %}">
               <table class="table table-hover align-middle mb-0" id="dashFileList" style="font-size: 13.5px;">
-                <thead class="table-light sticky-top">
+                <thead class="visually-hidden">
                   <tr>
-                    <th class="border-bottom fw-normal text-secondary text-center" style="width: 44px;"><input id="dashboardSelectAllFiles" class="form-check-input" type="checkbox" aria-label="全選檔案"></th>
-                    <th class="border-bottom fw-normal text-secondary ps-3">檔案名稱</th>
-                    <th class="border-bottom fw-normal text-secondary" style="width: 160px;">上傳時間</th>
-                    <th class="border-bottom fw-normal text-secondary text-end pe-3" style="width: 100px;">操作</th>
+                    <th scope="col">勾選刪除</th>
+                    <th scope="col">檔案名稱</th>
+                    <th scope="col">上傳時間</th>
                   </tr>
                 </thead>
                 <tbody id="dashFileListBody">
                   {% if uploaded_files %}
                     {% for f in uploaded_files %}
-                    <tr data-file-id="{{ f.id }}">
-                      <td class="text-center py-2.5"><input class="form-check-input dashboard-file-select" type="checkbox" value="{{ f.id }}" aria-label="選取 {{ f.name }}"></td>
-                      <td class="ps-3 py-2.5">
+                    <tr data-file-id="{{ f.id }}" tabindex="0" aria-label="選取 {{ f.name }} 作為分析檔案">
+                      <td class="dashboard-delete-cell text-center py-1"><label class="dashboard-delete-select d-inline-flex align-items-center mb-0" style="cursor: pointer;"><input class="form-check-input dashboard-file-select mt-0" type="checkbox" value="{{ f.id }}" aria-label="勾選刪除 {{ f.name }}"></label></td>
+                      <td class="dashboard-file-name ps-3 py-1">
                         <div class="d-flex align-items-center gap-2">
                           <i class="bi bi-filetype-xlsx text-success fs-5"></i>
                           <a href="#" class="text-dark text-decoration-none file-display-name">{{ f.name }}</a>
-                          <span class="status-badge-selected ms-2" style="font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--blue-100); color: var(--blue-700); font-weight: 500; display: none;"><i class="bi bi-check"></i> 已選取</span>
+                          <span class="status-badge-selected ms-2" style="font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--blue-100); color: var(--blue-700); font-weight: 500; display: none;"><i class="bi bi-check"></i> 分析檔案已選</span>
                         </div>
                       </td>
-                      <td class="text-secondary py-2.5">
-                        {{ f.time }}
-                      </td>
-                      <td class="text-end pe-3 py-2.5">
-                        <button type="button" class="btn btn-link text-danger p-0 border-0 btn-del-file" data-file-id="{{ f.id }}" data-name="{{ f.name }}" style="font-size: 13px; text-decoration: none;"><i class="bi bi-trash me-1"></i>刪除</button>
-                      </td>
+                      <td class="dashboard-file-time text-secondary text-end pe-3 py-1" aria-label="上傳時間 {{ f.time }}">{{ f.time }}</td>
                     </tr>
                     {% endfor %}
                   {% else %}
                     <tr id="noFileRow">
-                      <td colspan="4" class="text-center text-muted py-5">
+                      <td colspan="3" class="text-center text-muted py-5">
                         <i class="bi bi-inbox fs-2 d-block mb-2 opacity-50"></i>尚無已上傳的資料檔案
                       </td>
                     </tr>

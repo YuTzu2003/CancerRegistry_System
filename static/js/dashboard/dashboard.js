@@ -271,11 +271,53 @@ window.DashboardRenderer.getSelectedCancerTitle = function() {
             if (language !== 'en') return previewTitle;
             const translatedKeys = selectedKeys.map(key => cancerNameMap[key]?.en).filter(Boolean);
             if (translatedKeys.length) return translatedKeys.join(', ');
-            return previewTitle.split('、').map(name => {
-                const translation = Object.values(cancerNameMap).find(item =>
-                    item.zh === name || item.zh?.replace(/癌$/, '') === name);
-                return translation?.en || name;
-            }).join(', ');
+            const legacyAliases = {
+                '口腔癌症': 'Oral Cavity, Oropharynx, and Hypopharynx',
+                '口腔': 'Oral Cavity',
+                'P16+': 'Oropharynx (P16+)',
+                'P16-': 'Oropharynx (P16-)',
+                '喉部': 'Larynx',
+                '直腸': 'Rectum (including RS Colon)',
+                '乳房': 'Breast',
+                '男性乳房': 'Breast(Male)',
+                '肺': 'Lung and Bronchus',
+                '邊緣區淋巴瘤': 'Marginal zone lymphoma (splenic, nodal and MALT)',
+                '淋巴漿細胞淋巴瘤': 'Lymphoplasmacytic lymphoma',
+                '濾泡性淋巴瘤': 'Follicular lymphoma',
+                '被套細胞淋巴瘤': 'Mantle cell lymphoma',
+                '伯基特淋巴瘤': 'Burkitt lymphoma',
+                '瀰漫性大 B 細胞淋巴瘤': 'Diffuse large B-cell lymphoma (any subtype)',
+                '原發性縱膈腔大型 B 細胞淋巴瘤': 'Primary mediastinal (thymic) large B-cell lymphoma',
+                '其他 B 細胞淋巴瘤': 'Other B-cell lymphomas',
+                '結外 NK/T 細胞淋巴瘤': 'Extranodal NK/T cell lymphoma, nasal or other type',
+                '皮膚 T 細胞淋巴瘤': 'Cutaneous T cell lymphoma (Including Mycosis fungoides/Sëzary syndrome)',
+                '腸病型 T 細胞淋巴瘤': 'Enteropathy-type T-cell lymphoma',
+                '肝脾 T 細胞淋巴瘤': 'Hepatosplenic T-cell lymphoma',
+                '皮下脂膜炎性 T 細胞淋巴瘤': 'Subcutaneous panniculitis-like T-cell Lymphoma',
+                '非特異性周邊 T 細胞淋巴瘤': 'Peripheral T-cell lymphoma, NOS',
+                '血管免疫芽細胞性 T 細胞淋巴瘤': 'Angioimmunoblastic T-cell lymphoma',
+                '退行性大細胞淋巴瘤': 'Anaplastic large cell lymphoma',
+                '成人 T 細胞淋巴瘤／白血病': 'Adult T-cell lymphoma/leukemia',
+                '其他 T 細胞淋巴瘤': 'Other T-cell lymphomas'
+            };
+            const names = new Map();
+            Object.values(cancerNameMap).forEach(item => {
+                if (item.zh) {
+                    names.set(item.zh, item.en);
+                    names.set(item.zh.replace(/癌$/, ''), item.en);
+                }
+            });
+            Object.entries(legacyAliases).forEach(([name, translation]) => names.set(name, translation));
+            const candidates = [...names].sort((left, right) => right[0].length - left[0].length);
+            const translated = [];
+            let remaining = previewTitle.trim();
+            while (remaining) {
+                const match = candidates.find(([name]) => remaining === name || remaining.startsWith(name + '、'));
+                if (!match) return previewTitle;
+                translated.push(match[1]);
+                remaining = remaining.slice(match[0].length).replace(/^、/, '');
+            }
+            return translated.join(', ');
         }
         if (language === 'en' && selectedKeys.length > 0) {
             const translatedNames = selectedKeys
@@ -470,7 +512,7 @@ window.DashboardRenderer.rerenderDashboardLanguage = function(options = {}) {
         this.updateChartCaptions(yearTitle, cancerTitle);
         if (window.dashboardChartInstance) window.dashboardChartInstance.setOption(this.getGenderAgeChartOption(window.lastChartData.genderAgeData), true);
         this.updateHistologyChart(window.lastChartData.histologyData, window.lastChartData.histologyNoDataReason);
-        if (options.regenerateInsights && !window.dashboardExportPreparing) this.regenerateInsightsForLanguage();
+        if (options.regenerateInsights && !window.dashboardExportPreparing && !window.dashboardPreviewMode) this.regenerateInsightsForLanguage();
     };
 
 /* ── 顯示年度資料區塊 ── */
@@ -744,7 +786,9 @@ document.addEventListener('DOMContentLoaded', function() {
                             const tablePanel = Array.from(
                                 surgeryContainer?.querySelectorAll('.stage-surgery-panel') || []
                             ).find(panel => panel.dataset.stageSurgeryKey === tableKeyOf(table, surgeryIndex));
-                            const fieldKey = surgeryInsightButton?.dataset.insightFieldKey || '';
+                            const fieldKey = window.dashboardPreviewMode
+                                ? `期別與手術術式（${table.system}期別）`
+                                : surgeryInsightButton?.dataset.insightFieldKey || '';
                             const llmText = getExportInsight(fieldKey);
                             const stageSystem = table.system || (exportLanguage === 'en' ? 'Unspecified' : '未指定');
                             const title = exportLanguage === 'en'
@@ -805,7 +849,9 @@ document.addEventListener('DOMContentLoaded', function() {
                             const tablePanel = Array.from(
                                 treatmentContainer?.querySelectorAll('.stage-first-course-panel') || []
                             ).find(panel => panel.dataset.stageSystem === table.system);
-                            const fieldKey = treatmentInsightButton?.dataset.insightFieldKey || '';
+                            const fieldKey = window.dashboardPreviewMode
+                                ? `期別與首次療程（${table.system}期別）`
+                                : treatmentInsightButton?.dataset.insightFieldKey || '';
                             const llmText = getExportInsight(fieldKey);
                             const stageSystem = table.system || (exportLanguage === 'en' ? 'Unspecified' : '未指定');
                             const title = exportLanguage === 'en'
@@ -920,6 +966,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 window.utils.showLoading('資料分析中，請稍後...');
             }
             try {
+                if (isPreviewExport) {
+                    const response = await fetch(`/api/llm-tasks/${encodeURIComponent(window.dashboardPreviewTask?.TaskID || '')}`);
+                    if (!response.ok) throw new Error('無法確認年報敘述的完成狀態');
+                    const data = await response.json();
+                    window.updateAnnualPreviewTask?.(data.task);
+                    if (!window.isAnnualPreviewExportReady?.(data.task)) throw new Error('中英文分析敘述尚未全部完成');
+                }
 
                 const activePaneIds = new Set(Array.from(document.querySelectorAll('#chartTabsContainer .chart-tab-btn')).map(button => button.dataset.target));
                 let totalInsights = 0;
@@ -940,22 +993,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 };
                 await window.DashboardI18n?.setLanguage('zh-TW');
                 exportDataByLanguage['zh-TW'] = await collectExportData(sharedChartImages, { generateInsights: !isPreviewExport, onInsightComplete });
-                if (!isPreviewExport) {
-                    await window.DashboardI18n?.setLanguage('en');
-                    exportDataByLanguage.en = await collectExportData(sharedChartImages);
-                }
+                await window.DashboardI18n?.setLanguage('en');
+                exportDataByLanguage.en = await collectExportData(sharedChartImages);
             } catch (error) {
                 console.error('Export preparation failed:', error);
                 preparationError = error;
             } finally {
                 await window.DashboardI18n?.setLanguage(originalLanguage);
                 window.dashboardExportPreparing = false;
-                btnPrepareExport.disabled = false;
+                btnPrepareExport.disabled = isPreviewExport ? !window.isAnnualPreviewExportReady?.(window.dashboardPreviewTask) : false;
             }
 
             if (preparationError) {
                 if (window.utils?.hideLoading) window.utils.hideLoading();
-                const isInsightFailure = /insigh分析敘述ration failed/i.test(String(preparationError?.message || ''));
+                const isInsightFailure = preparationError?.message === '中英文分析敘述尚未全部完成';
                 utils.alert(isInsightFailure ? '語言模型敘述尚未完成；系統未建立不完整匯出，請稍後再試。' : '匯出內容準備失敗，請再試一次。', 'error');
                 return;
             }
@@ -1034,7 +1085,9 @@ window.DashboardRenderer.renderStageSurgeryTables = function(tables, yearTitle, 
         window.stageSurgeryActiveTableKey = button.dataset.stageSurgeryKey;
         container.querySelectorAll('.stage-surgery-tab').forEach(tab => tab.classList.toggle('active', tab === button));
         container.querySelectorAll('.stage-surgery-panel').forEach(panel => panel.classList.toggle('d-none', panel.dataset.stageSurgeryKey !== button.dataset.stageSurgeryKey));
-        document.getElementById('btnAiTreatmentSurgery')?.onclick?.();
+        const activeTable = tables.find((item, index) => tableKeyOf(item, index) === window.stageSurgeryActiveTableKey);
+        if (window.dashboardPreviewMode && activeTable) window.showDashboardPreviewNarrative?.(`期別與手術術式（${activeTable.system}期別）`);
+        else document.getElementById('btnAiTreatmentSurgery')?.onclick?.();
     }));
 };
 
@@ -2072,7 +2125,9 @@ window.DashboardRenderer.renderStageFirstCourseTables = function(tables, yearTit
                     panel.classList.toggle('d-none', panel.dataset.stageSystem !== system);
                 });
                 const insightButton = document.getElementById('btnAiTreatmentFirstCourse');
-                if (insightButton && window.lastChartData && typeof insightButton.onclick === 'function') {
+                if (window.dashboardPreviewMode) {
+                    window.showDashboardPreviewNarrative?.(`期別與首次療程（${system}期別）`);
+                } else if (insightButton && window.lastChartData && typeof insightButton.onclick === 'function') {
                     insightButton.onclick();
                 }
             });

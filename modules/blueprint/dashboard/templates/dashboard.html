@@ -17,7 +17,7 @@
   </div>
   {% if preview_task %}
   <div class="d-flex align-items-center gap-2">
-    <button type="button" class="btn btn-outline-secondary" id="btnBackToQuery">回到上一頁查詢</button><button type="button" class="btn btn-success" id="btnPrepareExport">匯出圖表與 LLM 敘述</button>
+    <button type="button" class="btn btn-outline-secondary" id="btnBackToQuery">回到上一頁查詢</button><button type="button" class="btn btn-success" id="btnPrepareExport"{% if preview_task.Status != 'completed' %} disabled title="中英文分析敘述完成後才能匯出"{% endif %}>匯出圖表與 LLM 敘述</button>
   </div>
   {% endif %}
 </div>

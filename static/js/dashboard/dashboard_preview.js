@@ -29,7 +29,19 @@
   const selected = (payload.items || []).map((item) => ({ ...item, pane: paneFor(item.field_key), response: responseFor(item.field_key) })).filter((item) => item.pane);
   let activePreviewItem = selected[0] || null;
   let currentTask = initialTask;
+  window.dashboardPreviewTask = initialTask;
   let renderer = null;
+  const taskReadyForExport = (task) => {
+    if ((task?.Status || task?.status) !== 'completed' || !payload.items?.length) return false;
+    const results = new Map((task.result || []).map((row) => [row.custom_id, row.result]));
+    return payload.items.every((item) => {
+      const result = results.get(item.item_id);
+      return result?.success && ['zh-TW', 'en'].every((language) =>
+        typeof result.insights?.[language] === 'string' && result.insights[language].trim()
+      );
+    });
+  };
+  window.isAnnualPreviewExportReady = taskReadyForExport;
   const stageFieldKey = (report) => {
     const view = report?.view || 'stage';
     return `${report?.staging_system || ''} Stage Distribution${view === 'sex' ? ' by Sex' : view === 'age' ? ' by Age Group' : ''}`;
@@ -60,6 +72,15 @@
   };
   const applyNarratives = (task) => {
     currentTask = task || initialTask;
+    window.dashboardPreviewTask = currentTask;
+    const status = currentTask.Status || currentTask.status;
+    const statusText = ({ queued: '處理中', running: '處理中', retrying: '處理中', completed: '已完成', partial_failed: '部分完成', failed: '處理失敗', cancelled: '已取消' })[status] || status;
+    document.querySelector('.page-head .lead').textContent = `${currentTask.DocumentLabel || '年報分析'}｜${statusText}｜中英敘述 ${currentTask.ProgressCurrent || 0}/${currentTask.ProgressTotal || 0}`;
+    const exportButton = document.getElementById('btnPrepareExport');
+    if (exportButton) {
+      exportButton.disabled = !taskReadyForExport(currentTask);
+      exportButton.title = exportButton.disabled ? '中英文分析敘述完成後才能匯出' : '';
+    }
     const results = Object.fromEntries((currentTask.result || []).map((row) => [row.field_key, row.result?.insights || {}]));
     const language = window.DashboardI18n?.getLanguage() || 'zh-TW';
     window.dashboardPreviewNarratives = Object.fromEntries(Object.entries(results).map(([fieldKey, insights]) => [fieldKey, insights[language] || '']));
@@ -67,16 +88,24 @@
       const item = (payload.items || []).find((entry) => entry.field_key === fieldKey) || {};
       Object.entries(insights).forEach(([language, insight]) => window.DashboardRenderer?.insightCache?.set(`${language}|${item.mode_ai || 'balanced'}|${fieldKey}`, insight));
     });
-    const item = activePreviewItem || selected[0];
-    const target = item && document.getElementById(item.response);
-    if (target) target.textContent = results[item.field_key]?.[language] || (['failed', 'partial_failed', 'completed'].includes(currentTask.Status || currentTask.status) ? '此圖表敘述未能完成。' : '正在處理中…');
+    const responseItems = new Map();
+    selected.forEach((item) => {
+      if (!responseItems.has(item.response) || item.field_key === activePreviewItem?.field_key) responseItems.set(item.response, item);
+    });
+    responseItems.forEach((item, responseId) => {
+      const target = document.getElementById(responseId);
+      if (target) target.textContent = results[item.field_key]?.[language] || (['failed', 'partial_failed', 'completed'].includes(currentTask.Status || currentTask.status) ? '此圖表敘述未能完成。' : '正在處理中…');
+    });
     bindRegenerateButtons(currentTask);
   };
+  window.updateAnnualPreviewTask = applyNarratives;
   window.rerenderDashboardPreviewNarrative = () => applyNarratives(currentTask);
   window.showDashboardPreviewNarrative = (fieldKey) => {
     const item = selected.find((entry) => entry.field_key === fieldKey);
-    if (item) activePreviewItem = item;
-    applyNarratives(currentTask);
+    if (item && document.querySelector('.chart-tab-btn.active')?.dataset.target === item.pane) {
+      activePreviewItem = item;
+      applyNarratives(currentTask);
+    }
   };
   const refreshNarratives = async () => {
     try {
@@ -84,8 +113,6 @@
       const data = await response.json();
       applyNarratives(data.task);
       const status = data.task.Status || data.task.status;
-      const statusText = ['queued', 'running', 'retrying'].includes(status) ? '處理中' : status;
-      document.querySelector('.page-head .lead').textContent = `${data.task.DocumentLabel || '年報分析'}｜${statusText}｜${data.task.ProgressCurrent || 0}/${data.task.ProgressTotal || 0}`;
       if (['queued', 'running', 'retrying'].includes(status)) setTimeout(refreshNarratives, 3000);
     } catch (_) { setTimeout(refreshNarratives, 3000); }
   };
@@ -130,6 +157,7 @@
     const button = item && document.getElementById(buttonFor(item.response));
     if (!button) return;
     button.style.display = 'block';
+    button.dataset.insightFieldKey = item.field_key;
     button.disabled = !canRegenerate;
     if (!canRegenerate) return;
     button.onclick = async () => {

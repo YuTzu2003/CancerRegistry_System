@@ -79,7 +79,7 @@ def _style_indicator_narrative_cell(cell):
 
 def generate_export_files(format_pdf, format_word, charts_data, output_dir, export_language="zh-TW", filename_base="export_report"):
     os.makedirs(output_dir, exist_ok=True)
-    insight_heading = "generated narrative:" if export_language == "en" else "分析敘述："
+    insight_heading = "Analysis and description" if export_language == "en" else "分析敘述："
     html_content = """
     <!DOCTYPE html>
     <html>

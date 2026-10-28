@@ -1156,7 +1156,11 @@ function initDashboardControl() {
       const row = e.target.closest('#dashFileListBody tr');
       if (!row) return;
       if (!row.querySelector('a')) return;
-      if (e.target.closest('.btn-del-file, .dashboard-file-select')) return;
+      if (e.target.closest('.dashboard-delete-cell')) return;
+      if (row.closest('.file-list-card.is-delete-mode')) {
+          e.preventDefault();
+          return;
+      }
       
       e.preventDefault();
       const fileRows = document.querySelectorAll('#dashFileListBody tr');
@@ -1177,6 +1181,12 @@ function initDashboardControl() {
       if (window.loadDashboardFileYearRange) {
           window.loadDashboardFileYearRange(selectedFileId);
       }
+  });
+  document.addEventListener('keydown', function(e) {
+      const row = e.target.closest('#dashFileListBody tr');
+      if (!row || e.target !== row || !['Enter', ' '].includes(e.key)) return;
+      e.preventDefault();
+      row.click();
   });
 
   /* ── 查詢按鈕執行邏輯 ── */
@@ -2027,19 +2037,34 @@ function initDashboardControl() {
   }
 
   /* ── 檔案勾選與刪除邏輯 ── */
+  const dashboardFileListCard = document.querySelector('.file-list-card');
+  const batchDeleteButton = document.getElementById('btnBatchDeleteDashboardFiles');
   const dashboardFileCheckboxes = () => Array.from(document.querySelectorAll('.dashboard-file-select'));
   const syncDashboardFileBulkActions = () => {
       const checkboxes = dashboardFileCheckboxes();
       const checkedCount = checkboxes.filter((checkbox) => checkbox.checked).length;
       const selectAll = document.getElementById('dashboardSelectAllFiles');
-      const batchDeleteButton = document.getElementById('btnBatchDeleteDashboardFiles');
       if (selectAll) {
           selectAll.checked = checkboxes.length > 0 && checkedCount === checkboxes.length;
           selectAll.indeterminate = checkedCount > 0 && checkedCount < checkboxes.length;
       }
-      if (batchDeleteButton) batchDeleteButton.disabled = checkedCount === 0;
+      if (batchDeleteButton) {
+          const isDeleteMode = dashboardFileListCard?.classList.contains('is-delete-mode');
+          batchDeleteButton.disabled = isDeleteMode ? checkedCount === 0 : checkboxes.length === 0;
+          batchDeleteButton.textContent = isDeleteMode
+              ? (checkedCount ? `刪除 ${checkedCount} 個` : '刪除已勾選')
+              : '刪除';
+      }
+  };
+  const setDashboardFileDeleteMode = (enabled) => {
+      dashboardFileListCard?.classList.toggle('is-delete-mode', enabled);
+      if (!enabled) dashboardFileCheckboxes().forEach((checkbox) => { checkbox.checked = false; });
+      const hint = document.getElementById('dashboardFileListHint');
+      if (hint) hint.textContent = enabled ? '勾選檔案後，再按右上角刪除' : '點選檔案列，設為分析來源';
+      syncDashboardFileBulkActions();
   };
 
+  document.getElementById('btnCancelDashboardFileDelete')?.addEventListener('click', () => setDashboardFileDeleteMode(false));
   document.getElementById('dashboardSelectAllFiles')?.addEventListener('change', (event) => {
       dashboardFileCheckboxes().forEach((checkbox) => { checkbox.checked = event.target.checked; });
       syncDashboardFileBulkActions();
@@ -2047,75 +2072,36 @@ function initDashboardControl() {
   document.addEventListener('change', (event) => {
       if (event.target.matches('.dashboard-file-select')) syncDashboardFileBulkActions();
   });
-  document.getElementById('btnBatchDeleteDashboardFiles')?.addEventListener('click', () => {
+  batchDeleteButton?.addEventListener('click', async () => {
+      if (!dashboardFileListCard?.classList.contains('is-delete-mode')) {
+          setDashboardFileDeleteMode(true);
+          return;
+      }
       const fileIds = dashboardFileCheckboxes().filter((checkbox) => checkbox.checked).map((checkbox) => checkbox.value);
       if (!fileIds.length) return;
-      Swal.fire({
-          title: '確定刪除？',
-          text: `將刪除 ${fileIds.length} 個檔案，此動作無法復原。`,
-          icon: 'warning',
-          showCancelButton: true,
-          allowOutsideClick: false,
-          confirmButtonColor: '#dc2626',
-          cancelButtonText: '取消',
-          confirmButtonText: '刪除'
-      }).then((result) => {
-          if (!result.isConfirmed) return;
-          fetch('/dashboard/delete-batch', {
+      batchDeleteButton.disabled = true;
+      try {
+          const response = await fetch('/dashboard/delete-batch', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ file_ids: fileIds })
-          })
-          .then((response) => response.json())
-          .then((data) => {
-              if (data.deleted) {
-                  const title = data.ok ? '已刪除' : '部分檔案未刪除';
-                  const text = data.ok ? `已刪除 ${data.deleted} 個檔案。` : data.error || '部分檔案無法刪除。';
-                  Swal.fire({ icon: data.ok ? 'success' : 'warning', title, text, confirmButtonColor: '#2563eb' })
-                      .then(() => location.reload());
-              } else {
-                  Swal.fire({ icon: 'error', title: '刪除失敗', text: data.error || '未知錯誤', confirmButtonColor: '#2563eb' });
-              }
-          })
-          .catch(() => Swal.fire({ icon: 'error', title: '刪除失敗', text: '無法連線至伺服器，請稍後再試。', confirmButtonColor: '#2563eb' }));
-      });
+          });
+          const data = await response.json();
+          if (data.deleted) {
+              const title = data.ok ? '已刪除' : '部分檔案未刪除';
+              const text = data.ok ? `已刪除 ${data.deleted} 個檔案。` : data.error || '部分檔案無法刪除。';
+              await Swal.fire({ icon: data.ok ? 'success' : 'warning', title, text, confirmButtonColor: '#2563eb' });
+              location.reload();
+          } else {
+              await Swal.fire({ icon: 'error', title: '刪除失敗', text: data.error || '未知錯誤', confirmButtonColor: '#2563eb' });
+              syncDashboardFileBulkActions();
+          }
+      } catch {
+          await Swal.fire({ icon: 'error', title: '刪除失敗', text: '無法連線至伺服器，請稍後再試。', confirmButtonColor: '#2563eb' });
+          syncDashboardFileBulkActions();
+      }
   });
   syncDashboardFileBulkActions();
-
-  document.addEventListener('click', function(e) {
-      const btn = e.target.closest('.btn-del-file');
-      if (!btn) return;
-      
-      const name = btn.dataset.name;
-      const fileId = btn.dataset.fileId;
-      Swal.fire({
-          title: '確定刪除？',
-          text: `將刪除 ${name}`,
-          icon: 'warning',
-          showCancelButton: true,
-          allowOutsideClick: false,
-          confirmButtonColor: '#dc2626',
-          cancelButtonText: '取消',
-          confirmButtonText: '刪除'
-      }).then(result => {
-          if (!result.isConfirmed) return;
-          
-          fetch('/dashboard/delete', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ file_id: fileId })
-          })
-          .then(r => r.json())
-          .then(data => {
-              if (data.ok) {
-                  Swal.fire({ icon: 'success', title: '已刪除', confirmButtonColor: '#2563eb' })
-                      .then(() => location.reload());
-              } else {
-                  Swal.fire({ icon: 'error', title: '刪除失敗', text: data.error, confirmButtonColor: '#2563eb' });
-              }
-          });
-      });
-  });
 
 }
 
