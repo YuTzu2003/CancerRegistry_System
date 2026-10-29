@@ -480,6 +480,11 @@ window.DashboardRenderer.ensureInsightsForLanguage = async function({ retry = tr
 window.DashboardRenderer.rerenderDashboardLanguage = function(options = {}) {
         const selector = document.getElementById('dashboardLanguageSelect');
         if (selector && window.DashboardI18n) selector.value = window.DashboardI18n.getLanguage();
+        document.querySelectorAll('#chartTabsContainer .chart-tab-btn').forEach(button => {
+            const original = button.dataset.labelZh || button.textContent.trim();
+            button.dataset.labelZh = original;
+            button.textContent = window.AnnualReportRenderer?.resultTabLabel(original, window.DashboardI18n?.getLanguage()) || original;
+        });
         const languageLabel = document.getElementById('dashboardLanguageLabel');
         if (languageLabel && selector) languageLabel.textContent = selector.value === 'en' ? 'English' : '繁體中文';
         const headerMap = {
@@ -787,7 +792,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 surgeryContainer?.querySelectorAll('.stage-surgery-panel') || []
                             ).find(panel => panel.dataset.stageSurgeryKey === tableKeyOf(table, surgeryIndex));
                             const fieldKey = window.dashboardPreviewMode
-                                ? `期別與手術術式（${table.system}期別）`
+                                ? window.AnnualReportRenderer.surgeryInsightKey(table, surgeryIndex)
                                 : surgeryInsightButton?.dataset.insightFieldKey || '';
                             const llmText = getExportInsight(fieldKey);
                             const stageSystem = table.system || (exportLanguage === 'en' ? 'Unspecified' : '未指定');
@@ -889,7 +894,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (paneId === 'chartPane-IncidenceAge' && window.dashboardChartInstance) {
                         chartImage = await captureChartImage(window.dashboardChartInstance);
                     } else if (paneId === 'chartPane-DiagnosisHistology' && window.dashboardHistologyChartInstance) {
-                        chartImageKey = 'histology-full';
+                        // The labels inside the histogram change with the selected language,
+                        // so Chinese and English exports must not share the same image cache.
+                        chartImageKey = `histology-full-${exportLanguage}`;
                         if (!sharedChartImages[chartImageKey]) {
                             sharedChartImages[chartImageKey] = await captureChartImage(
                                 window.dashboardHistologyChartInstance,
@@ -1086,7 +1093,7 @@ window.DashboardRenderer.renderStageSurgeryTables = function(tables, yearTitle, 
         container.querySelectorAll('.stage-surgery-tab').forEach(tab => tab.classList.toggle('active', tab === button));
         container.querySelectorAll('.stage-surgery-panel').forEach(panel => panel.classList.toggle('d-none', panel.dataset.stageSurgeryKey !== button.dataset.stageSurgeryKey));
         const activeTable = tables.find((item, index) => tableKeyOf(item, index) === window.stageSurgeryActiveTableKey);
-        if (window.dashboardPreviewMode && activeTable) window.showDashboardPreviewNarrative?.(`期別與手術術式（${activeTable.system}期別）`);
+        if (window.dashboardPreviewMode && activeTable) window.showDashboardPreviewNarrative?.(window.AnnualReportRenderer.surgeryInsightKey(activeTable, tables.indexOf(activeTable)));
         else document.getElementById('btnAiTreatmentSurgery')?.onclick?.();
     }));
 };
@@ -1264,6 +1271,22 @@ window.DashboardRenderer.getGenderAgeChartOption = function(genderAgeData) {
 window.DashboardRenderer.renderDiagnosisClassificationChart = function(chartData, yearTitle, cancerTitle) {
         let chartDom = document.getElementById('annualDiagnosisClassificationChart');
         if (!chartDom) return;
+
+        this.classificationChartRenderArgs = [chartData, yearTitle, cancerTitle];
+        if (!this.classificationChartResizeObserver && typeof ResizeObserver !== 'undefined') {
+            let lastWidth = 0;
+            this.classificationChartResizeObserver = new ResizeObserver(entries => {
+                const width = Math.round(entries[0]?.contentRect.width || 0);
+                if (!width || width === lastWidth) return;
+                lastWidth = width;
+                requestAnimationFrame(() => {
+                    if (this.classificationChartRenderArgs) {
+                        this.renderDiagnosisClassificationChart(...this.classificationChartRenderArgs);
+                    }
+                });
+            });
+            this.classificationChartResizeObserver.observe(chartDom);
+        }
         
         if (!this.classificationChartInst) {
             this.classificationChartInst = echarts.init(chartDom);
@@ -1277,6 +1300,8 @@ window.DashboardRenderer.renderDiagnosisClassificationChart = function(chartData
         const chartTitle = isEnglish
             ? `${this.getEnglishCancerPatientLabel(selectedCancer)} Case Class Distribution, ${yearTitle}`
             : `${yearTitle}年${selectedCancer}${this.t('classificationDistribution')}`;
+        const chartWidth = chartDom.clientWidth || 1100;
+        const legendTextWidth = Math.min(450, Math.floor(chartWidth * 0.38) - 34);
         chartDom.style.height = '450px';
         this.classificationChartInst.resize();
         const labels = [
@@ -1308,7 +1333,7 @@ window.DashboardRenderer.renderDiagnosisClassificationChart = function(chartData
                 textStyle: {
                     fontSize: 14,
                     lineHeight: 22,
-                    width: 450,
+                    width: legendTextWidth,
                     overflow: 'break'
                 }
             },
@@ -1318,7 +1343,7 @@ window.DashboardRenderer.renderDiagnosisClassificationChart = function(chartData
             },
             grid: {
                 left: '3%',
-                right: '32%',
+                right: `${legendTextWidth + 75}px`,
                 top: '15%',
                 bottom: '3%',
                 containLabel: true

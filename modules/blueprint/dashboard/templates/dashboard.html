@@ -4,7 +4,7 @@
 {% block extra_head %}
   <script src="/static/vendor/echarts/echarts.min.js"></script>
   <script src="/static/vendor/i18next/i18next.min.js"></script>
-  <link rel="stylesheet" href="/static/css/dashboard/dashboard.css?v=20261008-summary-rwd">
+  <link rel="stylesheet" href="/static/css/dashboard/dashboard.css?v=20261029-classification-chart-scroll">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/dashboard_page.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/llm_task_panel.css') }}">
 {% endblock %}
@@ -60,7 +60,9 @@
               <tbody id="annualSexAgeTableBody"></tbody>
             </table>
           </div>
-          <div id="main" style="width: 100%; height: 450px;"></div>
+          <div class="annual-gender-age-chart-scroll">
+            <div id="main" style="width: 100%; height: 450px;"></div>
+          </div>
           <div id="annualSexAgeChartCaption" class="annual-chart-caption">圖、XXXX年新診斷XX病患性別及年齡分佈圖</div>
         </div>
         <!--LLM 分析結果-->
@@ -181,7 +183,9 @@
           </div>
           <div class="row align-items-center">
             <div class="col-md-12">
-              <div id="annualDiagnosisClassificationChart" style="width: 100%; height: 450px;"></div>
+              <div class="annual-classification-chart-scroll">
+                <div id="annualDiagnosisClassificationChart" style="width: 100%; height: 450px;"></div>
+              </div>
             </div>
           </div>
           <div id="annualDiagnosisClassificationChartCaption" class="annual-chart-caption mt-2">圖、XXXX年新診斷XX病患個案分類分佈圖</div>
@@ -345,12 +349,12 @@
   {{ cancer_name_translations | tojson }}
 </script>
 <script src="{{ url_for('static', filename='js/dashboard/dashboard_page.js') }}"></script>
-<script src="{{ url_for('static', filename='js/dashboard/llm_task_panel.js', v='20261007-swal-delete') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard/llm_task_panel.js', v='20261029-comparison-progress') }}"></script>
 <script src="{{ url_for('static', filename='js/dashboard/dashboard_i18n.js') }}"></script>
-<script src="{{ url_for('static', filename='js/dashboard/annual_report_renderer.js') }}"></script>
-<script src="{{ url_for('static', filename='js/dashboard/dashboard.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard/annual_report_renderer.js', v='20261029-surgery-insights') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard/dashboard.js', v='20261029-surgery-insights') }}"></script>
 {% if preview_task %}
 <script id="dashboardPreviewData" type="application/json">{{ {"task": preview_task, "payload": preview_payload} | tojson }}</script>
-<script src="{{ url_for('static', filename='js/dashboard/dashboard_preview.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard/dashboard_preview.js', v='20261029-surgery-insights') }}"></script>
 {% endif %}
 {% endblock %}

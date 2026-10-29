@@ -9,6 +9,45 @@
     female: '#EE6666',
     total: '#91CC75'
   });
+  // ECharts calculates one uniform width for every age group in a chart.
+  // The maximum keeps the bars from becoming oversized on wide displays.
+  const GENDER_AGE_BAR_MAX_WIDTH = 16;
+  const RESULT_TAB_ENGLISH = Object.freeze({
+    '性別年齡分佈': 'Sex and age distribution',
+    '性別年齡分布': 'Sex and age distribution',
+    '年齡中位數': 'Median age',
+    '可分析個案與確診個案': 'Analyzable and confirmed cases',
+    '組織型態': 'Histology',
+    '個案分類': 'Case classification',
+    '期別': 'Stage',
+    '分期呈現最細碼': 'Detailed stage',
+    '分期不呈現最細碼': 'Stage summary',
+    '期別與首次療程': 'Stage and first course treatment',
+    '期別與手術術式': 'Stage and surgical procedure',
+    '存活率': 'Survival',
+    '歷年年齡中位數': 'Median age over time',
+    '歷年期別分佈': 'Stage distribution over time',
+    '歷年新診斷件數': 'New diagnoses over time',
+    '本院常見癌症': 'Common cancers at our hospital'
+  });
+  function resultTabLabel(label, language) {
+    return language === 'en' ? (RESULT_TAB_ENGLISH[label] || label) : label;
+  }
+  function surgeryTableKey(table, index) {
+    return `${table?.manual_key || 'unknown'}::${table?.system || 'stage'}::${index}`;
+  }
+  function surgeryInsightKey(table, index) {
+    return `期別與手術術式|${surgeryTableKey(table, index)}`;
+  }
+  const SURGERY_STAGE_MANUALS = Object.freeze({
+    FIGO: ['Cervix_Uteri', 'Corpus_Uteri', 'Ovary'],
+    MAC: ['Colon', 'Rectum'], BCLC: ['Liver'], SCLC: ['Lung'],
+    DSS: ['Plasma_cell_neoplasms'], DRE: ['Prostate'],
+    'Breast Cancer Prognostic Stage': ['Breast'], Binet: ['CLL']
+  });
+  function surgeryStageApplicable(table) {
+    return table?.system === 'AJCC' || (SURGERY_STAGE_MANUALS[table?.system] || []).includes(table?.manual_key);
+  }
   const ANALYSIS_CONDITIONS = Object.freeze([
     { label: '性別年齡分佈', analysisId: 'chkIncidenceAge', comparisonId: 'compareItemGenderAge' },
     { label: '年齡中位數', analysisId: 'chkIncidenceMedian', comparisonId: 'compareItemAgeMedian' },
@@ -181,23 +220,25 @@
           name: labels.male,
           type: 'bar',
           data: data.male,
-          barWidth: 20,
-          barGap: '20%',
-          barCategoryGap: '42%',
+          barMaxWidth: GENDER_AGE_BAR_MAX_WIDTH,
+          // Keep the three series visually grouped, while leaving a clearer
+          // separation before the next age group.
+          barGap: '10%',
+          barCategoryGap: '48%',
           itemStyle: { color: GENDER_AGE_COLORS.male }
         },
         {
           name: labels.female,
           type: 'bar',
           data: data.female,
-          barWidth: 20,
+          barMaxWidth: GENDER_AGE_BAR_MAX_WIDTH,
           itemStyle: { color: GENDER_AGE_COLORS.female }
         },
         {
           name: labels.total,
           type: 'bar',
           data: data.total,
-          barWidth: 20,
+          barMaxWidth: GENDER_AGE_BAR_MAX_WIDTH,
           z: 5,
           itemStyle: { color: GENDER_AGE_COLORS.total }
         }
@@ -209,6 +250,10 @@
     DEFAULT_AGE_GROUPS,
     GENDER_AGE_COLORS,
     ANALYSIS_CONDITIONS,
+    resultTabLabel,
+    surgeryTableKey,
+    surgeryInsightKey,
+    surgeryStageApplicable,
     sum,
     normalizeAgeGroupLabel,
     normalizeGenderAgeData,

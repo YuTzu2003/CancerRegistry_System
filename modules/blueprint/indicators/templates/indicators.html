@@ -49,7 +49,7 @@
   .indicators-file-name { color: var(--gray-800); font-size: 13.5px; min-width: 0; overflow-wrap: anywhere; }
   .indicators-file-item.is-selected .indicators-file-name { color: var(--blue-700); font-weight: 700; }
   .indicators-file-time { color: var(--gray-500); font-size: 11px; padding: 4px 12px; text-align: right; white-space: nowrap; }
-  .indicators-file-delete-cell { align-items: center; align-self: stretch; background: var(--gray-50); border-right: 1px solid var(--border); display: none; justify-content: center; }
+  .indicators-file-delete-cell { align-items: center; align-self: stretch; background: transparent; border-right: 0; display: none; justify-content: center; }
   .file-list-card.is-delete-mode .indicators-file-item { cursor: default; grid-template-columns: 42px minmax(0, 1fr) 160px; }
   .file-list-card.is-delete-mode .indicators-file-delete-cell { display: flex; }
   .file-list-card.is-delete-mode .indicators-file-item:hover { background: var(--white); }
@@ -218,7 +218,7 @@
       </div>
       <div>
         <div class="file-list-card">
-          <div class="file-list-header"><div><h6 class="mb-1 fw-bold text-dark d-flex align-items-center gap-2"><i class="bi bi-folder2-open text-primary"></i>檔案清單 <span id="indicatorsFileCount" class="badge bg-secondary rounded-pill font-monospace" style="font-size: 11px;">0</span></h6><div id="indicatorsFileListHint" class="text-secondary" style="font-size: 12px;">點選檔案列，設為分析來源</div></div><div class="indicators-file-bulk-actions"><button id="btnCancelIndicatorFileDelete" class="indicators-delete-control btn btn-sm btn-link text-secondary p-0" type="button">取消</button><label class="indicators-delete-control align-items-center gap-1 mb-0 text-danger" style="cursor: pointer; white-space: nowrap; font-size: 12px;"><input id="indicatorSelectAllFiles" class="form-check-input mt-0" type="checkbox" aria-label="全選要刪除的檔案"><span>全選</span></label><button id="btnBatchDeleteIndicatorFiles" class="btn btn-sm btn-outline-danger" type="button" disabled>刪除</button></div></div>
+          <div class="file-list-header"><div><h6 class="mb-1 fw-bold text-dark d-flex align-items-center gap-2"><i class="bi bi-folder2-open text-primary"></i>檔案清單 <span id="indicatorsFileCount" class="badge bg-secondary rounded-pill font-monospace" style="font-size: 11px;">0</span></h6><div id="indicatorsFileListHint" class="text-secondary" style="font-size: 12px;">點選檔案列，設為分析來源</div></div><div class="indicators-file-bulk-actions"><button id="btnCancelIndicatorFileDelete" class="indicators-delete-control btn btn-sm btn-link text-secondary text-decoration-none p-0" type="button">取消</button><label class="indicators-delete-control align-items-center gap-1 mb-0 text-danger" style="cursor: pointer; white-space: nowrap; font-size: 12px;"><input id="indicatorSelectAllFiles" class="form-check-input mt-0" type="checkbox" aria-label="全選要刪除的檔案"><span>全選</span></label><button id="btnBatchDeleteIndicatorFiles" class="btn btn-sm btn-outline-danger" type="button" disabled>刪除</button></div></div>
           <div class="file-list-container"><div id="indicatorsFileList" class="indicators-file-list" aria-live="polite"><div class="indicators-file-empty"><span class="indicators-file-empty-title">尚未選擇檔案</span><span>請選擇 Excel、CSV 或 TXT 後加入檔案清單</span></div></div></div>
         </div>
       </div>
@@ -1329,7 +1329,7 @@
         const targetLabel = hasTarget ? `${operator}${Number(target).toLocaleString()}%` : '尚未設定';
         const statusClass = meetsTarget == null ? '' : meetsTarget ? 'is-success' : 'is-warning';
         const statusIcon = meetsTarget == null ? 'bi-dash-circle' : meetsTarget ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill';
-        const statusLabel = !calculationAvailable ? '尚未建立規則' : meetsTarget == null ? '待設定閾值' : meetsTarget ? '達標' : '未達標';
+        const statusLabel = !calculationAvailable ? '尚未建立規則' : !hasTarget ? '待設定閾值' : percentage == null ? '無法計算' : meetsTarget ? '達標' : '未達標';
         const thresholdMarkup = canManageThresholds ? `<span class="indicator-threshold-editor">
           <span>閾值：</span>
           <select class="form-select form-select-sm indicator-threshold-operator" data-threshold-operator aria-label="指標 ${escapeHtml(indicator.id)} 閾值比較方式">
@@ -1594,7 +1594,7 @@
       const rateLabel = !calculationAvailable ? '尚未建立規則' : percentage == null ? '無法計算' : `${percentage}%`;
       const targetLabel = hasTarget ? `${operator}${Number(target).toLocaleString()}%` : '尚未設定';
       const statusClass = meetsTarget == null ? 'is-neutral' : meetsTarget ? 'is-success' : 'is-warning';
-      const statusLabel = !calculationAvailable ? '尚未建立規則' : meetsTarget == null ? '待設定閾值' : meetsTarget ? '達標' : '未達標';
+      const statusLabel = !calculationAvailable ? '尚未建立規則' : !hasTarget ? '待設定閾值' : percentage == null ? '無法計算' : meetsTarget ? '達標' : '未達標';
       const statusSymbol = meetsTarget == null ? '－' : meetsTarget ? '✓' : '▲';
       const valuePositionClass = percentage === 0 ? ' is-zero' : percentage === 100 ? ' is-full' : '';
       const valuePositionStyle = percentage !== 0 && percentage !== 100 ? `left:${safePercentage}%;` : '';

@@ -33,6 +33,14 @@
   let renderer = null;
   const taskReadyForExport = (task) => {
     if ((task?.Status || task?.status) !== 'completed' || !payload.items?.length) return false;
+    if (payload.items.some(item => item.field_key?.startsWith('期別與手術術式'))) {
+      const keys = new Set(payload.items.map(item => item.field_key));
+      if ((chartData.stageSurgeryData || []).some((table, index) => !keys.has(window.AnnualReportRenderer.surgeryInsightKey(table, index)))) return false;
+    }
+    if (payload.items.some(item => item.field_key?.startsWith('期別與首次療程'))) {
+      const keys = new Set(payload.items.map(item => item.field_key));
+      if ((chartData.stageFirstCourseData || []).some(table => table.system && !keys.has(`期別與首次療程（${table.system}期別）`))) return false;
+    }
     const results = new Map((task.result || []).map((row) => [row.custom_id, row.result]));
     return payload.items.every((item) => {
       const result = results.get(item.item_id);
@@ -48,6 +56,21 @@
   };
   const activatePreviewItem = (item) => {
     activePreviewItem = item;
+    if (item.response === 'llmResponseTreatmentFirstCourse') {
+      const system = window.stageFirstCourseActiveSystem;
+      if (system) {
+        const fieldKey = `期別與首次療程（${system}期別）`;
+        activePreviewItem = selected.find(entry => entry.field_key === fieldKey) || { field_key: fieldKey, pane: item.pane, response: item.response };
+      }
+    }
+    if (item.response === 'llmResponseTreatmentSurgery') {
+      const tables = chartData.stageSurgeryData || [];
+      const index = tables.findIndex((table, i) => window.AnnualReportRenderer.surgeryTableKey(table, i) === window.stageSurgeryActiveTableKey);
+      if (index >= 0) {
+        const fieldKey = window.AnnualReportRenderer.surgeryInsightKey(tables[index], index);
+        activePreviewItem = selected.find(entry => entry.field_key === fieldKey) || { field_key: fieldKey, pane: item.pane, response: item.response };
+      }
+    }
     const pane = document.querySelector(item.pane);
     document.querySelectorAll('.chart-pane').forEach((entry) => entry.classList.add('d-none'));
     pane?.classList.remove('d-none');
@@ -79,7 +102,7 @@
     const exportButton = document.getElementById('btnPrepareExport');
     if (exportButton) {
       exportButton.disabled = !taskReadyForExport(currentTask);
-      exportButton.title = exportButton.disabled ? '中英文分析敘述完成後才能匯出' : '';
+      exportButton.title = exportButton.disabled ? '所有表格的中英文敘述完成後才能匯出；舊任務若缺少敘述，請重新查詢。' : '';
     }
     const results = Object.fromEntries((currentTask.result || []).map((row) => [row.field_key, row.result?.insights || {}]));
     const language = window.DashboardI18n?.getLanguage() || 'zh-TW';
@@ -92,9 +115,10 @@
     selected.forEach((item) => {
       if (!responseItems.has(item.response) || item.field_key === activePreviewItem?.field_key) responseItems.set(item.response, item);
     });
+    if (activePreviewItem?.response) responseItems.set(activePreviewItem.response, activePreviewItem);
     responseItems.forEach((item, responseId) => {
       const target = document.getElementById(responseId);
-      if (target) target.textContent = results[item.field_key]?.[language] || (['failed', 'partial_failed', 'completed'].includes(currentTask.Status || currentTask.status) ? '此圖表敘述未能完成。' : '正在處理中…');
+      if (target) target.textContent = results[item.field_key]?.[language] || (!item.item_id ? '此表格沒有對應的敘述，請重新建立年報分析任務。' : ['failed', 'partial_failed', 'completed'].includes(currentTask.Status || currentTask.status) ? '此圖表敘述未能完成。' : '正在處理中…');
     });
     bindRegenerateButtons(currentTask);
   };
@@ -102,8 +126,9 @@
   window.rerenderDashboardPreviewNarrative = () => applyNarratives(currentTask);
   window.showDashboardPreviewNarrative = (fieldKey) => {
     const item = selected.find((entry) => entry.field_key === fieldKey);
-    if (item && document.querySelector('.chart-tab-btn.active')?.dataset.target === item.pane) {
-      activePreviewItem = item;
+    const pane = paneFor(fieldKey);
+    if (document.querySelector('.chart-tab-btn.active')?.dataset.target === (item?.pane || pane)) {
+      activePreviewItem = item || { field_key: fieldKey, pane, response: responseFor(fieldKey) };
       applyNarratives(currentTask);
     }
   };
@@ -140,7 +165,7 @@
       .map((tab) => ({ ...tab, item: selected.find((item) => item.pane === tab.pane) }))
       .filter((tab) => tab.item);
     tabs.forEach((tab, index) => {
-      const button = document.createElement('button'); button.type = 'button'; button.className = 'btn btn-outline-primary chart-tab-btn'; button.dataset.target = tab.pane; button.textContent = tab.label;
+      const button = document.createElement('button'); button.type = 'button'; button.className = 'btn btn-outline-primary chart-tab-btn'; button.dataset.target = tab.pane; button.dataset.labelZh = tab.label; button.textContent = window.AnnualReportRenderer?.resultTabLabel(tab.label, window.DashboardI18n?.getLanguage()) || tab.label;
       button.addEventListener('click', () => {
         container.querySelectorAll('.chart-tab-btn').forEach((entry) => entry.classList.remove('active'));
         button.classList.add('active');
@@ -158,8 +183,8 @@
     if (!button) return;
     button.style.display = 'block';
     button.dataset.insightFieldKey = item.field_key;
-    button.disabled = !canRegenerate;
-    if (!canRegenerate) return;
+    button.disabled = !canRegenerate || !item.item_id;
+    if (button.disabled) { button.onclick = null; return; }
     button.onclick = async () => {
       button.disabled = true;
       const response = await fetch('/api/llm-tasks/' + encodeURIComponent(taskId) + '/regenerate/' + encodeURIComponent(item.item_id), { method: 'POST' });

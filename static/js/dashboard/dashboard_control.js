@@ -359,7 +359,7 @@
       const mainCatIds = preset.main_category.split(',');
       mainCatIds.forEach(id => {
         const mainCat = document.getElementById(id);
-        if (mainCat) {
+        if (mainCat && mainCat.dataset.group !== 'cross_year') {
           mainCat.checked = true;
           mainCat.dispatchEvent(new Event('change'));
         }
@@ -378,7 +378,7 @@
           return;
         }
         const subCat = document.getElementById(id);
-        if (subCat) {
+        if (subCat && subCat.dataset.parent !== 'cross_year') {
           subCat.checked = true;
           subCat.dispatchEvent(new Event('change'));
         }
@@ -883,12 +883,14 @@
 
     const categoryRadios = document.querySelectorAll('input[name="mainCategoryTab"]');
     categoryRadios.forEach(radio => {
-      radio.disabled = !isBehaviorValid;
+      radio.disabled = !isBehaviorValid || radio.dataset.group === 'cross_year';
+      if (radio.dataset.group === 'cross_year') radio.checked = false;
     });
 
     const itemRadios = document.querySelectorAll('.item-checkbox');
     itemRadios.forEach(radio => {
-      radio.disabled = !isBehaviorValid;
+      radio.disabled = !isBehaviorValid || radio.dataset.parent === 'cross_year';
+      if (radio.dataset.parent === 'cross_year') radio.checked = false;
     });
     updateStageModeSelection(isBehaviorValid);
     updateStageSummaryOptions();
@@ -1447,7 +1449,8 @@ function initDashboardControl() {
                               const btn = document.createElement('button');
                               btn.className = 'btn btn-outline-primary chart-tab-btn';
                               btn.type = 'button';
-                              btn.innerText = itemChk.value;
+                              btn.dataset.labelZh = itemChk.value;
+                              btn.innerText = window.AnnualReportRenderer?.resultTabLabel(itemChk.value, window.DashboardI18n?.getLanguage()) || itemChk.value;
                               btn.dataset.target = targetSelector;
                               
                               btn.addEventListener('click', function() {
@@ -1528,6 +1531,8 @@ function initDashboardControl() {
                               const activeKey = window.stageSurgeryActiveTableKey;
                               const item = tables.find((table, index) => `${table.manual_key || 'unknown'}::${table.system || 'stage'}::${index}` === activeKey) || tables[0] || {};
                               return {
+                                  cancer: item.cancer_name || item.manual_key || '',
+                                  cancer_en: item.cancer_name_en || '',
                                   stage_system: item.system || '',
                                   stage_mode: item.stage_mode || '',
                                   stage_columns: item.stage_columns || [],
@@ -1544,7 +1549,8 @@ function initDashboardControl() {
                               const tables = Array.isArray(data.stageSurgeryData) ? data.stageSurgeryData : [];
                               const activeKey = window.stageSurgeryActiveTableKey;
                               const item = tables.find((table, index) => `${table.manual_key || 'unknown'}::${table.system || 'stage'}::${index}` === activeKey) || tables[0];
-                              return item?.system ? `期別與手術術式（${item.system}期別）` : '期別與手術術式';
+                              const index = tables.indexOf(item);
+                              return index >= 0 ? window.AnnualReportRenderer.surgeryInsightKey(item, index) : '期別與手術術式';
                           }
                       }                  ];
 
@@ -1635,23 +1641,29 @@ function initDashboardControl() {
                            : treatmentSystems[0] || '';
                        const treatmentInsightButton = document.getElementById('btnAiTreatmentFirstCourse');
                        if (document.getElementById('chkTreatmentFirstCourse')?.checked && initialTreatmentSystem) {
-                           window.stageFirstCourseActiveSystem = initialTreatmentSystem;
-                           variantInsightTasks.push(() => treatmentInsightButton?.onclick?.());
+                           [...new Set(treatmentSystems.filter(Boolean))].forEach(system => variantInsightTasks.push(async () => {
+                               window.stageFirstCourseActiveSystem = system;
+                               try { return await treatmentInsightButton?.onclick?.(); }
+                               finally { window.stageFirstCourseActiveSystem = initialTreatmentSystem; }
+                           }));
                        }
                        window.stageFirstCourseActiveSystem = initialTreatmentSystem;
                        window.DashboardRenderer.renderStageFirstCourseTables(chartData.stageFirstCourseData, yearTitle, cancerTitle);                       const surgeryTables = Array.isArray(chartData.stageSurgeryData)
                            ? chartData.stageSurgeryData
                            : [];
-                       const surgerySystems = surgeryTables.map(table => table.system);
-                       const initialSurgerySystem = surgerySystems.includes(window.stageSurgeryActiveSystem)
-                           ? window.stageSurgeryActiveSystem
-                           : surgerySystems[0] || '';
+                       const surgeryKeys = surgeryTables.map((table, index) => window.AnnualReportRenderer.surgeryTableKey(table, index));
+                       const initialSurgeryKey = surgeryKeys.includes(window.stageSurgeryActiveTableKey)
+                           ? window.stageSurgeryActiveTableKey
+                           : surgeryKeys[0] || '';
                        const surgeryInsightButton = document.getElementById('btnAiTreatmentSurgery');
-                       if (document.getElementById('chkTreatmentSurgery')?.checked && initialSurgerySystem) {
-                           window.stageSurgeryActiveSystem = initialSurgerySystem;
-                           variantInsightTasks.push(() => surgeryInsightButton?.onclick?.());
+                       if (document.getElementById('chkTreatmentSurgery')?.checked && initialSurgeryKey) {
+                           surgeryKeys.forEach(key => variantInsightTasks.push(async () => {
+                               window.stageSurgeryActiveTableKey = key;
+                               try { return await surgeryInsightButton?.onclick?.(); }
+                               finally { window.stageSurgeryActiveTableKey = initialSurgeryKey; }
+                           }));
                        }
-                       window.stageSurgeryActiveSystem = initialSurgerySystem;
+                       window.stageSurgeryActiveTableKey = initialSurgeryKey;
                        window.DashboardRenderer.renderStageSurgeryTables(chartData.stageSurgeryData, yearTitle, cancerTitle);
                       window.DashboardRenderer.renderSurvivalTable(chartData.survivalData, yearTitle, cancerTitle);
                       window.DashboardRenderer.updateChartCaptions(yearTitle, cancerTitle);

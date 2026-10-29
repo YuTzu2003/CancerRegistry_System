@@ -72,6 +72,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function renderExportItems() {
         const exportData = getCurrentExportData();
+        const isEnglish = exportLanguageSelect.value === 'en';
         listContainer.innerHTML = '';
         exportData.forEach((item, index) => {
         const div = document.createElement('div');
@@ -89,11 +90,11 @@ document.addEventListener('DOMContentLoaded', function() {
         div.innerHTML = `
             <div class="d-flex align-items-center flex-grow-1">
                 <i class="bi bi-grip-vertical text-muted fs-4 drag-handle-icon"></i>
-                <div class="export-item-title ms-2"><i class="bi bi-graph-up-arrow text-primary me-2"></i> ${item.id.startsWith('chartPane-TreatmentSurgery-') ? item.title : (exportItemLabels[item.id.replace(/-\d+$/, '')] || item.title)}</div>
+                <div class="export-item-title ms-2"><i class="bi bi-graph-up-arrow text-primary me-2"></i> ${item.title}</div>
                 <div class="d-flex align-items-center gap-3 ms-4 flex-wrap" onmousedown="event.stopPropagation()">
                     ${hasChart ? '<div class="form-check"><input class="form-check-input item-cb-chart" type="checkbox" checked id="cb_chart_'+item.id+'"><label class="form-check-label" for="cb_chart_'+item.id+'">圖表</label></div>' : ''}
                     ${hasTable ? '<div class="form-check"><input class="form-check-input item-cb-table" type="checkbox" checked id="cb_table_'+item.id+'"><label class="form-check-label" for="cb_table_'+item.id+'">表格</label></div>' : ''}
-                    ${hasAi ? '<div class="form-check"><input class="form-check-input item-cb-ai" type="checkbox" checked id="cb_ai_'+item.id+'"><label class="form-check-label" for="cb_ai_'+item.id+'">AI敘述</label></div>' : ''}
+                    ${hasAi ? '<div class="form-check"><input class="form-check-input item-cb-ai" type="checkbox" checked id="cb_ai_'+item.id+'"><label class="form-check-label" for="cb_ai_'+item.id+'">分析敘述</label></div>' : ''}
                 </div>
             </div>
             <div class="export-actions ms-3">
@@ -101,6 +102,15 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
         `;
             listContainer.appendChild(div);
+            if (isEnglish) {
+                const setControlLabel = (selector, text) => {
+                    const label = div.querySelector(selector)?.closest('.form-check')?.querySelector('label');
+                    if (label) label.textContent = text;
+                };
+                setControlLabel('.item-cb-chart', 'Figure');
+                setControlLabel('.item-cb-table', 'Table');
+                setControlLabel('.item-cb-ai', 'Analysis and description');
+            }
         });
 
         if (typeof Sortable !== 'undefined') {

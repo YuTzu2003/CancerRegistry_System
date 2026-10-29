@@ -55,7 +55,7 @@
           #dashFileListBody .dashboard-file-name > .d-flex { flex-wrap: wrap; min-width: 0; }
           #dashFileListBody .dashboard-file-name .file-display-name { min-width: 0; overflow-wrap: anywhere; }
           #dashFileListBody .dashboard-file-time { display: flex; align-items: center; justify-content: flex-end; font-size: 11px; white-space: nowrap; }
-          #dashFileListBody .dashboard-delete-cell { display: flex; align-items: center; justify-content: center; width: auto; border-right: 1px solid var(--border); background: var(--gray-50) !important; cursor: default; }
+          #dashFileListBody .dashboard-delete-cell { display: flex; align-items: center; justify-content: center; width: auto; border-right: 0; background: transparent !important; cursor: default; }
           #dashFileListBody tr.table-active { border-color: var(--blue-500) !important; }
           #dashFileListBody tr:focus-visible { outline: 2px solid var(--blue-500); outline-offset: -2px; }
           #dashFileListBody #noFileRow { display: block; }
@@ -80,7 +80,7 @@
               <div id="dashboardFileListHint" class="text-secondary" style="font-size: 12px;">點選檔案列，設為分析來源</div>
             </div>
             <div class="dashboard-file-actions">
-              <button id="btnCancelDashboardFileDelete" class="dashboard-delete-cancel btn btn-sm btn-link text-secondary p-0" type="button">取消</button>
+              <button id="btnCancelDashboardFileDelete" class="dashboard-delete-cancel btn btn-sm btn-link text-secondary text-decoration-none p-0" type="button">取消</button>
               <label class="dashboard-delete-select-all d-inline-flex align-items-center gap-1 mb-0 text-danger" style="cursor: pointer; white-space: nowrap; font-size: 12px;"><input id="dashboardSelectAllFiles" class="form-check-input mt-0" type="checkbox" aria-label="全選要刪除的檔案"><span>全選</span></label>
               <button id="btnBatchDeleteDashboardFiles" class="btn btn-sm btn-outline-danger" type="button" disabled>刪除</button>
             </div>
@@ -241,7 +241,7 @@
               <label class="cat-btn-label" for="chkGroupTreatment"><i class="bi bi-capsule me-1"></i> 治療方式<span class="badge rounded-pill bg-warning text-dark ms-1 cat-count-badge d-none" data-parent-group="treatment">0</span></label>
               
               <input class="btn-check group-checkbox" type="radio" name="mainCategoryTab" id="chkGroupCrossYear" data-group="cross_year" disabled>
-              <label class="cat-btn-label" for="chkGroupCrossYear"><i class="bi bi-calendar3 me-1"></i> 跨年度分析<span class="badge rounded-pill bg-warning text-dark ms-1 cat-count-badge d-none" data-parent-group="cross_year">0</span></label>
+              <label class="cat-btn-label" for="chkGroupCrossYear" title="跨年度分析暫不開放"><i class="bi bi-calendar3 me-1"></i> 跨年度分析<span class="badge rounded-pill bg-warning text-dark ms-1 cat-count-badge d-none" data-parent-group="cross_year">0</span></label>
             </div>
           </div>
 
@@ -916,5 +916,5 @@
 
 <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/control.css', v='20261007-file-list-rwd-v2') }}">
 
-<script src="{{ url_for('static', filename='js/dashboard/annual_report_renderer.js') }}"></script>
-<script src="{{ url_for('static', filename='js/dashboard/dashboard_control.js', v='20261012-file-batch-delete') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard/annual_report_renderer.js', v='20261029-surgery-insights') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard/dashboard_control.js', v='20261029-disable-cross-year') }}"></script>

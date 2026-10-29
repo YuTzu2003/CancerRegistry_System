@@ -191,6 +191,23 @@ STAGE_FUNCTIONS = {
     "Breast Cancer Prognostic Stage": breast_stages, "Binet": binet_stages,
 }
 
+# Manual keys follow resolve_surgery_manual_key; these mirror the site and
+# histology eligibility in the stage functions above and the selection UI.
+SURGERY_STAGE_MANUALS = {
+    "FIGO": {"Cervix_Uteri", "Corpus_Uteri", "Ovary"},
+    "MAC": {"Colon", "Rectum"},
+    "BCLC": {"Liver"},
+    "SCLC": {"Lung"},
+    "DSS": {"Plasma_cell_neoplasms"},
+    "DRE": {"Prostate"},
+    "Breast Cancer Prognostic Stage": {"Breast"},
+    "Binet": {"CLL"},
+}
+
+
+def surgery_stage_applicable(manual_key, system):
+    return system == "AJCC" or manual_key in SURGERY_STAGE_MANUALS.get(system, set())
+
 AGE_GROUPS = [
     ("≦19", None, 19), ("20-24", 20, 24), ("25-29", 25, 29),
     ("30-34", 30, 34), ("35-39", 35, 39), ("40-44", 40, 44),
@@ -436,7 +453,7 @@ def _treatment_record(case):
     }
 
 
-def _available_stage_labels(system, detailed, period_codes):
+def _available_stage_labels(system, detailed, period_codes, manual_key=None):
     """Return reportable Period_Code labels for an empty stage-treatment table."""
     label = period_codes["label"].astype(str).str.strip()
     label_matches = {
@@ -451,6 +468,9 @@ def _available_stage_labels(system, detailed, period_codes):
         "Binet": label.eq("Binet(ostagec)"),
     }
     codes = period_codes.loc[label_matches.get(system, pd.Series(False, index=period_codes.index))]
+    figo_sites = {"Cervix_Uteri": "C53", "Corpus_Uteri": "C54", "Ovary": "C56"}
+    if system == "FIGO" and manual_key in figo_sites:
+        codes = codes[codes["site"].astype(str).str.strip().str.upper().eq(figo_sites[manual_key])]
     stage_column = "stage_detail" if detailed else "stage_detail_hide"
     labels = []
     for _, code in codes.iterrows():
@@ -628,10 +648,12 @@ def calculate_stage_surgery_distribution(cases, options, period_codes=None, manu
             )
 
         for key in requested_manual_keys:
+            if not surgery_stage_applicable(key, system):
+                continue
             summary, rules = summaries[key], rules_by_manual[key]
             stage_columns = sorted(summary["stage_columns"], key=_stage_sort_key)
             if not stage_columns:
-                stage_columns = _available_stage_labels(system, detailed, period_codes)
+                stage_columns = _available_stage_labels(system, detailed, period_codes, key)
             rows = [
                 {
                     "row_key": str(rule["RowKey"]),

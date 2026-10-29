@@ -5,6 +5,8 @@ const fileNameDisplay = document.getElementById('fileName');
 const txtHeaderOption = document.getElementById('txtHeaderOption');
 const txtHasHeader = document.getElementById('txtHasHeader');
 const analyzeFileBtn = document.getElementById('analyzeFileBtn');
+const formatSelect = document.getElementById('formatSelect');
+const formatHint = document.getElementById('dataGenFormatHint');
 const selectAllExtraFieldsBtn = document.getElementById('btnSelectAllDataGenExtras');
 const clearAllExtraFieldsBtn = document.getElementById('btnClearAllDataGenExtras');
 const configSection = document.getElementById('configSection');
@@ -17,6 +19,22 @@ let currentColumns = [];
 let downloadUrl = '';
 let downloadFilename = '';
 let selectedUploadFile = null;
+let analysisVersion = 0;
+
+function syncFileFormatState() {
+    const needsFormat = Boolean(selectedUploadFile && !formatSelect?.value);
+    if (formatHint) formatHint.style.display = needsFormat ? 'block' : 'none';
+    if (analyzeFileBtn) analyzeFileBtn.disabled = needsFormat;
+}
+
+formatSelect?.addEventListener('change', () => {
+    analysisVersion += 1;
+    loadingOverlay.style.display = 'none';
+    syncFileFormatState();
+    if (selectedUploadFile && formatSelect.value && !selectedUploadFile.name.toLowerCase().endsWith('.txt')) {
+        analyzeSelectedFile();
+    }
+});
 
 function clearGeneratedDownload() {
     if (downloadUrl) {
@@ -73,13 +91,8 @@ document.querySelectorAll('#namingScheme .naming-chip').forEach(chip => {
 fileInput.onchange = async (e) => {
     if (e.target.files.length > 0) {
         const file = e.target.files[0];
-        const formatSelect = document.getElementById('formatSelect');
-        if (!formatSelect?.value) {
-            utils.alert('請先選擇參考資料格式', 'warning');
-            fileInput.value = '';
-            return;
-        }
-
+        analysisVersion += 1;
+        loadingOverlay.style.display = 'none';
         selectedUploadFile = file;
         fileNameDisplay.innerText = file.name;
         fileInfo.style.display = 'flex';
@@ -88,8 +101,9 @@ fileInput.onchange = async (e) => {
         txtHeaderOption.style.display = isTxt ? 'block' : 'none';
         txtHasHeader.checked = false;
         analyzeFileBtn.style.display = isTxt ? 'inline-flex' : 'none';
+        syncFileFormatState();
 
-        if (!isTxt) {
+        if (!isTxt && formatSelect?.value) {
             analyzeSelectedFile();
         }
     }
@@ -103,10 +117,12 @@ async function analyzeSelectedFile() {
     }
 
     const isTxt = file.name.toLowerCase().endsWith('.txt');
-    if (isTxt && !txtHasHeader.checked && !document.getElementById('formatSelect')?.value) {
-        utils.alert('無標頭 TXT 請先選擇參考資料格式', 'warning');
+    if (!formatSelect?.value) {
+        utils.alert('請選擇參考資料格式', 'warning');
         return;
     }
+
+        const requestVersion = ++analysisVersion;
 
         const formData = new FormData();
         formData.append('file', file);
@@ -119,6 +135,7 @@ async function analyzeSelectedFile() {
         try {
             const resp = await fetch('/api/data_gen/analyze', { method: 'POST', body: formData });
             const res = await resp.json();
+            if (requestVersion !== analysisVersion) return;
             loadingOverlay.style.display = 'none';
             
             if (res.ok) {
@@ -143,6 +160,7 @@ async function analyzeSelectedFile() {
                 utils.alert("分析失敗: " + res.error, "error");
             }
         } catch (err) {
+            if (requestVersion !== analysisVersion) return;
             loadingOverlay.style.display = 'none';
             utils.alert("上傳發生錯誤", "error");
         }
@@ -417,6 +435,8 @@ function downloadResult() {
 }
 
 function resetUpload() {
+    analysisVersion += 1;
+    loadingOverlay.style.display = 'none';
     fileInput.value = '';
     const formatSelect = document.getElementById('formatSelect');
     if (formatSelect) {
@@ -436,6 +456,7 @@ function resetUpload() {
     currentColumns = [];
     clearGeneratedDownload();
     selectedUploadFile = null;
+    syncFileFormatState();
     document.getElementById('dateFields').innerHTML = '';
     document.getElementById('specialFields').innerHTML = '';
     document.getElementById('outputFieldList').innerHTML = '<span class="field-chip disabled"><i class="bi bi-asterisk"></i> 尚未載入欄位，請先上傳檔案</span>';
