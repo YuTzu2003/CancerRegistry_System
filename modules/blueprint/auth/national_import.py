@@ -3,8 +3,8 @@ from datetime import datetime
 from uuid import UUID, uuid4
 from zipfile import BadZipFile
 from flask import flash, redirect, render_template, request, session, url_for
-from openpyxl import load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
+from modules.blueprint.auth.excel_import import load_import_workbook
 from modules.blueprint.auth.key_access import data_update_key_required
 from modules.services.auth import auth_bp, login_required
 from modules.services.db import get_conn
@@ -24,7 +24,7 @@ NATIONAL_COLUMN_LABELS = {
 
 def read_national_import_rows(file_source):
     try:
-        workbook = load_workbook(file_source, read_only=True, data_only=True)
+        workbook = load_import_workbook(file_source)
     except (BadZipFile, InvalidFileException, OSError) as error:
         raise ValueError("無法讀取 Excel 檔案。") from error
     try:
@@ -357,8 +357,8 @@ def national_import():
     try:
         if not uploaded_file or not uploaded_file.filename:
             raise ValueError("請選擇國家資料 Excel 檔案。")
-        if not uploaded_file.filename.lower().endswith(".xlsx"):
-            raise ValueError("僅接受 .xlsx 格式的國家資料檔案。")
+        if not uploaded_file.filename.lower().endswith((".xls", ".xlsx")):
+            raise ValueError("僅接受 .xls 或 .xlsx 格式的國家資料檔案。")
         imported_rows = read_national_import_rows(uploaded_file)
         insert_national_rows(imported_rows)
     except ValueError as error:

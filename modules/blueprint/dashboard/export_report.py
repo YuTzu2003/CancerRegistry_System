@@ -79,7 +79,7 @@ def _style_indicator_narrative_cell(cell):
 
 def generate_export_files(format_pdf, format_word, charts_data, output_dir, export_language="zh-TW", filename_base="export_report"):
     os.makedirs(output_dir, exist_ok=True)
-    insight_heading = "AI-generated narrative:" if export_language == "en" else "AI 分析敘述："
+    insight_heading = "Analysis and description" if export_language == "en" else "分析敘述："
     html_content = """
     <!DOCTYPE html>
     <html>
@@ -290,9 +290,9 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir, expo
         # LLM text
         if chart.get('includeAi', True):
             llm_text = chart.get('llmText', '')
-            if llm_text:
+            if llm_text and str(llm_text).strip() != '定義還沒串接使用。':
                 if chart.get('exportKind') == 'indicators':
-                    narrative_heading = chart.get('narrativeHeading') or '語言模型敘述'
+                    narrative_heading = chart.get('narrativeHeading') or '分析敘述'
                     html_content += (
                         '<div class="llm-text indicator-export-narrative">'
                         f'<div class="indicator-export-narrative-title">{html.escape(str(narrative_heading))}</div>'
@@ -566,7 +566,7 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir, expo
                         narrative_table.autofit = True
                         narrative_cell = narrative_table.cell(0, 0)
                         _style_indicator_narrative_cell(narrative_cell)
-                        title_text = chart_data.get('narrativeHeading') or '語言模型敘述'
+                        title_text = chart_data.get('narrativeHeading') or '分析敘述'
                         title_paragraph = narrative_cell.paragraphs[0]
                         title_paragraph.paragraph_format.space_after = Pt(4)
                         title_run = title_paragraph.add_run(str(title_text))

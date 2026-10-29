@@ -556,6 +556,25 @@
   white-space: nowrap;
 }
 
+/* Keep all three bars in each of the 15 age groups readable on narrow screens.
+   Only this chart scrolls horizontally when its available space is too small. */
+.annual-gender-age-chart-scroll {
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.annual-gender-age-chart-scroll #main {
+  min-width: 1120px;
+}
+
+.annual-classification-chart-scroll {
+  overflow-x: auto;
+}
+
+.annual-classification-chart-scroll #annualDiagnosisClassificationChart {
+  min-width: 1100px;
+}
+
 /* 年報分析期別：與其他分析細項相同的勾選框格式 */
 .annual-stage-system-row,
 .annual-stage-class-row {

@@ -263,12 +263,62 @@ window.DashboardRenderer.getSelectedYearTitle = function() {
 
 // 取得癌症標題
 window.DashboardRenderer.getSelectedCancerTitle = function() {
-        if (window.dashboardPreviewMode && window.dashboardPreviewCancerTitle) {
-            return window.dashboardPreviewCancerTitle;
-        }
         const language = window.DashboardI18n?.getLanguage();
         const cancerNameMap = window.dashboardCancerNameTranslations || {};
         const selectedKeys = window.dashboardSelectedCancerDisplayKeys || [];
+        if (window.dashboardPreviewMode && window.dashboardPreviewCancerTitle) {
+            const previewTitle = window.dashboardPreviewCancerTitle;
+            if (language !== 'en') return previewTitle;
+            const translatedKeys = selectedKeys.map(key => cancerNameMap[key]?.en).filter(Boolean);
+            if (translatedKeys.length) return translatedKeys.join(', ');
+            const legacyAliases = {
+                '口腔癌症': 'Oral Cavity, Oropharynx, and Hypopharynx',
+                '口腔': 'Oral Cavity',
+                'P16+': 'Oropharynx (P16+)',
+                'P16-': 'Oropharynx (P16-)',
+                '喉部': 'Larynx',
+                '直腸': 'Rectum (including RS Colon)',
+                '乳房': 'Breast',
+                '男性乳房': 'Breast(Male)',
+                '肺': 'Lung and Bronchus',
+                '邊緣區淋巴瘤': 'Marginal zone lymphoma (splenic, nodal and MALT)',
+                '淋巴漿細胞淋巴瘤': 'Lymphoplasmacytic lymphoma',
+                '濾泡性淋巴瘤': 'Follicular lymphoma',
+                '被套細胞淋巴瘤': 'Mantle cell lymphoma',
+                '伯基特淋巴瘤': 'Burkitt lymphoma',
+                '瀰漫性大 B 細胞淋巴瘤': 'Diffuse large B-cell lymphoma (any subtype)',
+                '原發性縱膈腔大型 B 細胞淋巴瘤': 'Primary mediastinal (thymic) large B-cell lymphoma',
+                '其他 B 細胞淋巴瘤': 'Other B-cell lymphomas',
+                '結外 NK/T 細胞淋巴瘤': 'Extranodal NK/T cell lymphoma, nasal or other type',
+                '皮膚 T 細胞淋巴瘤': 'Cutaneous T cell lymphoma (Including Mycosis fungoides/Sëzary syndrome)',
+                '腸病型 T 細胞淋巴瘤': 'Enteropathy-type T-cell lymphoma',
+                '肝脾 T 細胞淋巴瘤': 'Hepatosplenic T-cell lymphoma',
+                '皮下脂膜炎性 T 細胞淋巴瘤': 'Subcutaneous panniculitis-like T-cell Lymphoma',
+                '非特異性周邊 T 細胞淋巴瘤': 'Peripheral T-cell lymphoma, NOS',
+                '血管免疫芽細胞性 T 細胞淋巴瘤': 'Angioimmunoblastic T-cell lymphoma',
+                '退行性大細胞淋巴瘤': 'Anaplastic large cell lymphoma',
+                '成人 T 細胞淋巴瘤／白血病': 'Adult T-cell lymphoma/leukemia',
+                '其他 T 細胞淋巴瘤': 'Other T-cell lymphomas'
+            };
+            const names = new Map();
+            Object.values(cancerNameMap).forEach(item => {
+                if (item.zh) {
+                    names.set(item.zh, item.en);
+                    names.set(item.zh.replace(/癌$/, ''), item.en);
+                }
+            });
+            Object.entries(legacyAliases).forEach(([name, translation]) => names.set(name, translation));
+            const candidates = [...names].sort((left, right) => right[0].length - left[0].length);
+            const translated = [];
+            let remaining = previewTitle.trim();
+            while (remaining) {
+                const match = candidates.find(([name]) => remaining === name || remaining.startsWith(name + '、'));
+                if (!match) return previewTitle;
+                translated.push(match[1]);
+                remaining = remaining.slice(match[0].length).replace(/^、/, '');
+            }
+            return translated.join(', ');
+        }
         if (language === 'en' && selectedKeys.length > 0) {
             const translatedNames = selectedKeys
                 .map(key => cancerNameMap[key]?.en)
@@ -421,7 +471,7 @@ window.DashboardRenderer.ensureInsightsForLanguage = async function({ retry = tr
         let results = await run();
         if (retry && results.some(result => !result?.success)) results = await run();
         if (results.some(result => !result?.success)) {
-            throw new Error('部分語言模型敘述尚未準備完成');
+            throw new Error('部分分析敘述尚未準備完成');
         }
         return results;
     };
@@ -430,6 +480,11 @@ window.DashboardRenderer.ensureInsightsForLanguage = async function({ retry = tr
 window.DashboardRenderer.rerenderDashboardLanguage = function(options = {}) {
         const selector = document.getElementById('dashboardLanguageSelect');
         if (selector && window.DashboardI18n) selector.value = window.DashboardI18n.getLanguage();
+        document.querySelectorAll('#chartTabsContainer .chart-tab-btn').forEach(button => {
+            const original = button.dataset.labelZh || button.textContent.trim();
+            button.dataset.labelZh = original;
+            button.textContent = window.AnnualReportRenderer?.resultTabLabel(original, window.DashboardI18n?.getLanguage()) || original;
+        });
         const languageLabel = document.getElementById('dashboardLanguageLabel');
         if (languageLabel && selector) languageLabel.textContent = selector.value === 'en' ? 'English' : '繁體中文';
         const headerMap = {
@@ -462,7 +517,7 @@ window.DashboardRenderer.rerenderDashboardLanguage = function(options = {}) {
         this.updateChartCaptions(yearTitle, cancerTitle);
         if (window.dashboardChartInstance) window.dashboardChartInstance.setOption(this.getGenderAgeChartOption(window.lastChartData.genderAgeData), true);
         this.updateHistologyChart(window.lastChartData.histologyData, window.lastChartData.histologyNoDataReason);
-        if (options.regenerateInsights && !window.dashboardExportPreparing) this.regenerateInsightsForLanguage();
+        if (options.regenerateInsights && !window.dashboardExportPreparing && !window.dashboardPreviewMode) this.regenerateInsightsForLanguage();
     };
 
 /* ── 顯示年度資料區塊 ── */
@@ -592,6 +647,12 @@ document.addEventListener('DOMContentLoaded', function() {
             const exportLanguage = window.DashboardI18n?.getLanguage() || 'zh-TW';
             const modeAi = document.getElementById('mode_ai')?.value || 'balanced';
             const generateInsights = options.generateInsights === true;
+            const getExportInsight = (fieldKey, responseText = '') => {
+                if (!fieldKey) return '';
+                if (window.dashboardPreviewMode) return window.dashboardPreviewNarratives?.[fieldKey] || '';
+                const insight = window.DashboardRenderer?.insightCache?.get(`${exportLanguage}|${modeAi}|${fieldKey}`) || responseText;
+                return insight.trim() === '定義還沒串接使用。' ? '' : insight;
+            };
             const insightFieldKeys = {
                 'chartPane-IncidenceAge': '性別與年齡分佈',
                 'chartPane-IncidenceMedian': '年齡中位數',
@@ -669,11 +730,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             const stageButton = document.getElementById('btnAiStageSummary');
                             const stageFieldKey = `${report.staging_system} ${view === 'sex' ? 'Stage Distribution by Sex' : view === 'age' ? 'Stage Distribution by Age Group' : 'Stage Distribution'}`;
                             const stageResponse = document.getElementById('llmResponseStageSummary');
-                            const stageLlmText = stageFieldKey
-                                ? (window.DashboardRenderer?.insightCache?.get(`${exportLanguage}|${modeAi}|${stageFieldKey}`)
-                                    || stageResponse?.textContent
-                                    || '')
-                                : '';
+                            const stageLlmText = getExportInsight(stageFieldKey, stageResponse?.textContent || '');
                             const tabKey = view === 'sex' ? 'stageSexTab' : view === 'age' ? 'stageAgeTab' : 'stageTab';
                             const stageTitle = exportLanguage === 'en'
                                 ? window.DashboardRenderer.t(tabKey, { system: window.DashboardRenderer.getStageSystemTitle(report.staging_system) })
@@ -734,10 +791,10 @@ document.addEventListener('DOMContentLoaded', function() {
                             const tablePanel = Array.from(
                                 surgeryContainer?.querySelectorAll('.stage-surgery-panel') || []
                             ).find(panel => panel.dataset.stageSurgeryKey === tableKeyOf(table, surgeryIndex));
-                            const fieldKey = surgeryInsightButton?.dataset.insightFieldKey || '';
-                            const llmText = fieldKey
-                                ? (window.DashboardRenderer?.insightCache?.get(`${exportLanguage}|${modeAi}|${fieldKey}`) || '')
-                                : '';
+                            const fieldKey = window.dashboardPreviewMode
+                                ? window.AnnualReportRenderer.surgeryInsightKey(table, surgeryIndex)
+                                : surgeryInsightButton?.dataset.insightFieldKey || '';
+                            const llmText = getExportInsight(fieldKey);
                             const stageSystem = table.system || (exportLanguage === 'en' ? 'Unspecified' : '未指定');
                             const title = exportLanguage === 'en'
                                 ? `${table.cancer_name_en || table.manual_key} (${stageSystem} Stage) and Surgical Procedure`
@@ -797,10 +854,10 @@ document.addEventListener('DOMContentLoaded', function() {
                             const tablePanel = Array.from(
                                 treatmentContainer?.querySelectorAll('.stage-first-course-panel') || []
                             ).find(panel => panel.dataset.stageSystem === table.system);
-                            const fieldKey = treatmentInsightButton?.dataset.insightFieldKey || '';
-                            const llmText = fieldKey
-                                ? (window.DashboardRenderer?.insightCache?.get(`${exportLanguage}|${modeAi}|${fieldKey}`) || '')
-                                : '';
+                            const fieldKey = window.dashboardPreviewMode
+                                ? `期別與首次療程（${table.system}期別）`
+                                : treatmentInsightButton?.dataset.insightFieldKey || '';
+                            const llmText = getExportInsight(fieldKey);
                             const stageSystem = table.system || (exportLanguage === 'en' ? 'Unspecified' : '未指定');
                             const title = exportLanguage === 'en'
                                 ? `${table.system} Stage and First Course Treatment`
@@ -837,7 +894,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (paneId === 'chartPane-IncidenceAge' && window.dashboardChartInstance) {
                         chartImage = await captureChartImage(window.dashboardChartInstance);
                     } else if (paneId === 'chartPane-DiagnosisHistology' && window.dashboardHistologyChartInstance) {
-                        chartImageKey = 'histology-full';
+                        // The labels inside the histogram change with the selected language,
+                        // so Chinese and English exports must not share the same image cache.
+                        chartImageKey = `histology-full-${exportLanguage}`;
                         if (!sharedChartImages[chartImageKey]) {
                             sharedChartImages[chartImageKey] = await captureChartImage(
                                 window.dashboardHistologyChartInstance,
@@ -863,10 +922,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             options.onInsightComplete?.();
                         }
                         const fieldKey = insightButton?.dataset.insightFieldKey || insightFieldKeys[paneId];
-                        const cachedInsight = fieldKey
-                            ? window.DashboardRenderer?.insightCache?.get(`${exportLanguage}|${modeAi}|${fieldKey}`)
-                            : '';
-                        llmText = cachedInsight || (exportLanguage === 'en'
+                        llmText = getExportInsight(fieldKey, exportLanguage === 'en'
                             ? ''
                             : llmDiv.textContent || llmDiv.innerText);
                     }
@@ -917,6 +973,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 window.utils.showLoading('資料分析中，請稍後...');
             }
             try {
+                if (isPreviewExport) {
+                    const response = await fetch(`/api/llm-tasks/${encodeURIComponent(window.dashboardPreviewTask?.TaskID || '')}`);
+                    if (!response.ok) throw new Error('無法確認年報敘述的完成狀態');
+                    const data = await response.json();
+                    window.updateAnnualPreviewTask?.(data.task);
+                    if (!window.isAnnualPreviewExportReady?.(data.task)) throw new Error('中英文分析敘述尚未全部完成');
+                }
 
                 const activePaneIds = new Set(Array.from(document.querySelectorAll('#chartTabsContainer .chart-tab-btn')).map(button => button.dataset.target));
                 let totalInsights = 0;
@@ -937,22 +1000,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 };
                 await window.DashboardI18n?.setLanguage('zh-TW');
                 exportDataByLanguage['zh-TW'] = await collectExportData(sharedChartImages, { generateInsights: !isPreviewExport, onInsightComplete });
-                if (!isPreviewExport) {
-                    await window.DashboardI18n?.setLanguage('en');
-                    exportDataByLanguage.en = await collectExportData(sharedChartImages);
-                }
+                await window.DashboardI18n?.setLanguage('en');
+                exportDataByLanguage.en = await collectExportData(sharedChartImages);
             } catch (error) {
                 console.error('Export preparation failed:', error);
                 preparationError = error;
             } finally {
                 await window.DashboardI18n?.setLanguage(originalLanguage);
                 window.dashboardExportPreparing = false;
-                btnPrepareExport.disabled = false;
+                btnPrepareExport.disabled = isPreviewExport ? !window.isAnnualPreviewExportReady?.(window.dashboardPreviewTask) : false;
             }
 
             if (preparationError) {
                 if (window.utils?.hideLoading) window.utils.hideLoading();
-                const isInsightFailure = /insight generation failed/i.test(String(preparationError?.message || ''));
+                const isInsightFailure = preparationError?.message === '中英文分析敘述尚未全部完成';
                 utils.alert(isInsightFailure ? '語言模型敘述尚未完成；系統未建立不完整匯出，請稍後再試。' : '匯出內容準備失敗，請再試一次。', 'error');
                 return;
             }
@@ -1031,7 +1092,9 @@ window.DashboardRenderer.renderStageSurgeryTables = function(tables, yearTitle, 
         window.stageSurgeryActiveTableKey = button.dataset.stageSurgeryKey;
         container.querySelectorAll('.stage-surgery-tab').forEach(tab => tab.classList.toggle('active', tab === button));
         container.querySelectorAll('.stage-surgery-panel').forEach(panel => panel.classList.toggle('d-none', panel.dataset.stageSurgeryKey !== button.dataset.stageSurgeryKey));
-        document.getElementById('btnAiTreatmentSurgery')?.onclick?.();
+        const activeTable = tables.find((item, index) => tableKeyOf(item, index) === window.stageSurgeryActiveTableKey);
+        if (window.dashboardPreviewMode && activeTable) window.showDashboardPreviewNarrative?.(window.AnnualReportRenderer.surgeryInsightKey(activeTable, tables.indexOf(activeTable)));
+        else document.getElementById('btnAiTreatmentSurgery')?.onclick?.();
     }));
 };
 
@@ -1208,6 +1271,22 @@ window.DashboardRenderer.getGenderAgeChartOption = function(genderAgeData) {
 window.DashboardRenderer.renderDiagnosisClassificationChart = function(chartData, yearTitle, cancerTitle) {
         let chartDom = document.getElementById('annualDiagnosisClassificationChart');
         if (!chartDom) return;
+
+        this.classificationChartRenderArgs = [chartData, yearTitle, cancerTitle];
+        if (!this.classificationChartResizeObserver && typeof ResizeObserver !== 'undefined') {
+            let lastWidth = 0;
+            this.classificationChartResizeObserver = new ResizeObserver(entries => {
+                const width = Math.round(entries[0]?.contentRect.width || 0);
+                if (!width || width === lastWidth) return;
+                lastWidth = width;
+                requestAnimationFrame(() => {
+                    if (this.classificationChartRenderArgs) {
+                        this.renderDiagnosisClassificationChart(...this.classificationChartRenderArgs);
+                    }
+                });
+            });
+            this.classificationChartResizeObserver.observe(chartDom);
+        }
         
         if (!this.classificationChartInst) {
             this.classificationChartInst = echarts.init(chartDom);
@@ -1221,6 +1300,8 @@ window.DashboardRenderer.renderDiagnosisClassificationChart = function(chartData
         const chartTitle = isEnglish
             ? `${this.getEnglishCancerPatientLabel(selectedCancer)} Case Class Distribution, ${yearTitle}`
             : `${yearTitle}年${selectedCancer}${this.t('classificationDistribution')}`;
+        const chartWidth = chartDom.clientWidth || 1100;
+        const legendTextWidth = Math.min(450, Math.floor(chartWidth * 0.38) - 34);
         chartDom.style.height = '450px';
         this.classificationChartInst.resize();
         const labels = [
@@ -1252,7 +1333,7 @@ window.DashboardRenderer.renderDiagnosisClassificationChart = function(chartData
                 textStyle: {
                     fontSize: 14,
                     lineHeight: 22,
-                    width: 450,
+                    width: legendTextWidth,
                     overflow: 'break'
                 }
             },
@@ -1262,7 +1343,7 @@ window.DashboardRenderer.renderDiagnosisClassificationChart = function(chartData
             },
             grid: {
                 left: '3%',
-                right: '32%',
+                right: `${legendTextWidth + 75}px`,
                 top: '15%',
                 bottom: '3%',
                 containLabel: true
@@ -2069,7 +2150,9 @@ window.DashboardRenderer.renderStageFirstCourseTables = function(tables, yearTit
                     panel.classList.toggle('d-none', panel.dataset.stageSystem !== system);
                 });
                 const insightButton = document.getElementById('btnAiTreatmentFirstCourse');
-                if (insightButton && window.lastChartData && typeof insightButton.onclick === 'function') {
+                if (window.dashboardPreviewMode) {
+                    window.showDashboardPreviewNarrative?.(`期別與首次療程（${system}期別）`);
+                } else if (insightButton && window.lastChartData && typeof insightButton.onclick === 'function') {
                     insightButton.onclick();
                 }
             });

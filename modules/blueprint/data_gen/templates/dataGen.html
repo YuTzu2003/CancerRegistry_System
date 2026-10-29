@@ -44,8 +44,8 @@
     <div class="uploader" id="uploadArea">
       <div class="ico"><i class="bi bi-cloud-arrow-up"></i></div>
       <div class="fw-bold">點擊或拖曳檔案至此處上傳</div>
-      <div class="hint mt-1">檔案格式：TXT / CSV / XLSX；TXT 請於選檔後確認是否包含標頭</div>
-      <input type="file" id="fileInput" accept=".txt,.csv,.xlsx">
+      <div class="hint mt-1">檔案格式：TXT / CSV / XLS / XLSX；TXT 請於選檔後確認是否包含標頭</div>
+      <input type="file" id="fileInput" accept=".txt,.csv,.xls,.xlsx">
     </div>
     <div id="txtHeaderOption" class="form-check mt-3" style="display: none;">
       <input class="form-check-input" type="checkbox" id="txtHasHeader">
@@ -60,6 +60,7 @@
       </button>
       <button type="button" class="btn-close ms-2" aria-label="Remove" onclick="resetUpload()"></button>
     </div>
+    <div id="dataGenFormatHint" class="text-secondary small mt-2" style="display: none;" role="status">已選擇檔案，請選擇參考資料格式後繼續。</div>
   </div>
 </div>
 
@@ -238,5 +239,5 @@
   <div class="text-muted small mt-1">這可能需要幾秒鐘的時間</div>
 </div>
 
-<script src="/static/js/data_gen/data_gen.js?v=20261012-no-server-retention"></script>
+<script src="/static/js/data_gen/data_gen.js?v=20261029-file-format-order"></script>
 {% endblock %}

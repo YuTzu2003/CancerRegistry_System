@@ -4,6 +4,7 @@
   const esc = (text) => String(text ?? '').replace(/[&<>'"`]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;', '`': '&#x60;' }[char]));
   const filters = { query: '', status: '' };
   let tasks = [];
+  let loadError = false;
   const selectedTaskIds = new Set();
   const taskPanel = document.querySelector('#annualLlmTaskPanel');
   const taskTypes = taskPanel?.dataset.llmTaskType === 'comparison_report' ? ['comparison_report'] : ['chart', 'annual_report'];
@@ -47,11 +48,12 @@
     if (!taskPanel || !taskList) return;
     taskPanel.classList.remove('d-none');
     const displayed = visibleTasks();
-    taskPanel.querySelector('#llmTaskCount').textContent = `顯示 ${displayed.length} / ${tasks.length} 筆任務`;
-    taskList.innerHTML = displayed.length ? displayed.map((task) => {
+    taskPanel.querySelector('#llmTaskCount').textContent = loadError ? '紀錄載入失敗' : `顯示 ${displayed.length} / ${tasks.length} 筆任務`;
+    taskList.innerHTML = loadError && !tasks.length ? '<div class="llm-task-empty">暫時無法載入紀錄，請按「重新整理」再試。</div>' : displayed.length ? displayed.map((task) => {
       const status = String(value(task, 'Status') || 'queued'); const id = String(value(task, 'TaskID') || '');
       const elapsed = duration(value(task, 'CreatedAt'), ['completed', 'partial_failed', 'failed', 'cancelled'].includes(status) ? value(task, 'CompletedAt') : null);
-      return `<article class="llm-task-row"><label class="llm-task-select" aria-label="選取任務 ${esc(id)}"><input class="task-cb" type="checkbox" value="${esc(id)}"${selectedTaskIds.has(id) ? ' checked' : ''}></label><div class="llm-task-row__content"><div class="llm-task-row__heading"><h3>${esc(value(task, 'DocumentLabel') || '年報分析')}</h3></div><div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; font-size:12px; margin-top:6px; color:var(--muted,#6b7280);"><span>建立時間：${esc(formatDate(value(task, 'CreatedAt')))}</span><span style="width:4px;height:4px;border-radius:50%;background:#d1d5db;flex-shrink:0;"></span><span>處理時間：${esc(elapsed)}</span><span style="width:4px;height:4px;border-radius:50%;background:#d1d5db;flex-shrink:0;"></span><span class="llm-task-status is-${esc(status)}">狀態：${esc(labels[status] || status)}</span></div></div><div class="llm-task-side"><span class="llm-task-id">${esc(id.slice(-5))}</span><div class="llm-task-side__bottom"><div class="llm-task-row__actions"><button class="btn btn-sm btn-outline-dark llm-preview" type="button" data-id="${esc(id)}" data-type="${esc(value(task, 'TaskType'))}">預覽</button>${value(task, 'TaskType') === 'annual_report' && status === 'completed' ? `<button class="btn btn-sm btn-success llm-export" type="button" data-id="${esc(id)}">匯出</button>` : ''}<button class="btn btn-sm btn-danger llm-row-delete" type="button" data-id="${esc(id)}">刪除</button></div></div></div></article>`;
+      const progress = ['annual_report', 'comparison_report'].includes(value(task, 'TaskType')) ? `<span>中英敘述：${esc(value(task, 'ProgressCurrent') || 0)}/${esc(value(task, 'ProgressTotal') || 0)}</span>` : '';
+      return `<article class="llm-task-row"><label class="llm-task-select" aria-label="選取任務 ${esc(id)}"><input class="task-cb" type="checkbox" value="${esc(id)}"${selectedTaskIds.has(id) ? ' checked' : ''}></label><div class="llm-task-row__content"><div class="llm-task-row__heading"><h3>${esc(value(task, 'DocumentLabel') || '年報分析')}</h3></div><div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; font-size:12px; margin-top:6px; color:var(--muted,#6b7280);"><span>建立時間：${esc(formatDate(value(task, 'CreatedAt')))}</span><span style="width:4px;height:4px;border-radius:50%;background:#d1d5db;flex-shrink:0;"></span><span>處理時間：${esc(elapsed)}</span><span style="width:4px;height:4px;border-radius:50%;background:#d1d5db;flex-shrink:0;"></span><span class="llm-task-status is-${esc(status)}">狀態：${esc(labels[status] || status)}</span>${progress}</div></div><div class="llm-task-side"><span class="llm-task-id">${esc(id.slice(-5))}</span><div class="llm-task-side__bottom"><div class="llm-task-row__actions"><button class="btn btn-sm btn-outline-dark llm-preview" type="button" data-id="${esc(id)}" data-type="${esc(value(task, 'TaskType'))}">預覽</button>${value(task, 'TaskType') === 'annual_report' && status === 'completed' ? `<button class="btn btn-sm btn-success llm-export" type="button" data-id="${esc(id)}">匯出</button>` : ''}<button class="btn btn-sm btn-danger llm-row-delete" type="button" data-id="${esc(id)}">刪除</button></div></div></div></article>`;
     }).join('') : `<div class="llm-task-empty">${tasks.length ? '找不到符合搜尋或狀態條件的任務。' : '目前尚無工作任務。'}</div>`;
   };
   const preview = (id, taskType) => { window.location.assign((taskType === 'comparison_report' ? '/comparison-preview/' : '/dashboard-preview/') + encodeURIComponent(id)); };
@@ -59,13 +61,13 @@
     try {
       const response = await fetch('/api/llm-tasks?limit=50');
       const payload = await response.json();
-      if (response.ok && payload.success) {
-        tasks = (payload.tasks || []).filter((task) => (
-          taskTypes.includes(value(task, 'TaskType'))
-          && value(task, 'InsightModule') !== 'indicators'
-        ));
-      }
-    } catch (e) {}
+      if (!response.ok || !payload.success) throw new Error(payload.error || '紀錄載入失敗');
+      tasks = (payload.tasks || []).filter((task) => (
+        taskTypes.includes(value(task, 'TaskType'))
+        && value(task, 'InsightModule') !== 'indicators'
+      ));
+      loadError = false;
+    } catch (e) { loadError = true; console.error('無法載入年報紀錄：', e); }
     render();
     if (tasks.some((task) => ['queued', 'running', 'retrying'].includes(value(task, 'Status')))) {
       setTimeout(() => load().catch(() => {}), 3000);
