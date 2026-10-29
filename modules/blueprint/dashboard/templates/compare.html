@@ -5,7 +5,7 @@
   <script src="/static/vendor/echarts/echarts.min.js"></script>
   <script src="/static/vendor/i18next/i18next.min.js"></script>
   <link rel="stylesheet" href="/static/css/dashboard/dashboard.css">
-  <link rel="stylesheet" href="/static/css/dashboard/dashboard_compare.css">
+  <link rel="stylesheet" href="/static/css/dashboard/dashboard_compare.css?v=20261029-surgery-table-layout">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/llm_task_panel.css') }}">
 {% if preview_task %}
   <style>
@@ -176,7 +176,7 @@
       <input class="btn-check group-checkbox" type="radio" name="compareType" id="compareTypeTreatment" value="treatment" disabled>
       <label class="cat-btn-label" for="compareTypeTreatment"><i class="bi bi-capsule me-1"></i> 治療方式 <span class="badge rounded-pill bg-warning text-dark ms-1 cat-count-badge d-none" data-parent-group="treatment">0</span></label>
       <input class="btn-check group-checkbox" type="radio" name="compareType" id="compareTypeCrossYear" value="cross_year" disabled>
-      <label class="cat-btn-label" for="compareTypeCrossYear"><i class="bi bi-calendar3 me-1"></i> 跨年度分析 <span class="badge rounded-pill bg-warning text-dark ms-1 cat-count-badge d-none" data-parent-group="cross_year">0</span></label>
+      <label class="cat-btn-label" for="compareTypeCrossYear" title="跨年度分析暫不開放"><i class="bi bi-calendar3 me-1"></i> 跨年度分析 <span class="badge rounded-pill bg-warning text-dark ms-1 cat-count-badge d-none" data-parent-group="cross_year">0</span></label>
     </div>
 
     <div class="d-flex align-items-center mt-3">
@@ -330,7 +330,7 @@
   <section id="compareAiNarrative" class="mt-4 p-3 rounded d-none" style="background-color: rgba(209, 231, 221, 0.5); border: 1px solid #a3cfbb;" aria-live="polite">
     <div class="d-flex align-items-center mb-2 justify-content-between">
       <div class="d-flex align-items-center">
-        <h6 class="mb-0 fw-bold text-dark">語言模型敘述</h6>
+        <h6 class="mb-0 fw-bold text-dark">分析敘述</h6>
       </div>
       <button type="button" id="btnRetryAiNarrative" class="btn btn-sm" style="background-color: transparent; border: 1px solid #495057; color: #212529; font-weight: 500;">
         <i class="bi bi-arrow-clockwise me-1"></i>重新產生敘述
@@ -355,9 +355,9 @@
 {% endif %}
 <script src="{{ url_for('static', filename='js/dashboard/compare_page.js') }}"></script>
 <script src="{{ url_for('static', filename='js/dashboard/dashboard_i18n.js') }}"></script>
-<script src="{{ url_for('static', filename='js/dashboard/annual_report_renderer.js') }}"></script>
-<script src="{{ url_for('static', filename='js/dashboard/dashboard_compare.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard/annual_report_renderer.js', v='20261029-surgery-applicability') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard/dashboard_compare.js', v='20261029-disable-cross-year') }}"></script>
 {% if not preview_task %}
-<script src="{{ url_for('static', filename='js/dashboard/llm_task_panel.js', v='20261007-swal-delete') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard/llm_task_panel.js', v='20261029-comparison-progress') }}"></script>
 {% endif %}
 {% endblock %}

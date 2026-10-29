@@ -116,6 +116,13 @@ def get_chart_insight_logic(data):
             and meaningful stage patterns. Do not interpret an excluded case as having no
             treatment, and do not infer treatment effectiveness.
         """
+    if "期別與手術術式" in field_key:
+        treatment_instruction = """
+            Analyze only the supplied cancer and stage-by-surgery table. If the table
+            has zero included cases, explicitly state that there are no cases available
+            for this table and do not describe surgery or stage trends. Do not interpret
+            excluded or unmapped cases as patients who had no surgery.
+        """
     prompt = f"""
                 You are a professional medical and oncology data analysis expert.
                 Produce matching Traditional Chinese and English narratives from the same
@@ -195,6 +202,16 @@ def get_compare_insight_logic(data):
                 comparison against the side with no data. If both sides have no data, report
                 their reasons only. Never generate clinical explanations or unsupported
                 inferences for a side with no eligible cases.
+            """
+    if analysis_item == "期別與手術術式":
+        histology_no_data_instruction = """
+                [Surgery table no-data rule]
+                Evaluate the selected surgery table separately for each period. If a
+                table is missing or has zero included cases, say that no cases are
+                available for that table; do not infer surgery or stage distributions.
+                Do not compare a period with no table cases as though its distribution
+                were meaningful. Overall cancer case totals are not surgery table totals;
+                clearly distinguish them if mentioned. Do not infer why cases are absent.
             """
     prompt = f"""
                 You are a professional medical and oncology data comparison expert.

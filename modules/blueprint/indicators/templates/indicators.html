@@ -34,28 +34,40 @@
   .indicators-upload-layout { display: grid; gap: 24px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .indicators-upload-pane + .indicators-upload-pane { border-left: 1px solid var(--gray-200); padding-left: 24px; }
   .indicators-preview-head { align-items: center; display: flex; justify-content: space-between; margin-bottom: 8px; }
-  .indicators-file-count { color: var(--gray-500); font-size: 12px; }
-  .indicators-file-list { background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: 8px; max-height: 300px; min-height: 92px; overflow-y: auto; padding: 8px; }
-  .file-list-card .indicators-file-list { background: var(--white); border: 0; border-radius: 0; max-height: none; min-height: 178px; padding: 8px; }
-  .file-list-card .indicators-file-empty { min-height: 160px; }
+  .indicators-file-list { background: var(--gray-50); display: grid; gap: 8px; padding: 10px; }
+  .file-list-card .indicators-file-list { min-height: 178px; }
+  .file-list-card .indicators-file-list:has(.indicators-file-item) { min-height: 0; }
+  .file-list-card .indicators-file-empty { min-height: 158px; }
   .indicators-file-empty { color: var(--gray-500); display: grid; font-size: 12px; gap: 3px; min-height: 66px; place-content: center; text-align: center; }
   .indicators-file-empty-title { color: var(--gray-700); font-size: 14px; font-weight: 700; }
-  .indicators-file-item { align-items: center; border: 1px solid transparent; border-radius: 7px; display: grid; gap: 11px; grid-template-columns: 22px 38px minmax(0, 1fr) auto; min-height: 66px; padding: 8px; transition: background-color 150ms ease, border-color 150ms ease; }
-  .indicators-file-item + .indicators-file-item { margin-top: 4px; }
-  .indicators-file-item.is-selected { background: #eef6f7; border-color: #b9dadd; }
-  .indicators-file-icon { align-items: center; background: #e8f3f4; border-radius: 7px; color: #166C7A; display: flex; font-size: 18px; height: 38px; justify-content: center; width: 38px; }
-  .indicators-file-name { color: var(--gray-800); font-size: 14px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .indicators-file-meta { color: var(--gray-500); font-size: 12px; margin-top: 3px; }
+  .indicators-file-item { align-items: center; background: var(--white); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; display: grid; grid-template-columns: minmax(0, 1fr) 160px; min-height: 44px; overflow: hidden; }
+  .indicators-file-item:hover { background: var(--gray-50); }
+  .indicators-file-item.is-selected { background: #f0f7ff; border-color: var(--blue-500); }
+  .indicators-file-item:focus-visible { outline: 2px solid var(--blue-500); outline-offset: -2px; }
+  .indicators-file-name-cell { align-items: center; display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; padding: 4px 12px 4px 16px; }
+  .indicators-file-name-cell > i { flex: none; }
+  .indicators-file-name { color: var(--gray-800); font-size: 13.5px; min-width: 0; overflow-wrap: anywhere; }
+  .indicators-file-item.is-selected .indicators-file-name { color: var(--blue-700); font-weight: 700; }
+  .indicators-file-time { color: var(--gray-500); font-size: 11px; padding: 4px 12px; text-align: right; white-space: nowrap; }
+  .indicators-file-delete-cell { align-items: center; align-self: stretch; background: transparent; border-right: 0; display: none; justify-content: center; }
+  .file-list-card.is-delete-mode .indicators-file-item { cursor: default; grid-template-columns: 42px minmax(0, 1fr) 160px; }
+  .file-list-card.is-delete-mode .indicators-file-delete-cell { display: flex; }
+  .file-list-card.is-delete-mode .indicators-file-item:hover { background: var(--white); }
+  .indicators-file-delete-cell .form-check-input:checked, #indicatorSelectAllFiles:checked { background-color: var(--danger); border-color: var(--danger); }
   .indicators-file-status { background: #e8f3f4; border-radius: 999px; color: #166C7A; font-size: 12px; font-weight: 700; padding: 4px 9px; white-space: nowrap; }
   .indicators-file-status.is-loading { background: #fff7e0; color: #8a6200; }
   .indicators-file-status.is-success { background: #eaf7ef; color: #237a45; }
   .indicators-file-status.is-error { background: #fcebec; color: #a7373d; }
-  .indicators-file-actions { align-items: center; display: flex; gap: 6px; }
-  .indicators-file-select { border: 1px solid var(--gray-300); border-radius: 6px; background: var(--white); color: var(--gray-700); font-size: 12px; padding: 4px 8px; white-space: nowrap; }
-  .indicators-file-select.is-selected { border-color: #87bdc3; color: #166C7A; font-weight: 700; }
-  .indicators-file-delete { align-items: center; background: transparent; border: 0; border-radius: 6px; color: var(--gray-500); display: inline-flex; height: 29px; justify-content: center; padding: 0; width: 29px; }
-  .indicators-file-delete:hover { background: #fcebec; color: #b4232c; }
-  .indicators-file-bulk-actions { align-items: center; display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+  .indicators-file-bulk-actions { align-items: center; display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-end; }
+  .indicators-file-bulk-actions .indicators-delete-control { display: none; }
+  .file-list-card.is-delete-mode .indicators-file-bulk-actions .indicators-delete-control { display: inline-flex; }
+  @container dashboard-file-list (max-width: 480px) {
+    .file-list-header { flex-wrap: wrap; gap: 12px; }
+    .indicators-file-item { grid-template-columns: minmax(0, 1fr) 112px; }
+    .file-list-card.is-delete-mode .indicators-file-item { grid-template-columns: 36px minmax(0, 1fr) 112px; }
+    .indicators-file-time { font-size: 10px; }
+    .indicators-file-bulk-actions { justify-content: flex-start; }
+  }
   .indicators-year-range { align-items: end; display: grid; gap: 10px; grid-template-columns: minmax(130px, 180px) 24px minmax(130px, 180px); justify-content: start; }
   .indicators-year-controls { align-items: end; display: flex; flex-wrap: wrap; gap: 18px; }
   .indicators-narrative-group { flex: 0 0 243px; max-width: 243px; width: 243px; }
@@ -163,8 +175,6 @@
     .indicators-upload-pane + .indicators-upload-pane { border-left: 0; border-top: 1px solid var(--gray-200); padding-left: 0; padding-top: 20px; }
   }
   @media (max-width: 575.98px) {
-    .indicators-file-item { align-items: start; grid-template-columns: 22px 38px minmax(0, 1fr); }
-    .indicators-file-actions { grid-column: 3; justify-content: flex-start; }
     .indicators-year-range { grid-template-columns: 1fr; }
     .indicators-year-separator { height: auto; }
     .indicators-narrative-group { flex: 1 1 100%; max-width: 100%; width: 100%; }
@@ -208,7 +218,7 @@
       </div>
       <div>
         <div class="file-list-card">
-          <div class="file-list-header"><h6 class="mb-0 fw-bold text-dark d-flex align-items-center gap-2"><i class="bi bi-folder2-open text-primary"></i>檔案清單</h6><div class="indicators-file-bulk-actions"><span id="indicatorsFileCount" class="text-secondary" style="font-size: 12px;">0 個檔案</span><label class="form-check m-0"><input id="indicatorSelectAllFiles" class="form-check-input" type="checkbox" aria-label="全選檔案"></label><button id="btnBatchDeleteIndicatorFiles" class="btn btn-sm btn-outline-danger" type="button" disabled>刪除勾選項目</button></div></div>
+          <div class="file-list-header"><div><h6 class="mb-1 fw-bold text-dark d-flex align-items-center gap-2"><i class="bi bi-folder2-open text-primary"></i>檔案清單 <span id="indicatorsFileCount" class="badge bg-secondary rounded-pill font-monospace" style="font-size: 11px;">0</span></h6><div id="indicatorsFileListHint" class="text-secondary" style="font-size: 12px;">點選檔案列，設為分析來源</div></div><div class="indicators-file-bulk-actions"><button id="btnCancelIndicatorFileDelete" class="indicators-delete-control btn btn-sm btn-link text-secondary text-decoration-none p-0" type="button">取消</button><label class="indicators-delete-control align-items-center gap-1 mb-0 text-danger" style="cursor: pointer; white-space: nowrap; font-size: 12px;"><input id="indicatorSelectAllFiles" class="form-check-input mt-0" type="checkbox" aria-label="全選要刪除的檔案"><span>全選</span></label><button id="btnBatchDeleteIndicatorFiles" class="btn btn-sm btn-outline-danger" type="button" disabled>刪除</button></div></div>
           <div class="file-list-container"><div id="indicatorsFileList" class="indicators-file-list" aria-live="polite"><div class="indicators-file-empty"><span class="indicators-file-empty-title">尚未選擇檔案</span><span>請選擇 Excel、CSV 或 TXT 後加入檔案清單</span></div></div></div>
         </div>
       </div>
@@ -283,7 +293,7 @@
           <span class="indicators-export-icon"><i class="bi bi-file-earmark-text"></i></span>
           <span class="indicators-export-copy">
             <span class="indicators-export-title">完整監測指標報告</span>
-            <span class="indicators-export-hint">包含監測表、圖表與語言模型敘述，可預覽並下載 PDF 或 Word</span>
+            <span class="indicators-export-hint">包含監測表、圖表與分析敘述，可預覽並下載 PDF 或 Word</span>
           </span>
           <span class="indicators-export-action">前往預覽與匯出 <i class="bi bi-arrow-right ms-1"></i></span>
         </button>
@@ -339,8 +349,11 @@
   const analyzeButton = document.getElementById('analyzeIndicators');
   const fileList = document.getElementById('indicatorsFileList');
   const fileCount = document.getElementById('indicatorsFileCount');
+  const fileListCard = fileList.closest('.file-list-card');
+  const fileListHint = document.getElementById('indicatorsFileListHint');
   const selectAllIndicatorFilesCheckbox = document.getElementById('indicatorSelectAllFiles');
   const batchDeleteIndicatorFilesButton = document.getElementById('btnBatchDeleteIndicatorFiles');
+  const cancelIndicatorFileDeleteButton = document.getElementById('btnCancelIndicatorFileDelete');
   const yearStep = document.getElementById('indicatorsYearStep');
   const cancerStep = document.getElementById('indicatorsCancerStep');
   const previewStep = document.getElementById('indicatorsPreviewStep');
@@ -358,6 +371,7 @@
   let loadedFileId = null;
   let nextFileId = 1;
   let uploadInProgress = false;
+  let deleteMode = false;
   let indicatorInputPreview = null;
   let indicatorInputPreviewLoading = false;
   let indicatorInputPreviewRequestId = 0;
@@ -700,12 +714,14 @@
   const renderFileList = () => {
     const selectedForDeletionCount = fileEntries.filter((entry) => entry.selectedForDeletion).length;
     const allSelectedForDeletion = fileEntries.length > 0 && selectedForDeletionCount === fileEntries.length;
+    fileListCard.classList.toggle('is-delete-mode', deleteMode);
+    fileListHint.textContent = deleteMode ? '勾選檔案後，再按右上角刪除' : '點選檔案列，設為分析來源';
     selectAllIndicatorFilesCheckbox.disabled = uploadInProgress || !fileEntries.length;
     selectAllIndicatorFilesCheckbox.checked = allSelectedForDeletion;
     selectAllIndicatorFilesCheckbox.indeterminate = selectedForDeletionCount > 0 && !allSelectedForDeletion;
-    batchDeleteIndicatorFilesButton.disabled = uploadInProgress || selectedForDeletionCount === 0;
+    batchDeleteIndicatorFilesButton.disabled = uploadInProgress || !fileEntries.length || (deleteMode && selectedForDeletionCount === 0);
     if (!fileEntries.length) {
-      fileCount.textContent = '0 個檔案';
+      fileCount.textContent = '0';
       fileList.innerHTML = '<div class="indicators-file-empty"><span class="indicators-file-empty-title">尚未選擇檔案</span><span>選擇 Excel、CSV 或 TXT 後，將在此顯示檔案資訊。</span></div>';
       return;
     }
@@ -715,7 +731,7 @@
       success: { label: '已載入', className: 'is-success' },
       error: { label: '載入失敗', className: 'is-error' }
     };
-    fileCount.textContent = `${fileEntries.length} 個檔案`;
+    fileCount.textContent = String(fileEntries.length);
     fileList.innerHTML = fileEntries.map((entry) => {
       const file = entry.file;
       const selected = entry.id === selectedFileId;
@@ -724,15 +740,10 @@
       const metadata = entry.detail || `${extension} · ${formatFileSize(file.size)}`;
       const metadataLine = entry.yearRange ? `${metadata} · 診斷年度範圍 ${entry.yearRange}` : metadata;
       const disabled = uploadInProgress ? ' disabled' : '';
-      return `<div class="indicators-file-item${selected ? ' is-selected' : ''}">
-        <div class="form-check m-0"><input class="form-check-input indicators-file-select" type="checkbox" data-file-action="mark-delete" data-file-id="${entry.id}" aria-label="選取 ${escapeHtml(file.name)}"${entry.selectedForDeletion ? ' checked' : ''}${disabled}></div>
-        <div class="indicators-file-icon"><i class="bi bi-folder2-open" aria-hidden="true"></i></div>
-        <div class="overflow-hidden"><div class="indicators-file-name" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</div><div class="indicators-file-meta">${escapeHtml(metadataLine)}</div></div>
-        <div class="indicators-file-actions">
-          <span class="indicators-file-status ${status.className}">${status.label}</span>
-          <button class="indicators-file-select${selected ? ' is-selected' : ''}" type="button" data-file-action="select" data-file-id="${entry.id}"${disabled}>${selected ? '已選用' : '選用'}</button>
-          <button class="indicators-file-delete" type="button" data-file-action="delete" data-file-id="${entry.id}" aria-label="刪除 ${escapeHtml(file.name)}" title="刪除檔案"${disabled}><i class="bi bi-trash3" aria-hidden="true"></i></button>
-        </div>
+      return `<div class="indicators-file-item${selected ? ' is-selected' : ''}" data-file-id="${entry.id}" tabindex="0" role="button" aria-label="選取 ${escapeHtml(file.name)} 作為分析檔案" title="${escapeHtml(metadataLine)}">
+        <div class="indicators-file-delete-cell"><input class="form-check-input mt-0" type="checkbox" data-file-action="mark-delete" data-file-id="${entry.id}" aria-label="勾選刪除 ${escapeHtml(file.name)}"${entry.selectedForDeletion ? ' checked' : ''}${disabled}></div>
+        <div class="indicators-file-name-cell"><i class="bi bi-filetype-${['XLS', 'XLSX'].includes(extension) ? 'xlsx' : extension.toLowerCase() === 'csv' ? 'csv' : 'txt'} text-success fs-5" aria-hidden="true"></i><span class="indicators-file-name">${escapeHtml(file.name)}</span>${selected ? '<span class="status-badge-selected" style="font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--blue-100); color: var(--blue-700); font-weight: 500;"><i class="bi bi-check"></i> 分析檔案已選</span>' : ''}${entry.state !== 'success' ? `<span class="indicators-file-status ${status.className}">${status.label}</span>` : ''}</div>
+        <div class="indicators-file-time">${escapeHtml(entry.uploadedAt || '尚未上傳')}</div>
       </div>`;
     }).join('');
   };
@@ -790,7 +801,7 @@
         newestEntry = existing;
         return;
       }
-      newestEntry = { id: nextFileId++, key, file, serverId: null, state: 'ready', detail: '', yearRange: '', years: [], selectedForDeletion: false };
+      newestEntry = { id: nextFileId++, key, file, serverId: null, state: 'ready', detail: '', yearRange: '', years: [], selectedForDeletion: false, uploadedAt: '' };
       fileEntries.push(newestEntry);
     });
     fileInput.value = '';
@@ -804,45 +815,23 @@
   });
 
   fileList.addEventListener('click', async (event) => {
-    const actionButton = event.target.closest('[data-file-action]');
-    if (!actionButton || uploadInProgress) return;
-    const entryId = Number(actionButton.dataset.fileId);
-    const entryIndex = fileEntries.findIndex((entry) => entry.id === entryId);
-    if (entryIndex < 0) return;
-    if (actionButton.dataset.fileAction === 'mark-delete') {
-      fileEntries[entryIndex].selectedForDeletion = actionButton.checked;
-      renderFileList();
-      return;
+    if (uploadInProgress || deleteMode || event.target.closest('.indicators-file-delete-cell')) return;
+    const row = event.target.closest('.indicators-file-item');
+    if (row) await activateFileEntry(Number(row.dataset.fileId));
+  });
+  fileList.addEventListener('keydown', (event) => {
+    const row = event.target.closest('.indicators-file-item');
+    if (row && event.target === row && ['Enter', ' '].includes(event.key)) {
+      event.preventDefault();
+      row.click();
     }
-    if (actionButton.dataset.fileAction === 'select') {
-      await activateFileEntry(entryId);
-      return;
-    }
-    if (actionButton.dataset.fileAction === 'delete') {
-      const entry = fileEntries[entryIndex];
-      if (entry.serverId) {
-        uploadInProgress = true;
-        renderFileList();
-        try {
-          await fetchJson(`/api/indicators/source/${encodeURIComponent(entry.serverId)}`, { method: 'DELETE' });
-        } catch (error) {
-          entry.state = 'error';
-          entry.detail = error.message || '無法刪除檔案。';
-          uploadInProgress = false;
-          renderFileList();
-          return;
-        }
-        uploadInProgress = false;
-      }
-      fileEntries.splice(entryIndex, 1);
-      if (loadedFileId === entryId) loadedFileId = null;
-      if (selectedFileId === entryId) {
-        const nextEntry = fileEntries[0] || null;
-        await activateFileEntry(nextEntry?.id ?? null);
-      } else {
-        renderFileList();
-      }
-    }
+  });
+  fileList.addEventListener('change', (event) => {
+    const checkbox = event.target.closest('[data-file-action="mark-delete"]');
+    if (!checkbox) return;
+    const entry = fileEntries.find((item) => item.id === Number(checkbox.dataset.fileId));
+    if (entry) entry.selectedForDeletion = checkbox.checked;
+    renderFileList();
   });
   const deleteIndicatorEntries = async (entries) => {
     const serverIds = entries.map((entry) => entry.serverId).filter(Boolean);
@@ -865,15 +854,24 @@
     fileEntries.forEach((entry) => { entry.selectedForDeletion = selectAllIndicatorFilesCheckbox.checked; });
     renderFileList();
   });
+  cancelIndicatorFileDeleteButton.addEventListener('click', () => {
+    deleteMode = false;
+    fileEntries.forEach((entry) => { entry.selectedForDeletion = false; });
+    renderFileList();
+  });
   batchDeleteIndicatorFilesButton.addEventListener('click', async () => {
+    if (!deleteMode) {
+      deleteMode = true;
+      renderFileList();
+      return;
+    }
     const entries = fileEntries.filter((entry) => entry.selectedForDeletion);
     if (!entries.length) return;
-    const result = await Swal.fire({ title: '確定刪除？', text: `將刪除 ${entries.length} 個檔案，此動作無法復原。`, icon: 'warning', showCancelButton: true, allowOutsideClick: false, confirmButtonColor: '#dc2626', cancelButtonText: '取消', confirmButtonText: '刪除' });
-    if (!result.isConfirmed) return;
     uploadInProgress = true;
     renderFileList();
     try {
       await deleteIndicatorEntries(entries);
+      deleteMode = false;
       Swal.fire({ icon: 'success', title: '已刪除', text: `已刪除 ${entries.length} 個檔案。`, confirmButtonColor: '#2563eb' });
     } catch (error) {
       Swal.fire({ icon: 'error', title: '刪除失敗', text: error.message || '無法刪除檔案。', confirmButtonColor: '#2563eb' });
@@ -969,6 +967,7 @@
       uploaded = true;
       loadedFileId = entry.id;
       entry.serverId = result.file_id;
+      entry.uploadedAt = result.uploaded_at || '';
       entry.state = 'success';
       entry.detail = `${file.name.split('.').pop().toUpperCase()} · ${formatFileSize(file.size)} · ${result.record_count.toLocaleString()} 筆資料`;
       entry.yearRange = `${years[0]}–${years[years.length - 1]}`;
@@ -1070,11 +1069,11 @@
     const thresholdsComplete = indicatorThresholdsComplete(report);
     const text = cachedText || (!thresholdsComplete
       ? '請先完成此癌別所有監測指標的閾值設定'
-      : pending ? '正在產生語言模型敘述，請稍候…' : '閾值已設定完成，請按「產生敘述」');
+      : pending ? '正在產生分析敘述，請稍候…' : '閾值已設定完成，請按「產生敘述」');
     const actionLabel = cachedText ? '重新產生敘述' : '產生敘述';
     return `<section class="indicators-ai-narrative" data-indicators-ai-narrative="${escapeHtml(cancerKey)}" aria-live="polite">
       <div class="indicators-ai-narrative-head">
-        <h6 class="indicators-ai-narrative-title">語言模型敘述</h6>
+        <h6 class="indicators-ai-narrative-title">分析敘述</h6>
         <button type="button" class="btn btn-sm indicators-ai-regenerate" data-regenerate-indicators-narrative="${escapeHtml(cancerKey)}"${pending || !thresholdsComplete ? ' disabled' : ''}>${actionLabel}</button>
       </div>
       <div class="indicators-ai-narrative-text${!cachedText && !pending && !thresholdsComplete ? ' is-threshold-hint' : ''}">${escapeHtml(text)}</div>
@@ -1114,7 +1113,7 @@
         if (attempt < 399) continue;
         itemMap.forEach(({ cancerKey, cacheKey }) => {
           indicatorNarrativePending.delete(cacheKey);
-          setIndicatorNarrativeState(cancerKey, cacheKey, error.message || '無法取得語言模型敘述。', { error: true });
+          setIndicatorNarrativeState(cancerKey, cacheKey, error.message || '無法取得分析敘述。', { error: true });
         });
         return;
       }
@@ -1131,7 +1130,7 @@
           indicatorNarrativeCache.set(item.cacheKey, text);
           setIndicatorNarrativeState(item.cancerKey, item.cacheKey, text, { generated: true });
         } else {
-          setIndicatorNarrativeState(item.cancerKey, item.cacheKey, `語言模型敘述產生失敗：${result.error || '請稍後再試。'}`, { error: true });
+          setIndicatorNarrativeState(item.cancerKey, item.cacheKey, `分析敘述產生失敗：${result.error || '請稍後再試。'}`, { error: true });
         }
       });
 
@@ -1140,7 +1139,7 @@
       itemMap.forEach(({ cancerKey, cacheKey }) => {
         if (completedItems.has(cacheKey)) return;
         indicatorNarrativePending.delete(cacheKey);
-        setIndicatorNarrativeState(cancerKey, cacheKey, status === 'cancelled' ? '語言模型敘述任務已取消。' : '語言模型敘述產生失敗，請重新產生。', { error: true });
+        setIndicatorNarrativeState(cancerKey, cacheKey, status === 'cancelled' ? '分析敘述任務已取消。' : '分析敘述產生失敗，請重新產生。', { error: true });
       });
       return;
     }
@@ -1160,7 +1159,7 @@
       if (!force && (indicatorNarrativeCache.has(cacheKey) || indicatorNarrativePending.has(cacheKey))) return;
       if (force) indicatorNarrativeCache.delete(cacheKey);
       indicatorNarrativePending.add(cacheKey);
-      setIndicatorNarrativeState(cancerKey, cacheKey, '正在產生語言模型敘述，請稍候…', { pending: true });
+      setIndicatorNarrativeState(cancerKey, cacheKey, '正在產生分析敘述，請稍候…', { pending: true });
       const itemId = `indicators-${timestamp}-${index + 1}`;
       itemMap.set(itemId, { cancerKey, cacheKey });
       items.push({
@@ -1193,7 +1192,7 @@
     } catch (error) {
       itemMap.forEach(({ cancerKey, cacheKey }) => {
         indicatorNarrativePending.delete(cacheKey);
-        setIndicatorNarrativeState(cancerKey, cacheKey, `無法建立語言模型敘述：${error.message || '請稍後再試。'}`, { error: true });
+        setIndicatorNarrativeState(cancerKey, cacheKey, `無法建立分析敘述：${error.message || '請稍後再試。'}`, { error: true });
       });
     }
   };
@@ -1211,6 +1210,7 @@
           key: `server:${source.file_id}`,
           file: { name: source.filename, size: Number(source.file_size || 0), lastModified: 0 },
           serverId: source.file_id,
+          uploadedAt: source.uploaded_at || '',
           state: 'success',
           detail: `${extension} · ${formatFileSize(Number(source.file_size || 0))} · ${Number(source.record_count || 0).toLocaleString()} 筆資料`,
           yearRange: years.length ? `${years[0]}–${years[years.length - 1]}` : '',
@@ -1329,7 +1329,7 @@
         const targetLabel = hasTarget ? `${operator}${Number(target).toLocaleString()}%` : '尚未設定';
         const statusClass = meetsTarget == null ? '' : meetsTarget ? 'is-success' : 'is-warning';
         const statusIcon = meetsTarget == null ? 'bi-dash-circle' : meetsTarget ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill';
-        const statusLabel = !calculationAvailable ? '尚未建立規則' : meetsTarget == null ? '待設定閾值' : meetsTarget ? '達標' : '未達標';
+        const statusLabel = !calculationAvailable ? '尚未建立規則' : !hasTarget ? '待設定閾值' : percentage == null ? '無法計算' : meetsTarget ? '達標' : '未達標';
         const thresholdMarkup = canManageThresholds ? `<span class="indicator-threshold-editor">
           <span>閾值：</span>
           <select class="form-select form-select-sm indicator-threshold-operator" data-threshold-operator aria-label="指標 ${escapeHtml(indicator.id)} 閾值比較方式">
@@ -1594,7 +1594,7 @@
       const rateLabel = !calculationAvailable ? '尚未建立規則' : percentage == null ? '無法計算' : `${percentage}%`;
       const targetLabel = hasTarget ? `${operator}${Number(target).toLocaleString()}%` : '尚未設定';
       const statusClass = meetsTarget == null ? 'is-neutral' : meetsTarget ? 'is-success' : 'is-warning';
-      const statusLabel = !calculationAvailable ? '尚未建立規則' : meetsTarget == null ? '待設定閾值' : meetsTarget ? '達標' : '未達標';
+      const statusLabel = !calculationAvailable ? '尚未建立規則' : !hasTarget ? '待設定閾值' : percentage == null ? '無法計算' : meetsTarget ? '達標' : '未達標';
       const statusSymbol = meetsTarget == null ? '－' : meetsTarget ? '✓' : '▲';
       const valuePositionClass = percentage === 0 ? ' is-zero' : percentage === 100 ? ' is-full' : '';
       const valuePositionStyle = percentage !== 0 && percentage !== 100 ? `left:${safePercentage}%;` : '';
@@ -1629,7 +1629,7 @@
     </section>`;
   };
 
-  const indicatorsExportWarning = '請先產生語言模型敘述，再進行預覽或下載!!';
+  const indicatorsExportWarning = '請先產生分析敘述，再進行預覽或下載!!';
   const getIndicatorsExportCancerLabels = () => Object.fromEntries(cancerInputs.map((input) => [
     input.value, input.parentElement.querySelector('span').childNodes[0].textContent.trim()
   ]));
@@ -1668,7 +1668,7 @@
         llmText: includeNarrative ? indicatorNarrativeCache.get(cacheKey) || '' : '',
         includeAi: includeNarrative,
         exportKind: 'indicators',
-        narrativeHeading: '語言模型敘述'
+        narrativeHeading: '分析敘述'
       });
     }
     return items;

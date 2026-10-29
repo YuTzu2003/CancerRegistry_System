@@ -108,7 +108,15 @@ def _write(task_type, task_id, filename, row):
 
 def _rows(task_type, task_id, filename):
     path = _dir(task_type, task_id) / filename
-    return [json.loads(line) for line in path.read_text(encoding='utf-8').splitlines()] if path.exists() else []
+    if not path.exists():
+        return []
+    rows = []
+    for line_number, line in enumerate(path.read_bytes().splitlines(), 1):
+        try:
+            rows.append(json.loads(line.decode('utf-8')))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            logging.warning('Skipping invalid LLM task record in %s at line %s', path, line_number)
+    return rows
 
 
 def _rewrite(task_type, task_id, filename, rows):
@@ -117,7 +125,23 @@ def _rewrite(task_type, task_id, filename, rows):
     path.write_text(''.join(json.dumps(row, ensure_ascii=False, default=str) + '\n' for row in rows), encoding='utf-8')
 
 
-def _batched_task_status(inputs, outputs, expected_ids=None):
+def _has_bilingual_insights(result):
+    insights = result.get('insights')
+    return bool(result.get('success')) and isinstance(insights, dict) and all(
+        isinstance(insights.get(language), str) and insights[language].strip()
+        for language in ('zh-TW', 'en')
+    )
+
+
+def _bilingual_progress(inputs, outputs):
+    expected_ids = {entry.get('custom_id') for entry in inputs}
+    return len({
+        entry.get('custom_id') for entry in outputs
+        if entry.get('custom_id') in expected_ids and _has_bilingual_insights(entry.get('result') or {})
+    })
+
+
+def _batched_task_status(inputs, outputs, expected_ids=None, *, require_bilingual=False):
     expected_ids = expected_ids or [entry.get('custom_id') for entry in inputs]
     output_ids = [entry.get('custom_id') for entry in outputs]
     is_complete = (
@@ -127,7 +151,11 @@ def _batched_task_status(inputs, outputs, expected_ids=None):
         and set(output_ids) == set(expected_ids)
         and all(entry.get('result', {}).get('success') for entry in outputs)
     )
-    return 'completed' if is_complete else 'failed'
+    if not is_complete:
+        return 'failed'
+    if require_bilingual and not all(_has_bilingual_insights(entry.get('result') or {}) for entry in outputs):
+        return 'partial_failed'
+    return 'completed'
 
 
 def _resolved_task_status(task_type, status, inputs, outputs, payload=None):
@@ -136,7 +164,7 @@ def _resolved_task_status(task_type, status, inputs, outputs, payload=None):
             item.get('item_id') for item in (payload or {}).get('items', [])
             if item.get('item_id')
         ]
-        return _batched_task_status(inputs, outputs, expected_ids)
+        return _batched_task_status(inputs, outputs, expected_ids, require_bilingual=task_type in {'annual_report', 'comparison_report'})
     return status
 
 
@@ -221,7 +249,11 @@ def _task(cursor, row):
     inputs = _rows(task['TaskType'], task['TaskID'], 'input.jsonl')
     outputs = _rows(task['TaskType'], task['TaskID'], 'output.jsonl')
     task['Status'] = _resolved_task_status(task['TaskType'], task['Status'], inputs, outputs, payload)
-    task['ProgressCurrent'] = task_data.get('ProgressCurrent', 0)
+    task['ProgressCurrent'] = (
+        _bilingual_progress(inputs, outputs)
+        if task['TaskType'] in {'annual_report', 'comparison_report'}
+        else task_data.get('ProgressCurrent', 0)
+    )
     task['DocumentLabel'] = payload.get('_document_label', '')
     task['TaskTitle'] = payload.get('job_title') or payload.get('field_key') or payload.get('analysis_item') or 'LLM 分析'
     items = payload.get('items') if isinstance(payload.get('items'), list) else []
@@ -377,7 +409,7 @@ def process_next_llm_task(worker_id):
             outputs = _rows(task_type, task_id, 'output.jsonl')
             inputs = _rows(task_type, task_id, 'input.jsonl')
             expected_ids = [item.get('item_id') for item in task['payload'].get('items', []) if item.get('item_id')]
-            status = _batched_task_status(inputs, outputs, expected_ids)
+            status = _batched_task_status(inputs, outputs, expected_ids, require_bilingual=task_type in {'annual_report', 'comparison_report'})
             _update(task_id, status=status)
             return {'task_id': task_id, 'status': status}
 

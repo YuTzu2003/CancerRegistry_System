@@ -5,6 +5,7 @@ import uuid
 import math
 import hashlib
 import json
+from datetime import datetime
 import pandas as pd
 from flask import Blueprint, current_app, jsonify, redirect, render_template, request, send_file, session, url_for
 from werkzeug.utils import secure_filename
@@ -105,6 +106,9 @@ def _source_response(source):
         "record_count": source.get("record_count", 0),
         "year_column": source.get("year_column", ""),
         "years": source.get("years", []),
+        "uploaded_at": source.get("uploaded_at") or datetime.fromtimestamp(
+            os.path.getmtime(source["path"])
+        ).strftime("%Y/%m/%d %H:%M"),
     }
 
 def _delete_source_file(source):
@@ -152,7 +156,7 @@ def export_indicators_report():
         for chart in charts
         if isinstance(chart, dict)
     ):
-        return jsonify({"ok": False, "error": "請先產生語言模型敘述，再進行預覽或下載!!"}), 400
+        return jsonify({"ok": False, "error": "請先產生分析敘述，再進行預覽或下載!!"}), 400
     if not format_pdf and not format_word:
         return jsonify({"ok": False, "error": "請至少選擇一種匯出格式。"}), 400
 
@@ -289,6 +293,7 @@ def upload_indicators_source():
         "record_count": int(len(dataframe)),
         "year_column": str(year_column) if year_column is not None else "",
         "years": years,
+        "uploaded_at": datetime.now().strftime("%Y/%m/%d %H:%M"),
         "header_normalized": True,
     }
     sources.append(source)

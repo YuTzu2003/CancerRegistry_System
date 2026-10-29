@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
   const storageKey = 'indicators_export_data';
-  const missingNarrativeWarning = '請先產生語言模型敘述，再進行預覽或下載!!';
+  const missingNarrativeWarning = '請先產生分析敘述，再進行預覽或下載!!';
   const listContainer = document.getElementById('exportItemList');
   const backButton = document.getElementById('btnBackToIndicators');
   const previewButton = document.getElementById('btnPreviewPdf');
@@ -23,8 +23,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const includeNarrative = exportMode === 'complete';
   if (!includeNarrative) {
     if (pageTitle) pageTitle.textContent = '基本監測指標報告匯出設定';
-    if (pageLead) pageLead.textContent = '預覽監測表與圖表，再選擇 PDF、Word 或兩者下載；不包含語言模型敘述。';
-    if (contentHint) contentHint.textContent = '基本報告僅包含監測表與圖表，不需要先產生語言模型敘述。';
+    if (pageLead) pageLead.textContent = '預覽監測表與圖表，再選擇 PDF、Word 或兩者下載；不包含分析敘述。';
+    if (contentHint) contentHint.textContent = '基本報告僅包含監測表與圖表，不需要先產生分析敘述。';
   }
 
   if (!exportData.length) {
@@ -48,7 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="d-flex align-items-center gap-3 ms-4 flex-wrap" onmousedown="event.stopPropagation()">
           ${hasChart ? checkboxMarkup('chart', item.id, '圖表') : ''}
           ${hasTable ? checkboxMarkup('table', item.id, '監測表') : ''}
-          ${hasAi ? checkboxMarkup('ai', item.id, '語言模型敘述') : ''}
+          ${hasAi ? checkboxMarkup('ai', item.id, '分析敘述') : ''}
         </div>
       </div>
       <div class="export-actions ms-3"><span class="badge bg-secondary">Item <span class="order-number">${index + 1}</span></span></div>`;
@@ -88,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const charts = selectedData();
     if (!charts.length) {
-      utils.alert(includeNarrative ? '請至少保留一項監測表、圖表或語言模型敘述。' : '請至少保留一項監測表或圖表。', 'warning');
+      utils.alert(includeNarrative ? '請至少保留一項監測表、圖表或分析敘述。' : '請至少保留一項監測表或圖表。', 'warning');
       return;
     }
 

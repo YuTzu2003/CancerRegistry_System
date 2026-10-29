@@ -12,6 +12,7 @@
   const cancerTitle = payload.cancer_title || '癌症';
   window.dashboardPreviewYearTitle = yearTitle;
   window.dashboardPreviewCancerTitle = cancerTitle;
+  window.dashboardSelectedCancerDisplayKeys = payload.cancer_display_keys || [];
   const taskId = initialTask.TaskID || initialTask.taskId;
   const paneFor = (fieldKey) => {
     if (fieldKey.includes('Stage Distribution') || /期別分布|期別分佈/.test(fieldKey)) return '#chartPane-StageSummary';
@@ -28,13 +29,48 @@
   const selected = (payload.items || []).map((item) => ({ ...item, pane: paneFor(item.field_key), response: responseFor(item.field_key) })).filter((item) => item.pane);
   let activePreviewItem = selected[0] || null;
   let currentTask = initialTask;
+  window.dashboardPreviewTask = initialTask;
   let renderer = null;
+  const taskReadyForExport = (task) => {
+    if ((task?.Status || task?.status) !== 'completed' || !payload.items?.length) return false;
+    if (payload.items.some(item => item.field_key?.startsWith('期別與手術術式'))) {
+      const keys = new Set(payload.items.map(item => item.field_key));
+      if ((chartData.stageSurgeryData || []).some((table, index) => !keys.has(window.AnnualReportRenderer.surgeryInsightKey(table, index)))) return false;
+    }
+    if (payload.items.some(item => item.field_key?.startsWith('期別與首次療程'))) {
+      const keys = new Set(payload.items.map(item => item.field_key));
+      if ((chartData.stageFirstCourseData || []).some(table => table.system && !keys.has(`期別與首次療程（${table.system}期別）`))) return false;
+    }
+    const results = new Map((task.result || []).map((row) => [row.custom_id, row.result]));
+    return payload.items.every((item) => {
+      const result = results.get(item.item_id);
+      return result?.success && ['zh-TW', 'en'].every((language) =>
+        typeof result.insights?.[language] === 'string' && result.insights[language].trim()
+      );
+    });
+  };
+  window.isAnnualPreviewExportReady = taskReadyForExport;
   const stageFieldKey = (report) => {
     const view = report?.view || 'stage';
     return `${report?.staging_system || ''} Stage Distribution${view === 'sex' ? ' by Sex' : view === 'age' ? ' by Age Group' : ''}`;
   };
   const activatePreviewItem = (item) => {
     activePreviewItem = item;
+    if (item.response === 'llmResponseTreatmentFirstCourse') {
+      const system = window.stageFirstCourseActiveSystem;
+      if (system) {
+        const fieldKey = `期別與首次療程（${system}期別）`;
+        activePreviewItem = selected.find(entry => entry.field_key === fieldKey) || { field_key: fieldKey, pane: item.pane, response: item.response };
+      }
+    }
+    if (item.response === 'llmResponseTreatmentSurgery') {
+      const tables = chartData.stageSurgeryData || [];
+      const index = tables.findIndex((table, i) => window.AnnualReportRenderer.surgeryTableKey(table, i) === window.stageSurgeryActiveTableKey);
+      if (index >= 0) {
+        const fieldKey = window.AnnualReportRenderer.surgeryInsightKey(tables[index], index);
+        activePreviewItem = selected.find(entry => entry.field_key === fieldKey) || { field_key: fieldKey, pane: item.pane, response: item.response };
+      }
+    }
     const pane = document.querySelector(item.pane);
     document.querySelectorAll('.chart-pane').forEach((entry) => entry.classList.add('d-none'));
     pane?.classList.remove('d-none');
@@ -48,9 +84,10 @@
         };
         Object.values(sections).forEach((section) => section?.classList.add('d-none'));
         sections[report.view || 'stage']?.classList.remove('d-none');
-        if (report.view === 'sex') renderer?.renderStageSexReport?.(report, yearTitle, cancerTitle);
-        else if (report.view === 'age') renderer?.renderStageAgeReport?.(report, yearTitle, cancerTitle);
-        else renderer?.renderStageDistributionReport?.(report, yearTitle, cancerTitle);
+        const displayCancerTitle = renderer?.getSelectedCancerTitle?.() || cancerTitle;
+        if (report.view === 'sex') renderer?.renderStageSexReport?.(report, yearTitle, displayCancerTitle);
+        else if (report.view === 'age') renderer?.renderStageAgeReport?.(report, yearTitle, displayCancerTitle);
+        else renderer?.renderStageDistributionReport?.(report, yearTitle, displayCancerTitle);
       }
     }
     pane?.querySelectorAll('div').forEach((element) => echarts.getInstanceByDom(element)?.resize());
@@ -58,21 +95,42 @@
   };
   const applyNarratives = (task) => {
     currentTask = task || initialTask;
+    window.dashboardPreviewTask = currentTask;
+    const status = currentTask.Status || currentTask.status;
+    const statusText = ({ queued: '處理中', running: '處理中', retrying: '處理中', completed: '已完成', partial_failed: '部分完成', failed: '處理失敗', cancelled: '已取消' })[status] || status;
+    document.querySelector('.page-head .lead').textContent = `${currentTask.DocumentLabel || '年報分析'}｜${statusText}｜中英敘述 ${currentTask.ProgressCurrent || 0}/${currentTask.ProgressTotal || 0}`;
+    const exportButton = document.getElementById('btnPrepareExport');
+    if (exportButton) {
+      exportButton.disabled = !taskReadyForExport(currentTask);
+      exportButton.title = exportButton.disabled ? '所有表格的中英文敘述完成後才能匯出；舊任務若缺少敘述，請重新查詢。' : '';
+    }
     const results = Object.fromEntries((currentTask.result || []).map((row) => [row.field_key, row.result?.insights || {}]));
-    window.dashboardPreviewNarratives = Object.fromEntries(Object.entries(results).map(([fieldKey, insights]) => [fieldKey, insights['zh-TW'] || insights.en || '']));
+    const language = window.DashboardI18n?.getLanguage() || 'zh-TW';
+    window.dashboardPreviewNarratives = Object.fromEntries(Object.entries(results).map(([fieldKey, insights]) => [fieldKey, insights[language] || '']));
     Object.entries(results).forEach(([fieldKey, insights]) => {
       const item = (payload.items || []).find((entry) => entry.field_key === fieldKey) || {};
       Object.entries(insights).forEach(([language, insight]) => window.DashboardRenderer?.insightCache?.set(`${language}|${item.mode_ai || 'balanced'}|${fieldKey}`, insight));
     });
-    const item = activePreviewItem || selected[0];
-    const target = item && document.getElementById(item.response);
-    if (target) target.textContent = results[item.field_key]?.['zh-TW'] || (['failed', 'partial_failed', 'completed'].includes(currentTask.Status || currentTask.status) ? '此圖表敘述未能完成。' : '正在處理中…');
+    const responseItems = new Map();
+    selected.forEach((item) => {
+      if (!responseItems.has(item.response) || item.field_key === activePreviewItem?.field_key) responseItems.set(item.response, item);
+    });
+    if (activePreviewItem?.response) responseItems.set(activePreviewItem.response, activePreviewItem);
+    responseItems.forEach((item, responseId) => {
+      const target = document.getElementById(responseId);
+      if (target) target.textContent = results[item.field_key]?.[language] || (!item.item_id ? '此表格沒有對應的敘述，請重新建立年報分析任務。' : ['failed', 'partial_failed', 'completed'].includes(currentTask.Status || currentTask.status) ? '此圖表敘述未能完成。' : '正在處理中…');
+    });
     bindRegenerateButtons(currentTask);
   };
+  window.updateAnnualPreviewTask = applyNarratives;
+  window.rerenderDashboardPreviewNarrative = () => applyNarratives(currentTask);
   window.showDashboardPreviewNarrative = (fieldKey) => {
     const item = selected.find((entry) => entry.field_key === fieldKey);
-    if (item) activePreviewItem = item;
-    applyNarratives(currentTask);
+    const pane = paneFor(fieldKey);
+    if (document.querySelector('.chart-tab-btn.active')?.dataset.target === (item?.pane || pane)) {
+      activePreviewItem = item || { field_key: fieldKey, pane, response: responseFor(fieldKey) };
+      applyNarratives(currentTask);
+    }
   };
   const refreshNarratives = async () => {
     try {
@@ -80,8 +138,6 @@
       const data = await response.json();
       applyNarratives(data.task);
       const status = data.task.Status || data.task.status;
-      const statusText = ['queued', 'running', 'retrying'].includes(status) ? '處理中' : status;
-      document.querySelector('.page-head .lead').textContent = `${data.task.DocumentLabel || '年報分析'}｜${statusText}｜${data.task.ProgressCurrent || 0}/${data.task.ProgressTotal || 0}`;
       if (['queued', 'running', 'retrying'].includes(status)) setTimeout(refreshNarratives, 3000);
     } catch (_) { setTimeout(refreshNarratives, 3000); }
   };
@@ -109,7 +165,7 @@
       .map((tab) => ({ ...tab, item: selected.find((item) => item.pane === tab.pane) }))
       .filter((tab) => tab.item);
     tabs.forEach((tab, index) => {
-      const button = document.createElement('button'); button.type = 'button'; button.className = 'btn btn-outline-primary chart-tab-btn'; button.dataset.target = tab.pane; button.textContent = tab.label;
+      const button = document.createElement('button'); button.type = 'button'; button.className = 'btn btn-outline-primary chart-tab-btn'; button.dataset.target = tab.pane; button.dataset.labelZh = tab.label; button.textContent = window.AnnualReportRenderer?.resultTabLabel(tab.label, window.DashboardI18n?.getLanguage()) || tab.label;
       button.addEventListener('click', () => {
         container.querySelectorAll('.chart-tab-btn').forEach((entry) => entry.classList.remove('active'));
         button.classList.add('active');
@@ -126,8 +182,9 @@
     const button = item && document.getElementById(buttonFor(item.response));
     if (!button) return;
     button.style.display = 'block';
-    button.disabled = !canRegenerate;
-    if (!canRegenerate) return;
+    button.dataset.insightFieldKey = item.field_key;
+    button.disabled = !canRegenerate || !item.item_id;
+    if (button.disabled) { button.onclick = null; return; }
     button.onclick = async () => {
       button.disabled = true;
       const response = await fetch('/api/llm-tasks/' + encodeURIComponent(taskId) + '/regenerate/' + encodeURIComponent(item.item_id), { method: 'POST' });
@@ -138,7 +195,7 @@
   };  const render = () => {
     renderer = window.DashboardRenderer;
     if (!renderer || !window.dashboardChartInstance) return setTimeout(render, 50);
-    const year = yearTitle; const cancer = cancerTitle; window.lastChartData = chartData;
+    const year = yearTitle; const cancer = renderer.getSelectedCancerTitle(); window.lastChartData = chartData;
     renderer.renderSexAgeTable?.(chartData.genderAgeData, year, cancer); renderer.renderAgeMedianTable?.(chartData.ageMedianData, year, cancer);
     renderer.renderAnalyzableConfirmedTable?.(chartData.analyzableConfirmedData, year, cancer); renderer.renderHistologyTable?.(chartData.histologyData, year, cancer, chartData.histologyNoDataReason);
     renderer.renderDiagnosisClassificationTable?.(chartData.diagnosisClassificationData, year, cancer); renderer.renderDiagnosisClassificationChart?.(chartData.diagnosisClassificationData, year, cancer);

@@ -83,7 +83,12 @@ def request_llm_chat(messages: Sequence[Mapping[str, str]], *, temperature: floa
     client, model = get_llm_client(settings)
     last_finish_reason = None
     for attempt in range(2):
-        response = client.chat.completions.create(model=model,messages=list(messages),temperature=temperature,timeout=settings.timeout_seconds,)
+        response = client.chat.completions.create(
+            model=model,
+            messages=list(messages),
+            temperature=temperature,
+            timeout=settings.timeout_seconds,
+        )
         choices = getattr(response, "choices", None) or []
         if choices:
             last_finish_reason = getattr(choices[0], "finish_reason", None)
@@ -98,10 +103,15 @@ def request_llm_chat(messages: Sequence[Mapping[str, str]], *, temperature: floa
                         parts.append(str(text))
                 if "".join(parts).strip():
                     return "".join(parts)
-        logging.warning("LLM returned empty content (attempt %s/2, finish_reason=%r)",attempt + 1, last_finish_reason,)
+        logging.warning(
+            "LLM returned empty content (attempt %s/2, finish_reason=%r)",
+            attempt + 1,
+            last_finish_reason,
+        )
     raise ValueError(f"LLM response is empty (finish_reason={last_finish_reason!r})")
 
-def request_azure_responses(settings: LLMSettings,messages: Sequence[Mapping[str, str]],*,temperature: float,) -> str:
+
+def request_azure_responses(settings: LLMSettings, messages: Sequence[Mapping[str, str]], *, temperature: float) -> str:
     payload = {
         "model": settings.model,
         "input": [

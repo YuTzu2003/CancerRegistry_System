@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block title %}存活率模組{% endblock %}
+{% block page_title %}存活率模組{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('survival_report.static', filename='css/survival_report.css') }}">
+{% endblock %}
+
+{% block content %}
+<section class="survival-module" aria-labelledby="survivalHeading">
+  <div class="page-head survival-page-head">
+    <div>
+      <h1 id="survivalHeading">存活率模組</h1>
+      <p>上傳一份或多份總院 Excel，確認辨識結果後，輸出可編輯 PowerPoint。</p>
+    </div>
+  </div>
+
+  <section class="survival-step">
+    <div class="survival-step-title">
+      <span class="survival-step-marker" aria-hidden="true"></span>
+      <span>資料上傳</span>
+      <span class="survival-step-hint">請上傳總院存活率 Excel，可選擇單一檔案或一次選擇多個檔案</span>
+    </div>
+    <div class="survival-step-body">
+      <div class="upload-card">
+        <div class="upload-card__heading">
+          <div class="upload-card__heading-main">
+            <div class="upload-card__title-row">
+              <h2>匯入原始資料</h2>
+            </div>
+            <ol class="workflow-steps" aria-label="製作流程">
+              <li class="active"><span>1</span>上傳資料</li>
+              <li><span>2</span>確認預覽</li>
+              <li><span>3</span>下載報表</li>
+            </ol>
+          </div>
+          <span class="format-badge">支援 XLS / XLSX</span>
+        </div>
+        <label class="drop-zone" id="dropZone" for="survivalFiles" tabindex="0">
+          <input id="survivalFiles" type="file" name="files" accept=".xls,.xlsx" multiple hidden>
+          <span class="drop-zone__icon"><i class="bi bi-cloud-arrow-up"></i></span>
+          <strong>點擊或拖曳檔案至此處上傳</strong>
+          <small>檔案格式：XLS / XLSX</small>
+        </label>
+        <div id="fileQueue" class="file-queue" aria-live="polite"></div>
+        <div class="upload-actions">
+          <button class="btn btn-primary action-button" id="generatePreview" type="button" disabled>
+            <i class="bi bi-layout-text-window-reverse"></i>產生預覽
+          </button>
+        </div>
+        <div id="moduleStatus" class="module-status" role="status" aria-live="polite" hidden></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="previewWorkspace" class="survival-step" hidden>
+    <div class="survival-step-title">
+      <span class="survival-step-marker" aria-hidden="true"></span>
+      <span>報表預覽與匯出</span>
+      <span class="survival-step-hint">確認辨識結果、調整顯示名稱與投影片順序後下載報表</span>
+    </div>
+    <div class="survival-step-body preview-workspace">
+      <aside class="report-sidebar" aria-label="報表清單">
+      <div class="report-sidebar__toolbar">
+        <div>
+          <h2>PPT 清單</h2>
+        </div>
+        <span id="deckSelectionSummary" class="selected-summary">0 / 0</span>
+      </div>
+      <div class="deck-selection-actions">
+        <button id="selectAllDecks" type="button">全選</button>
+        <button id="clearDeckSelection" type="button">清除選取</button>
+      </div>
+      <div id="deckList" class="deck-list" aria-label="PPT 清單"></div>
+      <div class="slide-list-heading">
+        <strong>目前 PPT 的投影片</strong>
+        <span id="selectedSummary" class="selected-summary">0 / 0</span>
+      </div>
+      <label class="filter-label" for="reportFilter">顯示範圍</label>
+      <select id="reportFilter" class="form-select form-select-sm">
+        <option value="all">全部報表</option>
+        <option value="warning">有警示</option>
+      </select>
+      <p class="sort-hint"><i class="bi bi-grip-vertical"></i>拖曳卡片可調整投影片順序</p>
+      <div id="reportList" class="report-list"></div>
+      </aside>
+
+      <div class="preview-panel">
+      <div class="preview-panel__toolbar">
+        <div>
+          <div class="preview-title-row">
+            <h2>投影片預覽</h2>
+            <span id="currentDeckSummary" class="current-deck-summary"></span>
+          </div>
+        </div>
+        <div class="preview-pagination">
+          <button id="previousReport" type="button" aria-label="上一張"><i class="bi bi-chevron-left"></i></button>
+          <span id="previewPosition">0 / 0</span>
+          <button id="nextReport" type="button" aria-label="下一張"><i class="bi bi-chevron-right"></i></button>
+        </div>
+      </div>
+
+      <div id="displayEditor" class="display-editor" hidden>
+        <div id="hospitalEditors" class="hospital-editors display-editor__field" aria-label="醫院名稱"></div>
+        <label>癌別<input id="cancerName" type="text" maxlength="60"></label>
+        <label>分期系統<input id="stagingSystem" type="text" maxlength="30"></label>
+        <div class="display-editor__field title-field">
+          <div class="title-label-row">
+            <input id="customTitleToggle" type="checkbox" aria-label="允許自訂投影片標題">
+            <label for="displayTitle">投影片標題</label>
+          </div>
+          <input id="displayTitle" type="text" maxlength="80" disabled>
+        </div>
+      </div>
+
+      <div id="reportPreview" class="slide-stage">
+        <div class="empty-preview">
+          <i class="bi bi-file-earmark-bar-graph"></i>
+          <strong>上傳資料後會在這裡顯示報表</strong>
+          <span>預覽可修改顯示名稱，但統計數值仍以來源檔為準。</span>
+        </div>
+      </div>
+
+      <div id="issuePanel" class="issue-panel" hidden></div>
+      <div class="export-bar">
+        <div class="export-bar__copy">
+          <strong>確認完成後下載</strong>
+          <span>下載後可於 PowerPoint 中調整表格與文字內容</span>
+        </div>
+        <div class="export-actions">
+          <button id="downloadPptx" class="btn btn-primary" type="button" disabled>
+            <i class="bi bi-file-earmark-ppt"></i>下載 PowerPoint
+          </button>
+        </div>
+      </div>
+      </div>
+    </div>
+  </section>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('survival_report.static', filename='js/survival_report_decks.js') }}"></script>
+<script src="{{ url_for('survival_report.static', filename='js/survival_report.js') }}"></script>
+{% endblock %}

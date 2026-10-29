@@ -4,7 +4,7 @@
 {% block extra_head %}
   <script src="/static/vendor/echarts/echarts.min.js"></script>
   <script src="/static/vendor/i18next/i18next.min.js"></script>
-  <link rel="stylesheet" href="/static/css/dashboard/dashboard.css?v=20261008-summary-rwd">
+  <link rel="stylesheet" href="/static/css/dashboard/dashboard.css?v=20261029-classification-chart-scroll">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/dashboard_page.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/llm_task_panel.css') }}">
 {% endblock %}
@@ -17,7 +17,7 @@
   </div>
   {% if preview_task %}
   <div class="d-flex align-items-center gap-2">
-    <button type="button" class="btn btn-outline-secondary" id="btnBackToQuery">回到上一頁查詢</button><button type="button" class="btn btn-success" id="btnPrepareExport">匯出圖表與 LLM 敘述</button>
+    <button type="button" class="btn btn-outline-secondary" id="btnBackToQuery">回到上一頁查詢</button><button type="button" class="btn btn-success" id="btnPrepareExport"{% if preview_task.Status != 'completed' %} disabled title="中英文分析敘述完成後才能匯出"{% endif %}>匯出圖表與 LLM 敘述</button>
   </div>
   {% endif %}
 </div>
@@ -60,14 +60,16 @@
               <tbody id="annualSexAgeTableBody"></tbody>
             </table>
           </div>
-          <div id="main" style="width: 100%; height: 450px;"></div>
+          <div class="annual-gender-age-chart-scroll">
+            <div id="main" style="width: 100%; height: 450px;"></div>
+          </div>
           <div id="annualSexAgeChartCaption" class="annual-chart-caption">圖、XXXX年新診斷XX病患性別及年齡分佈圖</div>
         </div>
         <!--LLM 分析結果-->
         <div class="mt-4 p-3 rounded" style="background-color: rgba(209, 231, 221, 0.5); border: 1px solid #a3cfbb;">
           <div class="d-flex align-items-center mb-2 justify-content-between">
             <div class="d-flex align-items-center">
-              <h6 class="mb-0 fw-bold text-dark llm-insight-title">語言模型敘述</h6>
+              <h6 class="mb-0 fw-bold text-dark llm-insight-title">分析敘述</h6>
             </div>
             <button type="button" id="btnAiMain" class="btn btn-sm" style="display: none; background-color: transparent; border: 1px solid #495057; color: #212529; font-weight: 500;">重新產生敘述</button>
           </div>
@@ -92,7 +94,7 @@
         <div class="mt-4 p-3 rounded" style="background-color: rgba(209, 231, 221, 0.5); border: 1px solid #a3cfbb;">
           <div class="d-flex align-items-center mb-2 justify-content-between">
             <div class="d-flex align-items-center">
-              <h6 class="mb-0 fw-bold text-dark llm-insight-title">語言模型敘述</h6>
+              <h6 class="mb-0 fw-bold text-dark llm-insight-title">分析敘述</h6>
             </div>
             <button type="button" id="btnAiMedian" class="btn btn-sm" style="display: none; background-color: transparent; border: 1px solid #495057; color: #212529; font-weight: 500;">重新產生敘述</button>
           </div>
@@ -117,7 +119,7 @@
           <div class="mt-4 p-3 rounded" style="background-color: rgba(209, 231, 221, 0.5); border: 1px solid #a3cfbb;">
             <div class="d-flex align-items-center mb-2 justify-content-between">
               <div class="d-flex align-items-center">
-                <h6 class="mb-0 fw-bold text-dark llm-insight-title">語言模型敘述</h6>
+                <h6 class="mb-0 fw-bold text-dark llm-insight-title">分析敘述</h6>
               </div>
               <button type="button" id="btnAiAnalyzable" class="btn btn-sm" style="display: none; background-color: transparent; border: 1px solid #495057; color: #212529; font-weight: 500;">重新產生敘述</button>
             </div>
@@ -160,7 +162,7 @@
         <div class="mt-4 p-3 rounded" style="background-color: rgba(209, 231, 221, 0.5); border: 1px solid #a3cfbb;">
           <div class="d-flex align-items-center mb-2 justify-content-between">
             <div class="d-flex align-items-center">
-              <h6 class="mb-0 fw-bold text-dark llm-insight-title">語言模型敘述</h6>
+              <h6 class="mb-0 fw-bold text-dark llm-insight-title">分析敘述</h6>
             </div>
             <button type="button" id="btnAiHistology" class="btn btn-sm" style="display: none; background-color: transparent; border: 1px solid #495057; color: #212529; font-weight: 500;">重新產生敘述</button>
           </div>
@@ -181,7 +183,9 @@
           </div>
           <div class="row align-items-center">
             <div class="col-md-12">
-              <div id="annualDiagnosisClassificationChart" style="width: 100%; height: 450px;"></div>
+              <div class="annual-classification-chart-scroll">
+                <div id="annualDiagnosisClassificationChart" style="width: 100%; height: 450px;"></div>
+              </div>
             </div>
           </div>
           <div id="annualDiagnosisClassificationChartCaption" class="annual-chart-caption mt-2">圖、XXXX年新診斷XX病患個案分類分佈圖</div>
@@ -189,7 +193,7 @@
           <div class="mt-4 p-3 rounded" style="background-color: rgba(209, 231, 221, 0.5); border: 1px solid #a3cfbb;">
             <div class="d-flex align-items-center mb-2 justify-content-between">
               <div class="d-flex align-items-center">
-                <h6 class="mb-0 fw-bold text-dark llm-insight-title">語言模型敘述</h6>
+                <h6 class="mb-0 fw-bold text-dark llm-insight-title">分析敘述</h6>
               </div>
               <button type="button" id="btnAiDiagnosisClassification" class="btn btn-sm" style="display: none; background-color: transparent; border: 1px solid #495057; color: #212529; font-weight: 500;">重新產生敘述</button>
             </div>
@@ -259,11 +263,11 @@
           <div id="annualStageAgeChartNote" class="annual-stage-chart-note small text-secondary mt-2 mb-0"></div>
           </section>
 
-          <!-- 目前所選期別報表的語言模型敘述（各期別分頁共用） -->
+          <!-- 目前所選期別報表的分析敘述（各期別分頁共用） -->
           <div class="mt-4 p-3 rounded" style="background-color: rgba(209, 231, 221, 0.5); border: 1px solid #a3cfbb;">
             <div class="d-flex align-items-center mb-2 justify-content-between">
               <div class="d-flex align-items-center">
-                <h6 class="mb-0 fw-bold text-dark llm-insight-title">語言模型敘述</h6>
+                <h6 class="mb-0 fw-bold text-dark llm-insight-title">分析敘述</h6>
               </div>
               <button type="button" id="btnAiStageSummary" class="btn btn-sm" style="display: none; background-color: transparent; border: 1px solid #495057; color: #212529; font-weight: 500;">重新產生敘述</button>
             </div>
@@ -280,7 +284,7 @@
           <div id="annualStageFirstCourseTables" class="annual-report-table-wrap"></div>
           <div class="mt-4 p-3 rounded" style="background-color: rgba(209, 231, 221, 0.5); border: 1px solid #a3cfbb;">
             <div class="d-flex align-items-center mb-2 justify-content-between">
-              <h6 class="mb-0 fw-bold text-dark llm-insight-title">語言模型敘述</h6>
+              <h6 class="mb-0 fw-bold text-dark llm-insight-title">分析敘述</h6>
               <button type="button" id="btnAiTreatmentFirstCourse" class="btn btn-sm" style="display: none; background-color: transparent; border: 1px solid #495057; color: #212529; font-weight: 500;">重新產生敘述</button>
             </div>
             <div id="llmResponseTreatmentFirstCourse" class="text-dark" style="font-size: 14px; white-space: pre-wrap;">自動產生敘述</div>
@@ -296,7 +300,7 @@
           <div id="annualStageSurgeryTables" class="annual-report-table-wrap"></div>
           <div class="mt-4 p-3 rounded" style="background-color: rgba(209, 231, 221, 0.5); border: 1px solid #a3cfbb;">
             <div class="d-flex align-items-center mb-2 justify-content-between">
-              <h6 class="mb-0 fw-bold text-dark llm-insight-title">語言模型敘述</h6>
+              <h6 class="mb-0 fw-bold text-dark llm-insight-title">分析敘述</h6>
               <button type="button" id="btnAiTreatmentSurgery" class="btn btn-sm" style="display: none; background-color: transparent; border: 1px solid #495057; color: #212529; font-weight: 500;">重新產生敘述</button>
             </div>
             <div id="llmResponseTreatmentSurgery" class="text-dark" style="font-size: 14px; white-space: pre-wrap;">自動產生敘述</div>
@@ -345,12 +349,12 @@
   {{ cancer_name_translations | tojson }}
 </script>
 <script src="{{ url_for('static', filename='js/dashboard/dashboard_page.js') }}"></script>
-<script src="{{ url_for('static', filename='js/dashboard/llm_task_panel.js', v='20261007-swal-delete') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard/llm_task_panel.js', v='20261029-comparison-progress') }}"></script>
 <script src="{{ url_for('static', filename='js/dashboard/dashboard_i18n.js') }}"></script>
-<script src="{{ url_for('static', filename='js/dashboard/annual_report_renderer.js') }}"></script>
-<script src="{{ url_for('static', filename='js/dashboard/dashboard.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard/annual_report_renderer.js', v='20261029-surgery-insights') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard/dashboard.js', v='20261029-surgery-insights') }}"></script>
 {% if preview_task %}
 <script id="dashboardPreviewData" type="application/json">{{ {"task": preview_task, "payload": preview_payload} | tojson }}</script>
-<script src="{{ url_for('static', filename='js/dashboard/dashboard_preview.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard/dashboard_preview.js', v='20261029-surgery-insights') }}"></script>
 {% endif %}
 {% endblock %}

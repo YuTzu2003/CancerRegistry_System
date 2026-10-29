@@ -104,4 +104,4 @@ def register_main_routes(app, app_env, login_required):
         except Exception as error:
             app.logger.error("Error fetching dashboard stats: %s", error)
             stats = {"sum_total_count": "0", "avg_completeness_score": "0.0%"}
-        return render_template("index.html", active="index", stats=stats, pending_application_count=pending_application_count, key_application_status=key_application_status, announcements=announcements)
+        return render_template("index.html", active="home", stats=stats, pending_application_count=pending_application_count, key_application_status=key_application_status, announcements=announcements)

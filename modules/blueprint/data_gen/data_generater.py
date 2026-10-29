@@ -16,7 +16,7 @@ from modules.blueprint.clean.pipeline import (
 )
 from modules.services.db import get_conn
 
-SUPPORTED_INPUT_EXTENSIONS = {".txt", ".csv", ".xlsx"}
+SUPPORTED_INPUT_EXTENSIONS = {".txt", ".csv", ".xls", ".xlsx"}
 TEXT_INPUT_ENCODINGS = ("utf-8-sig", "cp950", "big5hkscs", "big5", "gb18030")
 
 
@@ -219,13 +219,13 @@ def _read_uploaded_dataframe(file_path, format_id=None, nrows=None, txt_has_head
     """
     extension = os.path.splitext(str(file_path))[1].lower()
     if extension not in SUPPORTED_INPUT_EXTENSIONS:
-        raise ValueError("僅接受 .txt、.csv 或 .xlsx 格式。")
+        raise ValueError("僅接受txt、csv、xls、xlsx 格式")
 
     options = {"dtype": str}
     if nrows is not None:
         options["nrows"] = nrows
 
-    if extension == ".xlsx":
+    if extension in {".xls", ".xlsx"}:
         return pd.read_excel(file_path, **options), "excel"
 
     with open(file_path, "rb") as source:
@@ -672,10 +672,9 @@ def process_file_logic(
         scheme_display = scheme_display_map.get(naming_scheme, naming_scheme)
         fmt_prefix = f"fmt{fmt_name}_" if (format_id and 'fmt_name' in locals() and fmt_name) else ""
         
-        # TXT cannot safely retain its original byte positions after
-        # de-identification and column selection, so text inputs are exported
-        # as a standard Excel workbook.
-        output_ext = ".xlsx" if ext == ".txt" else orig_ext
+        # TXT cannot retain its byte positions, and legacy XLS output is not
+        # supported by pandas; both are exported as a standard Excel workbook.
+        output_ext = ".xlsx" if ext in {".txt", ".xls"} else orig_ext
         out_filename = f"Gen_{fmt_prefix}{orig_base}_{scheme_display}{output_ext}"
         out_path = os.path.join(os.path.dirname(file_path), out_filename)
         

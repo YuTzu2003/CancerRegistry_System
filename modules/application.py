@@ -9,10 +9,12 @@ from modules.blueprint.admin.audit_logs import audit_logs_bp
 from modules.blueprint.admin.key_approval import key_approval_bp
 from modules.blueprint.admin.member import member_bp
 from modules.blueprint.auth.key_application import key_application_bp
+from modules.blueprint.survival_report import survival_report_bp
 from modules.config import BaseConfig, CONFIG_BY_NAME
 from modules.services import auth_bp, clean_bp, dashboard_bp, data_gen_bp, indicators_bp, login_required
 from modules.services.audit import register_audit_logging
 from modules.services.home import register_main_routes
+from modules.services.data_gen import cleanup_abandoned_data_gen_uploads
 import modules.blueprint.auth.histology_code
 import modules.blueprint.auth.key_access
 import modules.blueprint.auth.national_import
@@ -27,6 +29,11 @@ def create_app():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s", datefmt="%Y-%m-%d %H:%M:%S", handlers=[logging.StreamHandler(sys.stdout)])
     logging.getLogger("werkzeug").handlers = []
     logging.getLogger("werkzeug").propagate = True
+
+    try:
+        cleanup_abandoned_data_gen_uploads()
+    except OSError:
+        logging.exception("Unable to clean up virtual-data temporary files at startup")
 
     project_root = os.path.dirname(os.path.dirname(__file__))
     flask_app = Flask(__name__, static_folder=os.path.join(project_root, "static"))
@@ -48,7 +55,7 @@ def create_app():
             raise RuntimeError("PROXY_COUNT must be 1 in production")
         flask_app.wsgi_app = ProxyFix(flask_app.wsgi_app, x_for=BaseConfig.PROXY_COUNT, x_proto=BaseConfig.PROXY_COUNT, x_host=BaseConfig.PROXY_COUNT, x_port=BaseConfig.PROXY_COUNT)
 
-    for blueprint in (auth_bp, member_bp, audit_logs_bp, clean_bp, data_gen_bp, dashboard_bp, indicators_bp, key_application_bp, key_approval_bp):
+    for blueprint in (auth_bp, member_bp, audit_logs_bp, clean_bp, data_gen_bp, dashboard_bp, indicators_bp, survival_report_bp, key_application_bp, key_approval_bp):
         flask_app.register_blueprint(blueprint)
     register_main_routes(flask_app, app_env, login_required)
     register_audit_logging(flask_app)
