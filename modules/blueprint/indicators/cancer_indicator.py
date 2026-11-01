@@ -4,9 +4,7 @@
 from __future__ import annotations
 from typing import Any
 
-# ===========================================================================
-# 1. 口腔癌品質指標規則庫 (Oral Cavity)
-# ===========================================================================
+# 口腔癌品質指標
 ORAL_CANCER_RULES: dict[int, dict[str, Any]] = {
     1: {
         "name": "口腔癌病人手術後 6 週內開始輔助治療（放射治療或化學放射治療)的比率。",
@@ -165,9 +163,7 @@ ORAL_CANCER_RULES: dict[int, dict[str, Any]] = {
 }
 
 
-"""食道癌品質指標
-注意：surgical_margin 等欄位包含英文字母，因此使用文字型運算子
-"""
+# 食道癌指標
 ESOPHAGEAL_CANCER_RULES: dict[int, dict[str, Any]] = {
     1: {
         "name": "食道癌病人手術切除標本切除端無殘餘侵襲性癌細胞(R0 切除)的比率。",
@@ -289,9 +285,7 @@ ESOPHAGEAL_CANCER_RULES: dict[int, dict[str, Any]] = {
 }
 
 
-# ===========================================================================
-# 2. 已建置癌別基礎定義 (Owned Cancer Declarations)
-# ===========================================================================
+# 已建置癌別基礎定義
 OWNED_CANCER_RULES: dict[str, dict[int, dict[str, Any]]] = {
     "Ovary": {
         2: {"name": "卵巢癌手術病人殘存腫瘤狀態及大小有詳細記載的比率。", "type": "positive"},
@@ -319,9 +313,7 @@ OWNED_CANCER_RULES: dict[str, dict[int, dict[str, Any]]] = {
     },
 }
 
-# ---------------------------------------------------------------------------
 # 組織型態群組、臨床試驗欄位與局部侵犯型判定共用條件
-# ---------------------------------------------------------------------------
 TYPE_I_HISTOLOGIES = [8380, 8382, 8383, 8480, 8560, 8570, 8140]
 TYPE_II_HISTOLOGIES = [8441, 8310, 8041, 8045, 8246, 8013, 8020, 8323, 8070, 8071, 8072, 8076]
 CLINICAL_TRIAL_FIELDS = [
@@ -338,9 +330,7 @@ LOCALLY_ADVANCED_PROSTATE = {"op": "all", "rules": [
     {"op": "equals", "field": "4.5.1", "value": 0},
 ]}
 
-# ---------------------------------------------------------------------------
-# 3. 卵巢癌 (Ovary) 分子分母規則裝配
-# ---------------------------------------------------------------------------
+# 卵巢癌指標
 for _number in (2, 3):
     OWNED_CANCER_RULES["Ovary"][_number].update({
         "denominator": {"op": "all", "rules": [
@@ -355,9 +345,7 @@ for _number in (2, 3):
         ),
     })
 
-# ---------------------------------------------------------------------------
-# 4. 膀胱癌 (Bladder) 分子分母規則裝配
-# ---------------------------------------------------------------------------
+# 膀胱癌指標
 OWNED_CANCER_RULES["Bladder"].update({
     1: {**OWNED_CANCER_RULES["Bladder"][1], "denominator": {"op": "all", "rules": [
         {"op": "between", "field": "4.1.4", "min": 20, "max": 27},
@@ -369,9 +357,7 @@ OWNED_CANCER_RULES["Bladder"].update({
         "numerator": {"op": "between", "field": "2.14", "min": 10, "max": 90}},
 })
 
-# ---------------------------------------------------------------------------
-# 5. 攝護腺癌 (Prostate) 分子分母規則裝配
-# ---------------------------------------------------------------------------
+# 攝護腺癌指標
 OWNED_CANCER_RULES["Prostate"].update({
     1: {**OWNED_CANCER_RULES["Prostate"][1], "denominator": {"op": "text_not_in", "field": "3.19", "values": ["X", "TX"]}, "numerator": {"op": "text_not_equals", "field": "3.19", "value": "8888"}},
     2: {**OWNED_CANCER_RULES["Prostate"][2], "denominator": {"op": "all", "rules": []}, "numerator": {"op": "between", "field": "8.1", "min": 1, "max": 998}},
@@ -385,9 +371,7 @@ OWNED_CANCER_RULES["Prostate"].update({
     5: {**OWNED_CANCER_RULES["Prostate"][5], "denominator": {"op": "all", "rules": [LOCALLY_ADVANCED_PROSTATE, {"op": "present", "field": "4.1.4"}, {"op": "not_in", "field": "4.1.4", "values": [14, 16, 17, 24, 26, 27, 30]}]}, "numerator": {"op": "between", "field": "4.1.4", "min": 31, "max": 80}},
 })
 
-# ---------------------------------------------------------------------------
-# 6. 子宮體癌 (Corpus Uteri) 分子分母規則裝配
-# ---------------------------------------------------------------------------
+# 子宮體癌指標
 OWNED_CANCER_RULES["Corpus_Uteri"].update({
     2: {**OWNED_CANCER_RULES["Corpus_Uteri"][2], "denominator": {"op": "all", "rules": [{"op": "in", "field": "2.8", "values": TYPE_I_HISTOLOGIES}, {"op": "stage_in", "field": "3.7", "values": ["1", "1A", "1B", "1C", "2"]}, {"op": "between", "field": "4.1.4", "min": 30, "max": 90}, {"op": "not", "rule": {"op": "all", "rules": [{"op": "stage_in", "field": "3.7", "values": ["1A"]}, {"op": "text_in", "field": "2.10.1", "values": ["1", "L"]}]}}]}, "numerator": {"op": "all", "rules": [{"op": "between", "field": "4.1.4", "min": 50, "max": 79}, {"op": "between", "field": "4.1.7", "min": 3, "max": 7}]}},
     3: {**OWNED_CANCER_RULES["Corpus_Uteri"][3], "denominator": {"op": "all", "rules": [{"op": "in", "field": "2.8", "values": TYPE_I_HISTOLOGIES}, {"op": "between", "field": "4.1.4", "min": 30, "max": 90}, {"op": "any", "rules": [{"op": "all", "rules": [{"op": "date_year_between", "field": "2.5", "min": 1, "max": 2023}, {"op": "any", "rules": [{"op": "all", "rules": [{"op": "preferred_stage_in", "preferred_field": "3.21", "fallback_field": "3.13", "invalid_values": ["", "0000", "8888", "9999"], "values": ["1B"]}, {"op": "text_in", "field": "2.10.2", "values": ["3", "H", "C"]}]}, {"op": "preferred_stage_in", "preferred_field": "3.21", "fallback_field": "3.13", "invalid_values": ["", "0000", "8888", "9999"], "values": ["2"]}]}, {"op": "not_in", "field": "4.1.4", "values": [60, 61, 62, 63, 64]}]}, {"op": "all", "rules": [{"op": "date_year_between", "field": "2.5", "min": 2024, "max": 9999}, {"op": "preferred_stage_in", "preferred_field": "3.21", "fallback_field": "3.13", "invalid_values": ["", "0000", "8888", "9999"], "values": ["1C", "2A", "2B", "2C"]}]}]}]}, "numerator": {"op": "any_date_on_or_after", "reference_field": "4.1.2", "candidate_fields": ["4.2.1.3", "4.3.4"]}},
@@ -405,7 +389,7 @@ BLADDER_CANCER_RULES = OWNED_CANCER_RULES["Bladder"]
 CORPUS_UTERI_CANCER_RULES = OWNED_CANCER_RULES["Corpus_Uteri"]
 
 
-# Dashboard3 cancer indicator definitions.
+# 胃癌指標
 GASTRIC_CANCER_RULES: dict[int, dict[str, Any]] = {
     1: {
         "name": "臨床分期為第 I~ IIIC 期之胃及食道賁門癌病人手術後 R0 切除的比率。",
@@ -448,6 +432,7 @@ GASTRIC_CANCER_RULES: dict[int, dict[str, Any]] = {
     },
 }
 
+# 肝癌指標
 LIVER_CANCER_RULES: dict[int, dict[str, Any]] = {
     1: {
         "name": "極早期和早期肝細胞癌病人接受治癒性療法的比率。",
@@ -516,11 +501,13 @@ LIVER_CANCER_RULES: dict[int, dict[str, Any]] = {
     6: {"name": "肝細胞癌 BCLC stage 0+A+B 病患等待治療時間在 45 天以內。", "type": "positive", "denominator": {"op": "all", "rules": [{"op": "equals", "field": "3.17", "value": 6}, {"op": "first_char_in", "field": "3.19", "values": ["0", "A", "B"]}, {"op": "in", "field": "2.3.2", "values": [1, 3]}]}, "numerator": {"op": "date_interval", "start_field": "2.5", "end_field": "4.1", "min_days": 0, "max_days": 45}},
 }
 
+# 大腸直腸癌指標
 COLON_RECTUM_CANCER_RULES: dict[int, dict[str, Any]] = {
     2: {"name": "病理期別第 I-III 期結腸癌手術病人，淋巴結病理檢查 12 顆以上的比率。", "type": "positive", "denominator": {"op": "all", "rules": [{"op": "text_starts_with", "field": "2.6", "values": ["C18"]}, {"op": "first_char_in", "field": "3.13", "values": ["1", "2", "3"]}, {"op": "between", "field": "4.1.4", "min": 30, "max": 90}]}, "numerator": {"op": "between", "field": "2.14", "min": 12, "max": 90}},
     3: {"name": "第 II、III 期直腸癌病人，6 週內開始治療的比率。", "type": "positive", "denominator": {"op": "all", "rules": [{"op": "text_starts_with", "field": "2.6", "values": ["C19", "C20"]}, {"op": "equals", "field": "2.3", "value": 1}, {"op": "first_char_in", "field": "3.7", "values": ["2", "3"]}]}, "numerator": {"op": "date_interval", "start_field": "2.12", "end_field": "4.1", "min_days": 0, "max_days": 42}},
 }
 
+# 胰臟癌指標
 PANCREATIC_ADENOCARCINOMA_HISTOLOGIES = [
     "8020", "8035", "8140", "8141", "8144", "8148", "8255",
     "8310", "8323", "8440", "8441", "8453", "8470", "8480",

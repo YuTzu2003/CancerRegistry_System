@@ -8,7 +8,7 @@
 {% block content %}
 {% if preview_mode %}
 <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2 mb-2">
-  <span class="text-secondary fw-medium">正在預覽版本 <code>{{ preview_commit_id }}</code>；此頁為唯讀，不會修改資料。</span>
+  <span class="text-secondary fw-medium">正在預覽{{ preview_label or '歷史版本' }}；此頁為唯讀，不會修改資料。</span>
 </div>
 <link rel="stylesheet" href="{{ url_for('static', filename='css/auth/histology_code_preview.css') }}">
 {% endif %}
@@ -25,13 +25,21 @@
     {% endif %}
     <div class="d-flex flex-wrap gap-2">
       <a class="btn btn-danger" href="{{ url_for('auth.histology_code_versions') }}">版本紀錄</a>
-      <form method="post" action="{{ url_for('auth.save_histology_code_version') }}" onsubmit="event.preventDefault(); Swal.fire({ title: '儲存目前版本', input: 'text', inputLabel: '本次更新內容', inputPlaceholder: '請輸入更新內容（最多 100 字）', inputAttributes: { maxlength: 100 }, showCancelButton: true, confirmButtonColor: '#2563eb', cancelButtonColor: '#6c757d', confirmButtonText: '確認儲存', cancelButtonText: '取消', inputValidator: (value) => { if (!value || !value.trim()) return '請輸入本次更新內容'; if (value.trim().length > 100) return '更新內容不可超過 100 字'; } }).then((result) => { if (result.isConfirmed) { this.querySelector('[name=info]').value = result.value.trim(); this.submit(); } });">
+      <form id="saveHistologyVersionForm" class="d-inline-block" method="post" action="{{ url_for('auth.save_histology_code_version') }}">
       <input type="hidden" name="info" value="">
       <input type="hidden" name="return_year" value="{{ selected_year }}">
       <input type="hidden" name="return_column" value="{{ search_column }}">
       <input type="hidden" name="return_q" value="{{ search_query }}">
       <button class="btn btn-success" type="submit">儲存目前版本</button>
       </form>
+      {% if pending_change_count %}
+      <form id="discardHistologyChangesForm" class="d-inline-block" method="post" action="{{ url_for('auth.discard_histology_code_changes') }}">
+        <input type="hidden" name="return_year" value="{{ selected_year }}">
+        <input type="hidden" name="return_column" value="{{ search_column }}">
+        <input type="hidden" name="return_q" value="{{ search_query }}">
+        <button class="btn btn-outline-danger" type="submit">捨棄未儲存變更</button>
+      </form>
+      {% endif %}
     </div>
   </div>
 </div>
@@ -255,4 +263,37 @@
 </section>
 
 <script src="{{ url_for('static', filename='js/auth/histology_code_preview.js') }}"></script>
+{% if not preview_mode %}
+<script>
+  const histologySubmitButton = document.querySelector('#saveHistologyVersionForm button[type="submit"]');
+  if (histologySubmitButton) histologySubmitButton.textContent = '送出審核';
+  document.getElementById('saveHistologyVersionForm')?.addEventListener('submit', async function (event) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const result = await Swal.fire({
+      title: '送出審核',
+      text: '送出後不會立即影響正式組織型態資料；需由管理員核准後才會啟用。',
+      input: 'text',
+      inputLabel: '變更說明',
+      inputPlaceholder: '例如：新增 116 年組織型態對照資料',
+      inputValidator: (value) => value ? undefined : '請填寫本次變更說明。',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: '送出審核',
+      cancelButtonText: '取消',
+    });
+    if (!result.isConfirmed) return;
+    this.querySelector('input[name="info"]').value = result.value;
+    this.submit();
+  }, true);
+  document.getElementById('discardHistologyChangesForm')?.addEventListener('submit', async function (event) {
+    event.preventDefault();
+    const result = await window.utils.confirm(
+      '確定要捨棄這些未儲存變更嗎？此動作無法復原，但不會影響正式資料或已送審版本。',
+      '捨棄未儲存變更',
+    );
+    if (result.isConfirmed) this.submit();
+  });
+</script>
+{% endif %}
 {% endblock %}

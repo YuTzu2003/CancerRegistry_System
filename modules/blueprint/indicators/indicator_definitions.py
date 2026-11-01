@@ -72,6 +72,30 @@ FIELD_SPECS = {
     "first_surgery_date": ("4.1.1", ("首次手術日期",)),
 }
 
+# Registry fields referenced by indicator rules. Labels come from the bundled
+# CancerRegistry_FmtField mapping; keep this editor list separate from the
+# aliases used by the analysis input parser.
+RULE_FIELD_LABELS = {
+    **{code: aliases[0] for code, aliases in FIELD_SPECS.values() if aliases},
+    '2.3.1': '診斷狀態分類', '2.9': '性態碼', '2.10.1': '臨床分級／分化',
+    '2.10.2': '病理分級／分化', '2.15': '區域淋巴結侵犯數目',
+    '3.2': '外院診斷性及分期性手術處置', '3.3': '申報醫院診斷性及分期性手術處置',
+    '3.11': '病理 N', '3.12': '病理 M', '3.21': '其他分期系統期別（病理分期）',
+    '4.1.7': '申報醫院區域淋巴結手術範圍', '4.1.9': '申報醫院其他部位手術方式',
+    '4.2.1.1': '放射治療臨床標靶體積摘要', '4.2.1.2': '放射治療儀器',
+    '4.2.2.2.3': '最高放射劑量臨床標靶體積治療次數',
+    '4.2.3.3.2': '其他放射治療臨床標靶體積劑量',
+    '4.2.3.3.3': '其他放射治療臨床標靶體積治療次數',
+    '4.3.2': '外院化學治療', '4.3.5': '外院荷爾蒙／類固醇治療',
+    '4.3.6': '申報醫院荷爾蒙／類固醇治療', '4.3.8': '外院免疫治療',
+    '4.3.9': '申報醫院免疫治療', '4.3.10': '申報醫院免疫治療開始日期',
+    '4.3.13': '外院標靶治療', '4.3.14': '申報醫院標靶治療',
+    '4.3.15': '申報醫院標靶治療開始日期', '4.5.1': '其他治療',
+    '8.1': '癌症部位特定因子 1', '8.3': '癌症部位特定因子 3',
+    '8.5': '癌症部位特定因子 5', '8.7': '癌症部位特定因子 7',
+    'is_nsclc': '非小細胞肺癌（系統判斷）',
+}
+
 
 def _is_nsclc(value) -> bool:
     try:
@@ -88,7 +112,22 @@ def _column_map(frame):
     }
 
 
-def _record_for(row, columns):
+def _rule_column_map(frame):
+    """Resolve exact registry names to rule codes, without fuzzy name matches."""
+    names = {str(column).strip().casefold(): column for column in frame.columns}
+    aliases_by_code = {code: aliases for code, aliases in FIELD_SPECS.values()}
+    result = {}
+    for code, label in RULE_FIELD_LABELS.items():
+        if not re.fullmatch(r'\d+(?:\.\d+)*', code):
+            continue
+        for name in (label, *aliases_by_code.get(code, ())):
+            if name.strip().casefold() in names:
+                result[code] = names[name.strip().casefold()]
+                break
+    return result
+
+
+def _record_for(row, columns, rule_columns=None):
     record = {}
     for column, value in row.items():
         header = str(column).strip()
@@ -97,6 +136,9 @@ def _record_for(row, columns):
             record[match.group(1)] = value
     for field, column in columns.items():
         record[field] = row[column] if column else None
+    for code, column in (rule_columns or {}).items():
+        if code not in record:
+            record[code] = row[column]
     record["is_nsclc"] = "TRUE" if _is_nsclc(record.get("2.8")) else "FALSE"
     return record
 
@@ -104,10 +146,11 @@ def _record_for(row, columns):
 def _calculator_for(rule):
     def calculator(frame):
         columns = _column_map(frame)
+        rule_columns = _rule_column_map(frame)
         denominator_values = []
         numerator_values = []
         for _, row in frame.iterrows():
-            record = _record_for(row, columns)
+            record = _record_for(row, columns, rule_columns)
             denominator = bool(evaluate_rule(record, rule["denominator"]))
             numerator = denominator and bool(evaluate_rule(record, rule["numerator"]))
             denominator_values.append(denominator)
@@ -157,8 +200,12 @@ def get_indicator_metadata(cancer_key):
     ]
 
 
-def get_indicator_definitions(cancer_key, metadata=None):
+def get_indicator_definitions(cancer_key, metadata=None, oral_rules=None, rule_override=None):
     rules = RULES_BY_CANCER.get(str(cancer_key or ""), {})
+    if cancer_key == 'Oral_Cavity' and oral_rules is not None:
+        rules = oral_rules
+    if rule_override is not None:
+        rules = rule_override
     if metadata is None:
         metadata = _metadata_by_indicator(cancer_key)
     elif isinstance(metadata, list):
@@ -173,12 +220,10 @@ def get_indicator_definitions(cancer_key, metadata=None):
             "id": number,
             "direction": rule["type"],
             "name": rule["name"],
-            "selection_reason": metadata.get(number, {}).get("selection_reason", ""),
-            "numerator_definition": metadata.get(number, {}).get("numerator_definition", "")
-            or "依已設定的分子規則計算。",
-            "denominator_definition": metadata.get(number, {}).get("denominator_definition", "")
-            or "依已設定的分母規則計算。",
-            "notes": metadata.get(number, {}).get("notes", ""),
+            "selection_reason": rule.get('selection_reason', metadata.get(number, {}).get('selection_reason', '')),
+            "numerator_definition": rule.get('numerator_definition', metadata.get(number, {}).get('numerator_definition', '')) or '依已設定的分子規則計算。',
+            "denominator_definition": rule.get('denominator_definition', metadata.get(number, {}).get('denominator_definition', '')) or '依已設定的分母規則計算。',
+            "notes": rule.get('notes', metadata.get(number, {}).get('notes', '')),
             "target_value": metadata.get(number, {}).get("target_value"),
             "target_operator": metadata.get(number, {}).get("target_operator", "") or ("<=" if rule["type"] == "negative" else ">="),
             "calculator": _calculator_for(rule),
