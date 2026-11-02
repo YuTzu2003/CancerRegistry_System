@@ -25,6 +25,7 @@ def run_database_backup():
         connection.autocommit = True
         cursor = connection.cursor()
         cursor.execute("SET IMPLICIT_TRANSACTIONS OFF")
+        cursor.execute("IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION")
         cursor.execute("SELECT @@TRANCOUNT")
         transaction_count = int(cursor.fetchone()[0])
         if transaction_count:
