@@ -51,7 +51,10 @@
             {"endpoint": "auth.data_update_access", "title": "資料維護", "icon": "bi-database-gear"},
           ]},
           {"endpoint": "data_gen.dataGen", "title": "虛擬資料生成", "icon": "bi-database-add"},
-          {"endpoint": "indicators.indicators", "title": "監測指標", "icon": "bi-clipboard2-pulse"},
+          {"title": "指標模組", "icon": "bi-clipboard2-pulse", "subitems": [
+            {"endpoint": "indicators.indicators", "title": "監測指標", "icon": "bi-clipboard2-pulse"},
+            {"endpoint": "indicators.indicator_definitions_page", "title": "資料維護", "icon": "bi-database-gear"},
+          ]},
           {"endpoint": "survival_report.index", "title": "存活率", "icon": "bi-file-earmark-bar-graph"},
           {"endpoint": "key_application.application", "title": "權限申請", "icon": "bi-key"},
         ] %}
@@ -67,7 +70,7 @@
           {% if item.subitems %}
           {% set ns = namespace(is_active=false) %}
           {% for sub in item.subitems %}
-            {% if active == sub.endpoint or active == sub.endpoint.split('.')[-1] %}
+            {% if active == sub.endpoint or active == sub.endpoint.split('.')[-1] or (item.subitems[0].endpoint == 'indicators.indicators' and active == 'indicators.indicator_definition_review_page') %}
               {% set ns.is_active = true %}
             {% endif %}
           {% endfor %}
@@ -80,7 +83,7 @@
             <ul class="collapse {% if ns.is_active %}show{% endif %} list-unstyled m-0 p-0" id="submenu-{{ loop.index }}">
               {% for subitem in item.subitems %}
               <li>
-                <a href="{{ url_for(subitem.endpoint) }}" class="nav-link {% if active == subitem.endpoint or active == subitem.endpoint.split('.')[-1] %}submenu-active{% endif %}" style="padding-left: 48px; height: 38px; margin-top: 4px;">
+                <a href="{{ url_for(subitem.endpoint) }}" {% if subitem.endpoint == 'indicators.indicator_definitions_page' %}data-indicator-definitions-link{% endif %} class="nav-link {% if active == subitem.endpoint or active == subitem.endpoint.split('.')[-1] %}submenu-active{% endif %}" style="padding-left: 48px; height: 38px; margin-top: 4px;">
                   <span class="nav-icon" style="width: 16px; font-size: 16px;"><i class="bi {{ subitem.icon }}"></i></span>
                   <span class="nav-text">{{ subitem.title }}</span>
                 </a>

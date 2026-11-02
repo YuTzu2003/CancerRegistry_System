@@ -202,6 +202,14 @@ def evaluate_rule(record: Record, rule: RuleConfig) -> bool:
         value = to_int(record.get(rule["field"]))
         return value is not None and value >= rule["value"]
 
+    if operation == "less_than":
+        value = to_int(record.get(rule["field"]))
+        return value is not None and value < rule["value"]
+
+    if operation == "less_than_or_equal":
+        value = to_int(record.get(rule["field"]))
+        return value is not None and value <= rule["value"]
+
     if operation == "not_in":
         value = to_int(record.get(rule["field"]))
         excluded = {to_int(item) for item in rule["values"]}
