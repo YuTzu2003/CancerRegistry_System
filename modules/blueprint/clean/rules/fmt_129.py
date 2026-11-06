@@ -421,7 +421,7 @@ RULES = {
         'ID':'3.6',
         'field': 'Clinical M',
         'max_length': 3,
-        'pattern_range': 'X, B, 0, 0B, 1, 1A, 1A0, 1A1, 1B, 1B0, 1B1, 1C, 1C0, 1C1, 1D, 1D0, 1D1, 1E, 888, 999',
+        'pattern_range': 'X, B, 0, 0B, 1, 1A, 1A0, 1A1, 1B, 1B0, 1B1, 1C, 1C0, 1C1, 1C2, 1D, 1D0, 1D1, 1E, 888, 999',
         'description': '指是否有遠端轉移。',
         'purpose': '作為 TNM 分期依據資料，該分期系統可用以評估癌症治療及控制的趨勢。醫師則用以進行預後的推估、治療的規劃、新療法的評估、結果的分析、追蹤的策劃和早期偵測結果的評定。'
     },
@@ -467,7 +467,7 @@ RULES = {
         'ID':'3.12',
         'field': 'Pathologic M',
         'max_length': 3,
-        'pattern_range': 'X, B, 0, 1, 1A, 1A0, 1A1, 1B, 1B0, 1B1, 1C, 1C0, 1C1, 1D, 1D0, 1D1, 1E, C, CA, CA0, CA1, CB, CB0, CB1, CC, CC0, CC1, CD, CD0, CD1, CE, 888, 999',
+        'pattern_range': 'X, B, 0, 1, 1A, 1A0, 1A1, 1B, 1B0, 1B1, 1C, 1C0, 1C1, 1C2, 1D, 1D0, 1D1, 1E, C, CA, CA0, CA1, CB, CB0, CB1, CC, CC0, CC1, CD, CD0, CD1, CE, 888, 999',
         'description': '指是否有遠端轉移。',
         'purpose': '做為 TNM 分期依據資料，該分期系統可用以評估癌症治療及控制的趨勢。醫師則用以進行預後的推估、治療的規劃、新療法的評估、結果的分析、追蹤的策劃和早期偵測結果的評定。'
     },
