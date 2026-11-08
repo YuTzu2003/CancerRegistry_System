@@ -464,6 +464,15 @@ a {
   margin: 0 auto;
 }
 
+.site-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  flex-shrink: 0;
+  background: var(--white);
+  color: var(--gray-700);
+}
+
 /* ==========================================================
    Page head
    ========================================================== */

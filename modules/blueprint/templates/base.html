@@ -45,14 +45,14 @@
             {"endpoint": "clean.clean", "title": "資料清洗", "icon": "bi-play-circle"},
             {"endpoint": "clean.history", "title": "資料審核紀錄", "icon": "bi-file-earmark-text"},
           ]},
-          {"title": "報表分析", "icon": "bi-bar-chart", "subitems": [
+          {"title": "統計報表", "icon": "bi-bar-chart", "subitems": [
             {"endpoint": "dashboard.dashboard", "title": "年報分析", "icon": "bi-bar-chart"},
             {"endpoint": "dashboard.compare", "title": "年度比較", "icon": "bi-columns-gap"},
             {"endpoint": "auth.data_update_access", "title": "資料維護", "icon": "bi-database-gear"},
           ]},
-          {"endpoint": "data_gen.dataGen", "title": "虛擬資料生成", "icon": "bi-database-add"},
+          {"endpoint": "data_gen.dataGen", "title": "虛擬資料", "icon": "bi-database-add"},
           {"endpoint": "indicators.indicators", "title": "監測指標", "icon": "bi-clipboard2-pulse"},
-          {"endpoint": "survival_report.index", "title": "存活率", "icon": "bi-file-earmark-bar-graph"},
+          {"endpoint": "survival_report.index", "title": "存活分析", "icon": "bi-file-earmark-bar-graph"},
           {"endpoint": "key_application.application", "title": "權限申請", "icon": "bi-key"},
         ] %}
         {% if session.get('position') == 'Admin' %}
@@ -160,6 +160,13 @@
         {% endwith %}
         {% block content %}{% endblock %}
       </main>
+      <footer class="site-footer py-2 border-top shadow-sm">
+        <div class="container text-center">
+          <span class="small">
+            &copy; 2026 國立臺灣大學醫學院附設醫院雲林分院腫瘤醫學部暨腫瘤中心癌登小組 &amp; 國立虎尾科技大學．人工智慧暨巨量資料實驗室
+          </span>
+        </div>
+      </footer>
     </div>
   </div>
 

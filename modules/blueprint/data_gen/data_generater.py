@@ -545,11 +545,16 @@ def process_file_logic(
         for i in range(row_count):
             current_offset = random.randint(-1500, 1500)
             if diag_col_name and pd.notna(df.loc[i, diag_col_name]):
-                dt_orig = df.loc[i, diag_col_name]
-                year = dt_orig.year
-                target = BIN1 if BIN1[0] <= year <= BIN1[1] else (BIN2 if BIN2[0] <= year <= BIN2[1] else (BIN3 if year >= BIN3[0] else (year, year)))
-                l_bound, u_bound = pd.Timestamp(target[0], 1, 1), pd.Timestamp(target[1], 12, 31)
-                current_offset = random.randint(max((l_bound - dt_orig).days, -1500), min((u_bound - dt_orig).days, 1500))
+                # The diagnosis date may not be among the selected columns, so it
+                # can still be a string here. Parse a temporary value for choosing
+                # a safe offset; do not convert or otherwise modify an unselected
+                # date column.
+                dt_orig = pd.to_datetime(df.loc[i, diag_col_name], errors="coerce")
+                if pd.notna(dt_orig):
+                    year = dt_orig.year
+                    target = BIN1 if BIN1[0] <= year <= BIN1[1] else (BIN2 if BIN2[0] <= year <= BIN2[1] else (BIN3 if year >= BIN3[0] else (year, year)))
+                    l_bound, u_bound = pd.Timestamp(target[0], 1, 1), pd.Timestamp(target[1], 12, 31)
+                    current_offset = random.randint(max((l_bound - dt_orig).days, -1500), min((u_bound - dt_orig).days, 1500))
             final_offsets.append(current_offset)
 
         offset_timedelta = pd.to_timedelta(final_offsets, unit='D')
@@ -602,7 +607,13 @@ def process_file_logic(
         birth_col = find_col_by_seq_or_key("1.6")
         diag_col_name = find_col_by_seq_or_key("2.5")
         
-        if special_configs.get('age_calc') and birth_col and diag_col_name:
+        if (
+            special_configs.get('age_calc')
+            and birth_col
+            and diag_col_name
+            and birth_col in selected_date_cols_std
+            and diag_col_name in selected_date_cols_std
+        ):
             age_col = scheme_target_for_seq.get("2.1") or find_col_by_seq_or_key("2.1") or "2.1診斷年齡"
             temp_birth = pd.to_datetime(df[birth_col], errors='coerce')
             temp_diag = pd.to_datetime(df[diag_col_name], errors='coerce')
