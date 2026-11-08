@@ -819,12 +819,7 @@
   // 下載清洗結果 
   $('#btnDownloadCleaned')?.addEventListener('click', () => {
     if (!currentJobId) return utils.alert('尚未執行清洗任務', 'warning');
-    window.location.href = `/api/download/cleaned/${currentJobId}`;
-  });
-
-  $('#btnDownloadReport')?.addEventListener('click', () => {
-    if (!currentJobId) return utils.alert('尚未執行清洗任務', 'warning');
-    window.location.href = `/api/download/report/${currentJobId}`;
+    window.location.href = `/api/download-clean-result/${currentJobId}`;
   });
 
   // 匯出 XLSX

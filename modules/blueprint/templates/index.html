@@ -5,7 +5,7 @@
 {% block content %}
 <div class="home-page">
   <section class="home-header" aria-labelledby="home-title">
-    <div class="home-brief"><div class="home-kicker"><i class="bi bi-activity"></i> 癌症資料登記</div><h2 id="home-title">功能總覽</h2><p>提供癌症登記資料處理方案，涵蓋資料清洗、虛擬資料生成、統計分析比較，以及資料使用權限之申請與審核管理。</p></div>
+    <div class="home-brief"><div class="home-kicker"><i class="bi bi-activity"></i> 癌症資料登記</div><h2 id="home-title">功能總覽</h2><p>提供資料審核、統計報表、虛擬資料、監測指標、存活分析與權限申請功能。</p></div>
     <div class="home-metrics" aria-label="資料概況"><div class="metric"><span>已處理個案</span><strong>{{ stats.sum_total_count }}</strong></div><div class="metric"><span>平均完整度</span><strong>{{ stats.avg_completeness_score }}</strong></div></div>
   </section>
   {% if session.get('position') == 'Admin' %}<a class="home-notice" href="{{ url_for('key_approval.key_approval') }}"><span class="notice-mark"><i class="bi bi-shield-check"></i></span><span><strong>權限申請待審核</strong><small><span class="notice-count">{{ pending_application_count }}</span> 筆申請正等待處理。</small></span><i class="bi bi-arrow-right notice-arrow"></i></a>{% elif key_application_status %}<a class="home-notice {% if key_application_status == 'Approved' %}is-approved{% else %}is-rejected{% endif %}" href="{{ url_for('key_application.application') }}"><span class="notice-mark"><i class="bi bi-bell"></i></span><span><strong>權限申請已完成審核</strong><small>前往權限申請頁查看結果與後續操作。</small></span><i class="bi bi-arrow-right notice-arrow"></i></a>{% endif %}
@@ -17,7 +17,7 @@
     <div class="intro-card is-prepare">
       <div class="intro-card-header">
         <div class="intro-card-icon"><i class="bi bi-funnel"></i></div>
-        <h2 class="intro-card-title">資料準備</h2>
+        <h2 class="intro-card-title">資料審核</h2>
       </div>
       <p class="intro-card-desc">將原始登記資料轉為可檢查、可分析的工作資料，並從審核紀錄追蹤處理結果。</p>
       <div class="intro-card-actions">
@@ -26,26 +26,26 @@
       </div>
     </div>
 
-    <div class="intro-card is-datagen">
-      <div class="intro-card-header">
-        <div class="intro-card-icon" style="background: var(--primary-soft, #e0f2fe); color: var(--primary, #0284c7);"><i class="bi bi-database-add"></i></div>
-        <h2 class="intro-card-title">虛擬資料生成</h2>
-      </div>
-      <p class="intro-card-desc">建立可供測試與分析使用的虛擬資料集，確保系統操作與驗證之便利性。</p>
-      <div class="intro-card-actions">
-        <a href="{{ url_for('data_gen.dataGen') }}">虛擬資料生成 <i class="bi bi-arrow-right"></i></a>
-      </div>
-    </div>
-
     <div class="intro-card is-review">
       <div class="intro-card-header">
         <div class="intro-card-icon"><i class="bi bi-bar-chart-line"></i></div>
-        <h2 class="intro-card-title">報表分析</h2>
+        <h2 class="intro-card-title">統計報表</h2>
       </div>
       <p class="intro-card-desc">從已完成的資料中檢視指標、分布，以及不同年度之間的差異比較。</p>
       <div class="intro-card-actions">
         <a href="{{ url_for('dashboard.dashboard') }}">年報分析 <i class="bi bi-arrow-right"></i></a>
         <a href="{{ url_for('dashboard.compare') }}">年度比較 <i class="bi bi-arrow-right"></i></a>
+      </div>
+    </div>
+
+    <div class="intro-card is-datagen">
+      <div class="intro-card-header">
+        <div class="intro-card-icon" style="background: var(--primary-soft, #e0f2fe); color: var(--primary, #0284c7);"><i class="bi bi-database-add"></i></div>
+        <h2 class="intro-card-title">虛擬資料</h2>
+      </div>
+      <p class="intro-card-desc">建立可供測試與分析使用的虛擬資料集，確保系統操作與驗證之便利性。</p>
+      <div class="intro-card-actions">
+        <a href="{{ url_for('data_gen.dataGen') }}">虛擬資料生成 <i class="bi bi-arrow-right"></i></a>
       </div>
     </div>
 
@@ -60,10 +60,21 @@
       </div>
     </div>
 
+    <div class="intro-card is-survival">
+      <div class="intro-card-header">
+        <div class="intro-card-icon"><i class="bi bi-file-earmark-bar-graph"></i></div>
+        <h2 class="intro-card-title">存活分析</h2>
+      </div>
+      <p class="intro-card-desc">重算個案存活率並核對回饋數值，也可將存活率報表轉為可編輯簡報。</p>
+      <div class="intro-card-actions">
+        <a href="{{ url_for('survival_report.index') }}">存活分析 <i class="bi bi-arrow-right"></i></a>
+      </div>
+    </div>
+
     <div class="intro-card is-access">
       <div class="intro-card-header">
         <div class="intro-card-icon"><i class="bi bi-person-check"></i></div>
-        <h2 class="intro-card-title">資料使用權限</h2>
+        <h2 class="intro-card-title">權限申請</h2>
       </div>
       <p class="intro-card-desc">
         {% if session.get('position') == 'Admin' %}

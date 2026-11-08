@@ -40,7 +40,16 @@ def register_audit_logging(app):
 
         blueprint = request.blueprint or "system"
         endpoint = (request.endpoint or "unknown").rsplit(".", 1)[-1]
-        write_audit_log(f"{blueprint}_{endpoint}_{request.method.lower()}",{"status_code": response.status_code},)
+        detail = {"status_code": response.status_code}
+        if response.status_code >= 400:
+            body = response.get_json(silent=True) if response.is_json else None
+            message = (body.get("error") or body.get("message")) if isinstance(body, dict) else None
+            if not message and response.mimetype in {"text/plain", "text/html"}:
+                response_text = response.get_data(as_text=True).strip()
+                if "<" not in response_text and len(response_text) <= 500:
+                    message = response_text
+            detail["error_message"] = str(message) if message else response.status
+        write_audit_log(f"{blueprint}_{endpoint}_{request.method.lower()}", detail)
         return response
 
     @app.teardown_request

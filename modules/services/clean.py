@@ -5,7 +5,9 @@ import os
 import shutil
 import stat
 import zipfile
+from copy import copy
 from flask import Blueprint, flash, jsonify, redirect, render_template, request, send_file, session, url_for
+from openpyxl import load_workbook
 from modules.services.auth import login_required, admin_required
 from modules.blueprint.clean import categorize_fields_logic,export_logic,preview_logic,get_formats_logic,add_format_logic,manage_format_logic,clean_job_logic,get_date_errors_logic,update_date_error_logic,download_file_logic,get_review_records_logic
 from modules.services.db import get_conn
@@ -100,37 +102,95 @@ def download_file(file_type, job_id):
     return jsonify(res), status
 
 
+@clean_bp.route("/api/download-clean-result/<job_id>")
+@login_required
+def download_clean_result(job_id):
+    cleaned, status = download_file_logic("cleaned", job_id, session.get("id"))
+    if not cleaned.get("send_file"):
+        return jsonify(cleaned), status
+    report, status = download_file_logic("report", job_id, session.get("id"))
+    if not report.get("send_file"):
+        return jsonify(report), status
+
+    output = _build_combined_clean_result(cleaned["path"], report["path"])
+    return send_file(output, as_attachment=True, download_name=cleaned["download_name"],
+                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+def _build_combined_clean_result(cleaned_path, report_path):
+    workbook = load_workbook(cleaned_path)
+    report_workbook = load_workbook(report_path)
+    try:
+        workbook.active.title = "清洗結果明細"
+        source = report_workbook.active
+        analysis = workbook.create_sheet("清洗結果分析", 0)
+        for row in source.iter_rows():
+            for cell in row:
+                target = analysis.cell(row=cell.row, column=cell.column, value=cell.value)
+                if cell.has_style:
+                    target.font = copy(cell.font)
+                    target.fill = copy(cell.fill)
+                    target.border = copy(cell.border)
+                    target.alignment = copy(cell.alignment)
+                    target.number_format = cell.number_format
+                    target.protection = copy(cell.protection)
+        for key, dimension in source.column_dimensions.items():
+            analysis.column_dimensions[key].width = dimension.width
+        for key, dimension in source.row_dimensions.items():
+            analysis.row_dimensions[key].height = dimension.height
+        for merged_range in source.merged_cells.ranges:
+            analysis.merge_cells(str(merged_range))
+        workbook.active = 0
+        output = io.BytesIO()
+        workbook.save(output)
+    finally:
+        report_workbook.close()
+        workbook.close()
+    output.seek(0)
+    return output
+
+
 # 清洗歷程頁面：顯示、管理與下載使用者的資料清洗作業結果。
 def remove_readonly(func, path, excinfo):
     os.chmod(path, stat.S_IWRITE)
     func(path)
 
-def _should_include_result_file(filename, original_filename=None):
+
+def _should_include_history_file(filename, original_filename=None):
     if not filename:
         return False
-
     if filename.startswith("Results_") and filename.endswith(".zip"):
         return False
-
-    if filename.endswith("_working.xlsx"):
+    if filename.endswith("_working.xlsx") or filename == "date_errors.json":
         return False
-
-    if filename == "date_errors.json":
-        return False
-
     if filename.endswith("_Clean.xlsx") or filename.endswith("_Report.xlsx"):
-        return True
-
+        return False
     if original_filename and filename == original_filename:
         return True
-
     if original_filename:
         original_base, _ = os.path.splitext(original_filename)
         file_base, file_ext = os.path.splitext(filename)
-
-        if file_base == original_base and file_ext.lower() in [".txt", ".xls", ".xlsx"]:
-            return True
+        return file_base == original_base and file_ext.lower() in [".txt", ".xls", ".xlsx"]
     return False
+
+
+def _add_history_files(zip_file, project_path, original_filename, fmt_name, folder_name=""):
+    for root, _, files in os.walk(project_path):
+        for filename in files:
+            if not _should_include_history_file(filename, original_filename):
+                continue
+            file_path = os.path.join(root, filename)
+            if os.path.isfile(file_path):
+                zip_file.write(file_path, os.path.join(folder_name, filename))
+
+    base_name, _ = os.path.splitext(original_filename)
+    result_name = f"fmt{fmt_name}_{base_name}_Clean.xlsx"
+    cleaned_path = os.path.join(project_path, result_name)
+    report_path = os.path.join(project_path, f"fmt{fmt_name}_{base_name}_Report.xlsx")
+    if os.path.exists(cleaned_path) and os.path.exists(report_path):
+        zip_file.writestr(os.path.join(folder_name, result_name),
+                          _build_combined_clean_result(cleaned_path, report_path).getvalue())
+
 
 @clean_bp.route("/clean/history")
 @login_required
@@ -221,28 +281,20 @@ def history_download_zip(job_id):
         user_id = session.get("id")
         conn = get_conn()
         cursor = conn.cursor()
-        cursor.execute("SELECT Path, FileName FROM Job WHERE JobID=? AND UserID=?", (job_id, user_id))
+        cursor.execute("""SELECT Job.Path, Job.FileName, DataFormat.FmtName
+                          FROM Job JOIN DataFormat ON Job.FmtID = DataFormat.FmtID
+                          WHERE Job.JobID=? AND Job.UserID=?""", (job_id, user_id))
         row = cursor.fetchone()
         conn.close()
         if not row or not row[0]: return jsonify({"ok": False, "error": "Not found"}), 404
 
         project_path = row[0].replace('work/', 'tasks/').replace('work\\', 'tasks\\')
-        original_filename = row[1]
-        zip_path = os.path.join(project_path, f"Results_{job_id}.zip")
-
-        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            for root, dirs, files in os.walk(project_path):
-                for file in files:
-                    if not _should_include_result_file(file, original_filename):
-                        continue
-
-                    file_path = os.path.join(root, file)
-                    if not os.path.isfile(file_path):
-                        continue
-
-                    zipf.write(file_path, file)
-
-        return send_file(os.path.abspath(zip_path), as_attachment=True)
+        output = io.BytesIO()
+        with zipfile.ZipFile(output, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            _add_history_files(zip_file, project_path, row[1], row[2])
+        output.seek(0)
+        return send_file(output, as_attachment=True, download_name=f"Results_{job_id}.zip",
+                         mimetype="application/zip")
     except Exception as e: return jsonify({"ok": False, "error": str(e)}), 500
 
 @clean_bp.route("/clean/history/batch_download", methods=["POST"])
@@ -266,24 +318,13 @@ def batch_download_history():
     memory_file = io.BytesIO()
     with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zipf:
         for job_id in job_ids:
-            cursor.execute("SELECT [Path], [FileName] FROM [Job] WHERE [JobID]=? AND [UserID]=?", (job_id, user_id))
+            cursor.execute("""SELECT Job.Path, Job.FileName, DataFormat.FmtName
+                              FROM Job JOIN DataFormat ON Job.FmtID = DataFormat.FmtID
+                              WHERE Job.JobID=? AND Job.UserID=?""", (job_id, user_id))
             row = cursor.fetchone()
             if row and row[0]:
                 project_path = row[0].replace('work/', 'tasks/').replace('work\\', 'tasks\\')
-                if os.path.exists(project_path):
-                    folder_name = f"Job_{job_id}"
-                    original_filename = row[1]
-                    for root, dirs, files in os.walk(project_path):
-                        for file in files:
-                            if not _should_include_result_file(file, original_filename):
-                                continue
-
-                            file_path = os.path.join(root, file)
-                            if not os.path.isfile(file_path):
-                                continue
-
-                            rel_path = os.path.join(folder_name, file)
-                            zipf.write(file_path, rel_path)
+                _add_history_files(zipf, project_path, row[1], row[2], f"Job_{job_id}")
     conn.close()
     memory_file.seek(0)
     return send_file(memory_file,mimetype='application/zip',as_attachment=True,download_name=f"Batch_Download_{datetime.datetime.now().strftime('%Y%m%d%H%M')}.zip")

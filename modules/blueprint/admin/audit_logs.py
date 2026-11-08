@@ -1,4 +1,5 @@
 import json
+from http import HTTPStatus
 from flask import Blueprint, render_template, request
 from modules.services.auth import admin_required, login_required
 from modules.services.db import get_conn
@@ -49,8 +50,19 @@ def audit_logs():
 
     for log in logs:
         try:
-            log["detail"] = json.dumps(json.loads(log["detail_json"] or "{}"), ensure_ascii=False, indent=2)
+            detail = json.loads(log["detail_json"] or "{}")
+            if isinstance(detail, dict) and isinstance(detail.get("status_code"), int) and detail["status_code"] >= 400 and not detail.get("error_message"):
+                code = detail["status_code"]
+                try:
+                    detail["error_message"] = f"{code} {HTTPStatus(code).phrase}"
+                except ValueError:
+                    detail["error_message"] = f"HTTP {code} 錯誤"
+            log["detail"] = json.dumps(detail, ensure_ascii=False, indent=2)
         except (TypeError, json.JSONDecodeError):
             log["detail"] = log["detail_json"] or ""
+            detail = {}
+        log["is_error"] = (log["Action"].endswith(("_failed", "_error"))
+                           or (isinstance(detail, dict) and (detail.get("status") == "error"
+                               or (isinstance(detail.get("status_code"), int) and detail["status_code"] >= 400))))
 
     return render_template("audit_logs.html", active="audit_logs", logs=logs, actions=actions, filters=filters,)

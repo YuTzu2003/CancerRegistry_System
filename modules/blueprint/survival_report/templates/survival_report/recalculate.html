@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}個案清單重算與對帳{% endblock %}
+{% block page_title %}個案清單重算與對帳{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('survival_report.static', filename='css/survival_report.css') }}">
+{% endblock %}
+{% macro percent(value) %}{{ '%.2f%%'|format(value * 100) if value is not none else '無法估計' }}{% endmacro %}
+{% block content %}
+<section class="survival-module survival-recalc">
+  <a href="{{ url_for('survival_report.index') }}" class="recalc-back"><i class="bi bi-arrow-left"></i> 返回存活率模組</a>
+
+  <header class="recalc-hero">
+    <div class="recalc-hero__icon"><i class="bi bi-calculator"></i></div>
+    <div class="recalc-hero__text">
+      <span class="recalc-badge">存活率試算</span>
+      <h1>個案清單重算與對帳</h1>
+      <p>院所 0439010518 · 民國 108～112 年 · 17 種癌別</p>
+    </div>
+  </header>
+
+  <form class="recalc-upload-card" method="post" enctype="multipart/form-data">
+    <div class="recalc-upload-card__head">
+      <i class="bi bi-file-earmark-spreadsheet"></i>
+      <div>
+        <strong>上傳存活率個案清單</strong>
+        <span>支援 .xlsx 格式</span>
+      </div>
+    </div>
+    <div class="recalc-upload-card__body">
+      <label class="recalc-file-zone" for="case-file">
+        <i class="bi bi-cloud-arrow-up"></i>
+        <span>點擊或拖曳檔案至此處</span>
+        <small id="recalc-file-name">尚未選擇檔案</small>
+        <input id="case-file" name="case_file" type="file" accept=".xlsx" required>
+      </label>
+      <button class="recalc-submit-btn" type="submit"><i class="bi bi-arrow-repeat"></i> 重算並核對</button>
+    </div>
+    {% if error %}<p class="recalc-error" role="alert"><i class="bi bi-exclamation-triangle"></i> {{ error }}</p>{% endif %}
+  </form>
+
+  {% if result %}
+  <div class="recalc-results-header">
+    <h2><i class="bi bi-clipboard2-data"></i> 存活率統計結果</h2>
+    <span class="recalc-count-badge">{{ result|length }} 種癌別</span>
+  </div>
+
+  <nav class="recalc-index" aria-label="癌別索引">
+    {% for cancer, system_groups in result %}
+    <a href="#recalc-cancer-{{ loop.index }}">{{ cancer }}</a>
+    {% endfor %}
+  </nav>
+
+  <p class="recalc-note"><i class="bi bi-info-circle"></i> 年齡組未滿 10 人時，試算優先往較高年齡組合併，末組則向前合併。</p>
+
+  {% for cancer, system_groups in result %}
+  {% set first_stages = system_groups[0][1] if system_groups else [] %}
+  {% set total_included = first_stages[0].included if first_stages and first_stages[0].stage == 'all' else 0 %}
+  <details class="recalc-cancer-card" id="recalc-cancer-{{ loop.index }}" name="recalc-cancer" {% if loop.first %}open{% endif %}>
+    <summary class="recalc-cancer-card__summary">
+      <span class="recalc-cancer-card__arrow"><i class="bi bi-chevron-right"></i></span>
+      <strong>{{ cancer }}</strong>
+      <span class="recalc-pill">共 {{ total_included }} 人納入</span>
+    </summary>
+    <div class="recalc-cancer-card__body">
+      {% if not system_groups or first_stages|length <= 1 %}
+      <p style="color: var(--sr-muted); font-style: italic; padding: 8px 0;">這份清單沒有符合篩選條件的個案。</p>
+      {% else %}
+      <div class="recalc-report-scroll">
+      <table class="recalc-report-table">
+        <thead>
+          <tr>
+            <th rowspan="2">癌別</th>
+            <th rowspan="2">期別<br>類別</th>
+            <th rowspan="2">期別</th>
+            <th rowspan="2">觀察<br>年數</th>
+            <th rowspan="2">期別人數<br>(可分析<br>個案數)</th>
+            <th rowspan="2">設限<br>個案數</th>
+            <th rowspan="2">死亡<br>個案數</th>
+            <th colspan="2">民國 108～112 年之 1-5 年觀察存活率</th>
+          </tr>
+          <tr>
+            <th>觀察存活率%<br>95% CI</th>
+            <th>年齡調整<br>5年存活率%<br>95% CI</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for staging_system, stages in system_groups %}
+        {% set sys_total = stages[0].included if stages and stages[0].stage == 'all' else 0 %}
+        {% set ns = namespace(total_known=0) %}
+        {% for sr in stages if sr.stage not in ('all', '999') %}
+          {% set ns.total_known = ns.total_known + sr.included %}
+        {% endfor %}
+        {% for sr in stages if sr.stage not in ('all', '999') %}
+          {% for row in sr.yearly %}
+          <tr{% if loop.first %} class="recalc-row-first"{% endif %}>
+            {% if loop.first %}
+            <td rowspan="{{ sr.yearly|length }}" class="recalc-td-cancer">
+              <strong>{{ cancer }}</strong>
+              <div>個案數：{{ sr.included }}</div>
+              {% if ns.total_known > 0 %}
+              <div>({{ '%.2f'|format(sr.included / ns.total_known * 100) }}%)</div>
+              {% endif %}
+              {% if ns.total_known != sys_total and sys_total > 0 %}
+              <div class="recalc-pct-alt">[含不詳 {{ '%.2f'|format(sr.included / sys_total * 100) }}%]</div>
+              {% endif %}
+              {% if sr.median_months is not none %}<div>({{ sr.median_months }}月)</div>{% endif %}
+            </td>
+            {% endif %}
+            <td class="recalc-td-ajcc">{{ staging_system }}</td>
+            {% if staging_system == 'BCLC' %}
+            <td class="recalc-td-stage">{{ {'0':'0期','A':'A期','B':'B期','C':'C期','D':'D期','999':'不詳'}[sr.stage] }}</td>
+            {% else %}
+            <td class="recalc-td-stage">{{ {'1':'第1期','2':'第2期','3':'第3期','4':'第4期','999':'不詳'}[sr.stage] }}</td>
+            {% endif %}
+            <td>{{ loop.index }}年</td>
+            <td>{{ row.n_start }}</td>
+            <td>{{ row.censored }}</td>
+            <td>{{ row.deaths }}</td>
+            <td class="recalc-td-rate">{% if row.rate is not none %}{{ '%.2f'|format(row.rate * 100) }}<br><span class="recalc-ci-text">({{ '%.2f'|format(row.ci_lower * 100) }}, {{ '%.2f'|format(row.ci_upper * 100) }})</span>{% else %}-{% endif %}</td>
+            {% if loop.first %}
+            <td rowspan="{{ sr.yearly|length }}" class="recalc-td-adjusted">{% if sr.adjusted is not none %}{{ '%.2f'|format(sr.adjusted * 100) }}{% else %}-{% endif %}</td>
+            {% endif %}
+          </tr>
+          {% endfor %}
+        {% endfor %}
+        {% set all_sr = stages[0] if stages and stages[0].stage == 'all' else none %}
+        {% if all_sr %}
+          {% for row in all_sr.yearly %}
+          <tr{% if loop.first %} class="recalc-row-first"{% endif %}>
+            {% if loop.first %}
+            <td rowspan="{{ all_sr.yearly|length }}" class="recalc-td-cancer">
+              <strong>{{ cancer }}</strong>
+              <div>個案數：{{ all_sr.included }}</div>
+              <div>(100.00%)</div>
+              {% if all_sr.median_months is not none %}<div>({{ all_sr.median_months }}月)</div>{% endif %}
+            </td>
+            {% endif %}
+            <td class="recalc-td-ajcc">{{ staging_system }}</td>
+            <td class="recalc-td-stage">不分期別<br>(含不詳)</td>
+            <td>{{ loop.index }}年</td>
+            <td>{{ row.n_start }}</td>
+            <td>{{ row.censored }}</td>
+            <td>{{ row.deaths }}</td>
+            <td class="recalc-td-rate">{% if row.rate is not none %}{{ '%.2f'|format(row.rate * 100) }}<br><span class="recalc-ci-text">({{ '%.2f'|format(row.ci_lower * 100) }}, {{ '%.2f'|format(row.ci_upper * 100) }})</span>{% else %}-{% endif %}</td>
+            {% if loop.first %}
+            <td rowspan="{{ all_sr.yearly|length }}" class="recalc-td-adjusted">{% if all_sr.adjusted is not none %}{{ '%.2f'|format(all_sr.adjusted * 100) }}{% else %}-{% endif %}</td>
+            {% endif %}
+          </tr>
+          {% endfor %}
+        {% endif %}
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+      {% endif %}
+    </div>
+  </details>
+  {% endfor %}
+  <script src="{{ url_for('survival_report.static', filename='js/survival_recalculate.js') }}" defer></script>
+  {% endif %}
+</section>
+{% endblock %}

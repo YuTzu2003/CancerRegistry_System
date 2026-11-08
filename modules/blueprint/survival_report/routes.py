@@ -8,10 +8,13 @@ import uuid
 from pathlib import Path
 
 from flask import Blueprint, current_app, jsonify, render_template, request, send_file, session
+from openpyxl.utils.exceptions import InvalidFileException
+from zipfile import BadZipFile
 
 from modules.services.auth import login_required
 
 from .export_bundle import build_pptx_download
+from .case_recalculation import recalculate_cases
 from .job_store import JobNotFound, JobStore
 from .parser import UnsupportedSourceFormat, parse_survival_workbook
 from .report_builder import (
@@ -56,6 +59,24 @@ def _not_found():
 @login_required
 def index():
     return render_template("survival_report/index.html", active="survival_report.index")
+
+
+@survival_report_bp.route("/survival-report/recalculate", methods=["GET", "POST"])
+@login_required
+def recalculate():
+    result = error = None
+    if request.method == "POST":
+        upload = request.files.get("case_file")
+        if not upload or Path(upload.filename).suffix.lower() != ".xlsx":
+            error = "請選擇 .xlsx 個案清單。"
+        else:
+            try:
+                result = recalculate_cases(upload.stream)
+            except ValueError as exc:
+                error = str(exc)
+            except (BadZipFile, InvalidFileException, KeyError, OSError):
+                error = "無法讀取此 Excel 檔案。"
+    return render_template("survival_report/recalculate.html", result=result, error=error), 400 if error else 200
 
 
 @survival_report_bp.post("/api/survival-report/preview")

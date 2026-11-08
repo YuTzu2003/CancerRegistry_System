@@ -234,11 +234,15 @@ function renderFixedFields(analyzedColumns) {
     const specialGrid = document.getElementById('specialFields');
 
     dateGrid.replaceChildren(...analyzedColumns.map(col => {
+        if (!col.is_date && ['1.6', '2.5'].includes(String(col.seq || ''))) {
+            col.is_date = true;
+        }
         const label = document.createElement('label');
         label.className = `field-chip${col.is_date ? ' selected' : ''}`;
         const input = document.createElement('input');
         input.type = 'checkbox';
         input.value = col.name;
+        input.dataset.seq = String(col.seq || '');
         input.checked = col.is_date;
         label.append(input, document.createTextNode(` ${col.name}`));
         return label;
@@ -273,8 +277,27 @@ function renderFixedFields(analyzedColumns) {
     document.querySelectorAll('.config-section .field-chip input').forEach(cb => {
         cb.addEventListener('change', function() {
             this.checked ? this.parentElement.classList.add('selected') : this.parentElement.classList.remove('selected');
+            if (this.closest('#dateFields')) syncAgeRecalcAvailability();
         });
     });
+    syncAgeRecalcAvailability();
+}
+
+function syncAgeRecalcAvailability() {
+    const birthDateChecked = Boolean(document.querySelector('#dateFields input[data-seq="1.6"]:checked'));
+    const diagnosisDateChecked = Boolean(document.querySelector('#dateFields input[data-seq="2.5"]:checked'));
+    const ageRecalc = document.querySelector('#specialFields input[data-key="age_calc"]');
+    if (!ageRecalc) return;
+
+    const canRecalculate = birthDateChecked && diagnosisDateChecked;
+    ageRecalc.disabled = !canRecalculate;
+    if (!canRecalculate) {
+        ageRecalc.checked = false;
+        ageRecalc.closest('.field-chip')?.classList.remove('selected');
+        ageRecalc.title = '需同時勾選出生日期與最初診斷日期，才能重算年齡。';
+    } else {
+        ageRecalc.title = '';
+    }
 }
 
 function renderExtraFields(analyzedColumns, selectedScheme) {

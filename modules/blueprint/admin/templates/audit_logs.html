@@ -65,7 +65,7 @@
           {% for log in logs %}
           <tr>
             <td class="text-nowrap">{{ log.CreatedAt.strftime('%Y-%m-%d %H:%M:%S') if log.CreatedAt else '-' }}</td>
-            <td>{{ log.UserName or '-' }}</td><td><span class="badge text-bg-light border">{{ log.Action }}</span></td>
+            <td>{{ log.UserName or '-' }}</td><td><span class="badge {{ 'text-bg-danger' if log.is_error else 'text-bg-light border' }}">{{ log.Action }}</span></td>
             <td class="text-nowrap">{{ log.Remote_addr or '-' }}</td>
             <td><button class="btn btn-sm btn-outline-secondary audit-detail" type="button" data-detail="{{ log.detail|e }}">查看</button></td>
           </tr>

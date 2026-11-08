@@ -12,15 +12,28 @@
   <div class="page-head survival-page-head">
     <div>
       <h1 id="survivalHeading">存活率模組</h1>
-      <p>上傳一份或多份總院 Excel，確認辨識結果後，輸出可編輯 PowerPoint。</p>
+      <p>依手上的 Excel 資料選擇功能。</p>
     </div>
   </div>
 
-  <section class="survival-step">
+  <nav class="survival-workflows" aria-label="存活率功能">
+    <a class="survival-workflow" href="{{ url_for('survival_report.recalculate') }}">
+      <span class="survival-workflow-label">逐筆個案清單 · 試算</span>
+      <strong>個案清單重算與對帳 <span aria-hidden="true">→</span></strong>
+      <span>上傳「2026存活率個案清單.xlsx」，重算本院存活率並核對回饋值。</span>
+    </a>
+    <a class="survival-workflow" href="#survival-report-upload">
+      <span class="survival-workflow-label">已完成統計的 Excel</span>
+      <strong>回饋報表轉 PowerPoint <span aria-hidden="true">↓</span></strong>
+      <span>上傳已算好的存活率報表，預覽後輸出可編輯簡報。</span>
+    </a>
+  </nav>
+
+  <section class="survival-step" id="survival-report-upload">
     <div class="survival-step-title">
       <span class="survival-step-marker" aria-hidden="true"></span>
-      <span>資料上傳</span>
-      <span class="survival-step-hint">請上傳總院存活率 Excel，可選擇單一檔案或一次選擇多個檔案</span>
+      <span>回饋報表上傳</span>
+      <span class="survival-step-hint">請選擇一份或多份已完成統計的存活率報表</span>
     </div>
     <div class="survival-step-body">
       <div class="upload-card">

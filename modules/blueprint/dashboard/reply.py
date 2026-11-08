@@ -153,6 +153,13 @@ def get_chart_insight_logic(data):
                 8. Use Traditional Chinese for zh-TW and professional medical English for en.
                 9. Return valid JSON only, without markdown or explanatory text, using exactly:
                    {{"zh-TW":"中文分析敘述","en":"English analysis narrative"}}
+                10. This is an annual analysis, not a year-to-year comparison. Describe only
+                    the selected year's data (or the selected range as a whole). Do not
+                    compare different years or mention changes from previous years.
+                11. For sex-related data, mention special sex categories (such as intersex,
+                    transgender, other, or unknown) only when the supplied data explicitly
+                    gives that category a count greater than zero. Do not describe absent
+                    or zero-count categories as "not recorded" or "no cases".
         """
 
     try:
