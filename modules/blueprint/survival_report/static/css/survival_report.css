@@ -25,6 +25,10 @@
   margin: 0;
 }
 
+.powerpoint-page-head {
+  padding-left: 16px;
+}
+
 .survival-page-head p,
 .upload-card__heading p,
 .export-bar span {
@@ -133,6 +137,140 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 14px 28px;
+}
+
+.comparison-mode {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0;
+  padding: 0;
+  border: 0;
+}
+
+.comparison-mode__option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 150px;
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--sr-line);
+  border-radius: 8px;
+  background: var(--surface, #fff);
+  color: var(--sr-navy);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.comparison-mode__option:has(input:checked) {
+  border-color: var(--sr-blue);
+  background: var(--sr-pale);
+}
+
+.comparison-mode__option input {
+  accent-color: var(--sr-blue);
+}
+
+.year-comparison-settings {
+  display: grid;
+  gap: 14px;
+  margin: 0 0 16px;
+  padding: 16px;
+  border: 1px solid var(--sr-line);
+  border-radius: 10px;
+  background: var(--gray-50, #f8fafc);
+}
+
+.preview-year-comparison-settings {
+  margin: 18px 18px 0;
+}
+
+.year-comparison-settings__heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.year-comparison-settings__heading > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.year-comparison-settings__heading strong {
+  color: var(--sr-navy);
+  font-size: 15px;
+}
+
+.year-comparison-settings__heading span,
+.year-comparison-settings__note {
+  color: var(--sr-muted);
+  font-size: 13px;
+}
+
+.year-comparison-details {
+  display: grid;
+  gap: 14px;
+}
+
+.year-comparison-details[hidden] {
+  display: none;
+}
+
+.year-comparison-mode {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.year-comparison-mode .comparison-mode__option {
+  min-width: 0;
+  padding: 8px 12px;
+  background: var(--surface, #fff);
+  font-size: 13px;
+}
+
+.year-comparison-fields {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto minmax(180px, 1fr) minmax(150px, .7fr);
+  align-items: end;
+  gap: 12px;
+}
+
+.year-comparison-fields label,
+.year-comparison-definition {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  color: var(--sr-navy);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.year-comparison-fields select,
+.year-comparison-definition select {
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid var(--sr-line);
+  border-radius: 7px;
+  background: var(--surface, #fff);
+  color: var(--sr-muted);
+  font-size: 13px;
+}
+
+.year-comparison-fields__versus {
+  padding-bottom: 10px;
+  color: var(--sr-blue);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.year-comparison-settings__note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
 }
 
 .upload-card__title-row h2 {
@@ -351,6 +489,7 @@
 .slide-preview__table th,
 .slide-preview__table td { padding: .38em .28em; border: 1px solid #334155; text-align: center; vertical-align: middle; }
 .slide-preview__table th { background: #c6d9f1; font-weight: 800; }
+.slide-preview__stage { white-space: nowrap; }
 .slide-preview__table .hospital-value { color: #0033cc; font-weight: 800; }
 .slide-preview__table .ci-row td { padding-top: .25em; padding-bottom: .48em; }
 .slide-preview__notes { margin-top: 1%; color: #1f2937; font-size: clamp(6px, .57vw, 9px); line-height: 1.45; }
@@ -369,6 +508,8 @@
 
 @media (max-width: 1100px) {
   .survival-page-head { flex-direction: column; }
+  .year-comparison-fields { grid-template-columns: minmax(160px, 1fr) auto minmax(160px, 1fr); }
+  .year-comparison-definition { grid-column: 1 / -1; }
   .preview-workspace { grid-template-columns: 1fr; }
   .report-sidebar { position: static; padding: 0 0 18px; border-right: 0; border-bottom: 1px solid var(--sr-line); }
   .preview-panel { padding: 18px 0 0; }
@@ -383,6 +524,13 @@
   .workflow-steps li:not(:last-child)::after { width: 12px; }
   .upload-card__heading, .upload-actions, .export-bar { align-items: stretch; flex-direction: column; }
   .upload-card__heading-main { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .comparison-mode,
+  .year-comparison-mode,
+  .year-comparison-settings__heading { align-items: stretch; flex-direction: column; }
+  .comparison-mode__option { width: 100%; min-width: 0; }
+  .year-comparison-fields { grid-template-columns: 1fr; }
+  .year-comparison-fields__versus { display: none; }
+  .year-comparison-definition { grid-column: auto; }
   .action-button, .export-actions, .export-actions .btn { width: 100%; }
   .export-actions { flex-direction: column; }
   .display-editor { grid-template-columns: 1fr; }

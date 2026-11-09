@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import unicodedata
 from dataclasses import dataclass, field, replace
 from decimal import Decimal
 from enum import Enum
@@ -355,6 +356,16 @@ class ReportTable:
         )
         return primary.display_name if primary else ""
 
+    @property
+    def detail_visible(self) -> bool:
+        """Whether the finalized deck includes this table as a detail slide."""
+        cancer = "".join(unicodedata.normalize("NFKC", self.cancer).split()).casefold()
+        staging = "".join(unicodedata.normalize("NFKC", self.staging_system).split()).casefold()
+        return not (
+            staging == "ajcc"
+            and cancer in {"子宮體癌", "肝癌", "卵巢癌"}
+        )
+
     def hospital_value(self, row: ReportRow, hospital_key: str) -> HospitalReportValue:
         return row.value_for(hospital_key)
 
@@ -396,6 +407,7 @@ class ReportTable:
             "staging_system": self.staging_system,
             "display_title": self.display_title,
             "custom_title": self.custom_title,
+            "detail_visible": self.detail_visible,
             "comparison_banner": self.comparison_banner,
             "rows": [item.to_dict() for item in self.rows],
             "issues": [item.to_dict() for item in self.issues],
@@ -538,11 +550,38 @@ def _decks_from_tables(tables: tuple[ReportTable, ...]) -> tuple[ReportDeck, ...
     return tuple(decks)
 
 
+@dataclass(frozen=True)
+class YearComparisonSettings:
+    enabled: bool = False
+    base_period: str = ""
+    comparison_period: str = ""
+    death_definition: str = "all"
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "enabled": self.enabled,
+            "base_period": self.base_period,
+            "comparison_period": self.comparison_period,
+            "death_definition": self.death_definition,
+        }
+
+    @classmethod
+    def from_dict(cls, value: dict[str, Any] | None) -> "YearComparisonSettings":
+        data = value or {}
+        return cls(
+            enabled=bool(data.get("enabled", False)),
+            base_period=str(data.get("base_period", "")).strip(),
+            comparison_period=str(data.get("comparison_period", "")).strip(),
+            death_definition=str(data.get("death_definition", "all")).strip() or "all",
+        )
+
+
 @dataclass(frozen=True, init=False)
 class ReportBatch:
     sources: tuple[ParsedWorkbook, ...]
     decks: tuple[ReportDeck, ...]
     issues: tuple[ParseIssue, ...]
+    year_comparison: YearComparisonSettings
 
     def __init__(
         self,
@@ -550,12 +589,18 @@ class ReportBatch:
         decks: tuple[ReportDeck, ...] = (),
         issues: tuple[ParseIssue, ...] = (),
         tables: tuple[ReportTable, ...] | None = None,
+        year_comparison: YearComparisonSettings | None = None,
     ) -> None:
         if tables is not None:
             decks = _decks_from_tables(tuple(tables))
         object.__setattr__(self, "sources", tuple(sources))
         object.__setattr__(self, "decks", tuple(decks))
         object.__setattr__(self, "issues", tuple(issues))
+        object.__setattr__(
+            self,
+            "year_comparison",
+            year_comparison or YearComparisonSettings(),
+        )
 
     @property
     def tables(self) -> tuple[ReportTable, ...]:
@@ -582,12 +627,51 @@ class ReportBatch:
             for table in deck.ordered_tables
         )
 
+    @staticmethod
+    def _period_label(deck: ReportDeck) -> str:
+        return f"{deck.period_start}-{deck.period_end}"
+
+    @property
+    def comparison_decks(self) -> tuple[ReportDeck, ...]:
+        settings = self.year_comparison
+        if not settings.enabled:
+            return ()
+        by_period = {self._period_label(deck): deck for deck in self.decks}
+        base = by_period.get(settings.base_period)
+        comparison = by_period.get(settings.comparison_period)
+        if base is None or comparison is None:
+            return ()
+        return base, comparison
+
+    def with_year_comparison(
+        self,
+        settings: YearComparisonSettings,
+    ) -> "ReportBatch":
+        if settings.enabled:
+            if settings.death_definition != "all":
+                raise ValueError("目前年份比較僅支援全死因。")
+            if settings.base_period == settings.comparison_period:
+                raise ValueError("基準期間與比較期間不可相同。")
+            periods = {self._period_label(deck) for deck in self.decks}
+            if (
+                settings.base_period not in periods
+                or settings.comparison_period not in periods
+            ):
+                raise ValueError("選擇的年份比較期間不存在。")
+        return ReportBatch(
+            sources=self.sources,
+            decks=self.decks,
+            issues=self.issues,
+            year_comparison=settings,
+        )
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "sources": [item.to_dict() for item in self.sources],
             "decks": [item.to_dict() for item in self.decks],
             "tables": [item.to_dict() for item in self.tables],
             "issues": [item.to_dict() for item in self.issues],
+            "year_comparison": self.year_comparison.to_dict(),
         }
 
     @classmethod
@@ -599,4 +683,5 @@ class ReportBatch:
             decks=decks,
             tables=None if decks else legacy_tables,
             issues=tuple(ParseIssue.from_dict(item) for item in value.get("issues", [])),
+            year_comparison=YearComparisonSettings.from_dict(value.get("year_comparison")),
         )

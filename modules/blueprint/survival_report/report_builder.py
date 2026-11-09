@@ -103,6 +103,11 @@ def _source_issue(issue: ParseIssue, table_id: str) -> ParseIssue:
 
 
 def _generated_title(cancer: str, staging_system: str) -> str:
+    finalized = _FINALIZED_DETAIL_TITLES.get(
+        (_report_title_key(cancer), _report_title_key(staging_system))
+    )
+    if finalized is not None:
+        return finalized
     cancer_label = cancer.strip()
     staging_label = staging_system.strip()
     if not staging_label or staging_label.casefold() == "ajcc":
@@ -117,12 +122,38 @@ def _report_title_key(title: str) -> str:
     return re.sub(r"[\s_\-－—]+", "", normalized)
 
 
+_FINALIZED_DETAIL_TITLES = {
+    (_report_title_key("大腸癌-all"), _report_title_key("AJCC")): "結腸直腸癌-ALL存活率",
+    (_report_title_key("大腸癌-結腸癌"), _report_title_key("AJCC")): "結腸癌存活率",
+    (_report_title_key("大腸癌-直腸癌"), _report_title_key("AJCC")): "直腸癌存活率",
+    (_report_title_key("子宮頸癌"), _report_title_key("FIGO")): "子宮頸癌存活率",
+    (_report_title_key("子宮體癌"), _report_title_key("FIGO")): "子宮體癌存活率",
+    (_report_title_key("卵巢癌"), _report_title_key("FIGO")): "卵巢癌FIGO分期存活率",
+    (_report_title_key("女性乳癌"), _report_title_key("AJCC")): "乳癌存活率",
+    (_report_title_key("肺癌 非小細胞癌-all"), _report_title_key("AJCC")): "肺癌 非小細胞癌-ALL存活率",
+    (_report_title_key("肺癌 非小細胞癌-腺癌"), _report_title_key("AJCC")): "肺癌 非小細胞癌-腺癌存活率",
+    (_report_title_key("肺癌 非小細胞癌-鱗狀細胞癌"), _report_title_key("AJCC")): "肺癌 非小細胞癌-鱗狀細胞癌存活率",
+    (_report_title_key("肺癌 小細胞癌"), _report_title_key("AJCC")): "肺癌-小細胞癌存活率",
+    (_report_title_key("食道癌"), _report_title_key("AJCC")): "食道癌存活率",
+    (_report_title_key("肝癌"), _report_title_key("BCLC")): "肝癌BCLC分期存活率",
+    (_report_title_key("胃癌"), _report_title_key("AJCC")): "胃癌存活率",
+    (_report_title_key("鼻咽癌"), _report_title_key("AJCC")): "鼻咽癌存活率",
+    (_report_title_key("口腔癌"), _report_title_key("AJCC")): "口腔癌存活率",
+    (_report_title_key("下咽癌"), _report_title_key("AJCC")): "下咽癌存活率",
+    (_report_title_key("喉癌"), _report_title_key("AJCC")): "喉癌存活率",
+    (_report_title_key("口咽癌_p16+"), _report_title_key("AJCC")): "口咽癌_P16+存活率",
+    (_report_title_key("口咽癌_p16-"), _report_title_key("AJCC")): "口咽癌_P16-癌存活率",
+    (_report_title_key("膀胱癌"), _report_title_key("AJCC")): "膀胱癌存活率",
+    (_report_title_key("攝護腺癌"), _report_title_key("AJCC")): "攝護腺癌存活率",
+}
+
+
 _REFERENCE_REPORT_TITLE_GROUPS = (
     ("大腸癌-all存活率", "結腸直腸癌-all存活率"),
     ("大腸癌-結腸癌存活率", "結腸癌存活率"),
     ("大腸癌-直腸癌存活率", "直腸癌存活率"),
-    ("子宮頸癌FIGO分期存活率",),
-    ("子宮體癌FIGO分期存活率",),
+    ("子宮頸癌FIGO分期存活率", "子宮頸癌存活率"),
+    ("子宮體癌FIGO分期存活率", "子宮體癌存活率"),
     ("卵巢癌FIGO分期存活率",),
     ("女性乳癌存活率", "乳癌存活率"),
     ("肺癌 非小細胞癌-all存活率",),
@@ -149,9 +180,10 @@ _REFERENCE_REPORT_TITLE_RANK = {
 
 
 def _default_report_sort_key(table: ReportTable) -> tuple[int, int]:
+    canonical_title = _generated_title(table.cancer, table.staging_system)
     return (
         _REFERENCE_REPORT_TITLE_RANK.get(
-            _report_title_key(table.display_title),
+            _report_title_key(canonical_title),
             len(_REFERENCE_REPORT_TITLE_GROUPS),
         ),
         table.sort_order,
@@ -507,7 +539,12 @@ def apply_display_overrides(
             if deck_override.selected is not None:
                 updates["selected"] = bool(deck_override.selected)
         changed_decks.append(deck.with_updates(**updates))
-    return ReportBatch(sources=batch.sources, decks=tuple(changed_decks), issues=batch.issues)
+    return ReportBatch(
+        sources=batch.sources,
+        decks=tuple(changed_decks),
+        issues=batch.issues,
+        year_comparison=batch.year_comparison,
+    )
 
 
 def _apply_table_override(

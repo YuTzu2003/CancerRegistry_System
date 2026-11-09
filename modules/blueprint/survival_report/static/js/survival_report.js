@@ -9,6 +9,11 @@
     previewButton: $("#generatePreview"),
     status: $("#moduleStatus"),
     workspace: $("#previewWorkspace"),
+    yearComparisonMode: document.querySelectorAll('input[name="yearComparisonMode"]'),
+    yearComparisonDetails: $("#yearComparisonDetails"),
+    baseComparisonPeriod: $("#baseComparisonPeriod"),
+    targetComparisonPeriod: $("#targetComparisonPeriod"),
+    deathDefinition: $("#deathDefinition"),
     deckList: $("#deckList"),
     selectAllDecks: $("#selectAllDecks"),
     clearDeckSelection: $("#clearDeckSelection"),
@@ -108,6 +113,26 @@
     `).join("");
   }
 
+  function renderYearComparisonSettings() {
+    const periods = deckState.comparisonPeriods(state.batch);
+    const modeEnabled = Array.from(elements.yearComparisonMode)
+      .some((input) => input.checked && input.value === "on");
+    const enabled = modeEnabled && periods.length >= 2;
+    elements.yearComparisonDetails.hidden = !modeEnabled;
+    const options = periods.length >= 2
+      ? periods.map((period) => `<option value="${escapeHtml(period.value)}">${escapeHtml(period.label)}</option>`).join("")
+      : '<option value="">至少需要兩個期間</option>';
+
+    elements.baseComparisonPeriod.innerHTML = options;
+    elements.targetComparisonPeriod.innerHTML = options;
+    if (periods.length >= 2) {
+      elements.baseComparisonPeriod.value = periods[0].value;
+      elements.targetComparisonPeriod.value = periods[periods.length - 1].value;
+    }
+    elements.baseComparisonPeriod.disabled = !enabled;
+    elements.targetComparisonPeriod.disabled = !enabled;
+  }
+
   elements.input.addEventListener("change", (event) => acceptFiles(event.target.files));
   elements.dropZone.addEventListener("keydown", (event) => {
     if (event.key === "Enter" || event.key === " ") {
@@ -132,8 +157,13 @@
     setPhase(state.files.length ? "ready" : "empty");
   });
 
+  elements.yearComparisonMode.forEach((input) => {
+    input.addEventListener("change", renderYearComparisonSettings);
+  });
+
   elements.previewButton.addEventListener("click", async () => {
     if (!state.files.length) return;
+    elements.workspace.hidden = true;
     setPhase("uploading", `正在解析 ${state.files.length} 個檔案…`);
     const form = new FormData();
     state.files.forEach((file) => form.append("files", file, file.name));
@@ -146,6 +176,7 @@
       const initial = deckState.selectDeck(state.batch, deckState.orderedDecks(state.batch)[0]?.deck_id);
       state.currentDeckId = initial.deckId;
       state.currentId = initial.tableId;
+      renderYearComparisonSettings();
       elements.workspace.hidden = false;
       renderAll();
       const fileStatus = deckState.previewFileStatus(payload.files);
@@ -173,7 +204,8 @@
     const decks = deckState.orderedDecks(state.batch);
     elements.deckList.innerHTML = decks.map((deck) => {
       const hospitals = deck.hospital_names?.join("、") || "未辨識醫院";
-      const issueText = deck.warning_count ? `${deck.warning_count} 個警示` : `${deck.tables.length} 張投影片`;
+      const previewTables = deckState.currentDeckTables(deck, "all");
+      const issueText = deck.warning_count ? `${deck.warning_count} 個警示` : `${previewTables.length} 張投影片`;
       return `
         <article class="deck-card ${deck.deck_id === state.currentDeckId ? "active" : ""}"
           data-deck-id="${escapeHtml(deck.deck_id)}" tabindex="0">
@@ -204,7 +236,8 @@
         </article>`;
     }).join("");
     const deck = currentDeck();
-    elements.selectedSummary.textContent = `${deck?.tables.length || 0} / ${deck?.tables.length || 0}`;
+    const detailCount = currentDeckTables().length;
+    elements.selectedSummary.textContent = `${detailCount} / ${detailCount}`;
   }
 
   const rate = (estimate) => estimate.rate === null ? "-" : Number(estimate.rate).toFixed(2);
@@ -217,11 +250,7 @@
   );
 
   const generatedTitle = (table) => {
-    const cancer = table.cancer.trim();
-    let staging = table.staging_system.trim();
-    if (!staging || staging.toLowerCase() === "ajcc") return `${cancer}存活率`;
-    if (!staging.endsWith("分期")) staging = `${staging}分期`;
-    return `${cancer}${staging}存活率`;
+    return deckState.finalizedTitle(table.cancer, table.staging_system);
   };
 
   function comparisonBanner(table) {
@@ -272,7 +301,7 @@
       }).join("");
       return `
       <tr>
-        <td rowspan="2"><strong>${escapeHtml(row.stage)}</strong></td>
+        <td rowspan="2" class="slide-preview__stage"><strong>${escapeHtml(row.stage)}</strong></td>
         <td rowspan="2">${escapeHtml(row.stage_count ?? "-")}</td>
         <td rowspan="2">${escapeHtml(row.death_count ?? "-")}</td>
         ${hospitalRates}
@@ -288,7 +317,7 @@
       </tr>`;
     }).join("");
     const hospitalHeaders = table.hospitals.map((hospital) => `<th>${escapeHtml(hospital.display_name)}<br>年齡調整（觀察）<br>存活率% · 95% CI</th>`).join("");
-    const columns = ["7%", "8%", "8%", ...table.hospitals.map(() => "auto"), "auto", "auto", "auto"];
+    const columns = ["11%", "7%", "7%", ...table.hospitals.map(() => "auto"), "auto", "auto", "auto"];
     const minimumWidth = Math.max(100, 46 + (table.hospitals.length * 14));
     elements.preview.innerHTML = `
       <h3 class="slide-preview__title">${escapeHtml(table.display_title)}</h3>
@@ -449,6 +478,15 @@
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        year_comparison: {
+          enabled: Array.from(elements.yearComparisonMode)
+            .some((input) => input.checked && input.value === "on")
+            && Boolean(elements.baseComparisonPeriod.value)
+            && Boolean(elements.targetComparisonPeriod.value),
+          base_period: elements.baseComparisonPeriod.value,
+          comparison_period: elements.targetComparisonPeriod.value,
+          death_definition: elements.deathDefinition.value,
+        },
         decks: state.batch.decks.map((deck) => ({
           deck_id: deck.deck_id,
           selected: deck.selected,
