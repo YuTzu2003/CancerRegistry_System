@@ -23,6 +23,7 @@ from .report_builder import (
     apply_display_overrides,
     build_report_batch,
 )
+from .models import YearComparisonSettings
 
 
 survival_report_bp = Blueprint(
@@ -59,6 +60,12 @@ def _not_found():
 @login_required
 def index():
     return render_template("survival_report/index.html", active="survival_report.index")
+
+
+@survival_report_bp.get("/survival-report/powerpoint")
+@login_required
+def powerpoint():
+    return render_template("survival_report/powerpoint.html", active="survival_report.index")
 
 
 @survival_report_bp.route("/survival-report/recalculate", methods=["GET", "POST"])
@@ -158,16 +165,22 @@ def update_job(job_id: str):
     payload = request.get_json(silent=True) or {}
     tables = payload.get("tables")
     decks = payload.get("decks", [])
+    year_comparison = payload.get("year_comparison")
     if not isinstance(tables, list):
         return jsonify({"ok": False, "error": "tables 必須是陣列。"}), 400
     if not isinstance(decks, list):
         return jsonify({"ok": False, "error": "decks 必須是陣列。"}), 400
+    if year_comparison is not None and not isinstance(year_comparison, dict):
+        return jsonify({"ok": False, "error": "year_comparison 必須是物件。"}), 400
     try:
         store = _job_store()
         stored = store.load(_owner_id(), job_id)
         overrides = [DisplayOverride.from_dict(item) for item in tables if isinstance(item, dict)]
         deck_overrides = [DeckOverride.from_dict(item) for item in decks if isinstance(item, dict)]
         batch = apply_display_overrides(stored.batch, overrides, deck_overrides)
+        batch = batch.with_year_comparison(
+            YearComparisonSettings.from_dict(year_comparison)
+        )
         store.save_batch(_owner_id(), job_id, batch)
     except JobNotFound:
         return _not_found()
@@ -188,7 +201,10 @@ def delete_job(job_id: str):
 
 def _load_selected_job(job_id: str):
     stored = _job_store().load(_owner_id(), job_id)
-    if not stored.batch.selected_decks:
+    if (
+        not stored.batch.year_comparison.enabled
+        and not stored.batch.selected_decks
+    ):
         raise ValueError("沒有已選取的 PPT。")
     return stored
 
@@ -198,7 +214,7 @@ def _load_selected_job(job_id: str):
 def export_pptx(job_id: str):
     try:
         stored = _load_selected_job(job_id)
-        artifact = build_pptx_download(stored.batch.selected_decks, _TEMPLATE_PATH)
+        artifact = build_pptx_download(stored.batch, _TEMPLATE_PATH)
     except JobNotFound:
         return _not_found()
     except ValueError as error:
