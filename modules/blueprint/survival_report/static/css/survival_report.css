@@ -750,7 +750,6 @@
 .recalc-td-stage strong { color: var(--sr-navy); }
 .recalc-td-rate { font-weight: 700; color: var(--sr-blue); text-align: center; }
 .recalc-ci-text { display: block; font-weight: 400; color: var(--sr-muted); font-size: 12px; }
-.recalc-pct-alt { font-size: 11px; color: var(--sr-accent); opacity: 0.8; }
 .recalc-td-adjusted {
   background: var(--gray-50, #f8fafc);
   font-weight: 700;

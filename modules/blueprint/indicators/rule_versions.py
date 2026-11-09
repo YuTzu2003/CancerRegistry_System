@@ -15,6 +15,58 @@ DATE_RULE_FIELDS = frozenset({
 })
 NUMERIC_FIELD_OPERATIONS = COMPARISONS | {'in', 'not_in'}
 
+# The original rule declarations predate the editable maintenance metadata, so
+# they do not carry a selection reason.  Provide a readable baseline reason for
+# every built-in rule while still allowing each version to replace it.
+SYSTEM_SELECTION_REASON_OVERRIDES = {
+    ('Oral_Cavity', 1): (
+        '會影響局部區域的控制：口腔癌病人接受術後輔助治療時，'
+        '應於手術後 6 週內開始，以維持預期的局部控制效果。'
+    ),
+}
+
+# Plain-language numerator and denominator definitions transcribed from the
+# indicator table supplied for oral-cavity monitoring.
+SYSTEM_INDICATOR_DEFINITION_OVERRIDES = {
+    ('Oral_Cavity', 1): {
+        'numerator_definition': '分母中，手術後 6 週內開始輔助治療（放射治療或化學放射治療）的人數。',
+        'denominator_definition': '手術後接受輔助治療（放射治療或化學放射治療）的人數。',
+    },
+    ('Oral_Cavity', 2): {
+        'numerator_definition': '分母中，手術後 30 天內死亡的人數。',
+        'denominator_definition': '口腔癌手術的人數。（排除緩和治療。）',
+    },
+    ('Oral_Cavity', 3): {
+        'numerator_definition': '口腔癌病人開始接受放射治療（不含化療）後 90 天內死亡的人數。',
+        'denominator_definition': '口腔癌病人接受放射治療（不含化療）的人數。（排除緩和治療。）',
+    },
+    ('Oral_Cavity', 4): {
+        'numerator_definition': '口腔癌病人開始接受同步化學治療及放射治療後 90 天內死亡的人數。',
+        'denominator_definition': '口腔癌病人接受同步化學治療及放射治療的人數。（排除緩和治療。）',
+    },
+    ('Oral_Cavity', 5): {
+        'numerator_definition': '分母中，口腔癌切除標本淋巴結病理檢查報告 15 顆（含）以上的人數。',
+        'denominator_definition': '第一個癌是口腔癌且接受頸部淋巴廓清術的人數。',
+    },
+    ('Oral_Cavity', 6): {
+        'numerator_definition': '病理切緣小於 4 mm（不包含 4 mm）。（若有多個手術切緣距離，應摘錄最近的距離。）',
+        'denominator_definition': '口腔鱗狀細胞癌施行根除性手術且有紀錄病理切緣。（排除病理切緣不詳者及病理報告描述手術切緣為非侵襲癌。）',
+    },
+}
+
+
+def _system_selection_reason(cancer_key, number, rule):
+    """Return the editable baseline rationale for a built-in indicator."""
+    override = SYSTEM_SELECTION_REASON_OVERRIDES.get((cancer_key, int(number)))
+    if override:
+        return override
+    direction = rule.get('type')
+    if direction == 'negative':
+        return '用於監測不良治療結果或照護流程風險的發生情形，作為照護品質改善參考。'
+    if direction == 'observation':
+        return '用於觀察目前的臨床處置與治療分布，作為癌症照護品質分析與改善參考。'
+    return '用於監測病人是否依指標條件完成建議的診斷、治療或病理評估，作為照護品質改善參考。'
+
 # Every operation implemented by rule.py has a fixed, validated schema here.
 # The UI can therefore edit rules without ever accepting executable code.
 TREE_SCHEMAS = {
@@ -76,7 +128,7 @@ def validate_rule_tree(tree, original=None):
         op = node.get('op')
         if op in ('all', 'any'):
             if set(node) != {'op', 'rules'} or not isinstance(node['rules'], list) or not 1 <= len(node['rules']) <= 30:
-                raise ValueError('每組且／或條件至少需要一項，最多 30 項。')
+                raise ValueError('每組且/或條件至少需要一項，最多 30 項。')
             return {'op': op, 'rules': [validate(child, depth + 1) for child in node['rules']]}
         if op == 'not':
             if set(node) != {'op', 'rule'}:
@@ -178,7 +230,15 @@ def default_rules(cancer_key='Oral_Cavity'):
     spec = CANCER_SPECS.get(cancer_key)
     if spec is None:
         raise ValueError('找不到指定的癌別。')
-    return copy.deepcopy(spec.rules)
+    rules = copy.deepcopy(spec.rules)
+    for number, rule in rules.items():
+        if not str(rule.get('selection_reason') or '').strip():
+            rule['selection_reason'] = _system_selection_reason(cancer_key, number, rule)
+        definitions = SYSTEM_INDICATOR_DEFINITION_OVERRIDES.get((cancer_key, int(number)), {})
+        for field, value in definitions.items():
+            if not str(rule.get(field) or '').strip():
+                rule[field] = value
+    return rules
 
 
 def editable_conditions(rules):
@@ -287,6 +347,7 @@ def build_user_indicator(item, number):
         'name': name,
         'type': direction,
         'selection_reason': str(item.get('selection_reason') or '').strip()[:3000],
+        'notes': str(item.get('notes') or '').strip()[:3000],
         'numerator_definition': str(item.get('numerator_definition') or '').strip(),
         'denominator_definition': str(item.get('denominator_definition') or '').strip(),
         'numerator': build_group('numerator'),
@@ -299,32 +360,3 @@ def decode_rules(raw):
     if not isinstance(data, dict):
         raise ValueError('指標版本資料格式不正確。')
     return {int(number): rule for number, rule in data.items()}
-
-
-def load_version(cancer_key, version_id, connection_factory):
-    """Resolve a version only within its owning cancer; never fall back silently."""
-    baseline = default_rules(cancer_key)
-    if version_id in (None, '', 'default'):
-        return baseline, {'id': 'default', 'name': '115 年度指標定義（系統基準）'}
-    try:
-        if isinstance(version_id, bool):
-            raise ValueError
-        number = int(str(version_id))
-        if not 0 < number <= 2147483647:
-            raise ValueError
-    except (TypeError, ValueError):
-        raise ValueError('指標定義版本不正確。') from None
-    conn = connection_factory()
-    try:
-        cursor = conn.cursor()
-        cursor.execute('SELECT version_name, rules_json FROM dbo.IndicatorRuleVersion WHERE cancer_group_key = ? AND version_id = ?',
-                       (cancer_key, number))
-        row = cursor.fetchone()
-        if not row:
-            raise ValueError('找不到此癌別所選的指標定義版本。')
-        rules = decode_rules(row[1])
-        if set(rules) != set(baseline) or any(not isinstance(rule, dict) for rule in rules.values()):
-            raise ValueError('指標定義版本內容不完整。')
-        return rules, {'id': str(number), 'name': row[0]}
-    finally:
-        conn.close()

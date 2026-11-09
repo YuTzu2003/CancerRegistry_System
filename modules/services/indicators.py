@@ -26,7 +26,7 @@ from modules.blueprint.indicators.excel_export import create_indicators_excel
 from modules.blueprint.indicators.export_report import generate_indicator_export_files
 from modules.blueprint.indicators.rule_versions import default_rules, editable_conditions, apply_changes, next_revision_name, build_user_indicator, validate_rule_tree
 from modules.blueprint.indicators.definition_versions import decode_definition, load_definition
-from modules.blueprint.indicators.indicator_definitions import RULE_FIELD_LABELS, get_indicator_metadata
+from modules.blueprint.indicators.indicator_definitions import RULE_FIELD_LABELS
 
 indicators_bp = Blueprint("indicators",__name__,template_folder="../blueprint/indicators/templates",)
 
@@ -139,110 +139,14 @@ def _require_complete_definition(definition):
         raise ValueError('完整指標定義版本須包含所有癌別；尚未設定：' + '、'.join(missing) + '。')
 
 
-def _analysis_result_snapshot(result):
-    """Persist a compact, non-identifying summary sufficient for later audit."""
-    reports = []
-    for report in result.get('reports', []):
-        reports.append({
-            'cancer_key': report.get('cancer_key'),
-            'cancer_name': report.get('cancer_name'),
-            'input_count': report.get('input_count'),
-            'included_count': report.get('included_count'),
-            'global_exclusions': report.get('global_exclusions', {}),
-            'indicators': [{
-                'id': item.get('id'),
-                'name': item.get('name'),
-                'numerator': item.get('numerator'),
-                'denominator': item.get('denominator'),
-                'percentage': item.get('percentage'),
-                'calculation_available': item.get('calculation_available'),
-                'numerator_definition': item.get('numerator_definition'),
-                'denominator_definition': item.get('denominator_definition'),
-                'target_value': item.get('target_value'),
-                'target_operator': item.get('target_operator') or (
-                    '<=' if item.get('direction') == 'negative' else '>='
-                ),
-                'target_met': _indicator_target_met(item),
-            } for item in report.get('indicators', [])],
-        })
-    return {'reports': reports}
-
-
-def _indicator_target_met(item):
-    """Return the exact target outcome shown for an indicator, if calculable."""
-    target = item.get('target_value')
-    percentage = item.get('percentage')
-    if target is None or percentage is None:
-        return None
-    try:
-        target = float(target)
-        percentage = float(percentage)
-    except (TypeError, ValueError):
-        return None
-    operator = item.get('target_operator') or (
-        '<=' if item.get('direction') == 'negative' else '>='
-    )
-    comparisons = {
-        '>=': lambda value, limit: value >= limit,
-        '>': lambda value, limit: value > limit,
-        '<=': lambda value, limit: value <= limit,
-        '<': lambda value, limit: value < limit,
-        '=': lambda value, limit: value == limit,
-    }
-    comparison = comparisons.get(operator)
-    return comparison(percentage, target) if comparison else None
-
-
-def _record_indicator_analysis_run(*, cancers, year_start, year_end,
-                                   rules_by_cancer, versions, result):
-    """Store the exact rule and result snapshots used by one analysis request."""
-    version = next(iter(versions.values()), {})
-    version_id = version.get('id')
-    definition_version_id = int(version_id) if str(version_id).isdigit() else None
-    definition_snapshot = {key: rules_by_cancer[key] for key in dict.fromkeys(cancers)}
-    conn = get_conn()
-    try:
-        cursor = conn.cursor()
-        cursor.execute(
-            'INSERT INTO dbo.IndicatorAnalysisRun '
-            '(user_id, year_start, year_end, cancer_keys_json, definition_version_id, '
-            'definition_version_name, definition_snapshot_json, result_snapshot_json) '
-            'OUTPUT INSERTED.run_id VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            (
-                str(session.get('id') or session.get('userid') or ''),
-                year_start, year_end,
-                json.dumps(list(dict.fromkeys(cancers)), ensure_ascii=False),
-                definition_version_id,
-                str(version.get('name') or '115 年度指標定義（系統基準）'),
-                json.dumps(definition_snapshot, ensure_ascii=False),
-                json.dumps(_analysis_result_snapshot(result), ensure_ascii=False),
-            ),
-        )
-        row = cursor.fetchone()
-        conn.commit()
-        return int(row[0])
-    finally:
-        conn.close()
-
-
-def _analysis_run_timestamp(value):
-    if value is None:
-        return None
-    if value.tzinfo is None:
-        value = value.replace(tzinfo=timezone.utc)
-    return value.isoformat()
-
 
 def _snapshot_definition_texts(definition):
+    fields = ('numerator_definition', 'denominator_definition', 'selection_reason', 'notes')
     for cancer_key, rules in definition.items():
-        fields = ('numerator_definition', 'denominator_definition', 'selection_reason', 'notes')
-        if all(all(field in rule for field in fields) for rule in rules.values()):
-            continue
-        metadata = {item['id']: item for item in get_indicator_metadata(cancer_key)}
         for number, rule in rules.items():
             for field in fields:
                 fallback = '依已設定的分子規則計算。' if field == 'numerator_definition' else '依已設定的分母規則計算。' if field == 'denominator_definition' else ''
-                rule.setdefault(field, metadata.get(number, {}).get(field) or fallback)
+                rule.setdefault(field, fallback)
     return definition
 
 
@@ -302,10 +206,11 @@ def get_definition_version(version_id, cancer_key):
         version['fingerprint'] = _definition_fingerprint(definition, version)
         included = cancer_key in definition
         rules = definition[cancer_key] if included else default_rules(cancer_key)
-        metadata = {item['id']: item for item in get_indicator_metadata(cancer_key)}
-        descriptions = [{'id': number, 'name': rule['name'],
-                         'numerator_definition': rule.get('numerator_definition', metadata.get(number, {}).get('numerator_definition', '')),
-                         'denominator_definition': rule.get('denominator_definition', metadata.get(number, {}).get('denominator_definition', ''))}
+        descriptions = [{'id': number, 'name': rule['name'], 'direction': rule.get('type', 'positive'),
+                         'selection_reason': rule.get('selection_reason', ''),
+                         'notes': rule.get('notes', ''),
+                         'numerator_definition': rule.get('numerator_definition') or '依已設定的分子規則計算。',
+                         'denominator_definition': rule.get('denominator_definition') or '依已設定的分母規則計算。'}
                         for number, rule in sorted(rules.items())]
         field_labels = RULE_FIELD_LABELS
         return jsonify({'ok': True, 'cancer_key': cancer_key, 'included': included, 'version': version,
@@ -352,11 +257,14 @@ def create_definition_version(version_id=None):
     if updating and (not version_id or not version_id.isdecimal() or not 0 < int(version_id) <= 2147483647):
         return jsonify({'ok': False, 'error': '原始指標定義無法直接更新，請建立新版本。'}), 400
     name = str(payload.get('name') or '').strip()
-    definition_year = _definition_year(payload.get('definition_year'))
-    if definition_year is not None and not updating:
-        name = f'{definition_year} 年度指標定義'
-    description = _definition_text(payload.get('description'), '版本說明')
-    reason = _definition_text(payload.get('reason'), '本次修改原因', required=updating)
+    try:
+        definition_year = _definition_year(payload.get('definition_year'))
+        if definition_year is not None and not updating:
+            name = f'{definition_year} 年度指標定義'
+        description = _definition_text(payload.get('description'), '版本說明')
+        reason = _definition_text(payload.get('reason'), '本次修改原因', required=updating)
+    except ValueError as error:
+        return jsonify({'ok': False, 'error': str(error)}), 400
     if not revising and len(name) > 100:
         return jsonify({'ok': False, 'error': '請輸入 100 字以內的版本名稱。'}), 400
     try:
@@ -408,6 +316,18 @@ def create_definition_version(version_id=None):
                     if not isinstance(value, str) or not value.strip() or len(value) > 3000:
                         raise ValueError(f'{get_cancer_label(cancer_key)}：每項指標名稱及分子、分母說明均須填寫（最多 3000 字）。')
                     rules[item['id']][key] = value.strip()
+                direction = item.get('direction')
+                if direction not in {'positive', 'negative', 'observation'}:
+                    raise ValueError(f'{get_cancer_label(cancer_key)}：指標屬性不正確。')
+                selection_reason = item.get('selection_reason', '')
+                if not isinstance(selection_reason, str) or len(selection_reason) > 3000:
+                    raise ValueError(f'{get_cancer_label(cancer_key)}：選取理由格式不正確（最多 3000 字）。')
+                notes = item.get('notes', '')
+                if not isinstance(notes, str) or len(notes) > 3000:
+                    raise ValueError(f'{get_cancer_label(cancer_key)}：備註格式不正確（最多 3000 字）。')
+                rules[item['id']]['type'] = direction
+                rules[item['id']]['selection_reason'] = selection_reason.strip()
+                rules[item['id']]['notes'] = notes.strip()
             for item in new_items:
                 new_rule = build_user_indicator(item, max(rules, default=0) + 1)
                 for key in ('numerator_definition', 'denominator_definition'):
@@ -662,12 +582,6 @@ def delete_definition_version(version_id):
             conn.rollback()
             return jsonify({'ok': False, 'error': '已發布版本不可刪除；請先停用後再決定是否刪除。'}), 409
         name = row[0]
-        cursor.execute(
-            'SELECT 1 FROM dbo.IndicatorAnalysisRun WHERE definition_version_id = ?', (int(version_id),)
-        )
-        if cursor.fetchone():
-            conn.rollback()
-            return jsonify({'ok': False, 'error': '此版本已用於分析紀錄，為保留結果追溯性，不能刪除；可改為停用。'}), 409
         _record_definition_history(
             cursor, version_id=int(version_id), action='DELETED', status_before=current_status,
             rules_before=row[1], reason=f'刪除{current_status}版本',
@@ -1057,6 +971,7 @@ def batch_delete_indicators_sources():
 def save_indicator_threshold():
     payload = request.get_json(silent=True) or {}
     cancer_key = str(payload.get("cancer_key") or "").strip()
+    version_id = payload.get("definition_version_id")
     try:
         indicator_no = int(payload.get("indicator_no"))
     except (TypeError, ValueError):
@@ -1064,6 +979,16 @@ def save_indicator_threshold():
 
     if cancer_key not in CANCER_SPECS or indicator_no < 1:
         return jsonify({"ok": False, "error": "找不到指定的癌別或監測指標。"}), 404
+
+    if not version_id or str(version_id).strip() in ('', 'default'):
+        return jsonify({"ok": False, "error": "請先選擇一套指標定義版本，才能設定閾值。"}), 400
+    try:
+        version_id_int = int(version_id)
+        if not 0 < version_id_int <= 2147483647:
+            raise ValueError
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "指標定義版本不正確。"}), 400
+
     rule = get_indicator_rules(cancer_key).get(indicator_no)
     direction = (rule or {}).get("type") or str(payload.get("direction") or "positive")
     if direction not in {"positive", "negative", "observation"}:
@@ -1088,16 +1013,30 @@ def save_indicator_threshold():
     try:
         cursor = conn.cursor()
         cursor.execute(
-            "UPDATE dbo.Indicator_definition_metadata SET target_value = ?, target_operator = ? "
-            "WHERE cancer_group_key = ? AND indicator_no = ?",
-            (target_value, target_operator, cancer_key, indicator_no),
+            'SELECT rules_json, status FROM dbo.IndicatorDefinitionVersion '
+            'WITH (UPDLOCK, HOLDLOCK) WHERE version_id = ?', (version_id_int,)
         )
-        if cursor.rowcount == 0:
-            cursor.execute(
-                "INSERT INTO dbo.Indicator_definition_metadata "
-                "(cancer_group_key, indicator_no, target_value, target_operator) VALUES (?, ?, ?, ?)",
-                (cancer_key, indicator_no, target_value, target_operator),
-            )
+        row = cursor.fetchone()
+        if not row:
+            conn.rollback()
+            return jsonify({"ok": False, "error": "找不到所選的指標定義版本。"}), 404
+        rules_data = json.loads(row[0])
+        cancer_rules = rules_data.get(cancer_key)
+        if not isinstance(cancer_rules, dict):
+            conn.rollback()
+            return jsonify({"ok": False, "error": "所選版本未包含此癌別定義。"}), 404
+        indicator_key = str(indicator_no)
+        if indicator_key not in cancer_rules:
+            conn.rollback()
+            return jsonify({"ok": False, "error": "所選版本未包含此監測指標。"}), 404
+        cancer_rules[indicator_key]['target_value'] = target_value
+        cancer_rules[indicator_key]['target_operator'] = target_operator
+        updated_json = json.dumps(rules_data, ensure_ascii=False)
+        user_id = str(session.get('id') or session.get('userid') or '')
+        cursor.execute(
+            'UPDATE dbo.IndicatorDefinitionVersion SET rules_json = ?, updated_by = ?, updated_at = SYSUTCDATETIME() '
+            'WHERE version_id = ?', (updated_json, user_id, version_id_int)
+        )
         conn.commit()
     finally:
         conn.close()
@@ -1105,6 +1044,7 @@ def save_indicator_threshold():
     write_audit_log(
         "indicators_threshold_update",
         {
+            "definition_version_id": version_id_int,
             "cancer_key": cancer_key,
             "indicator_no": indicator_no,
             "target_value": target_value,
@@ -1239,99 +1179,10 @@ def preview_indicators():
         dataframe = _read_uploaded_file(stored_path, extension, nrows=None)
         rules_by_cancer, versions = _selected_rule_versions(payload, cancers)
         result = run_indicators_analysis(dataframe, cancers, year_start, year_end, rules_by_cancer=rules_by_cancer)
-        analysis_run_id = _record_indicator_analysis_run(
-            cancers=cancers, year_start=year_start, year_end=year_end,
-            rules_by_cancer=rules_by_cancer, versions=versions, result=result,
-        )
         for report in result.get('reports', []):
             report['rule_version'] = versions.get(report['cancer_key'])
-            report['analysis_run_id'] = analysis_run_id
-        result['analysis_run_id'] = analysis_run_id
-        write_audit_log('indicator_analysis_recorded', {
-            'analysis_run_id': analysis_run_id,
-            'year_start': year_start, 'year_end': year_end,
-            'cancers': list(dict.fromkeys(cancers)),
-            'definition_version_id': next(iter(versions.values()), {}).get('id'),
-        })
     except ValueError as exc:
         return jsonify({'ok': False, 'error': str(exc)}), 400
     except Exception as exc:
         return jsonify({"ok": False, "error": f"產生指標內容失敗：{exc}"}), 500
     return jsonify(result), (200 if result.get("ok") else 400)
-
-
-@indicators_bp.route('/api/indicators/analysis-runs/<run_id>', methods=['GET'])
-@login_required
-def get_indicator_analysis_run(run_id):
-    """Return a persisted analysis snapshot for its owner or a maintenance user."""
-    if not run_id.isdecimal() or not 0 < int(run_id):
-        return jsonify({'ok': False, 'error': '分析紀錄編號不正確。'}), 400
-    conn = get_conn()
-    try:
-        cursor = conn.cursor()
-        cursor.execute(
-            'SELECT run_id, user_id, created_at, year_start, year_end, cancer_keys_json, '
-            'definition_version_id, definition_version_name, definition_snapshot_json, result_snapshot_json '
-            'FROM dbo.IndicatorAnalysisRun WHERE run_id = ?', (int(run_id),)
-        )
-        row = cursor.fetchone()
-    finally:
-        conn.close()
-    if not row:
-        return jsonify({'ok': False, 'error': '找不到分析紀錄。'}), 404
-    current_user_id = str(session.get('id') or session.get('userid') or '')
-    if row[1] != current_user_id and not has_data_update_access():
-        return jsonify({'ok': False, 'error': '沒有權限查看此分析紀錄。'}), 403
-    return jsonify({
-        'ok': True,
-        'run': {
-            'id': str(row[0]), 'user_id': row[1],
-            'created_at': _analysis_run_timestamp(row[2]),
-            'year_start': row[3], 'year_end': row[4],
-            'cancers': json.loads(row[5]),
-            'definition_version_id': str(row[6]) if row[6] is not None else 'default',
-            'definition_version_name': row[7],
-            'definition_snapshot': json.loads(row[8]),
-            'result_snapshot': json.loads(row[9]),
-        },
-    })
-
-
-@indicators_bp.route('/api/indicators/analysis-runs', methods=['GET'])
-@login_required
-def list_indicator_analysis_runs():
-    """List recent saved analysis snapshots for the current user."""
-    current_user_id = str(session.get('id') or session.get('userid') or '')
-    can_view_all = has_data_update_access()
-    conn = get_conn()
-    try:
-        cursor = conn.cursor()
-        if can_view_all:
-            cursor.execute(
-                'SELECT TOP (100) run_id, user_id, created_at, year_start, year_end, '
-                'cancer_keys_json, definition_version_name '
-                'FROM dbo.IndicatorAnalysisRun ORDER BY created_at DESC, run_id DESC'
-            )
-        else:
-            cursor.execute(
-                'SELECT TOP (100) run_id, user_id, created_at, year_start, year_end, '
-                'cancer_keys_json, definition_version_name '
-                'FROM dbo.IndicatorAnalysisRun WHERE user_id = ? '
-                'ORDER BY created_at DESC, run_id DESC', (current_user_id,)
-            )
-        rows = cursor.fetchall()
-    except Exception as exc:
-        return jsonify({'ok': False, 'error': f'讀取分析紀錄失敗：{exc}'}), 500
-    finally:
-        conn.close()
-    return jsonify({
-        'ok': True,
-        'can_view_all': can_view_all,
-        'runs': [{
-            'id': str(row[0]), 'user_id': row[1],
-            'created_at': _analysis_run_timestamp(row[2]),
-            'year_start': row[3], 'year_end': row[4],
-            'cancers': json.loads(row[5]),
-            'definition_version_name': row[6],
-        } for row in rows],
-    })

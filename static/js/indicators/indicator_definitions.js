@@ -28,6 +28,7 @@
   const cancelButton = document.getElementById('cancelDefinitionEdit');
   const contents = document.getElementById('definitionContents');
   const yearInput = document.getElementById('definitionYear');
+  const yearError = document.getElementById('definitionYearError');
   // The save workflow historically used `nameInput`; the displayed field is now
   // the annual edition, and the server derives a readable version name from it.
   const nameInput = yearInput;
@@ -57,6 +58,18 @@
   const showStatus = (message, error = false) => {
     status.textContent = message;
     status.className = error ? 'alert alert-danger mt-3' : 'text-secondary mt-3';
+  };
+  const validateDefinitionYear = ({ showEmpty = false } = {}) => {
+    const value = yearInput.value.trim();
+    const invalid = value && (!/^\d+$/.test(value) || Number(value) < 1 || Number(value) > 9999);
+    const message = !value ? (showEmpty ? '請填寫適用年度。' : '') : (invalid ? '適用年度須為 1 至 9999 的整數。' : '');
+    yearInput.setCustomValidity(message);
+    yearInput.classList.toggle('is-invalid', Boolean(message));
+    if (yearError) {
+      yearError.textContent = message;
+      yearError.classList.toggle('d-none', !message);
+    }
+    return !message;
   };
   const updateNavigation = () => {
     const url = new URL(backLink.href, window.location.origin);
@@ -113,7 +126,7 @@
     if (startButton) {
       startButton.disabled = busy || editing || !currentData;
       startButton.classList.toggle('d-none', !isDefaultVersion && !canEditExisting);
-      if (startButtonLabel) startButtonLabel.textContent = isDefaultVersion ? '建立空白版本' : '另建版本';
+      if (startButtonLabel) startButtonLabel.textContent = isDefaultVersion ? '以系統基準建立新版本' : '沿用此版本建立新版本';
     }
     if (deleteButton) deleteButton.disabled = busy || editing || !currentData || versionSelect.value === 'default' || versionStatus === 'PUBLISHED';
     renameButton.disabled = busy || editing || !currentData || versionSelect.value === 'default' || versionStatus === 'PUBLISHED';
@@ -122,6 +135,7 @@
     if (statusTarget) statusTarget.disabled = busy || editing || !canApprove || canToggleAvailability || !currentData || versionSelect.value === 'default' || !(nextStatuses[versionStatus] || []).length;
     if (changeStatusButton) changeStatusButton.disabled = busy || editing || !canApprove || canToggleAvailability || !currentData || versionSelect.value === 'default' || !(nextStatuses[versionStatus] || []).length;
     if (reviseButton) {
+      reviseButton.classList.toggle('d-none', isDefaultVersion);
       reviseButton.disabled = busy || editing || !currentData || versionSelect.value === 'default';
       const reviseLabel = currentData?.included === false
         ? '加入此癌別並建立新版'
@@ -154,11 +168,19 @@
     })),
     ruleTrees: Object.fromEntries([...contents.querySelectorAll('[data-rule-indicator]')].map(card => [card.dataset.ruleIndicator,
       Object.fromEntries([...card.querySelectorAll('[data-rule-tree]')].map(input => [input.dataset.ruleTree, JSON.parse(input.value)]))])),
-    descriptions: [...contents.querySelectorAll('[data-description]')].map(element => element.value),
+    descriptions: [...contents.querySelectorAll('[data-rule-indicator]')].map(card => ({
+      id: Number(card.dataset.ruleIndicator),
+      name: card.querySelector('[data-description="name"]').value,
+      direction: card.querySelector('[data-description="direction"]').value,
+      selection_reason: card.querySelector('[data-description="selection_reason"]').value,
+      notes: card.querySelector('[data-description="notes"]').value,
+      denominator_definition: card.querySelector('[data-description="denominator_definition"]').value,
+      numerator_definition: card.querySelector('[data-description="numerator_definition"]').value,
+    })),
     removed: [...contents.querySelectorAll('[data-remove-indicator]:checked')].map(element => Number(element.value)),
     newIndicators: readNewIndicators(),
   });
-  const blankNewIndicator = () => ({ name: '', type: 'positive', selection_reason: '', numerator_definition: '', denominator_definition: '', numerator: [blankNewCondition()], denominator: [blankNewCondition()] });
+  const blankNewIndicator = () => ({ name: '', type: 'positive', selection_reason: '', notes: '', numerator_definition: '', denominator_definition: '', numerator: [blankNewCondition()], denominator: [blankNewCondition()] });
   const blankNewCondition = () => ({ field: Object.keys(currentData?.field_labels || {})[0] || '', op: 'equals', value: '', min: '', max: '' });
   const readNewIndicators = () => [...contents.querySelectorAll('[data-new-indicator-card]')].map(card => {
     const readConditions = section => {
@@ -176,6 +198,7 @@
       name: card.querySelector('[data-new-name]').value,
       type: card.querySelector('[data-new-type]').value,
       selection_reason: card.querySelector('[data-new-reason]').value,
+      notes: card.querySelector('[data-new-notes]').value,
       numerator_definition: card.querySelector('[data-new-numerator-description]').value,
       denominator_definition: card.querySelector('[data-new-denominator-description]').value,
       numerator: readConditions('numerator'),
@@ -204,20 +227,72 @@
       row.querySelector('[data-second]').value = value.second;
       row.querySelector('[data-op]').dispatchEvent(new Event('change'));
     });
-    contents.querySelectorAll('[data-description]').forEach((element, index) => { element.value = values.descriptions[index]; });
+    contents.querySelectorAll('[data-rule-indicator]').forEach(card => {
+      const value = values.descriptions.find(item => item.id === Number(card.dataset.ruleIndicator));
+      if (!value) return;
+      card.querySelectorAll('[data-description]').forEach(element => { element.value = value[element.dataset.description] ?? ''; });
+    });
     contents.querySelectorAll('[data-remove-indicator]').forEach(element => { element.checked = values.removed.includes(Number(element.value)); });
     contents.querySelectorAll('[data-rule-indicator]').forEach(card => {
       const sections = values.ruleTrees?.[card.dataset.ruleIndicator];
-      if (sections) card.querySelectorAll('[data-rule-tree]').forEach(input => { input.value = JSON.stringify(sections[input.dataset.ruleTree]); });
+      if (sections) card.querySelectorAll('[data-rule-tree]').forEach(input => {
+        input.value = JSON.stringify(sections[input.dataset.ruleTree]);
+        const summary = card.querySelector(`[data-rule-summary="${input.dataset.ruleTree}"]`);
+        if (summary) summary.textContent = window.describeIndicatorRule(sections[input.dataset.ruleTree], currentData?.field_labels || {});
+      });
+    });
+    contents.querySelectorAll('[data-nav-indicator]').forEach(btn => {
+      const id = btn.dataset.navIndicator;
+      const nameEl = contents.querySelector(`[data-description="name"][data-indicator="${id}"]`);
+      const listRow = btn.closest('tr');
+      if (nameEl && listRow) listRow.querySelector('.definition-list-name').textContent = nameEl.value || '未命名';
+      if (listRow) listRow.classList.toggle('removed', values.removed.includes(Number(id)));
     });
     renderNewIndicatorEditor(values.newIndicators || []);
   };
   const reviewChanges = keys => {
     const conditionText = value => `${operators[value.op] || value.op} ${value.first}${value.op === 'between' ? ` 至 ${value.second}` : ''}`;
-    const item = (title, before, after) => `<div class="definition-review-item"><strong>${escapeHtml(title)}</strong><div class="definition-review-value">修改前：${escapeHtml(before || '（空白）')}</div><div class="definition-review-value">修改後：${escapeHtml(after || '（空白）')}</div></div>`;
+    const numberTokens = value => [...String(value ?? '').matchAll(/\d+(?:\.\d+)?/g)];
+    const changedNumberIndexes = (value, other) => {
+      const current = numberTokens(value).map(match => match[0]);
+      const compared = numberTokens(other).map(match => match[0]);
+      const matrix = Array.from({ length: current.length + 1 }, () => Array(compared.length + 1).fill(0));
+      for (let i = current.length - 1; i >= 0; i -= 1) {
+        for (let j = compared.length - 1; j >= 0; j -= 1) {
+          matrix[i][j] = current[i] === compared[j]
+            ? matrix[i + 1][j + 1] + 1
+            : Math.max(matrix[i + 1][j], matrix[i][j + 1]);
+        }
+      }
+      const unchanged = new Set();
+      let i = 0; let j = 0;
+      while (i < current.length && j < compared.length) {
+        if (current[i] === compared[j]) { unchanged.add(i); i += 1; j += 1; }
+        else if (matrix[i + 1][j] >= matrix[i][j + 1]) i += 1;
+        else j += 1;
+      }
+      return new Set(current.map((_, index) => index).filter(index => !unchanged.has(index)));
+    };
+    const formatReviewValue = (value, other, state) => {
+      const text = String(value ?? '').trim();
+      if (!text) return '（空白）';
+      const matches = numberTokens(text);
+      const changed = changedNumberIndexes(text, other);
+      let result = ''; let cursor = 0;
+      matches.forEach((match, index) => {
+        result += escapeHtml(text.slice(cursor, match.index));
+        const token = escapeHtml(match[0]);
+        result += changed.has(index) ? `<span class="definition-review-number definition-review-number-${state}">${token}</span>` : token;
+        cursor = (match.index || 0) + match[0].length;
+      });
+      return result + escapeHtml(text.slice(cursor));
+    };
+    const item = (title, before, after) => `<div class="definition-review-item"><strong>${escapeHtml(title)}</strong><div class="definition-review-value">修改前：${formatReviewValue(before, after, 'before')}</div><div class="definition-review-value">修改後：${formatReviewValue(after, before, 'after')}</div></div>`;
     const groups = keys.map(key => {
       const { data, values } = drafts[key];
       const original = originals[key];
+      const originalDescriptions = data.descriptions || original.descriptions || [];
+      const originalRuleTrees = data.rule_trees || original.ruleTrees || {};
       const cancer = [...cancerSelect.options].find(option => option.value === key)?.textContent || key;
       const rows = [];
       if (data.included === false) rows.push('<p class="small">此癌別尚未收錄於來源版本，儲存後會加入。</p>');
@@ -225,13 +300,18 @@
         const indicator = data.descriptions.find(entry => entry.id === number);
         rows.push(item(`指標 ${number}・移除`, indicator?.name || '', '從儲存後的版本移除'));
       });
-      const descriptionLabels = ['指標名稱', '分母說明', '分子說明'];
-      values.descriptions.forEach((after, index) => {
-        const before = original.descriptions[index];
-        if (!values.removed.includes(data.descriptions[Math.floor(index / 3)].id) && before.trim() !== after.trim()) {
-          const indicator = data.descriptions[Math.floor(index / 3)];
-          rows.push(item(`指標 ${indicator.id}・${descriptionLabels[index % 3]}`, before.trim(), after.trim()));
-        }
+      const descriptionLabels = {
+        name: '指標名稱', direction: '指標屬性', selection_reason: '選取理由', notes: '備註',
+        denominator_definition: '分母說明', numerator_definition: '分子說明',
+      };
+      values.descriptions.forEach(after => {
+        const before = originalDescriptions.find(entry => Number(entry.id) === Number(after.id)) || {};
+        if (values.removed.includes(after.id)) return;
+        Object.entries(descriptionLabels).forEach(([field, label]) => {
+          if (String(before[field] ?? '').trim() !== String(after[field] ?? '').trim()) {
+            rows.push(item(`指標 ${after.id}・${label}`, String(before[field] ?? '').trim(), String(after[field] ?? '').trim()));
+          }
+        });
       });
       values.conditions.forEach((after, index) => {
         const before = original.conditions[index];
@@ -245,7 +325,7 @@
       });
       values.newIndicators.forEach((indicator, index) => {
         rows.push(item(`新增指標 ${index + 1}（${indicator.type === 'positive' ? '正向' : indicator.type === 'negative' ? '負向' : '觀察'}）`, '尚未建立', indicator.name.trim() || '未命名指標'));
-        for (const section of ['denominator', 'numerator']) {
+        for (const section of ['numerator', 'denominator']) {
           const tree = Array.isArray(indicator[section]) ? {op:'all', rules:indicator[section].map(condition => ({
             op:condition.op, field:condition.field, ...(condition.op === 'between' ? {min:condition.min, max:condition.max} : {value:condition.value}),
           }))} : indicator[section];
@@ -254,9 +334,9 @@
       });
       Object.entries(values.ruleTrees || {}).forEach(([number, sections]) => {
         if (values.removed.includes(Number(number))) return;
-        for (const section of ['denominator', 'numerator']) {
-          if (JSON.stringify(sections[section]) !== JSON.stringify(original.ruleTrees?.[number]?.[section]))
-            rows.push(item(`指標 ${number}・${section === 'numerator' ? '分子' : '分母'}計算條件`, window.describeIndicatorRule(original.ruleTrees?.[number]?.[section], data.field_labels), window.describeIndicatorRule(sections[section], data.field_labels)));
+        for (const section of ['numerator', 'denominator']) {
+          if (JSON.stringify(sections[section]) !== JSON.stringify(originalRuleTrees?.[number]?.[section]))
+            rows.push(item(`指標 ${number}・${section === 'numerator' ? '分子' : '分母'}計算條件`, window.describeIndicatorRule(originalRuleTrees?.[number]?.[section], data.field_labels), window.describeIndicatorRule(sections[section], data.field_labels)));
         }
       });
       return rows.length ? `<section class="definition-review-group"><strong>${escapeHtml(cancer)}</strong>${rows.join('')}</section>` : '';
@@ -288,10 +368,11 @@
           <label class="col-md-8">\u6307\u6a19\u540d\u7a31<input class="form-control mt-2" data-new-name maxlength="3000" required value="${escapeHtml(item.name)}"></label>
           <label class="col-md-4">\u6307\u6a19\u5c6c\u6027<select class="form-select mt-2" data-new-type><option value="positive"${item.type === 'positive' ? ' selected' : ''}>\u6b63\u5411\u6307\u6a19</option><option value="negative"${item.type === 'negative' ? ' selected' : ''}>\u8ca0\u5411\u6307\u6a19</option><option value="observation"${item.type === 'observation' ? ' selected' : ''}>\u89c0\u5bdf\u6307\u6a19</option></select></label>
           <label class="col-12">\u9078\u53d6\u7406\u7531<textarea class="form-control mt-2" data-new-reason rows="2" maxlength="3000">${escapeHtml(item.selection_reason)}</textarea></label>
+          <label class="col-12">\u5099\u8a3b<textarea class="form-control mt-2" data-new-notes rows="2" maxlength="3000">${escapeHtml(item.notes || '')}</textarea></label>
           <label class="col-md-6">\u5206\u5b50\u5b9a\u7fa9<textarea class="form-control mt-2" data-new-numerator-description rows="3" maxlength="3000" required>${escapeHtml(item.numerator_definition)}</textarea></label>
           <label class="col-md-6">\u5206\u6bcd\u5b9a\u7fa9<textarea class="form-control mt-2" data-new-denominator-description rows="3" maxlength="3000" required>${escapeHtml(item.denominator_definition)}</textarea></label>
         </div>
-        ${['denominator', 'numerator'].map(section => `<section class="definition-section"><h4>${section === 'denominator' ? '分母條件' : '分子條件'}</h4><textarea hidden data-new-tree="${section}">${Array.isArray(item[section]) ? '' : escapeHtml(JSON.stringify(item[section]))}</textarea>${Array.isArray(item[section]) ? `<p class="small text-secondary mb-2">簡易條件須全部符合；日期、代碼與「或」請使用完整條件編輯。</p><div data-new-condition-list="${section}">${item[section].map((condition, conditionIndex) => renderCondition(condition, index, section, conditionIndex)).join('')}</div><button type="button" class="btn btn-outline-secondary btn-sm mt-2" data-add-new-condition data-section="${section}" data-indicator-index="${index}">新增條件</button>` : '<p class="small text-secondary">已使用完整條件設定。</p>'} <button type="button" class="btn btn-outline-primary btn-sm mt-2" data-edit-new-tree data-section="${section}" data-indicator-index="${index}">編輯完整條件</button></section>`).join('')}
+        ${['numerator', 'denominator'].map(section => `<section class="definition-section"><h4>${section === 'denominator' ? '分母條件' : '分子條件'}</h4><textarea hidden data-new-tree="${section}">${Array.isArray(item[section]) ? '' : escapeHtml(JSON.stringify(item[section]))}</textarea>${Array.isArray(item[section]) ? `<p class="small text-secondary mb-2">簡易條件須全部符合；日期、代碼與「或」請使用完整條件編輯。</p><div data-new-condition-list="${section}">${item[section].map((condition, conditionIndex) => renderCondition(condition, index, section, conditionIndex)).join('')}</div><button type="button" class="btn btn-outline-secondary btn-sm mt-2" data-add-new-condition data-section="${section}" data-indicator-index="${index}">新增條件</button>` : '<p class="small text-secondary">已使用完整條件設定。</p>'} <button type="button" class="btn btn-outline-primary btn-sm mt-2" data-edit-new-tree data-section="${section}" data-indicator-index="${index}">編輯完整條件</button></section>`).join('')}
         <button type="button" class="btn btn-outline-danger btn-sm mt-3" data-remove-new-indicator data-indicator-index="${index}"><i class="bi bi-trash me-1" aria-hidden="true"></i>\u79fb\u9664\u6b64\u6307\u6a19</button>
       </div>
     </details>`).join('');
@@ -307,35 +388,65 @@
     });
   };
   const render = () => {
-    const renderConditions = (item, section) => {
+    const items = currentData.descriptions || [];
+    const renderRuleSection = (item, section) => {
+      const label = section === 'denominator' ? '分母' : '分子';
+      const key = `${section}_definition`;
       const tree = currentData.rule_trees?.[item.id]?.[section];
-      return `<textarea hidden data-rule-tree="${section}">${escapeHtml(JSON.stringify(tree))}</textarea><button type="button" class="btn btn-outline-primary btn-sm mt-2" data-edit-rule-tree="${section}">編輯完整條件</button>`;
+      const summary = tree ? window.describeIndicatorRule(tree, currentData.field_labels) : '尚未設定條件';
+      return `<div class="definition-section"><h4>${label}</h4>
+        <label class="w-100">${label}說明<textarea class="form-control" data-description="${key}" data-indicator="${escapeHtml(item.id)}" rows="3" maxlength="3000" required>${escapeHtml(item[key])}</textarea></label>
+        <div class="small text-secondary mt-3">系統計算條件（用於分析）</div>
+        <div class="definition-rule-summary" data-rule-summary="${section}">${escapeHtml(summary)}</div>
+        <textarea hidden data-rule-tree="${section}">${escapeHtml(JSON.stringify(tree))}</textarea>
+        <button type="button" class="btn btn-outline-primary btn-sm mt-2" data-edit-rule-tree="${section}">編輯條件</button>
+        <div data-rule-editor-host="${section}"></div>
+      </div>`;
     };
-    contents.innerHTML = `<p class="small text-secondary mt-4 mb-2">點選指標名稱展開內容。請確認說明與計算條件一致；特殊條件保留原設定。</p>` + (currentData.descriptions || []).map(item => {
-      const sections = ['denominator', 'numerator'].map(section => {
-        const label = section === 'denominator' ? '分母' : '分子';
-        const key = `${section}_definition`;
-        return `<div class="definition-section"><h4>${label}</h4>
-          <label class="w-100">${label}說明<textarea class="form-control" data-description="${key}" data-indicator="${escapeHtml(item.id)}" rows="3" maxlength="3000" required>${escapeHtml(item[key])}</textarea></label>
-          <div class="small text-secondary mt-3">計算條件</div>${renderConditions(item, section)}</div>`;
-      }).join('');
-      return `<details class="definition-indicator" data-rule-indicator="${escapeHtml(item.id)}"><summary>指標 ${escapeHtml(item.id)}：${escapeHtml(item.name)}</summary>
-        <div class="definition-indicator-body"><label class="w-100">指標名稱<input class="form-control mt-2" data-description="name" data-indicator="${escapeHtml(item.id)}" maxlength="3000" required value="${escapeHtml(item.name)}"></label>${sections}<label class="d-block mt-3 text-danger"><input type="checkbox" data-remove-indicator value="${escapeHtml(item.id)}"> 從儲存後的版本移除此指標</label></div></details>`;
+    const typeLabels = { positive: '正向指標', negative: '負向指標', observation: '觀察指標' };
+    const list = items.map((item, idx) => {
+      const numeratorFields = window.describeIndicatorRule(currentData.rule_trees?.[item.id]?.numerator, currentData.field_labels);
+      const denominatorFields = window.describeIndicatorRule(currentData.rule_trees?.[item.id]?.denominator, currentData.field_labels);
+      const numeratorDefinition = item.numerator_definition === '依已設定的分子規則計算。' ? '—' : (item.numerator_definition || '—');
+      const denominatorDefinition = item.denominator_definition === '依已設定的分母規則計算。' ? '—' : (item.denominator_definition || '—');
+      return `<tr class="definition-list-row${editing && idx === 0 ? ' active' : ''}" data-indicator-list-row="${escapeHtml(item.id)}">
+      <td>${escapeHtml(String(item.id))}</td>
+      <td>${escapeHtml(typeLabels[item.direction] || item.direction || '—')}</td>
+      <td><span class="definition-list-name">${escapeHtml(item.name)}</span></td>
+      <td><span class="definition-list-text">${escapeHtml(item.selection_reason || '—')}</span></td>
+      <td><span class="definition-list-text">${escapeHtml(numeratorDefinition)}</span></td>
+      <td><span class="definition-list-text">${escapeHtml(denominatorDefinition)}</span></td>
+      <td><span class="definition-list-text">${escapeHtml(numeratorFields)}</span></td>
+      <td><span class="definition-list-text">${escapeHtml(denominatorFields)}</span></td>
+      <td><span class="definition-list-text">${escapeHtml(item.notes || '—')}</span></td>
+      ${editing ? `<td><button type="button" class="btn btn-outline-dark btn-sm definition-list-open" data-nav-indicator="${escapeHtml(item.id)}">編輯</button></td>` : ''}
+    </tr>`;
     }).join('');
+    const panels = editing ? items.map((item, idx) => {
+      const sections = ['numerator', 'denominator'].map(section => renderRuleSection(item, section)).join('');
+      return `<div data-rule-indicator="${escapeHtml(item.id)}" data-indicator-panel${idx > 0 ? ' hidden' : ''}>
+        <div class="definition-current-indicator"><strong>指標 ${escapeHtml(String(item.id))}：${escapeHtml(item.name)}</strong><span class="small text-secondary">${escapeHtml(typeLabels[item.direction] || item.direction || '未設定指標屬性')}</span></div>
+        <div class="row g-3 definition-indicator-meta">
+          <label class="col-md-8">指標名稱<input class="form-control mt-2" data-description="name" data-indicator="${escapeHtml(item.id)}" maxlength="3000" required value="${escapeHtml(item.name)}"></label>
+          <label class="col-md-4">指標屬性<select class="form-select mt-2" data-description="direction"><option value="positive"${item.direction === 'positive' ? ' selected' : ''}>正向指標</option><option value="negative"${item.direction === 'negative' ? ' selected' : ''}>負向指標</option><option value="observation"${item.direction === 'observation' ? ' selected' : ''}>觀察指標</option></select></label>
+          <label class="col-12">選取理由<textarea class="form-control mt-2" data-description="selection_reason" rows="3" maxlength="3000">${escapeHtml(item.selection_reason || '')}</textarea></label>
+          <label class="col-12">備註<textarea class="form-control mt-2" data-description="notes" rows="2" maxlength="3000">${escapeHtml(item.notes || '')}</textarea></label>
+        </div>
+        ${sections}
+        <label class="d-block mt-3 text-danger"><input type="checkbox" data-remove-indicator value="${escapeHtml(item.id)}"> 從儲存後的版本移除此指標</label>
+      </div>`;
+    }).join('') : '';
+    const actionHeader = editing ? '<th rowspan="2">操作</th>' : '';
+    const tableColumns = `<colgroup>
+      <col class="definition-list-col-number"><col class="definition-list-col-direction"><col class="definition-list-col-name"><col class="definition-list-col-reason"><col class="definition-list-col-numerator-definition"><col class="definition-list-col-denominator-definition"><col class="definition-list-col-numerator-field"><col class="definition-list-col-denominator-field"><col class="definition-list-col-notes">${editing ? '<col class="definition-list-col-action">' : ''}
+    </colgroup>`;
+    const selectedEditor = editing ? `<section class="definition-selected-editor"><div class="definition-selected-heading"><div><h3>指標內容</h3><p class="small text-secondary">可在此調整指標說明與系統計算條件。</p></div></div>${panels}</section>` : '';
+    const listHint = editing ? '選擇一項指標，即可在下方編輯完整內容。' : '下表顯示此癌別的完整指標內容。';
+    contents.innerHTML = `<div class="definition-list-panel"><div class="definition-list-heading"><div><h3>指標清單</h3><p class="small text-secondary mb-0">${listHint}</p></div><span class="small text-secondary">共 ${items.length} 項指標</span></div><div class="definition-list-table-wrap"><table class="definition-list-table${editing ? ' is-editing' : ''}">${tableColumns}<thead><tr><th rowspan="2">編號</th><th rowspan="2">指標屬性</th><th rowspan="2">指標名稱</th><th rowspan="2">選取理由</th><th rowspan="2">分子定義</th><th rowspan="2">分母定義</th><th colspan="2">癌登資料選用欄位</th><th rowspan="2">備註</th>${actionHeader}</tr><tr><th>分子</th><th>分母</th></tr></thead><tbody>${list}</tbody></table></div></div>${selectedEditor}`;
     if (editing) {
       contents.insertAdjacentHTML('beforeend', '<div class="definition-section mt-4"><div class="d-flex flex-wrap justify-content-between align-items-center gap-2"><h4 class="mb-1">新增指標</h4><button type="button" class="btn btn-outline-primary btn-sm" data-add-new-indicator><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>新增指標</button></div><div data-new-indicator-list></div></div>');
       renderNewIndicatorEditor(drafts[currentData.cancer_key]?.values.newIndicators || []);
     }
-    contents.querySelectorAll('[data-condition]').forEach(row => {
-      const toggle = () => {
-        const range = row.querySelector('[data-op]').value === 'between';
-        row.querySelector('[data-second]').hidden = !range;
-        row.querySelector('[data-second]').required = range;
-        row.querySelector('[data-range-label]').hidden = !range;
-      };
-      row.querySelector('[data-op]').addEventListener('change', toggle);
-      toggle();
-    });
     updateControls();
   };
   const loadDetails = async () => {
@@ -384,6 +495,7 @@
     void loadDetails();
   });
   versionSelect.addEventListener('change', () => { void loadDetails(); });
+  yearInput?.addEventListener('input', () => { validateDefinitionYear(); });
   renameButton.addEventListener('click', async () => {
     if (busy || editing || !currentData || versionSelect.value === 'default') return;
     const selected = versionSelect.value;
@@ -426,32 +538,38 @@
   });
   startButton?.addEventListener('click', () => {
     if (!canManage || !currentData || busy) return;
-    editing = true; revising = false; drafts = {}; originals = {}; originalVersionDescription = ''; originals[currentData.cancer_key] = readDraft(); updateDraftStatus(); nameInput.value = ''; descriptionInput.value = ''; reasonInput.value = ''; render(); nameInput.focus();
-    showStatus('正在編輯新的整套版本。可切換癌別，完成後一次儲存。');
+    editing = true; revising = false; drafts = {}; originals = {}; originalVersionDescription = ''; nameInput.value = ''; descriptionInput.value = ''; reasonInput.value = ''; validateDefinitionYear(); render(); originals[currentData.cancer_key] = readDraft(); updateDraftStatus(); nameInput.focus();
+    showStatus(versionSelect.value === 'default'
+      ? '正在以系統基準建立新版本，可切換癌別，完成後一次儲存。'
+      : '正在沿用目前版本建立新版本。可切換癌別，完成後一次儲存。');
   });
   reviseButton?.addEventListener('click', () => {
     if (!canManage || !currentData || busy) return;
     if (versionSelect.value === 'default') return;
     if (!['DRAFT', 'PENDING', 'INACTIVE'].includes(currentData.version.status)) {
       editing = true; revising = false; drafts = {}; originals = {};
-      originals[currentData.cancer_key] = readDraft();
-      updateDraftStatus();
       nameInput.value = currentData.version?.definition_year || '';
+      validateDefinitionYear();
       descriptionInput.value = currentData.version?.description || '';
       originalVersionDescription = '';
       reasonInput.value = '';
       render();
+      originals[currentData.cancer_key] = readDraft();
+      updateDraftStatus();
       contents.querySelector('details')?.setAttribute('open', '');
       contents.querySelector('input, textarea, select')?.focus();
       showStatus('正在以目前版本為來源建立新版；修改送審後不會覆寫原版本。');
       return;
     }
-    editing = true; revising = true; drafts = {}; originals = {}; sourceFingerprint = currentData.version.fingerprint; originals[currentData.cancer_key] = readDraft(); updateDraftStatus();
+    editing = true; revising = true; drafts = {}; originals = {}; sourceFingerprint = currentData.version.fingerprint;
     nameInput.value = currentData.version?.definition_year || '';
+    validateDefinitionYear();
     descriptionInput.value = currentData.version?.description || '';
     originalVersionDescription = descriptionInput.value;
     reasonInput.value = '';
     render();
+    originals[currentData.cancer_key] = readDraft();
+    updateDraftStatus();
     contents.querySelector('details')?.setAttribute('open', '');
     contents.querySelector('input, textarea, select')?.focus();
     showStatus(currentData.version.status === 'INACTIVE' ? '正在編輯已停用版本；儲存後會送交管理員審核。' : '正在編輯待審或退回修改版本。可切換癌別，完成後一次儲存至目前版本。');
@@ -472,7 +590,10 @@
     const name = nameInput.value.trim();
     const description = descriptionInput.value.trim();
     const reason = reasonInput.value.trim();
-    if (!revising && !name) { showStatus('請填寫新版本名稱。', true); nameInput.reportValidity(); nameInput.focus(); return; }
+    if (!revising && !validateDefinitionYear({ showEmpty: true })) {
+      nameInput.focus({ preventScroll: true });
+      return;
+    }
     if (revising && !reason) { showStatus('請填寫本次修改原因，以保留版本歷程。', true); reasonInput.reportValidity(); reasonInput.focus(); return; }
     captureDraft();
     let keys = Object.keys(drafts).filter(isChanged);
@@ -491,16 +612,28 @@
       if (values.conditions.some((value, index) => !values.removed.includes(data.conditions[index].indicator) && (!validNumber(value.first) || (value.op === 'between' && (!validNumber(value.second) || Number(value.first) > Number(value.second)))))) {
         showStatus(`${label}的數值條件不完整或區間有誤，請切換至該癌別檢查。`, true); return;
       }
-      if (values.descriptions.some((value, index) => !values.removed.includes(data.descriptions[Math.floor(index / 3)].id) && (!value.trim() || value.length > 3000))) {
-        showStatus(`${label}的指標名稱或分子、分母說明未填寫，請切換至該癌別檢查。`, true); return;
+      if (values.descriptions.some(value => !values.removed.includes(value.id) && (
+        !value.name.trim() || !value.numerator_definition.trim() || !value.denominator_definition.trim()
+        || !['positive', 'negative', 'observation'].includes(value.direction)
+        || value.name.length > 3000 || value.selection_reason.length > 3000 || value.notes.length > 3000
+        || value.numerator_definition.length > 3000 || value.denominator_definition.length > 3000
+      ))) {
+        showStatus(`${label}的指標名稱、屬性或分子、分母說明未填寫，請切換至該癌別檢查。`, true); return;
       }
       const changes = [];
-      const descriptions = data.descriptions.map((item, index) => ({ id: item.id,
-        name: values.descriptions[index * 3].trim(), denominator_definition: values.descriptions[index * 3 + 1].trim(),
-        numerator_definition: values.descriptions[index * 3 + 2].trim() })).filter(item => !values.removed.includes(item.id));
+      const descriptions = values.descriptions.map(item => ({
+        id: item.id,
+        name: item.name.trim(),
+        direction: item.direction,
+        selection_reason: item.selection_reason.trim(),
+        notes: item.notes.trim(),
+        denominator_definition: item.denominator_definition.trim(),
+        numerator_definition: item.numerator_definition.trim(),
+      })).filter(item => !values.removed.includes(item.id));
       if (values.newIndicators.length > 30) { showStatus(`${label}：一次最多新增 30 個指標。`, true); return; }
       for (const [newIndex, item] of values.newIndicators.entries()) {
-        if (!item.name.trim() || !item.numerator_definition.trim() || !item.denominator_definition.trim()) {
+        if (!item.name.trim() || !item.numerator_definition.trim() || !item.denominator_definition.trim()
+          || item.selection_reason.length > 3000 || item.notes.length > 3000) {
           showStatus(`${label}：新增指標 ${newIndex + 1} 請填寫名稱、分子定義與分母定義。`, true); return;
         }
         for (const section of ['numerator', 'denominator']) {
@@ -533,7 +666,7 @@
         showCancelButton: true,
         confirmButtonText: isRevision ? '確認更新版本' : '確認並建立版本',
         cancelButtonText: '返回修改',
-        confirmButtonColor: '#2563eb',
+        confirmButtonColor: '#262a31',
         width: '720px',
         focusCancel: true,
       });
@@ -611,13 +744,31 @@
     finally { busy = false; updateControls(); }
   });
   contents.addEventListener('click', event => {
+    const navItem = event.target.closest('[data-nav-indicator]');
+    if (navItem) {
+      const id = navItem.dataset.navIndicator;
+      contents.querySelectorAll('[data-indicator-list-row]').forEach(row => row.classList.toggle('active', row.dataset.indicatorListRow === id));
+      contents.querySelectorAll('[data-indicator-panel]').forEach(panel => { panel.hidden = panel.dataset.ruleIndicator !== id; });
+      return;
+    }
     if (!editing || busy) return;
     const existingTree = event.target.closest('[data-edit-rule-tree]');
     if (existingTree) {
       const card = existingTree.closest('[data-rule-indicator]');
-      const input = card.querySelector(`[data-rule-tree="${existingTree.dataset.editRuleTree}"]`);
-      void window.openIndicatorRuleEditor(JSON.parse(input.value), currentData.field_labels).then(tree => {
-        if (tree) { input.value = JSON.stringify(tree); captureDraft(); }
+      const section = existingTree.dataset.editRuleTree;
+      const input = card.querySelector(`[data-rule-tree="${section}"]`);
+      const host = card.querySelector(`[data-rule-editor-host="${section}"]`);
+      if (host.children.length) return;
+      existingTree.disabled = true;
+      window.openInlineRuleEditor(host, JSON.parse(input.value), currentData.field_labels, {
+        onApply: tree => {
+          input.value = JSON.stringify(tree);
+          const summary = card.querySelector(`[data-rule-summary="${section}"]`);
+          if (summary) summary.textContent = window.describeIndicatorRule(tree, currentData.field_labels);
+          existingTree.disabled = false;
+          captureDraft();
+        },
+        onCancel: () => { existingTree.disabled = false; },
       });
       return;
     }
@@ -651,7 +802,14 @@
     restoreDraft(key);
     updateDraftStatus();
   });
-  contents.addEventListener('input', () => { if (editing) captureDraft(); });
+  contents.addEventListener('input', event => {
+    if (editing) captureDraft();
+    if (event.target.matches('[data-description="name"]')) {
+      const id = event.target.dataset.indicator;
+      const listName = contents.querySelector(`[data-indicator-list-row="${id}"] .definition-list-name`);
+      if (listName) listName.textContent = event.target.value || '未命名';
+    }
+  });
   contents.addEventListener('change', event => {
     if (!editing) return;
     const row = event.target.closest('[data-new-condition]');
@@ -664,6 +822,10 @@
       row.querySelector('[data-new-value]').required = !range;
       row.querySelector('[data-new-min]').required = range;
       row.querySelector('[data-new-max]').required = range;
+    }
+    if (event.target.matches('[data-remove-indicator]')) {
+      const listRow = contents.querySelector(`[data-indicator-list-row="${event.target.value}"]`);
+      if (listRow) listRow.classList.toggle('removed', event.target.checked);
     }
     captureDraft();
   });

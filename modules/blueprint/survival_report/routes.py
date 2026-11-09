@@ -14,7 +14,7 @@ from zipfile import BadZipFile
 from modules.services.auth import login_required
 
 from .export_bundle import build_pptx_download
-from .case_recalculation import recalculate_cases
+from .case_recalculation import case_file_options, recalculate_cases
 from .job_store import JobNotFound, JobStore
 from .parser import UnsupportedSourceFormat, parse_survival_workbook
 from .report_builder import (
@@ -65,18 +65,39 @@ def index():
 @login_required
 def recalculate():
     result = error = None
+    hospital = start_year = end_year = None
     if request.method == "POST":
         upload = request.files.get("case_file")
+        hospital = request.form.get("hospital", "").strip()
+        start_year = request.form.get("start_year", type=int)
+        end_year = request.form.get("end_year", type=int)
         if not upload or Path(upload.filename).suffix.lower() != ".xlsx":
             error = "請選擇 .xlsx 個案清單。"
+        elif not hospital or start_year is None or end_year is None or not 1 <= start_year <= end_year <= 999:
+            error = "請選擇院所及有效的民國起訖年度。"
         else:
             try:
-                result = recalculate_cases(upload.stream)
+                result = recalculate_cases(upload.stream, hospital, start_year, end_year)
             except ValueError as exc:
                 error = str(exc)
             except (BadZipFile, InvalidFileException, KeyError, OSError):
                 error = "無法讀取此 Excel 檔案。"
-    return render_template("survival_report/recalculate.html", result=result, error=error), 400 if error else 200
+    return render_template("survival_report/recalculate.html", result=result, error=error,
+                           hospital=hospital, start_year=start_year, end_year=end_year), 400 if error else 200
+
+
+@survival_report_bp.post("/api/survival-report/case-options")
+@login_required
+def recalculate_options():
+    upload = request.files.get("case_file")
+    if not upload or Path(upload.filename).suffix.lower() != ".xlsx":
+        return jsonify(error="請選擇 .xlsx 個案清單。"), 400
+    try:
+        return jsonify(hospitals=case_file_options(upload.stream))
+    except ValueError as exc:
+        return jsonify(error=str(exc)), 400
+    except (BadZipFile, InvalidFileException, KeyError, OSError):
+        return jsonify(error="無法讀取此 Excel 檔案。"), 400
 
 
 @survival_report_bp.post("/api/survival-report/preview")

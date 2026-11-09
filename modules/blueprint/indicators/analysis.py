@@ -88,9 +88,10 @@ def build_indicators_export_frame(frame, cancers, year_start, year_end, cancer_l
         return candidate
 
     for cancer_key in selected:
-        metadata = get_indicator_metadata(cancer_key)
+        override_rules = (rules_by_cancer or {}).get(cancer_key)
+        metadata = get_indicator_metadata(cancer_key, rules=override_rules)
         definitions = get_indicator_definitions(cancer_key, metadata, oral_rules=oral_rules,
-                                                rule_override=(rules_by_cancer or {}).get(cancer_key))
+                                                rule_override=override_rules)
         definition_by_id = {int(item["id"]): item for item in definitions}
         indicator_ids = sorted(definition_by_id if rules_by_cancer is not None and cancer_key in rules_by_cancer else {
             *definition_by_id.keys(), *(int(item["id"]) for item in metadata),
@@ -153,9 +154,10 @@ def run_indicators_analysis(frame, cancers, year_start, year_end, oral_rules=Non
     selected = [str(key) for key in (cancers or []) if str(key).strip()]
     reports = []
     for cancer_key in selected:
-        metadata = get_indicator_metadata(cancer_key)
+        override_rules = (rules_by_cancer or {}).get(cancer_key)
+        metadata = get_indicator_metadata(cancer_key, rules=override_rules)
         definitions = get_indicator_definitions(cancer_key, metadata, oral_rules=oral_rules,
-                                                rule_override=(rules_by_cancer or {}).get(cancer_key))
+                                                rule_override=override_rules)
         if rules_by_cancer is not None and cancer_key in rules_by_cancer:
             active_ids = {item['id'] for item in definitions}
             metadata = [item for item in metadata if item['id'] in active_ids]

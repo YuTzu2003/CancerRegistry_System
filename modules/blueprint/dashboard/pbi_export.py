@@ -9,6 +9,7 @@ from pathlib import Path
 import pandas as pd
 
 from .definition.cancer_grouping import classify_cancer_group
+from modules.services.case_class_filter import exclude_case_class_h
 
 
 # The existing PBIX query expects registry names without numeric IDs.
@@ -77,7 +78,7 @@ def _get_source_columns(df):
 
 
 def _filter_selected_rows(df, columns, cancers, year_start, year_end, behavior):
-    result = df.copy()
+    result = exclude_case_class_h(df, columns.get("class_col"))
     year_col = columns.get("year_col")
     behavior_col = columns.get("behavior_col")
     site_col = columns["site_col"]

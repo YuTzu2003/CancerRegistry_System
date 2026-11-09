@@ -8,8 +8,6 @@ class IndicatorDefinitionExcelTests(unittest.TestCase):
     def setUp(self):
         self.original_specs = definition_excel.CANCER_SPECS
         definition_excel.CANCER_SPECS = {"Demo": object()}
-        self.original_metadata = definition_excel._metadata
-        definition_excel._metadata = lambda _key: {1: {}}
         self.definition = {
             "Demo": {
                 1: {
@@ -23,7 +21,6 @@ class IndicatorDefinitionExcelTests(unittest.TestCase):
 
     def tearDown(self):
         definition_excel.CANCER_SPECS = self.original_specs
-        definition_excel._metadata = self.original_metadata
 
     def test_template_round_trip_preserves_rules_and_imports_text(self):
         stream = definition_excel.build_definition_workbook(

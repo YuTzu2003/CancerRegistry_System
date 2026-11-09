@@ -14,7 +14,6 @@ from openpyxl.styles import Alignment, Border, Side, Font
 from openpyxl.utils import get_column_letter
 
 from modules.blueprint.indicators.catalog import CANCER_SPECS, get_cancer_label
-from modules.blueprint.indicators.indicator_definitions import get_indicator_metadata
 
 
 DISPLAY_SHEET = "指標定義"
@@ -32,8 +31,13 @@ def _text(value):
     return str(value or "").strip()
 
 
-def _metadata(cancer_key):
-    return {item["id"]: item for item in get_indicator_metadata(cancer_key)}
+def _metadata_from_rule(rule):
+    return {
+        "selection_reason": rule.get("selection_reason", ""),
+        "numerator_definition": rule.get("numerator_definition", ""),
+        "denominator_definition": rule.get("denominator_definition", ""),
+        "notes": rule.get("notes", ""),
+    }
 
 
 def _rule_summary(rule):
@@ -77,18 +81,18 @@ def build_definition_workbook(definition, *, version_name, version_description="
     )
     if sample:
         cancer_key, number, rule = sample
-        item = _metadata(cancer_key).get(number, {})
+        item = _metadata_from_rule(rule)
         sheet.append((
             get_cancer_label(cancer_key),
             number,
             {"positive": "正向指標", "negative": "負向指標", "observation": "觀察指標"}.get(rule.get("type"), rule.get("type", "")),
             rule.get("name", ""),
-            rule.get("selection_reason", item.get("selection_reason", "")),
-            rule.get("numerator_definition", item.get("numerator_definition", "")),
-            rule.get("denominator_definition", item.get("denominator_definition", "")),
+            item.get("selection_reason", ""),
+            item.get("numerator_definition", ""),
+            item.get("denominator_definition", ""),
             _rule_summary(rule.get("numerator")),
             _rule_summary(rule.get("denominator")),
-            rule.get("notes", item.get("notes", "")),
+            item.get("notes", ""),
         ))
 
     for row in sheet.iter_rows():

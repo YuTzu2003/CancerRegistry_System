@@ -139,7 +139,6 @@ class IndicatorVersionApiTests(unittest.TestCase):
         for patcher in (patch.object(service, 'get_conn', return_value=self.database),
                         patch.object(key_access, 'get_conn', return_value=self.database),
                         patch.object(service, 'write_audit_log'),
-                        patch.object(service, 'get_indicator_metadata', return_value=[]),
                         patch('modules.services.auth.current_session_user', side_effect=lambda: self.user)):
             patcher.start()
             self.addCleanup(patcher.stop)

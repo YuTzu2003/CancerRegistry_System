@@ -366,6 +366,8 @@ def parse_survival_workbook(path: Path, original_filename: str) -> ParsedWorkboo
             current = _cell(row, columns[column_key])
             if _CI_PATTERN.search(_clean_text(current)):
                 return current
+            if _YEAR_PATTERN.fullmatch(_clean_text(_cell(ci_row, columns["year"]))):
+                return None
             return _cell(ci_row, columns[column_key])
         analyzable, analyzable_status = _parse_int(_cell(row, columns["analyzable"]))
         censored, censored_status = _parse_int(_cell(row, columns["censored"]))

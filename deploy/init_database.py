@@ -13,7 +13,6 @@ MIGRATION_PATHS = (
     PROJECT_ROOT / "deploy" / "database" / "add_oral_indicator_rule_versions.sql",
     PROJECT_ROOT / "deploy" / "database" / "add_indicator_rule_versions.sql",
     PROJECT_ROOT / "deploy" / "database" / "add_indicator_definition_versions.sql",
-    PROJECT_ROOT / "deploy" / "database" / "add_indicator_analysis_runs.sql",
     PROJECT_ROOT / "deploy" / "database" / "20261031_add_histology_review_workflow.sql",
     PROJECT_ROOT / "deploy" / "database" / "20261031_add_branch_commit_changes.sql",
     PROJECT_ROOT / "deploy" / "database" / "20261101_add_indicator_definition_year.sql",

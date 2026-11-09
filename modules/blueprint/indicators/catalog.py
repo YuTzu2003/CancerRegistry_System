@@ -4,6 +4,7 @@ import pandas as pd
 from modules.blueprint.dashboard.definition.cancer_grouping import classify_cancer_group
 from modules.blueprint.dashboard.definition.cancer_group_rules import CANCER_GROUP_RULES
 from modules.blueprint.indicators.exclusion_rules import _clean_code, _find_column
+from modules.services.case_class_filter import is_case_class_h
 from modules.blueprint.indicators.cancer_indicator import (
     BREAST_CANCER_RULES,
     BLADDER_CANCER_RULES,
@@ -162,7 +163,11 @@ def _group_mask(frame: pd.DataFrame, spec: CancerSpec) -> pd.Series:
         keys = {cancer.get("group_key"), cancer.get("subgroup_key"), *cancer.get("ancestor_subgroup_keys", [])}
         return spec.group_key in keys
 
-    return frame.apply(matches, axis=1).fillna(False)
+    mask = frame.apply(matches, axis=1).fillna(False)
+    case_class_column = _find_column(frame.columns, "2.3", ("class",))
+    if case_class_column:
+        mask &= ~frame[case_class_column].map(is_case_class_h)
+    return mask.fillna(False)
 
 def cancer_case_mask(frame: pd.DataFrame, cancer_key: str) -> pd.Series:
     """Return cases eligible for the cancer type before shared exclusions."""
@@ -185,6 +190,8 @@ def cancer_case_mask(frame: pd.DataFrame, cancer_key: str) -> pd.Series:
         mask |= sites.str.startswith(spec.site_prefixes)
     if spec.require_case_class:
         mask &= frame[case_class_column].map(_clean_code).isin({"1", "2"})
+    if case_class_column:
+        mask &= ~frame[case_class_column].map(is_case_class_h)
     if spec.histology_include:
         return (mask & histology.isin(spec.histology_include)).fillna(False)
 

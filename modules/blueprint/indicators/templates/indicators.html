@@ -190,7 +190,6 @@
     <h1>癌症監測指標模組</h1>
     <p class="lead">依上傳資料、診斷年度與癌別，產製指標預覽與匯出資料。</p>
   </div>
-  <button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#indicatorAnalysisHistoryModal">????</button>
 </div>
 
 <section class="card-flat" style="margin-bottom: 22px;">
@@ -334,7 +333,6 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script src="/static/js/indicators/analysis_history.js"></script>
 <script>
 (() => {
   const returnStateStorageKey = 'indicators_return_state_v2';
@@ -1513,7 +1511,8 @@
                 indicator_no: button.dataset.indicatorNo,
                 direction: button.dataset.direction,
                 target_value: clearThreshold ? '' : valueInput.value.trim(),
-                target_operator: operatorInput.value
+                target_operator: operatorInput.value,
+                definition_version_id: definitionVersionSelect.value
               })
             });
             const report = reports.find((item) => String(item.cancer_key) === String(result.cancer_key));
@@ -1732,7 +1731,6 @@
       input.value, input.parentElement.querySelector('span').childNodes[0].textContent.trim()
     ]));
     const reports = result.reports || [];
-    const analysisRunId = result.analysis_run_id || reports.find((report) => report.analysis_run_id)?.analysis_run_id;
     currentIndicatorReports = reports;
     const availableKeys = reports.map(report => String(report.cancer_key || ''));
     if (!availableKeys.includes(activePreviewCancerKey)) activePreviewCancerKey = availableKeys[0] || null;
@@ -1807,10 +1805,7 @@
       </div></div>`;
     }).join('');
     preview.className = 'indicators-result';
-    const auditNote = analysisRunId
-      ? `<div class="small text-secondary mb-2">本次分析紀錄：#${escapeHtml(analysisRunId)}（已保存所用指標版本、完整規則快照與彙總結果）</div>`
-      : '';
-    preview.innerHTML = `${auditNote}${tabs}${panels}`;
+    preview.innerHTML = `${tabs}${panels}`;
     renderIndicatorCharts(reports);
     preview.querySelectorAll('[data-regenerate-indicators-narrative]').forEach((button) => {
       button.addEventListener('click', () => {

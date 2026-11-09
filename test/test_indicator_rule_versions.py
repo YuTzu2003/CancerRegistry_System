@@ -1,17 +1,14 @@
 import json
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pandas as pd
-from flask import Flask, session
-
 from modules.blueprint.indicators.catalog import CANCER_SPECS
 from modules.blueprint.indicators.analysis import build_indicators_export_frame, run_indicators_analysis
 from modules.blueprint.indicators.definition_versions import decode_definition, default_definition
-from modules.blueprint.indicators.rule_versions import apply_changes, default_rules, editable_conditions, load_version, next_revision_name, validate_rule_tree, build_user_indicator
+from modules.blueprint.indicators.rule_versions import apply_changes, default_rules, editable_conditions, next_revision_name, validate_rule_tree, build_user_indicator
 from modules.blueprint.indicators.rule import evaluate_rule
 from modules.blueprint.indicators.indicator_definitions import RULE_FIELD_LABELS, _calculator_for
-import modules.services.indicators as indicator_service
 
 
 class IndicatorRuleVersionTests(unittest.TestCase):
@@ -138,8 +135,7 @@ class IndicatorRuleVersionTests(unittest.TestCase):
         self.assertEqual(snapshot, {key: default_rules(key) for key in CANCER_SPECS})
 
         frame = pd.DataFrame({'record_id': ['case-1'], '2.5': ['20250101'], '4.1.4': ['50']})
-        with patch('modules.blueprint.indicators.analysis.get_indicator_metadata', return_value=[]), \
-             patch('modules.blueprint.indicators.analysis.cancer_case_mask', return_value=pd.Series([True])), \
+        with patch('modules.blueprint.indicators.analysis.cancer_case_mask', return_value=pd.Series([True])), \
              patch('modules.blueprint.indicators.analysis.apply_global_indicators_exclusions',
                    side_effect=lambda data, **_: (data, data, {})):
             for cancer_key in CANCER_SPECS:
@@ -153,70 +149,6 @@ class IndicatorRuleVersionTests(unittest.TestCase):
                         rules_by_cancer={cancer_key: snapshot[cancer_key]},
                     )
                     self.assertEqual(snapshot_result, python_result)
-
-    def test_analysis_run_snapshot_preserves_rules_results_and_target_thresholds(self):
-        app = Flask(__name__)
-        app.secret_key = 'test-key'
-        connection = Mock()
-        cursor = connection.cursor.return_value
-        cursor.fetchone.return_value = (42,)
-        rules = {'Oral_Cavity': default_rules('Oral_Cavity')}
-        result = {'reports': [{
-            'cancer_key': 'Oral_Cavity', 'input_count': 5, 'included_count': 4,
-            'global_exclusions': {'excluded_count': 1},
-            'indicators': [{'id': 1, 'name': 'Test', 'numerator': 2, 'denominator': 4,
-                            'percentage': 50.0, 'numerator_definition': 'N',
-                            'denominator_definition': 'D', 'target_value': 60,
-                            'target_operator': '>=', 'direction': 'positive'}],
-        }]}
-        with app.test_request_context('/'):
-            session['userid'] = 'test-user'
-            with patch.object(indicator_service, 'get_conn', return_value=connection):
-                run_id = indicator_service._record_indicator_analysis_run(
-                    cancers=['Oral_Cavity'], year_start=2025, year_end=2025,
-                    rules_by_cancer=rules,
-                    versions={'Oral_Cavity': {'id': 'default', 'name': '原始指標定義'}},
-                    result=result,
-                )
-        self.assertEqual(run_id, 42)
-        params = cursor.execute.call_args.args[1]
-        self.assertEqual(params[:6], ('test-user', 2025, 2025, '["Oral_Cavity"]', None, '原始指標定義'))
-        self.assertEqual(json.loads(params[6]), json.loads(json.dumps(rules)))
-        persisted_result = json.loads(params[7])
-        self.assertNotIn('source_rows', persisted_result)
-        saved_indicator = persisted_result['reports'][0]['indicators'][0]
-        self.assertEqual(saved_indicator['denominator'], 4)
-        self.assertEqual(saved_indicator['target_value'], 60)
-        self.assertEqual(saved_indicator['target_operator'], '>=')
-        self.assertFalse(saved_indicator['target_met'])
-        self.assertTrue(indicator_service._indicator_target_met(
-            {'target_value': 50, 'percentage': 50, 'direction': 'negative'}
-        ))
-        connection.commit.assert_called_once()
-        connection.close.assert_called_once()
-
-    def test_version_lookup_is_scoped_to_cancer(self):
-        connection = Mock()
-        cursor = connection.cursor.return_value
-        cursor.fetchone.return_value = None
-        with self.assertRaises(ValueError):
-            load_version('Breast', '7', lambda: connection)
-        self.assertEqual(cursor.execute.call_args.args[1], ('Breast', 7))
-        connection.close.assert_called_once()
-
-    def test_default_version_does_not_query_database(self):
-        factory = Mock(side_effect=AssertionError('Default should not use the database'))
-        rules, version = load_version('Lung', 'default', factory)
-        self.assertEqual(rules, CANCER_SPECS['Lung'].rules)
-        self.assertEqual(version['id'], 'default')
-
-    def test_loaded_snapshot_keeps_its_own_name_and_rules(self):
-        connection = Mock()
-        rules = default_rules('Breast')
-        connection.cursor.return_value.fetchone.return_value = ('Test version', json.dumps(rules))
-        loaded, version = load_version('Breast', '9', lambda: connection)
-        self.assertEqual(loaded, rules)
-        self.assertEqual(version, {'id': '9', 'name': 'Test version'})
 
     def test_nested_not_condition_can_be_edited_without_changing_its_parent(self):
         rules = {1: {'denominator': {'op': 'not', 'rule': {'op': 'between', 'field': 'value', 'min': 1, 'max': 5}},
@@ -237,8 +169,7 @@ class IndicatorRuleVersionTests(unittest.TestCase):
                         'denominator': {'op': 'between', 'field': '4.1.4', 'min': minimum, 'max': 90},
                         'numerator': {'op': 'equals', 'field': '4.1.4', 'value': 40}}}
         selected = {'Oral_Cavity': rules(40), 'Breast': rules(30)}
-        with patch('modules.blueprint.indicators.analysis.get_indicator_metadata', return_value=[]), \
-             patch('modules.blueprint.indicators.analysis.cancer_case_mask', side_effect=lambda data, cancer: data['cancer'].eq(cancer)), \
+        with patch('modules.blueprint.indicators.analysis.cancer_case_mask', side_effect=lambda data, cancer: data['cancer'].eq(cancer)), \
              patch('modules.blueprint.indicators.analysis.apply_global_indicators_exclusions', side_effect=lambda data, **_: (data, data, {})):
             result = run_indicators_analysis(frame, list(selected), 2025, 2025, rules_by_cancer=selected)
             exported = build_indicators_export_frame(frame, list(selected), 2025, 2025, rules_by_cancer=selected)
@@ -252,9 +183,7 @@ class IndicatorRuleVersionTests(unittest.TestCase):
         rules = default_rules('Oral_Cavity')
         removed = next(iter(rules))
         del rules[removed]
-        metadata = [{'id': removed, 'numerator_definition': '', 'denominator_definition': ''}]
-        with patch('modules.blueprint.indicators.analysis.get_indicator_metadata', return_value=metadata), \
-             patch('modules.blueprint.indicators.analysis.cancer_case_mask', return_value=pd.Series([True])), \
+        with patch('modules.blueprint.indicators.analysis.cancer_case_mask', return_value=pd.Series([True])), \
              patch('modules.blueprint.indicators.analysis.apply_global_indicators_exclusions', side_effect=lambda data, **_: (data, data, {})):
             result = run_indicators_analysis(frame, ['Oral_Cavity'], 2025, 2025, rules_by_cancer={'Oral_Cavity': rules})
             exported = build_indicators_export_frame(frame, ['Oral_Cavity'], 2025, 2025, rules_by_cancer={'Oral_Cavity': rules})

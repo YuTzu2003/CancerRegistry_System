@@ -11,6 +11,45 @@ def default_definition():
     return {key: default_rules(key) for key in CANCER_SPECS}
 
 
+def _merge_system_metadata(rules, connection_factory):
+    """Overlay legacy database descriptions onto the built-in system rules."""
+    conn = connection_factory()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            'SELECT cancer_group_key, indicator_no, selection_reason, numerator_definition, '
+            'denominator_definition, notes, target_value, target_operator '
+            'FROM dbo.Indicator_definition_metadata'
+        )
+        for row in cursor.fetchall():
+            cancer_key, indicator_no = str(row[0]), int(row[1])
+            rule = rules.get(cancer_key, {}).get(indicator_no)
+            if rule is None:
+                continue
+            # Use database rationale and notes where present. Fill blank
+            # definitions while preserving any newer, explicitly authored
+            # system wording (for example, corrected oral-cavity definitions).
+            for field, value in (
+                ('selection_reason', row[2]),
+                ('notes', row[5]),
+            ):
+                if value is not None and str(value).strip():
+                    rule[field] = str(value).strip()
+            for field, value in (
+                ('numerator_definition', row[3]),
+                ('denominator_definition', row[4]),
+            ):
+                if not str(rule.get(field) or '').strip() and value is not None and str(value).strip():
+                    rule[field] = str(value).strip()
+            if rule.get('target_value') is None and row[6] is not None:
+                rule['target_value'] = float(row[6])
+            if not rule.get('target_operator') and row[7]:
+                rule['target_operator'] = str(row[7]).strip()
+    finally:
+        conn.close()
+    return rules
+
+
 def decode_definition(raw):
     data = json.loads(raw)
     if not isinstance(data, dict) or not data or any(key not in CANCER_SPECS for key in data):
@@ -36,7 +75,7 @@ def decode_definition(raw):
 
 def load_definition(version_id, connection_factory, *, allow_unpublished=False):
     if version_id in (None, '', 'default'):
-        rules = default_definition()
+        rules = _merge_system_metadata(default_definition(), connection_factory)
         return rules, {
             'id': 'default', 'name': '115 年度指標定義（系統基準）', 'description': '系統內建的 115 年度指標規則。',
             'definition_year': None, 'status': 'PUBLISHED', 'cancers': list(rules), 'immutable': True,

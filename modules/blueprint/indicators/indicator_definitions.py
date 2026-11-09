@@ -163,40 +163,27 @@ def _calculator_for(rule):
     return calculator
 
 
-def _metadata_by_indicator(cancer_key):
-    from modules.services.db import get_conn
-
-    conn = get_conn()
-    try:
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            SELECT indicator_no, selection_reason, numerator_definition,
-                   denominator_definition, notes, target_value, target_operator
-            FROM dbo.Indicator_definition_metadata
-            WHERE cancer_group_key = ?
-            """,
-            (str(cancer_key or ""),),
-        )
-        return {
-            int(row[0]): {
-                "selection_reason": row[1] or "",
-                "numerator_definition": row[2] or "",
-                "denominator_definition": row[3] or "",
-                "notes": row[4] or "",
-                "target_value": float(row[5]) if row[5] is not None else None,
-                "target_operator": row[6] or "",
-            }
-            for row in cursor.fetchall()
+def _metadata_from_rules(rules):
+    """Extract metadata fields from indicator rules (already embedded in rules_json)."""
+    return {
+        int(number): {
+            "selection_reason": rule.get("selection_reason", ""),
+            "numerator_definition": rule.get("numerator_definition", ""),
+            "denominator_definition": rule.get("denominator_definition", ""),
+            "notes": rule.get("notes", ""),
+            "target_value": rule.get("target_value"),
+            "target_operator": rule.get("target_operator", ""),
         }
-    finally:
-        conn.close()
+        for number, rule in rules.items()
+    }
 
 
-def get_indicator_metadata(cancer_key):
+def get_indicator_metadata(cancer_key, rules=None):
+    if rules is None:
+        rules = RULES_BY_CANCER.get(str(cancer_key or ""), {})
     return [
-        {"id": number, **definition}
-        for number, definition in sorted(_metadata_by_indicator(cancer_key).items())
+        {"id": number, **meta}
+        for number, meta in sorted(_metadata_from_rules(rules).items())
     ]
 
 
@@ -207,7 +194,7 @@ def get_indicator_definitions(cancer_key, metadata=None, oral_rules=None, rule_o
     if rule_override is not None:
         rules = rule_override
     if metadata is None:
-        metadata = _metadata_by_indicator(cancer_key)
+        metadata = _metadata_from_rules(rules)
     elif isinstance(metadata, list):
         metadata = {
             definition["id"]: {
@@ -224,8 +211,8 @@ def get_indicator_definitions(cancer_key, metadata=None, oral_rules=None, rule_o
             "numerator_definition": rule.get('numerator_definition', metadata.get(number, {}).get('numerator_definition', '')) or '依已設定的分子規則計算。',
             "denominator_definition": rule.get('denominator_definition', metadata.get(number, {}).get('denominator_definition', '')) or '依已設定的分母規則計算。',
             "notes": rule.get('notes', metadata.get(number, {}).get('notes', '')),
-            "target_value": metadata.get(number, {}).get("target_value"),
-            "target_operator": metadata.get(number, {}).get("target_operator", "") or ("<=" if rule["type"] == "negative" else ">="),
+            "target_value": rule.get("target_value", metadata.get(number, {}).get("target_value")),
+            "target_operator": rule.get("target_operator", metadata.get(number, {}).get("target_operator", "")) or ("<=" if rule["type"] == "negative" else ">="),
             "calculator": _calculator_for(rule),
         }
         for number, rule in sorted(rules.items())
