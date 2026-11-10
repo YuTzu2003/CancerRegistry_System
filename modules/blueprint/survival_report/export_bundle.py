@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Callable, Sequence
 from zipfile import ZIP_DEFLATED, ZipFile
 
-from .models import ReportDeck
+from .models import ReportBatch, ReportDeck
 from .pptx_exporter import build_presentation
 
 
@@ -41,6 +41,17 @@ def _deck_filename(deck: ReportDeck, suffix: str) -> str:
     ) or "未命名醫院"
     return _safe_filename(
         f"{deck.period_start}-{deck.period_end}_{hospital}_存活率報表{suffix}"
+    )
+
+
+def _comparison_filename(base: ReportDeck, comparison: ReportDeck) -> str:
+    hospital = "、".join(
+        _filename_hospital_name(name) for name in base.hospital_names
+    ) or "未命名醫院"
+    return _safe_filename(
+        f"{base.period_start}-{base.period_end}_vs_"
+        f"{comparison.period_start}-{comparison.period_end}_"
+        f"{hospital}_存活率比較報表.pptx"
     )
 
 
@@ -83,11 +94,25 @@ def _package(
 
 
 def build_pptx_download(
-    decks: Sequence[ReportDeck],
+    batch: ReportBatch,
     template_path: Path,
 ) -> DownloadArtifact:
+    if batch.year_comparison.enabled:
+        comparison_decks = batch.comparison_decks
+        if not comparison_decks:
+            raise ValueError("找不到年份比較所需的期間。")
+        base, comparison = comparison_decks
+        return DownloadArtifact(
+            build_presentation(
+                base,
+                template_path,
+                comparison_deck=comparison,
+            ),
+            PPTX_MIMETYPE,
+            _comparison_filename(base, comparison),
+        )
     return _package(
-        decks,
+        batch.selected_decks,
         ".pptx",
         PPTX_MIMETYPE,
         "存活率報表.zip",

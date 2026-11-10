@@ -156,10 +156,24 @@ def get_chart_insight_logic(data):
                 10. This is an annual analysis, not a year-to-year comparison. Describe only
                     the selected year's data (or the selected range as a whole). Do not
                     compare different years or mention changes from previous years.
-                11. For sex-related data, mention special sex categories (such as intersex,
-                    transgender, other, or unknown) only when the supplied data explicitly
-                    gives that category a count greater than zero. Do not describe absent
-                    or zero-count categories as "not recorded" or "no cases".
+                11. [Sex category rule — STRICT]
+                    The supplied data only contains counts for male (男) and female (女).
+                    Treat sex analysis as a male/female-only topic by default.
+                    You MUST NOT mention, list, enumerate, or reference any of the following
+                    categories unless the supplied data explicitly contains a numeric field
+                    for that category with a value strictly greater than zero:
+                      - 雙性人 / 雙性人或其他 / intersex / other
+                      - 變性人 / transgender
+                      - 性別不詳 / 不詳 / unknown
+                    Specifically forbidden phrases (never output these or any paraphrase):
+                      "雙性人或其他、變性人及性別不詳的數據在本年度未記錄"
+                      "雙性人、變性人、性別不詳未記錄"
+                      "沒有雙性人／變性人／性別不詳的個案"
+                      "intersex / transgender / unknown ... not recorded"
+                      "no cases of intersex / transgender / unknown"
+                    Do NOT state that these categories are absent, zero, not recorded,
+                    未記錄, 無資料, 無個案, or any equivalent. Simply omit them entirely.
+                    Write as if these categories do not exist in the dataset.
         """
 
     try:
@@ -245,6 +259,14 @@ def get_compare_insight_logic(data):
                 5. Keep each language version within 160 words.
                 6. Return valid JSON only, without markdown or explanatory text, using exactly:
                    {{"zh-TW": "Traditional Chinese narrative", "en": "English narrative"}}
+                7. [Sex category rule — STRICT]
+                   Sex analysis in the supplied datasets only contains male (男) and
+                   female (女) counts. You MUST NOT mention 雙性人、雙性人或其他、變性人、
+                   性別不詳, intersex, transgender, other, or unknown unless BOTH datasets
+                   explicitly supply a numeric field for that category and at least one
+                   side's value is strictly greater than zero. Never state that these
+                   categories are absent, zero, 未記錄, 無資料, 無個案, "not recorded", or
+                   "no cases". Simply omit them entirely — write as if they do not exist.
                 {histology_no_data_instruction}
             """
 
