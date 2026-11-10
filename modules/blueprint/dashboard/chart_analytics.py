@@ -11,6 +11,7 @@ from modules.blueprint.dashboard.definition.histology_code_mapping import (
     resolve_histology_code,
     should_append_in_situ,
 )
+from modules.services.case_class_filter import exclude_case_class_h
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 DASHBOARD_DATA = f"{BASE_DIR}/tasks/dashboard"
@@ -131,7 +132,7 @@ def _query_year_range_outside_data(df, cols, year_start, year_end):
     return query_start < data_start or query_end > data_end
 
 def filter_dashboard_data(df, cols, cancers=[], year_start="", year_end="", behavior=""):
-    df = df.copy()
+    df = exclude_case_class_h(df, cols.get("class_col"))
 
     # --- 年份篩選 ---
     year_col = cols["year_col"]
@@ -684,6 +685,9 @@ def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", beh
     try:
         source_df = source_df if source_df is not None else _read_dashboard_excel(filename)
         cols = cols or get_column_names(source_df)
+        source_df = exclude_case_class_h(source_df, cols.get("class_col"))
+        if filtered_df is not None:
+            filtered_df = exclude_case_class_h(filtered_df, cols.get("class_col"))
 
         no_data_message = "依目前選擇的年度、癌別與性態碼查無符合個案，無法產生分析結果。"
         if _query_year_range_outside_data(source_df, cols, year_start, year_end):
@@ -787,6 +791,7 @@ def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", beh
 def get_dashboard_file_years(filename, source_df=None, cols=None):
     df = source_df if source_df is not None else _read_dashboard_excel(filename)
     cols = cols or get_column_names(df)
+    df = exclude_case_class_h(df, cols.get("class_col"))
     years = _diagnosis_years(df, cols.get("year_col"))
     years = years[(years >= 1900) & (years <= 2100)]
     return sorted(years.astype(int).unique().tolist())
@@ -817,12 +822,14 @@ def summarize_dashboard_file(filename, behavior="", cancers=None, year_start="",
                              source_df=None, cols=None, filtered_df=None):
     df = source_df if source_df is not None else _read_dashboard_excel(filename)
     cols = cols or get_column_names(df)
+    df = exclude_case_class_h(df, cols.get("class_col"))
     years = get_dashboard_file_years(filename, df, cols)
     year_start = str(year_start or years[0]) if years else ""
     year_end = str(year_end or year_start) if years else ""
     filtered_df = filtered_df if filtered_df is not None else filter_dashboard_data(
         df, cols, cancers or [], year_start, year_end, behavior
     )
+    filtered_df = exclude_case_class_h(filtered_df, cols.get("class_col"))
     age_data = calculate_age_median(filtered_df, cols)
     case_data = calculate_analyzable_confirmed_cases(filtered_df, cols)
     filtered_years = _diagnosis_years(filtered_df, cols.get("year_col"))

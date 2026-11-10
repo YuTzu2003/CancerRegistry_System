@@ -5,6 +5,14 @@
 <link rel="stylesheet" href="{{ url_for('survival_report.static', filename='css/survival_report.css') }}">
 {% endblock %}
 {% macro percent(value) %}{{ '%.2f%%'|format(value * 100) if value is not none else '無法估計' }}{% endmacro %}
+{% macro adjusted_cell(sr) %}
+<td rowspan="{{ sr.yearly|length }}" class="recalc-td-adjusted">
+  {% if sr.adjusted is not none %}
+    {{ '%.2f'|format(sr.adjusted * 100) }}
+    {% if sr.adjusted_ci %}<br>({{ '%.2f'|format(sr.adjusted_ci[0] * 100) }}, {{ '%.2f'|format(sr.adjusted_ci[1] * 100) }}){% endif %}
+  {% else %}-{% endif %}
+</td>
+{% endmacro %}
 {% block content %}
 <section class="survival-module survival-recalc">
   <a href="{{ url_for('survival_report.index') }}" class="recalc-back"><i class="bi bi-arrow-left"></i> 返回存活率模組</a>
@@ -14,7 +22,7 @@
     <div class="recalc-hero__text">
       <span class="recalc-badge">存活率試算</span>
       <h1>個案清單重算與對帳</h1>
-      <p>院所 0439010518 · 民國 108～112 年 · 17 種癌別</p>
+      <p>{% if result %}院所 {{ hospital }} · 民國 {{ start_year }}～{{ end_year }} 年{% else %}上傳清單後選擇院所與民國診斷年度。{% endif %}</p>
     </div>
   </header>
 
@@ -33,7 +41,13 @@
         <small id="recalc-file-name">尚未選擇檔案</small>
         <input id="case-file" name="case_file" type="file" accept=".xlsx" required>
       </label>
-      <button class="recalc-submit-btn" type="submit"><i class="bi bi-arrow-repeat"></i> 重算並核對</button>
+      <div class="row g-2" id="recalc-filters" data-options-url="{{ url_for('survival_report.recalculate_options') }}" hidden>
+        <div class="col-sm"><label for="recalc-hospital" class="form-label">院所</label><select id="recalc-hospital" name="hospital" class="form-select" required></select></div>
+        <div class="col-sm"><label for="recalc-start-year" class="form-label">民國起年</label><select id="recalc-start-year" name="start_year" class="form-select" required></select></div>
+        <div class="col-sm"><label for="recalc-end-year" class="form-label">民國迄年</label><select id="recalc-end-year" name="end_year" class="form-select" required></select></div>
+      </div>
+      <p id="recalc-file-status" role="status"></p>
+      <button class="recalc-submit-btn" type="submit" disabled><i class="bi bi-arrow-repeat"></i> 重算並核對</button>
     </div>
     {% if error %}<p class="recalc-error" role="alert"><i class="bi bi-exclamation-triangle"></i> {{ error }}</p>{% endif %}
   </form>
@@ -50,7 +64,8 @@
     {% endfor %}
   </nav>
 
-  <p class="recalc-note"><i class="bi bi-info-circle"></i> 年齡組未滿 10 人時，試算優先往較高年齡組合併，末組則向前合併。</p>
+  <p class="recalc-note"><i class="bi bi-info-circle"></i> 細分類可能與合計重疊，請分開對照回饋表。系統以所選起始診斷年度的分齡個案數判斷併組，未滿 10 人時優先往較高年齡組合併，末組則向前合併。</p>
+  <p class="recalc-note">年齡調整後的 95% CI 以各年齡組 Greenwood 標準誤加權平方和開根號試算。口腔癌有年齡組追蹤不足 60 個月時，試算會沿用該組最後的 KM 估計。</p>
 
   {% for cancer, system_groups in result %}
   {% set first_stages = system_groups[0][1] if system_groups else [] %}
@@ -76,7 +91,7 @@
             <th rowspan="2">期別人數<br>(可分析<br>個案數)</th>
             <th rowspan="2">設限<br>個案數</th>
             <th rowspan="2">死亡<br>個案數</th>
-            <th colspan="2">民國 108～112 年之 1-5 年觀察存活率</th>
+            <th colspan="2">民國 {{ start_year }}～{{ end_year }} 年之 1–5 年觀察存活率</th>
           </tr>
           <tr>
             <th>觀察存活率%<br>95% CI</th>
@@ -85,9 +100,8 @@
         </thead>
         <tbody>
         {% for staging_system, stages in system_groups %}
-        {% set sys_total = stages[0].included if stages and stages[0].stage == 'all' else 0 %}
         {% set ns = namespace(total_known=0) %}
-        {% for sr in stages if sr.stage not in ('all', '999') %}
+        {% for sr in stages if sr.stage not in ('all', '999', '2A', '2B', '3A', '3B', '3C', '4M0', '4M1', '0+A') %}
           {% set ns.total_known = ns.total_known + sr.included %}
         {% endfor %}
         {% for sr in stages if sr.stage not in ('all', '999') %}
@@ -100,25 +114,22 @@
               {% if ns.total_known > 0 %}
               <div>({{ '%.2f'|format(sr.included / ns.total_known * 100) }}%)</div>
               {% endif %}
-              {% if ns.total_known != sys_total and sys_total > 0 %}
-              <div class="recalc-pct-alt">[含不詳 {{ '%.2f'|format(sr.included / sys_total * 100) }}%]</div>
-              {% endif %}
               {% if sr.median_months is not none %}<div>({{ sr.median_months }}月)</div>{% endif %}
             </td>
             {% endif %}
             <td class="recalc-td-ajcc">{{ staging_system }}</td>
             {% if staging_system == 'BCLC' %}
-            <td class="recalc-td-stage">{{ {'0':'0期','A':'A期','B':'B期','C':'C期','D':'D期','999':'不詳'}[sr.stage] }}</td>
+            <td class="recalc-td-stage">{{ sr.stage }}期</td>
             {% else %}
-            <td class="recalc-td-stage">{{ {'1':'第1期','2':'第2期','3':'第3期','4':'第4期','999':'不詳'}[sr.stage] }}</td>
+            <td class="recalc-td-stage">第{{ sr.stage }}期</td>
             {% endif %}
             <td>{{ loop.index }}年</td>
             <td>{{ row.n_start }}</td>
             <td>{{ row.censored }}</td>
             <td>{{ row.deaths }}</td>
-            <td class="recalc-td-rate">{% if row.rate is not none %}{{ '%.2f'|format(row.rate * 100) }}<br><span class="recalc-ci-text">({{ '%.2f'|format(row.ci_lower * 100) }}, {{ '%.2f'|format(row.ci_upper * 100) }})</span>{% else %}-{% endif %}</td>
+            <td class="recalc-td-rate">{% if row.rate is not none %}{{ '0.00%' if row.rate == 0 else '%.2f'|format(row.rate * 100) }}{% if row.ci_lower is not none and row.ci_upper is not none %}<br><span class="recalc-ci-text">({{ '%.2f'|format(row.ci_lower * 100) }}, {{ '%.2f'|format(row.ci_upper * 100) }})</span>{% endif %}{% else %}-{% endif %}</td>
             {% if loop.first %}
-            <td rowspan="{{ sr.yearly|length }}" class="recalc-td-adjusted">{% if sr.adjusted is not none %}{{ '%.2f'|format(sr.adjusted * 100) }}{% else %}-{% endif %}</td>
+            {{ adjusted_cell(sr) }}
             {% endif %}
           </tr>
           {% endfor %}
@@ -141,9 +152,9 @@
             <td>{{ row.n_start }}</td>
             <td>{{ row.censored }}</td>
             <td>{{ row.deaths }}</td>
-            <td class="recalc-td-rate">{% if row.rate is not none %}{{ '%.2f'|format(row.rate * 100) }}<br><span class="recalc-ci-text">({{ '%.2f'|format(row.ci_lower * 100) }}, {{ '%.2f'|format(row.ci_upper * 100) }})</span>{% else %}-{% endif %}</td>
+            <td class="recalc-td-rate">{% if row.rate is not none %}{{ '0.00%' if row.rate == 0 else '%.2f'|format(row.rate * 100) }}{% if row.ci_lower is not none and row.ci_upper is not none %}<br><span class="recalc-ci-text">({{ '%.2f'|format(row.ci_lower * 100) }}, {{ '%.2f'|format(row.ci_upper * 100) }})</span>{% endif %}{% else %}-{% endif %}</td>
             {% if loop.first %}
-            <td rowspan="{{ all_sr.yearly|length }}" class="recalc-td-adjusted">{% if all_sr.adjusted is not none %}{{ '%.2f'|format(all_sr.adjusted * 100) }}{% else %}-{% endif %}</td>
+            {{ adjusted_cell(all_sr) }}
             {% endif %}
           </tr>
           {% endfor %}
@@ -156,7 +167,7 @@
     </div>
   </details>
   {% endfor %}
-  <script src="{{ url_for('survival_report.static', filename='js/survival_recalculate.js') }}" defer></script>
   {% endif %}
+  <script src="{{ url_for('survival_report.static', filename='js/survival_recalculate.js') }}" defer></script>
 </section>
 {% endblock %}

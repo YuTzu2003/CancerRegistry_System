@@ -5,15 +5,62 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/auth/branch_version.css') }}">
 {% endblock %}
 {% block content %}
-<div class="page-head d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3"><div><h1>{{ title }}</h1><p class="lead mb-0">{{ description }}</p></div><a class="btn btn-outline-dark" href="{{ back_url }}"><i class="bi bi-arrow-left me-1"></i>返回資料頁</a></div>
+<div class="page-head d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+  <div><h1>{{ title }}</h1><p class="lead mb-0">{{ description }}</p></div>
+  <a class="btn btn-outline-dark" href="{{ back_url }}"><i class="bi bi-arrow-left me-1"></i>返回資料頁</a>
+</div>
 <section class="card-flat commit-ledger"><div class="section-body">
-  <div class="commit-ledger__toolbar"><span class="commit-ledger__branch"><i class="bi bi-diagram-3"></i>版本紀錄</span>{% if show_filters %}<form class="commit-ledger__filters" method="get"><label class="commit-ledger__filter"><i class="bi bi-person"></i><select name="user_id" onchange="this.form.submit()"><option value="">所有操作者</option>{% for user in users %}<option value="{{ user.id }}" {% if selected_user_id == user.id %}selected{% endif %}>{{ user.name }}</option>{% endfor %}</select></label><label class="commit-ledger__filter"><i class="bi bi-calendar3"></i><input type="date" name="date" value="{{ selected_date }}" onchange="this.form.submit()"></label>{% if selected_user_id or selected_date %}<a class="commit-ledger__clear" href="{{ url_for(version_endpoint) }}">清除篩選</a>{% endif %}</form>{% endif %}</div>
+  <div class="commit-ledger__toolbar">
+    <span class="commit-ledger__branch"><i class="bi bi-diagram-3"></i>版本紀錄</span>
+    {% if show_filters %}<form class="commit-ledger__filters" method="get">
+      <label class="commit-ledger__filter"><i class="bi bi-person"></i><select name="user_id" onchange="this.form.submit()"><option value="">所有操作者</option>{% for user in users %}<option value="{{ user.id }}" {% if selected_user_id == user.id %}selected{% endif %}>{{ user.name }}</option>{% endfor %}</select></label>
+      <label class="commit-ledger__filter"><i class="bi bi-calendar3"></i><input type="date" name="date" value="{{ selected_date }}" onchange="this.form.submit()"></label>
+      {% if selected_user_id or selected_date %}<a class="commit-ledger__clear" href="{{ url_for(version_endpoint) }}">清除篩選</a>{% endif %}
+    </form>{% endif %}
+  </div>
   {% for version in versions %}
-    {% if loop.first or version.CreatedAt.date() != loop.previtem.CreatedAt.date() %}<section class="commit-day"><div class="commit-day__label"><span class="commit-day__node"><i class="bi bi-dot"></i></span>{{ version.CreatedAt.strftime('%Y 年 %m 月 %d 日') if version.CreatedAt else '日期未記錄' }}</div>{% endif %}
-    <article class="commit-card"><div><h2 class="commit-card__title">{{ version.Info or ('回到先前版本狀態' if version.Action == 'Revert' else '更新資料版本') }}</h2><div class="commit-card__meta"><span><i class="bi bi-person me-1"></i>{{ version.CreatedByName or version.CreatedByUserID }}</span><span><i class="bi bi-clock me-1"></i>{{ version.CreatedAt.strftime('%H:%M') if version.CreatedAt else '—' }}</span><span><i class="bi bi-pencil-square me-1"></i>{{ version.ChangeCount }} 筆異動</span><span title="父版本">父版本：<code>{{ version.ParentCommitId or '初始版本' }}</code></span></div></div>
-      <div class="commit-card__actions"><span class="commit-card__commit-id" title="{{ version.CommitId }}">{{ (version.CommitId|string)[:7] }}</span><a class="btn btn-sm btn-outline-secondary commit-card__action-icon" href="{{ url_for(preview_endpoint, version_id=version.CommitId) }}" title="預覽此版本"><i class="bi bi-file-earmark-text"></i></a>{% if version.RevertUntil and version.RevertUntil >= now %}<form method="post" action="{{ url_for(restore_endpoint, version_id=version.CommitId) }}"><button class="btn btn-sm btn-outline-secondary commit-card__action-icon" type="submit" onclick="return confirm('確定要回復到此版本嗎？回復後請儲存目前版本。');" title="回到此時間點"><i class="bi bi-arrow-counterclockwise"></i></button></form>{% else %}<span class="commit-card__deadline">已超過可還原期限</span>{% endif %}</div>
+    {% if loop.first or version.CreatedAt.date() != loop.previtem.CreatedAt.date() %}<section class="commit-day"><div class="commit-day__label"><span class="commit-day__node"><i class="bi bi-dot"></i></span>{{ version.CreatedAt.strftime('%Y 年 %m 月 %d 日') if version.CreatedAt else '未知日期' }}</div>{% endif %}
+    <article class="commit-card">
+      <div>
+        <h2 class="commit-card__title">{{ version.Info or ('恢復版本' if version.Action == 'Revert' else '資料版本更新') }}</h2>
+        <div class="commit-card__meta">
+          <span><i class="bi bi-person me-1"></i>{{ version.CreatedByName or version.CreatedByUserID }}</span>
+          <span><i class="bi bi-clock me-1"></i>{{ version.CreatedAt.strftime('%H:%M') if version.CreatedAt else '--:--' }}</span>
+          <span><i class="bi bi-pencil-square me-1"></i>{{ version.ChangeCount }} 筆變更</span>
+          {% if show_review_workflow %}
+            {% if version.ReviewStatus == 'Pending' %}<span class="badge text-bg-warning">待審核</span>
+            {% elif version.ReviewStatus == 'Approved' %}<span class="badge text-bg-success">已啟用</span>
+            {% else %}<span class="badge text-bg-secondary">已退回</span>{% endif %}
+            {% if version.ReviewedAt %}<span><i class="bi bi-person-check me-1"></i>{{ version.ReviewedByName or '管理員' }}・{{ version.ReviewedAt.strftime('%m/%d %H:%M') }}</span>{% endif %}
+          {% endif %}
+        </div>
+      </div>
+      <div class="commit-card__actions">
+        {% if not show_review_workflow or version.ReviewStatus == 'Approved' %}
+          <a class="btn btn-sm btn-outline-secondary commit-card__action-icon" href="{{ url_for(preview_endpoint, version_id=version.CommitId) }}" title="查看版本內容"><i class="bi bi-file-earmark-text"></i></a>
+          {% if version.RevertUntil and version.RevertUntil >= now %}<form class="commit-restore-form" method="post" action="{{ url_for(restore_endpoint, version_id=version.CommitId) }}"><button class="btn btn-sm btn-outline-secondary commit-card__action-icon" type="submit" title="恢復至此版本"><i class="bi bi-arrow-counterclockwise"></i></button></form>{% endif %}
+        {% endif %}
+        {% if show_review_workflow and can_approve and version.ReviewStatus == 'Pending' %}
+          <a class="btn btn-sm btn-outline-secondary commit-card__action-icon" href="{{ url_for(preview_endpoint, version_id=version.CommitId) }}" title="審核前預覽"><i class="bi bi-file-earmark-text"></i></a>
+          <form class="commit-approve-form" method="post" action="{{ url_for(approval_endpoint, version_id=version.CommitId) }}"><button class="btn btn-sm btn-success" type="submit"><i class="bi bi-check-lg me-1"></i>核准並啟用</button></form>
+          <form class="commit-reject-form" method="post" action="{{ url_for(rejection_endpoint, version_id=version.CommitId) }}"><button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-x-lg me-1"></i>退回</button></form>
+        {% endif %}
+      </div>
     </article>
     {% if loop.last or version.CreatedAt.date() != loop.nextitem.CreatedAt.date() %}</section>{% endif %}
-  {% else %}<div class="commit-ledger__empty"><i class="bi bi-bookmark fs-4 d-block mb-2"></i>尚未儲存任何版本。</div>{% endfor %}
+  {% else %}<div class="commit-ledger__empty"><i class="bi bi-bookmark fs-4 d-block mb-2"></i>目前沒有已送出的版本。</div>{% endfor %}
 </div></section>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+  document.querySelectorAll('.commit-restore-form').forEach(form => {
+    form.addEventListener('submit', async event => { event.preventDefault(); const result = await window.utils.confirm('確定要恢復至此版本嗎？恢復後仍需儲存，才會送出新的待審核版本。', '恢復版本'); if (result.isConfirmed) form.submit(); });
+  });
+  document.querySelectorAll('.commit-approve-form').forEach(form => {
+    form.addEventListener('submit', async event => { event.preventDefault(); const result = await window.utils.confirm('核准後將立即套用到正式組織型態資料，確定要繼續嗎？', '核准並啟用'); if (result.isConfirmed) form.submit(); });
+  });
+  document.querySelectorAll('.commit-reject-form').forEach(form => {
+    form.addEventListener('submit', async event => { event.preventDefault(); const result = await window.utils.confirm('確定要退回此版本嗎？正式資料不會變更。', '退回版本'); if (result.isConfirmed) form.submit(); });
+  });
+</script>
 {% endblock %}

@@ -14,9 +14,10 @@
         <p class="data-access__eyebrow">資料維護授權</p>
         <h1 class="data-access__title" id="dataAccessTitle">先驗證，再選擇更新內容。</h1>
       </div>
-      <p class="data-access__note">同一份授權可用於組織型態與全國資料；進入後再選擇本次要維護的資料。</p>
+      <p class="data-access__note">同一份授權可用於報表分析與指標模組的資料維護。</p>
     </div>
     <form class="data-access__form" method="post" action="{{ url_for('auth.verify_data_update_access') }}">
+      {% for name, value in (access_destination or {}).items() %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
       <div class="d-flex align-items-center gap-3">
         <div class="data-access__icon" aria-hidden="true"><i class="bi bi-key"></i></div>
         <h2>輸入授權金鑰</h2>
@@ -25,7 +26,7 @@
       <div>
         <label class="form-label fw-semibold" for="data-update-api-key">授權金鑰</label>
         <input id="data-update-api-key" name="api_key" class="form-control data-access__input" type="password" autocomplete="off" aria-describedby="dataAccessHelp" required autofocus>
-        <div class="form-text" id="dataAccessHelp">驗證成功後會進入資料更新選擇頁。</div>
+        <div class="form-text" id="dataAccessHelp">驗證成功後會進入要維護的頁面。</div>
       </div>
       <button class="btn btn-dark data-access__submit" type="submit"><i class="bi bi-shield-check me-1"></i>驗證授權</button>
     </form>

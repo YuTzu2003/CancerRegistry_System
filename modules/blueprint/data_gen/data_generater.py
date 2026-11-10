@@ -5,6 +5,7 @@ import re
 import base64
 import io
 import pandas as pd
+from modules.services.case_class_filter import exclude_case_class_h
 import numpy as np
 from modules.blueprint.clean.field_mapping import detect_system
 from modules.blueprint.clean.pipeline import (
@@ -520,6 +521,14 @@ def process_file_logic(
                 selected_date_cols_std.append(col)
 
         df.rename(columns=rename_map, inplace=True)
+        case_class_col = next(
+            (column for column, seq in renamed_col_to_seq.items()
+             if seq == "2.3" and column in df.columns),
+            None,
+        )
+        if case_class_col:
+            df = exclude_case_class_h(df, case_class_col).reset_index(drop=True)
+            row_count = len(df)
         
         is_originally_99 = {col: [False] * row_count for col in selected_date_cols_std}
         for col in selected_date_cols_std:

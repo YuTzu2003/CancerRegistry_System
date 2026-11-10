@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}指標版本紀錄｜癌症資料登記{% endblock %}
+{% block page_title %}指標版本紀錄{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/auth/branch_version.css') }}">
+<style>
+  .review-page-head { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:16px; }
+  .review-page-head > div { flex:1 1 300px; }
+  .review-toolbar { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; padding-bottom:16px; border-bottom:1px solid var(--border); }
+  .review-toolbar .commit-ledger__clear { text-decoration:none; }
+  .review-toolbar .commit-ledger__clear:hover, .review-toolbar .commit-ledger__clear:focus { text-decoration:none; }
+  .review-toolbar .commit-ledger__clear[hidden] { display:none; }
+  .review-list { display:grid; gap:10px; }
+  .review-day { position:relative; margin:20px 0 0 8px; padding-left:24px; border-left:3px solid var(--border); }
+  .review-day-label { position:relative; margin:0 0 12px; color:var(--text-secondary); font-size:1rem; line-height:1.5; font-weight:700; }
+  .review-day-node { position:absolute; left:-33px; top:4px; width:15px; height:15px; border:3px solid var(--surface); border-radius:50%; background:var(--text-secondary); box-shadow:0 0 0 1px var(--border); }
+  .review-card { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:16px; padding:18px; border:1px solid var(--border); border-radius:10px; background:var(--surface); }
+  .review-card-main { flex:1 1 360px; min-width:0; }
+  .review-card-title { font-weight:700; margin-bottom:6px; overflow-wrap:anywhere; }
+  .review-meta { display:flex; flex-wrap:wrap; gap:8px 16px; color:var(--text-secondary); font-size:.9rem; }
+  .review-actions { display:flex; flex-wrap:wrap; gap:8px; }
+  .review-status { display:inline-flex; border-radius:999px; padding:3px 9px; font-weight:700; font-size:.82rem; }
+  .review-status-PENDING { background:#fef3c7; color:#854d0e; }
+  .review-status-PUBLISHED { background:#dcfce7; color:#166534; }
+  .review-status-INACTIVE { background:#e2e8f0; color:#475569; }
+  .review-status-DRAFT { background:#fee2e2; color:#991b1b; }
+  .review-empty { padding:24px; text-align:center; border:1px dashed var(--border); border-radius:10px; color:var(--text-secondary); background:var(--gray-50); }
+  .review-details { max-height:65vh; overflow:auto; text-align:left; }
+  .review-cancer { border:1px solid var(--border); border-radius:8px; margin:10px 0; padding:10px 12px; }
+  .review-cancer summary { cursor:pointer; font-weight:700; }
+  .review-indicator { border-top:1px solid var(--border); margin-top:10px; padding-top:10px; }
+  .review-condition { color:var(--text-secondary); font-size:.9rem; margin-top:4px; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-head review-page-head">
+  <div><h1>指標版本紀錄</h1><p class="lead">查看各版本的建立與審核狀態。核准、退回及啟用狀態調整由管理員處理。</p></div>
+  <a class="btn btn-outline-secondary" href="{{ url_for('indicators.indicator_definitions_page') }}"><i class="bi bi-arrow-left me-1" aria-hidden="true"></i>返回指標資料維護</a>
+</div>
+<section class="card-flat">
+  <div class="section-body">
+    <div class="review-toolbar">
+      <span class="commit-ledger__branch">版本紀錄</span>
+      <div class="commit-ledger__filters">
+        <label class="commit-ledger__filter"><i class="bi bi-person" aria-hidden="true"></i><select id="reviewUser" aria-label="篩選版本建立者"><option value="">所有操作者</option></select></label>
+        <label class="commit-ledger__filter"><i class="bi bi-calendar3" aria-hidden="true"></i><input id="reviewDate" type="date" aria-label="篩選版本建立日期"></label>
+        <button id="reviewClear" class="btn btn-link commit-ledger__clear" type="button" hidden>清除篩選</button>
+      </div>
+    </div>
+    <div id="reviewCount" class="hint mt-3">正在載入…</div>
+    <div id="reviewStatus" class="text-secondary mt-3" role="status" aria-live="polite">正在載入版本紀錄…</div>
+    <div id="reviewTimeline" class="review-list"></div>
+  </div>
+</section>
+<div id="definitionReview" data-cancers='{{ definition_cancers|tojson }}' data-can-approve="{{ 'true' if can_approve_definitions else 'false' }}"></div>
+{% endblock %}
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/indicators/indicator_rule_editor.js', v='20261101-field-fix') }}"></script>
+<script src="{{ url_for('static', filename='js/indicators/indicator_definition_review.js', v='20261101-review-no-restore') }}"></script>
+{% endblock %}

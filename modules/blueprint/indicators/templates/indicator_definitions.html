@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+{% block title %}指標資料維護｜癌症資料登記{% endblock %}
+{% block page_title %}指標資料維護{% endblock %}
+
+{% block extra_head %}
+<style>
+  .definition-page-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; }
+  .definition-page-head > div { flex: 1 1 280px; min-width: 0; overflow-wrap: anywhere; }
+  .definition-page-head > div:last-child { flex: 0 0 auto; margin-left: auto; justify-content: flex-end; }
+  .definition-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: end; }
+  .definition-version-field { min-width: 0; }
+  .definition-version-field label { display: block; margin-bottom: 8px; }
+  .definition-version-label { display: flex !important; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .definition-panel { padding: 20px; background: var(--gray-50); border: 1px solid var(--border); border-radius: 8px; }
+  .definition-mode-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+  .definition-version-actions { padding-top: 16px; margin-top: 16px; border-top: 1px solid var(--border); }
+  .definition-entry-pane { padding: 20px; background: var(--gray-50); border: 1px solid var(--border); border-radius: 8px; }
+  .definition-entry-pane .form-label { font-weight: 600; }
+  .definition-entry-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 12px; margin-bottom: 18px; }
+  .definition-viewer-summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; padding: 14px 16px; background: var(--gray-50); border: 1px solid var(--border); border-radius: 8px; }
+  .definition-version-state { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; min-height: 38px; }
+  .definition-cancer-picker { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 16px; margin-bottom: 18px; padding: 16px 18px; background: var(--gray-50); border: 1px solid var(--border); border-radius: 8px; }
+  .definition-cancer-picker .definition-version-field { width: min(100%, 420px); }
+  .definition-cancer-picker p { margin: 0; }
+  .definition-edit-panel { padding: 18px 20px; background: var(--gray-50); border: 1px solid var(--border); border-radius: 8px; }
+  .definition-edit-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+  [data-theme="dark"] .definition-panel, [data-theme="dark"] .definition-edit-panel { background: var(--surface); }
+  .definition-indicator { margin-top: 12px; border: 1px solid var(--border); border-radius: 8px; }
+  .definition-indicator summary { cursor: pointer; padding: 16px; font-weight: 600; overflow-wrap: anywhere; }
+  .definition-indicator[open] summary { border-bottom: 1px solid var(--border); }
+  .definition-indicator-body { padding: 16px; }
+  .definition-section { margin-top: 16px; padding: 14px; border: 1px solid var(--border); border-radius: 8px; }
+  .definition-section h4 { font-size: 1rem; font-weight: 600; margin-bottom: 8px; }
+  .definition-section textarea { margin-top: 6px; }
+  .definition-section .definition-condition:first-of-type { margin-top: 12px; }
+  .definition-text-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .definition-text-fields label:first-child { grid-column: 1 / -1; }
+  .definition-text-fields label { display: block; font-weight: 500; }
+  .definition-text-fields input, .definition-text-fields textarea { margin-top: 6px; }
+  .definition-condition { padding: 14px 0; border-top: 1px solid var(--border); }
+  .definition-condition-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .definition-condition-controls select { width: 200px; max-width: 100%; }
+  .definition-condition-controls input { width: 120px; }
+  /* The list follows the same card-and-table reading order as histology maintenance. */
+  .definition-list-panel { margin-bottom: 20px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .definition-list-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; padding: 14px 16px; background: var(--gray-50); border-bottom: 1px solid var(--border); }
+  .definition-list-heading h3, .definition-selected-heading h3 { margin: 0; font-size: 1rem; font-weight: 700; }
+  .definition-list-table-wrap { overflow-x: auto; }
+  .definition-list-table { width: 100%; min-width: 1900px; margin: 0; border-collapse: collapse; table-layout: fixed; }
+  .definition-list-col-number { width: 4%; }
+  .definition-list-col-direction { width: 6%; }
+  .definition-list-col-name { width: 14%; }
+  .definition-list-col-reason { width: 13%; }
+  .definition-list-col-numerator-definition, .definition-list-col-denominator-definition { width: 11%; }
+  .definition-list-col-numerator-field, .definition-list-col-denominator-field { width: 14%; }
+  .definition-list-col-notes { width: 13%; }
+  .definition-list-table.is-editing .definition-list-col-number { width: 3%; }
+  .definition-list-table.is-editing .definition-list-col-direction { width: 5%; }
+  .definition-list-table.is-editing .definition-list-col-name { width: 12%; }
+  .definition-list-table.is-editing .definition-list-col-reason { width: 12%; }
+  .definition-list-table.is-editing .definition-list-col-numerator-definition, .definition-list-table.is-editing .definition-list-col-denominator-definition { width: 10%; }
+  .definition-list-table.is-editing .definition-list-col-numerator-field, .definition-list-table.is-editing .definition-list-col-denominator-field { width: 12%; }
+  .definition-list-table.is-editing .definition-list-col-notes { width: 14%; }
+  .definition-list-col-action { width: 10%; }
+  .definition-list-table th { padding: 11px 12px; font-size: .86rem; font-weight: 700; white-space: nowrap; background: var(--gray-50); border-bottom: 1px solid var(--border); }
+  .definition-list-table th[colspan] { text-align: center; }
+  .definition-list-table td { padding: 12px; vertical-align: top; border-bottom: 1px solid var(--border); }
+  .definition-list-table tbody tr:last-child td { border-bottom: 0; }
+  .definition-list-row.active { background: #eff6ff; }
+  .definition-list-row.removed { opacity: .5; }
+  .definition-list-row.removed .definition-list-name { text-decoration: line-through; }
+  .definition-list-name { display: block; font-weight: 400; line-height: 1.5; overflow-wrap: anywhere; }
+  .definition-list-text { display: block; color: var(--text-secondary, #64748b); font-size: .88rem; line-height: 1.5; overflow-wrap: anywhere; white-space: pre-line; }
+  .definition-list-open { white-space: nowrap; }
+  .definition-selected-editor { padding: 20px; background: var(--gray-50); border: 1px solid var(--border); border-radius: 8px; }
+  .definition-selected-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding-bottom: 14px; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
+  .definition-selected-heading p { margin: 4px 0 0; }
+  .definition-indicator-meta { padding-bottom: 4px; }
+  /* Keep action buttons in the same charcoal-and-neutral palette as this module. */
+  #definitionManager .btn-primary {
+    --bs-btn-color: #fff;
+    --bs-btn-bg: var(--gray-800, #262a31);
+    --bs-btn-border-color: var(--gray-800, #262a31);
+    --bs-btn-hover-color: #fff;
+    --bs-btn-hover-bg: var(--gray-900, #1a1d23);
+    --bs-btn-hover-border-color: var(--gray-900, #1a1d23);
+    --bs-btn-active-color: #fff;
+    --bs-btn-active-bg: var(--gray-900, #1a1d23);
+    --bs-btn-active-border-color: var(--gray-900, #1a1d23);
+    --bs-btn-disabled-color: #fff;
+    --bs-btn-disabled-bg: var(--gray-800, #262a31);
+    --bs-btn-disabled-border-color: var(--gray-800, #262a31);
+  }
+  #definitionManager .btn-outline-primary {
+    --bs-btn-color: var(--gray-800, #262a31);
+    --bs-btn-border-color: var(--gray-400, #9aa1ab);
+    --bs-btn-hover-color: #fff;
+    --bs-btn-hover-bg: var(--gray-800, #262a31);
+    --bs-btn-hover-border-color: var(--gray-800, #262a31);
+    --bs-btn-active-color: #fff;
+    --bs-btn-active-bg: var(--gray-900, #1a1d23);
+    --bs-btn-active-border-color: var(--gray-900, #1a1d23);
+  }
+  #definitionManager .btn-primary:focus-visible,
+  #definitionManager .btn-outline-primary:focus-visible {
+    box-shadow: 0 0 0 .2rem rgba(38, 42, 49, .2);
+  }
+  .definition-current-indicator { margin-bottom: 16px; padding: 12px 14px; border-left: 3px solid var(--primary, #2563eb); background: var(--gray-100, #f1f5f9); border-radius: 6px; }
+  .definition-current-indicator strong { display: block; margin-bottom: 3px; overflow-wrap: anywhere; }
+  [data-theme="dark"] .definition-list-heading, [data-theme="dark"] .definition-list-table th, [data-theme="dark"] .definition-selected-editor, [data-theme="dark"] .definition-current-indicator { background: var(--surface); }
+  [data-theme="dark"] .definition-list-row.active { background: #1e3a5f; }
+  /* Rule summary */
+  .definition-rule-summary { padding: 12px 14px; background: var(--gray-100, #f1f5f9); border-left: 3px solid var(--primary, #2563eb); border-radius: 6px; font-size: 0.9rem; line-height: 1.75; white-space: pre-line; overflow-wrap: anywhere; color: var(--text, #1e293b); }
+  [data-theme="dark"] .definition-rule-summary { background: var(--gray-800, #1e293b); }
+  /* Inline rule editor */
+  .rule-editor-inline { border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-top: 10px; }
+  .rule-editor-inline .rule-editor { max-height: 50vh; overflow-y: auto; }
+  .rule-editor-inline-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .rule-editor { text-align:left; max-height:65vh; overflow:auto; }
+  .rule-editor-node { position:relative; margin:8px 0; padding:12px; border:1px solid var(--border); border-radius:8px; }
+  .rule-editor-node > .rule-editor-node { margin-left:20px; border-left: 2px solid var(--border, #d1d5db); padding-left: 14px; border-radius: 0; border-top: none; border-right: none; border-bottom: none; }
+  .rule-editor-node > button[data-rule-remove] { float:right; }
+  .rule-editor-fields { display:flex; flex-wrap:wrap; gap:10px; margin-top:10px; }
+  .rule-editor-fields label { flex:1 1 200px; }
+  .rule-editor-selected-fields { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; font-size: .82rem; line-height: 1.4; }
+  .rule-editor-selected-label { color: var(--text-secondary, #64748b); }
+  .rule-editor-selected-chip { padding: 3px 7px; border: 1px solid var(--border); border-radius: 999px; background: var(--gray-100, #f1f5f9); color: var(--text, #1e293b); overflow-wrap: anywhere; }
+  [data-theme="dark"] .rule-editor-selected-chip { background: var(--surface); }
+  .definition-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+  .definition-review { max-height: 55vh; overflow-y: auto; text-align: left; }
+  .definition-review-group { border: 1px solid var(--border, #dee2e6); border-radius: 8px; padding: 12px; margin-top: 12px; }
+  .definition-review-item { padding: 10px 0; border-top: 1px solid var(--border, #dee2e6); overflow-wrap: anywhere; }
+  .definition-review-value { white-space: pre-wrap; }
+  .definition-review-number { display: inline-block; padding: 0 4px; border-radius: 3px; font-weight: 700; }
+  .definition-review-number-before { color: #9f1239; background: #ffe4e6; text-decoration: line-through; }
+  .definition-review-number-after { color: #854d0e; background: #fef3c7; }
+  .definition-status-badge { display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 999px; font-size: .82rem; font-weight: 700; }
+  .definition-status-DRAFT { color: #854d0e; background: #fef3c7; }
+  .definition-status-PENDING { color: #1d4ed8; background: #dbeafe; }
+  .definition-status-PUBLISHED { color: #166534; background: #dcfce7; }
+  .definition-status-INACTIVE { color: #475569; background: #e2e8f0; }
+  @media (max-width: 767.98px) {
+    .definition-text-fields, .definition-toolbar { grid-template-columns: 1fr; }
+    .definition-version-state { align-items: flex-start; }
+    .section-head .hint { display: none; }
+    .definition-selected-editor { padding: 14px; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-head definition-page-head">
+  <div><h1>指標資料維護</h1><p class="lead">查看與編輯指標定義，送審核准後即可用於分析。</p></div>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-danger" href="{{ url_for('indicators.indicator_definition_review_page') }}">版本紀錄</a>
+    <a id="backToIndicators" class="btn btn-outline-dark" href="{{ url_for('indicators.indicators') }}"><i class="bi bi-arrow-left me-1" aria-hidden="true"></i>返回監測指標</a>
+  </div>
+</div>
+
+<div id="definitionManager"
+     data-can-manage="{{ 'true' if can_manage_definitions else 'false' }}"
+     data-can-approve="{{ 'true' if can_approve_definitions else 'false' }}">
+<section class="card-flat">
+  <div class="section-head"><h2><span class="dot" style="background:var(--warning)"></span>資料輸入與送審</h2></div>
+  <div class="section-body">
+    <div class="definition-entry-pane">
+          <div class="definition-entry-actions">
+            {% if can_manage_definitions %}<div class="definition-mode-actions">
+              <button id="startDefinitionEdit" type="button" class="btn btn-dark btn-sm" disabled><i class="bi bi-copy me-1" aria-hidden="true"></i><span id="startDefinitionEditLabel">以系統基準建立新版本</span></button>
+              <button id="reviseDefinitionVersion" type="button" class="btn btn-outline-secondary btn-sm" disabled><i class="bi bi-pencil-square me-1" aria-hidden="true"></i><span id="reviseDefinitionVersionLabel">編輯待審版本</span></button>
+              <button id="definitionHistory" type="button" class="btn btn-outline-secondary btn-sm" disabled><i class="bi bi-clock-history me-1" aria-hidden="true"></i>修改歷程</button>
+              <button id="deleteDefinitionVersion" type="button" class="btn btn-outline-danger btn-sm" disabled><i class="bi bi-trash me-1" aria-hidden="true"></i>刪除版本</button>
+            </div>{% endif %}
+          </div>
+          <div class="definition-toolbar">
+            <div class="definition-version-field"><label for="definitionVersion" class="definition-version-label">整套指標定義版本{% if can_manage_definitions %}<span id="definitionVersionState" class="definition-status-badge definition-status-PUBLISHED">已啟用</span>{% endif %}</label><select id="definitionVersion" class="form-select" disabled><option value="default">115 年度指標定義（系統基準）</option></select></div>
+            <div id="definitionStatus" class="text-secondary" role="status" aria-live="polite">正在載入指標定義…</div>
+          </div>
+    {% if can_manage_definitions %}
+          <div id="definitionEditSettings" class="definition-edit-panel d-none mt-3">
+            <div class="definition-edit-toolbar">
+              <p class="small text-secondary mb-0">未儲存的修改在重新整理或離開後會遺失。</p>
+              <button id="cancelDefinitionEdit" type="button" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash3 me-1" aria-hidden="true"></i>捨棄變更</button>
+            </div>
+            <p id="definitionDraftStatus" class="small text-primary" aria-live="polite"></p>
+            <label for="definitionYear" class="form-label">適用年度</label>
+            <input id="definitionYear" class="form-control" style="max-width:420px" type="number" min="1" max="9999" step="1" required placeholder="例如：2027" disabled>
+            <p id="definitionYearError" class="small text-danger mt-1 mb-0 d-none" role="alert"></p>
+            <p class="small text-secondary mt-1 mb-0">此年度用於辨識版本，不限制分析的診斷年度。</p>
+            <label for="definitionVersionDescription" class="form-label mt-3">版本說明/適用情境</label>
+            <textarea id="definitionVersionDescription" class="form-control" rows="2" maxlength="1000" placeholder="例如：依 2027 年癌症登記指標規範調整" disabled></textarea>
+            <label for="definitionChangeReason" class="form-label mt-3">本次修改原因</label>
+            <textarea id="definitionChangeReason" class="form-control" rows="2" maxlength="1000" placeholder="更新待審或退回修改版本時必填；會記錄於修改歷程" disabled></textarea>
+            <p id="definitionRevisionHint" class="text-secondary small mt-2 d-none">已停用版本修改後須重新審核；已啟用版本請先停用或建立新版本。</p>
+          </div>
+        {% endif %}
+    </div>
+  </div>
+</section>
+<section class="card-flat">
+  <div class="section-head"><h2><span class="dot" style="background:var(--warning)"></span>指標內容</h2></div>
+  <div class="section-body">
+    <div class="definition-cancer-picker">
+      <div class="definition-version-field"><label for="definitionCancer">選擇癌別</label><select id="definitionCancer" class="form-select">{% for cancer in definition_cancers %}<option value="{{ cancer.key }}">{{ cancer.name }}</option>{% endfor %}</select></div>
+    </div>
+    <div id="definitionContents"></div>
+    {% if can_manage_definitions %}
+    <div id="definitionEditActions" class="definition-actions d-none">
+      <button id="saveDefinitionVersion" type="button" class="btn btn-primary">送出審核</button>
+    </div>
+    {% endif %}
+  </div>
+</section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+    <script src="{{ url_for('static', filename='js/indicators/indicator_rule_editor.js', v='20261110-selected-fields') }}"></script>
+    <script src="{{ url_for('static', filename='js/indicators/indicator_definitions.js', v='20261110-year-inline-error') }}"></script>
+{% endblock %}
