@@ -115,7 +115,8 @@ def case_file_options(stream):
     try:
         rows = workbook.active.values
         headers = next(rows, ())
-        class_col = find_case_class_column(headers)
+        class_column = find_case_class_column(headers)
+        class_col = headers.index(class_column) if class_column is not None else None
         if not all(field in headers for field in ("hospid", "year", "pri_site")):
             raise ValueError("工作表缺少院所、診斷年度或癌別欄位。")
         hospital_col, year_col, cancer_col = (headers.index(field) for field in ("hospid", "year", "pri_site"))
@@ -141,7 +142,8 @@ def recalculate_cases(stream, hospital_id, start_year, end_year):
     try:
         rows = workbook.active.values
         headers = next(rows, ())
-        class_col = find_case_class_column(headers)
+        class_column = find_case_class_column(headers)
+        class_col = headers.index(class_column) if class_column is not None else None
         if not all(field in headers for field in required):
             raise ValueError("工作表缺少必要欄位，請上傳存活率個案清單。")
         columns = [headers.index(field) for field in required]
