@@ -1285,17 +1285,18 @@ function initDashboardControl() {
           const yearEnd = document.getElementById('filterYearEnd')?.value.trim() || '';
           const behavior = document.getElementById('filterBehavior')?.value || '';
           const cancers = Array.from(window.selectedCancers || []);
+          const cancerTitle = String(window.dashboardSelectedCancerTitle || '').trim();
           if (!fileId || !yearStart || !yearEnd || !behavior || cancers.length === 0) {
               utils.alert('請先完成檔案、年度、性態碼與癌別選擇。', 'warning');
               return;
           }
           btnDownloadPbiDataset.disabled = true;
-          window.utils?.showLoading?.('正在產生 Power BI 資料檔，請稍候…');
+          window.utils?.showLoading?.('正在產生Excel資料，請稍候…');
           try {
               const response = await fetch('/api/dashboard/download_pbi_dataset', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ file_id: fileId, cancers, year_start: yearStart, year_end: yearEnd, behavior })
+                  body: JSON.stringify({ file_id: fileId, cancers, cancer_title: cancerTitle, year_start: yearStart, year_end: yearEnd, behavior })
               });
               const contentType = response.headers.get('content-type') || '';
               if (!response.ok) {
@@ -1306,12 +1307,12 @@ function initDashboardControl() {
               const url = URL.createObjectURL(blob);
               const link = document.createElement('a');
               link.href = url;
-              link.download = 'powerbi_dataset.xlsx';
+              link.download = `${cancerTitle && cancerTitle !== 'XX' ? cancerTitle : 'dataset'}_dataset.xlsx`;
               document.body.appendChild(link);
               link.click();
               link.remove();
               URL.revokeObjectURL(url);
-              utils.alert('Power BI 資料檔已開始下載。', 'success');
+              utils.alert('Excel資料已開始下載。', 'success');
           } catch (error) {
               utils.alert(`無法下載 Power BI 資料檔：${error.message}`, 'error');
           } finally {
