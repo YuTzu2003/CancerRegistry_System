@@ -1,7 +1,7 @@
 """Recalculate observed survival for a selected hospital and diagnosis period."""
 
 from collections import Counter, defaultdict
-from math import isfinite, prod
+from math import isfinite, prod, sqrt
 
 from openpyxl import load_workbook
 from modules.services.case_class_filter import find_case_class_column, is_case_class_h
@@ -325,7 +325,7 @@ def _summarize(cancer, stage, matched, cases, start_year):
     ]
     if annual[-1] is not None and len(groups) > 1 and all(rate is not None for _, _, _, rate in age_results):
         adjusted = sum(weight * rate / 100 for _, _, weight, rate in age_results)
-        se = sum(group["weight"] * group["se"] / 100 for group in age_details)
+        se = sqrt(sum((group["weight"] * group["se"] / 100) ** 2 for group in age_details))
         adjusted_ci = (max(0, adjusted - 1.96 * se), min(1, adjusted + 1.96 * se))
     return {
         "matched": matched, "included": len(cases),

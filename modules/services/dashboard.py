@@ -1,4 +1,4 @@
-from flask import Blueprint, request, session, jsonify
+from flask import Blueprint, request, session, jsonify, current_app, url_for
 from modules.services.auth import login_required
 from modules.services.db import get_conn
 from modules.blueprint.dashboard import load_user_favorites, save_user_favorites
@@ -17,6 +17,7 @@ import uuid
 import hashlib
 import threading
 import shutil
+import tempfile
 import time
 from pathlib import Path
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
@@ -563,6 +564,52 @@ def publish_dashboard_selection_to_pbi():
     except Exception as exc:
         logging.exception("Failed to publish dashboard selection to PBI")
         return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@dashboard_bp.route('/api/dashboard/download_pbi_dataset', methods=['POST'])
+@login_required
+def download_dashboard_pbi_dataset():
+    """Generate the filtered Power BI workbook and download it to the browser."""
+    data = request.get_json(silent=True) or {}
+    file_id = data.get("file_id", "")
+    cancers = data.get("cancers", [])
+    year_start = str(data.get("year_start", "")).strip()
+    year_end = str(data.get("year_end", "")).strip()
+    behavior = str(data.get("behavior", "")).strip()
+    owned_file = _get_owned_dashboard_file(file_id, session.get("id"))
+    if not owned_file:
+        return jsonify({"ok": False, "error": "找不到已選擇的年報檔案。"}), 400
+    if not year_start or not year_end or not behavior or not isinstance(cancers, list) or not cancers:
+        return jsonify({"ok": False, "error": "請先完成檔案、年度、性態碼與癌別選擇。"}), 400
+
+    output_dir = Path(tempfile.mkdtemp(prefix="pbi-dataset-", dir=DASHBOARD_DATA))
+    output_path = output_dir / "powerbi_dataset.xlsx"
+    try:
+        from modules.blueprint.dashboard.pbi_export import export_pbi_dataset
+        result = export_pbi_dataset(
+            _absolute_dashboard_path(owned_file["storage_path"]),
+            output_path,
+            cancers=cancers,
+            year_start=year_start,
+            year_end=year_end,
+            behavior=behavior,
+        )
+        response = send_file(
+            output_path,
+            as_attachment=True,
+            download_name="powerbi_dataset.xlsx",
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        response.call_on_close(lambda: shutil.rmtree(output_dir, ignore_errors=True))
+        logging.info("Power BI dataset downloaded by user %s: %s rows", session.get("userid"), result["rows"])
+        return response
+    except (ValueError, FileNotFoundError, OSError) as exc:
+        shutil.rmtree(output_dir, ignore_errors=True)
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        shutil.rmtree(output_dir, ignore_errors=True)
+        logging.exception("Failed to create downloadable Power BI dataset")
+        return jsonify({"ok": False, "error": f"Power BI 資料產生失敗：{exc}"}), 500
 
 
 @dashboard_bp.route('/api/dashboard/export_pbip', methods=['POST'])

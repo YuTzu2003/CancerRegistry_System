@@ -65,7 +65,7 @@
   </nav>
 
   <p class="recalc-note"><i class="bi bi-info-circle"></i> 細分類可能與合計重疊，請分開對照回饋表。系統以所選起始診斷年度的分齡個案數判斷併組，未滿 10 人時優先往較高年齡組合併，末組則向前合併。</p>
-  <p class="recalc-note">年齡調整後的 95% CI 為加權 Greenwood 標準誤試算。口腔癌有年齡組追蹤不足 60 個月時，試算會沿用該組最後的 KM 估計。</p>
+  <p class="recalc-note">年齡調整後的 95% CI 以各年齡組 Greenwood 標準誤加權平方和開根號試算。口腔癌有年齡組追蹤不足 60 個月時，試算會沿用該組最後的 KM 估計。</p>
 
   {% for cancer, system_groups in result %}
   {% set first_stages = system_groups[0][1] if system_groups else [] %}
