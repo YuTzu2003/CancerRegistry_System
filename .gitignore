@@ -29,3 +29,5 @@ Jobs/
 !範本_全國比較值.xlsx
 *.csv
 tasks/
+.codegraph/
+.trail/
