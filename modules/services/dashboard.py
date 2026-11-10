@@ -573,6 +573,7 @@ def download_dashboard_pbi_dataset():
     data = request.get_json(silent=True) or {}
     file_id = data.get("file_id", "")
     cancers = data.get("cancers", [])
+    cancer_title = str(data.get("cancer_title", "")).strip()
     year_start = str(data.get("year_start", "")).strip()
     year_end = str(data.get("year_end", "")).strip()
     behavior = str(data.get("behavior", "")).strip()
@@ -597,7 +598,7 @@ def download_dashboard_pbi_dataset():
         response = send_file(
             output_path,
             as_attachment=True,
-            download_name="powerbi_dataset.xlsx",
+            download_name=f"{cancer_title if cancer_title and cancer_title != 'XX' else 'dataset'}_dataset.xlsx",
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
         response.call_on_close(lambda: shutil.rmtree(output_dir, ignore_errors=True))

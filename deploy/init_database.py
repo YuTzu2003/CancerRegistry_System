@@ -7,16 +7,6 @@ from sqlalchemy import create_engine
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_PATH = PROJECT_ROOT / "deploy" / "database" / "CancerRegistry_System.sql"
-MIGRATION_PATHS = (
-    PROJECT_ROOT / "deploy" / "database" / "add_indicator_thresholds.sql",
-    PROJECT_ROOT / "deploy" / "database" / "add_indicator_report_task_type.sql",
-    PROJECT_ROOT / "deploy" / "database" / "add_oral_indicator_rule_versions.sql",
-    PROJECT_ROOT / "deploy" / "database" / "add_indicator_rule_versions.sql",
-    PROJECT_ROOT / "deploy" / "database" / "add_indicator_definition_versions.sql",
-    PROJECT_ROOT / "deploy" / "database" / "20261031_add_histology_review_workflow.sql",
-    PROJECT_ROOT / "deploy" / "database" / "20261031_add_branch_commit_changes.sql",
-    PROJECT_ROOT / "deploy" / "database" / "20261101_add_indicator_definition_year.sql",
-)
 GO_SEPARATOR = re.compile(r"(?im)^\s*GO\s*(?:--.*)?$")
 FORBIDDEN_STATEMENTS = re.compile(r"(?im)^\s*(?:USE|CREATE\s+DATABASE|ALTER\s+DATABASE)\b")
 
@@ -58,10 +48,6 @@ def main() -> None:
         for index, batch in enumerate(load_sql_batches(), start=1):
             connection.exec_driver_sql(batch)
             print(f"Executed SQL batch {index}.")
-        for migration_path in MIGRATION_PATHS:
-            for batch in (item.strip() for item in GO_SEPARATOR.split(read_sql(migration_path)) if item.strip()):
-                connection.exec_driver_sql(batch)
-            print(f"Executed database migration: {migration_path.name}.")
     print("Database schema initialization completed.")
 
 
