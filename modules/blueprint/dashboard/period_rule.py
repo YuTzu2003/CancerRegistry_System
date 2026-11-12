@@ -335,28 +335,6 @@ def build_stage_report(stage_result, option, period_codes=None):
 
     chart_stage_labels = stage_labels
     chart_age_values = age_values
-    if view == "age" and detailed:
-        # 2.4 規定年齡層「圖」固定使用整併期別；表格仍依最細碼模式呈現。
-        chart_rows = []
-        for row in rows:
-            raw_code = _raw_stage_code(row)
-            category = row.get("ajcc_stage_category")
-            label = _stage_report_label(row, detailed=False)
-            if category in {"Stage Unknown", "Stage Not Applicable"}:
-                continue
-            if raw_code in {"888", "8888", "999", "9999"} or not label:
-                continue
-            chart_rows.append((row, label))
-        chart_stage_labels = sorted(
-            {label for _, label in chart_rows},
-            key=_stage_sort_key,
-        )
-        chart_stage_index = {label: index for index, label in enumerate(chart_stage_labels)}
-        chart_age_values = {label: [0] * len(chart_stage_labels) for label, _, _ in AGE_GROUPS}
-        for row, label in chart_rows:
-            age_group = _age_group_label(row.get("case") or {})
-            if age_group in chart_age_values:
-                chart_age_values[age_group][chart_stage_index[label]] += 1
 
     return {
         "option": option_name,

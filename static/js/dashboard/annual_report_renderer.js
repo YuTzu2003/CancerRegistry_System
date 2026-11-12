@@ -9,6 +9,31 @@
     female: '#EE6666',
     total: '#91CC75'
   });
+  const STAGE_COLORS = Object.freeze([
+    '#F3AE9F', '#E9CB92', '#C3E4C3', '#A7B9DF',
+    '#C8B0DC', '#79BBB5', '#F3B68C', '#D2BD89',
+    '#F2E89D', '#B3C27C', '#DAA9B4', '#8DCCDB'
+  ]);
+  function stageSegmentStyle(index) {
+    return { color: STAGE_COLORS[index % STAGE_COLORS.length] };
+  }
+  function stageSeparatorData(rows) {
+    const separators = [];
+    (rows || []).forEach(row => {
+      const values = (row.values || []).map(value => Number(value || 0));
+      let remaining = values.filter(value => value > 0).length;
+      let cumulative = 0;
+      values.forEach(value => {
+        if (value <= 0) return;
+        cumulative += value;
+        remaining -= 1;
+        if (remaining > 0) {
+          separators.push([Number(cumulative.toFixed(4)), String(row.age || '')]);
+        }
+      });
+    });
+    return separators;
+  }
   // ECharts calculates one uniform width for every age group in a chart.
   // The maximum keeps the bars from becoming oversized on wide displays.
   const GENDER_AGE_BAR_MAX_WIDTH = 16;
@@ -249,6 +274,9 @@
   global.AnnualReportRenderer = Object.freeze({
     DEFAULT_AGE_GROUPS,
     GENDER_AGE_COLORS,
+    STAGE_COLORS,
+    stageSegmentStyle,
+    stageSeparatorData,
     ANALYSIS_CONDITIONS,
     resultTabLabel,
     surgeryTableKey,

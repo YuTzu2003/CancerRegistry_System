@@ -1931,7 +1931,7 @@ window.DashboardRenderer.renderStageAgeReport = function(stageData, yearTitle, c
         /* 圖三：年齡層及期別分布圖 */
         const chartDom = document.getElementById('annualStageAgeChart');
         if (chartDom && typeof echarts !== 'undefined') {
-            const stageColors = ['#F3AE9F', '#E9CB92', '#C3E4C3', '#A7B9DF', '#C8B0DC'];
+            const stageColors = window.AnnualReportRenderer.STAGE_COLORS;
             const ageStagePercentages = chartAgeRows.map(row => {
                 const total = rowTotal(row);
                 return chartStageLabels.map((_, stageIndex) => total > 0
@@ -1990,6 +1990,24 @@ window.DashboardRenderer.renderStageAgeReport = function(stageData, yearTitle, c
                     };
                 }
             };
+            const stageSeparatorSeries = {
+                name: '__stageSeparators',
+                type: 'custom',
+                silent: true,
+                tooltip: { show: false },
+                z: 15,
+                data: window.AnnualReportRenderer.stageSeparatorData(
+                    chartAgeRows.map((row, index) => ({ age: row.age, values: ageStagePercentages[index] }))
+                ),
+                renderItem: (params, api) => {
+                    const point = api.coord([api.value(0), api.value(1)]);
+                    return {
+                        type: 'line',
+                        shape: { x1: point[0], y1: point[1] - 11, x2: point[0], y2: point[1] + 11 },
+                        style: { stroke: '#FFFFFF', lineWidth: 1 }
+                    };
+                }
+            };
             window.dashboardStageAgeChartInstance?.dispose();
             window.dashboardStageAgeChartInstance = echarts.init(chartDom);
             window.dashboardStageAgeChartInstance.setOption({
@@ -2004,7 +2022,7 @@ window.DashboardRenderer.renderStageAgeReport = function(stageData, yearTitle, c
                     trigger: 'axis',
                     axisPointer: { type: 'shadow' },
                     formatter: params => {
-                        const stageParams = params.filter(item => item.seriesName !== '__smallStageLabels');
+                        const stageParams = params.filter(item => !item.seriesName.startsWith('__'));
                         const rowIndex = stageParams[0]?.dataIndex ?? 0;
                         const row = chartAgeRows[rowIndex];
                         const total = row ? rowTotal(row) : 0;
@@ -2045,7 +2063,7 @@ window.DashboardRenderer.renderStageAgeReport = function(stageData, yearTitle, c
                     type: 'bar',
                     stack: 'age-stage-total',
                     barMaxWidth: 22,
-                    itemStyle: { color: stageColors[stageIndex % stageColors.length] },
+                    itemStyle: window.AnnualReportRenderer.stageSegmentStyle(stageIndex),
                     label: {
                         show: true,
                         position: 'inside',
@@ -2065,7 +2083,7 @@ window.DashboardRenderer.renderStageAgeReport = function(stageData, yearTitle, c
                             : ''
                     },
                     data: ageStagePercentages.map(values => values[stageIndex])
-                })), smallStageLabelSeries]
+                })), stageSeparatorSeries, smallStageLabelSeries]
             });
         }
     };
