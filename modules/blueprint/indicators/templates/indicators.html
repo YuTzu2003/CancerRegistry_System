@@ -242,7 +242,7 @@
       </div>
     </div>
     <div>
-      <div class="d-flex justify-content-between align-items-center mb-2"><div style="font-size: 13px; font-weight: 600; color: var(--gray-700);">未匹配欄位處理<span class="hint" style="font-weight: 400; margin-left: 6px;">勾選的欄位會一併保留於資料檔。</span></div><div class="d-flex align-items-center gap-2"><button id="btnSelectAllIndicatorExtras" class="btn btn-sm btn-outline-secondary" type="button" disabled>全選</button><button id="btnClearAllIndicatorExtras" class="btn btn-sm btn-outline-secondary" type="button" disabled>清除</button></div></div>
+      <div class="d-flex justify-content-between align-items-center mb-2"><div style="font-size: 13px; font-weight: 600; color: var(--gray-700);">未匹配欄位處理<span class="hint" style="font-weight: 400; margin-left: 6px;">勾選的欄位會一併保留於資料檔。</span></div><div class="d-flex align-items-center gap-2"><button id="btnSelectAllIndicatorExtras" class="btn btn-sm btn-outline-secondary" type="button" disabled>全選</button><button id="btnClearAllIndicatorExtras" class="btn btn-sm btn-outline-secondary" type="button" disabled>全不選</button></div></div>
       <div id="indicatorsInputFieldList" class="field-chiplist"><span class="field-chip disabled"><i class="bi bi-asterisk"></i> 請先選擇檔案</span></div>
     </div>
     <div class="d-flex justify-content-end gap-2 mt-3 pt-3" style="border-top:1px solid var(--border);"><button id="btnPreviewIndicatorsInput" class="btn btn-light" type="button" disabled><i class="bi bi-eye"></i> 預覽</button><button id="uploadIndicatorsFile" class="btn btn-primary d-flex align-items-center justify-content-center gap-2" type="button" disabled><i class="bi bi-upload"></i> 確認匯入</button></div>
@@ -271,12 +271,21 @@
       {% endfor %}
       <div class="indicators-cancer-actions" aria-label="癌別批次選擇">
         <button id="selectAllIndicatorCancers" class="btn btn-outline-primary btn-sm" type="button" aria-controls="indicatorsCancerGrid" disabled>全選</button>
-        <button id="clearAllIndicatorCancers" class="btn btn-outline-secondary btn-sm" type="button" aria-controls="indicatorsCancerGrid" disabled>清除</button>
+        <button id="clearAllIndicatorCancers" class="btn btn-outline-secondary btn-sm" type="button" aria-controls="indicatorsCancerGrid" disabled>全不選</button>
       </div>
     </div>
   </div>
 </section>
 
+<section class="indicators-step is-disabled" id="ruleVersionStep" aria-disabled="true">
+  <div class="indicators-step-title"><span class="indicators-step-marker" aria-hidden="true"></span>選擇指標定義版本</div>
+  <div class="indicators-step-body">
+    <p class="text-secondary small">本次分析的所有癌別會統一使用此套指標定義；分析及 Excel 匯出會使用相同版本。</p>
+    <div id="ruleVersionHint" class="text-secondary small" role="status"></div>
+    <label for="analysisDefinitionVersion" class="compare-label">指標定義版本</label>
+    <select id="analysisDefinitionVersion" class="form-select" style="max-width:420px" disabled><option value="default">115 年度指標定義（系統基準）</option></select>
+  </div>
+</section>
 <section id="indicatorsPreviewStep" class="indicators-step is-disabled" aria-disabled="true">
   <div class="indicators-step-title"><span class="indicators-step-marker" aria-hidden="true"></span><span>監測指標內容</span><span class="hint mb-0">分子件數為符合指標分子定義的案件數；分母件數為符合指標分母定義的案件數；監測結果(%)為分子件數／分母件數</span><button id="analyzeIndicators" class="btn btn-success btn-sm ms-auto" type="button" disabled><i class="bi bi-play-fill me-1"></i>開始分析</button></div>
   <div class="indicators-step-body">
@@ -326,7 +335,7 @@
 {% block extra_scripts %}
 <script>
 (() => {
-  const returnStateStorageKey = 'indicators_return_state_v1';
+  const returnStateStorageKey = 'indicators_return_state_v2';
   const fileInput = document.getElementById('indicatorsFile');
   const uploadButton = document.getElementById('uploadIndicatorsFile');
   const previewInputButton = document.getElementById('btnPreviewIndicatorsInput');
@@ -343,6 +352,10 @@
   const endSelect = document.getElementById('indicatorsYearEnd');
   const narrativeStyle = document.getElementById('indicatorsNarrativeStyle');
   const cancerInputs = [...document.querySelectorAll('.indicators-cancer')];
+  const definitionVersionSelect = document.getElementById('analysisDefinitionVersion');
+  let availableDefinitionVersions = [];
+  let definitionCancerLabels = {};
+  let ruleVersionsLoaded = false;
   const selectAllCancerButton = document.getElementById('selectAllIndicatorCancers');
   const clearAllCancerButton = document.getElementById('clearAllIndicatorCancers');
   const preview = document.getElementById('indicatorsPreview');
@@ -356,6 +369,11 @@
   const cancelIndicatorFileDeleteButton = document.getElementById('btnCancelIndicatorFileDelete');
   const yearStep = document.getElementById('indicatorsYearStep');
   const cancerStep = document.getElementById('indicatorsCancerStep');
+  const ruleVersionStep = document.getElementById('ruleVersionStep');
+  cancerStep.before(ruleVersionStep);
+  yearStep.querySelector('.indicators-step-title').lastChild.textContent = '步驟一：選擇分析年度';
+  ruleVersionStep.querySelector('.indicators-step-title').lastChild.textContent = '步驟二：選擇指標定義版本';
+  cancerStep.querySelector('.indicators-step-title').lastChild.textContent = '步驟三：選擇癌別';
   const previewStep = document.getElementById('indicatorsPreviewStep');
   const exportStep = document.getElementById('indicatorsExportStep');
   const reportExportButton = document.getElementById('exportWithNarrative');
@@ -388,11 +406,12 @@
   const saveIndicatorsReturnState = () => {
     const selectedEntry = fileEntries.find((entry) => entry.id === selectedFileId);
     const state = {
-      version: 1,
+      version: 2,
       sourceFileId: selectedEntry?.serverId || null,
       yearStart: startSelect.value,
       yearEnd: endSelect.value,
       narrativeStyle: narrativeStyle.value,
+      definitionVersion: definitionVersionSelect.value,
       cancers: cancerInputs.filter((input) => input.checked).map((input) => input.value),
       reports: currentIndicatorReports,
       narratives: [...indicatorNarrativeCache.entries()],
@@ -409,7 +428,7 @@
       if (!raw) return null;
       sessionStorage.removeItem(returnStateStorageKey);
       const state = JSON.parse(raw);
-      if (state?.version !== 1 || !Array.isArray(state.reports) || !state.reports.length) return null;
+      if (state?.version !== 2 || !Array.isArray(state.reports)) return null;
       return state;
     } catch (error) {
       sessionStorage.removeItem(returnStateStorageKey);
@@ -533,17 +552,41 @@
       && Number(startSelect.value) <= Number(endSelect.value)
     );
     if (!yearsSelected) cancerInputs.forEach((input) => { input.checked = false; });
-    const cancerSelected = yearsSelected && cancerInputs.some(input => input.checked);
+    const versionSelected = yearsSelected && ruleVersionsLoaded && Boolean(definitionVersionSelect.value);
+    const cancerSelected = versionSelected && cancerInputs.some(input => input.checked);
     setStepState(yearStep, uploaded, !uploaded);
     narrativeStyle.disabled = !uploaded;
-    setStepState(cancerStep, yearsSelected, !yearsSelected);
-    setStepState(previewStep, cancerSelected, !cancerSelected);
-    analyzeButton.disabled = !cancerSelected || previewInFlight;
+    setStepState(ruleVersionStep, yearsSelected, !yearsSelected);
+    setStepState(cancerStep, versionSelected, !versionSelected);
+    const selectedKeys = new Set(cancerInputs.filter(input => input.checked).map(input => input.value));
+    const version = availableDefinitionVersions.find(item => item.id === definitionVersionSelect.value);
+    const missing = version ? [...selectedKeys].filter(key => !version.cancers?.includes(key)) : [];
+    definitionVersionSelect.disabled = !yearsSelected || !ruleVersionsLoaded;
+    const hint = document.getElementById('ruleVersionHint');
+    if (yearsSelected && !definitionVersionSelect.value) {
+      hint.textContent = '請先選擇指標定義版本，再選擇癌別。';
+      hint.className = 'text-secondary small';
+    }
+    if (versionSelected && !selectedKeys.size) {
+      hint.textContent = '請選擇至少一個癌別。';
+      hint.className = 'text-secondary small';
+    }
+    if (ruleVersionsLoaded) {
+      hint.textContent = missing.length
+        ? `此版本未收錄：${missing.map(key => definitionCancerLabels[key] || key).join('、')}。請至資料維護補齊，或選擇其他完整版本。`
+        : '';
+      hint.className = missing.length ? 'text-danger small mb-2' : 'text-secondary small';
+    }
+    hint.hidden = versionSelected && ruleVersionsLoaded && !missing.length;
+    const canAnalyze = cancerSelected && ruleVersionsLoaded && !missing.length;
+    setStepState(previewStep, canAnalyze, !canAnalyze);
+    analyzeButton.disabled = !canAnalyze || previewInFlight;
     setStepState(exportStep, previewGenerated, !previewGenerated);
-    cancerInputs.forEach((input) => { input.disabled = !yearsSelected; });
-    selectAllCancerButton.disabled = !yearsSelected || cancerInputs.every((input) => input.checked);
-    clearAllCancerButton.disabled = !yearsSelected || !cancerInputs.some((input) => input.checked);
-    exportButtons.forEach((button) => { button.disabled = !previewGenerated; });
+    cancerInputs.forEach((input) => { input.disabled = !versionSelected; });
+    selectAllCancerButton.disabled = !versionSelected || cancerInputs.every((input) => input.checked);
+    clearAllCancerButton.disabled = !versionSelected || !cancerInputs.some((input) => input.checked);
+    exportButtons.forEach((button) => { button.disabled = !previewGenerated || !canAnalyze; });
+    syncDefinitionManagementLink();
   };
 
   const resetAnalysisState = () => {
@@ -1200,7 +1243,14 @@
   const loadStoredSources = async () => {
     try {
       const result = await fetchJson('/api/indicators/sources');
-      const returnState = consumeIndicatorsReturnState();
+      let returnState = consumeIndicatorsReturnState();
+      const params = new URLSearchParams(window.location.search);
+      const requestedVersion = params.get('definition_version') || params.get('rule_version') || params.get('oral_rule_version') || returnState?.definitionVersion || '';
+      await loadRuleVersions(requestedVersion || 'default');
+      if (!requestedVersion) definitionVersionSelect.value = '';
+      if (returnState && (!ruleVersionsLoaded || definitionVersionSelect.value !== returnState.definitionVersion)) {
+        returnState = { ...returnState, reports: [], narratives: [], activeCancerKey: null };
+      }
       (result.sources || []).forEach((source) => {
         if (fileEntries.some((entry) => entry.serverId === source.file_id)) return;
         const extension = source.filename.includes('.') ? source.filename.split('.').pop().toUpperCase() : '檔案';
@@ -1252,8 +1302,8 @@
         });
         currentIndicatorReports = returnState.reports;
         activePreviewCancerKey = returnState.activeCancerKey || null;
-        renderIndicatorsPreview({ ok: true, reports: currentIndicatorReports });
-        previewGenerated = true;
+        if (currentIndicatorReports.length) renderIndicatorsPreview({ ok: true, reports: currentIndicatorReports });
+        previewGenerated = currentIndicatorReports.length > 0;
         updateReadyState();
         window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
           window.scrollTo({ top: Number(returnState.scrollY || 0), behavior: 'auto' });
@@ -1337,8 +1387,8 @@
           </select>
           <input class="form-control form-control-sm indicator-threshold-value" data-threshold-value type="number" min="0" max="100" step="0.1" value="${hasTarget ? escapeHtml(target) : ''}" placeholder="0–100" aria-label="指標 ${escapeHtml(indicator.id)} 閾值百分比">
           <span>%</span>
-          <button class="btn btn-outline-secondary btn-sm indicator-threshold-save" type="button" data-save-threshold data-cancer-key="${escapeHtml(report.cancer_key)}" data-indicator-no="${escapeHtml(indicator.id)}">儲存</button>
-          <button class="btn btn-outline-danger btn-sm indicator-threshold-save" type="button" data-clear-threshold data-cancer-key="${escapeHtml(report.cancer_key)}" data-indicator-no="${escapeHtml(indicator.id)}"${hasTarget ? '' : ' disabled'}>清除</button>
+          <button class="btn btn-outline-secondary btn-sm indicator-threshold-save" type="button" data-save-threshold data-cancer-key="${escapeHtml(report.cancer_key)}" data-indicator-no="${escapeHtml(indicator.id)}" data-direction="${escapeHtml(indicator.direction)}">儲存</button>
+          <button class="btn btn-outline-danger btn-sm indicator-threshold-save" type="button" data-clear-threshold data-cancer-key="${escapeHtml(report.cancer_key)}" data-indicator-no="${escapeHtml(indicator.id)}" data-direction="${escapeHtml(indicator.direction)}"${hasTarget ? '' : ' disabled'}>清除</button>
         </span>` : `<span>閾值：<strong>${escapeHtml(targetLabel)}</strong></span>`;
         return {
           indicator,
@@ -1459,8 +1509,10 @@
               body: JSON.stringify({
                 cancer_key: button.dataset.cancerKey,
                 indicator_no: button.dataset.indicatorNo,
+                direction: button.dataset.direction,
                 target_value: clearThreshold ? '' : valueInput.value.trim(),
-                target_operator: operatorInput.value
+                target_operator: operatorInput.value,
+                definition_version_id: definitionVersionSelect.value
               })
             });
             const report = reports.find((item) => String(item.cancer_key) === String(result.cancer_key));
@@ -1738,7 +1790,7 @@
       return `<div class="indicators-cancer-panel" data-indicators-cancer-panel="${escapeHtml(cancerKey)}"><div class="indicators-report-card mb-4">
         ${warnings}
         ${calculationNotice}
-        <div class="indicators-report-table-wrap"><table class="indicators-result-table"><caption>表、${escapeHtml(startSelect.value)}–${escapeHtml(endSelect.value)}年${escapeHtml(cancerName)}監測指標表<br><span class="text-muted fw-normal" style="font-size: 0.85em;">資料來源：癌症登記資料庫</span></caption><thead><tr><th>癌別</th><th>指標編號</th><th>指標名稱</th><th>分子定義</th><th>分母定義</th><th>分子件數</th><th>分母件數</th><th>監測結果(%)</th></tr></thead><tbody>${rows}</tbody></table></div>
+        <div class="indicators-report-table-wrap"><table class="indicators-result-table"><caption>表、${escapeHtml(startSelect.value)}–${escapeHtml(endSelect.value)}年${escapeHtml(cancerName)}監測指標表<br><span class="text-muted fw-normal" style="font-size: 0.85em;">資料來源：癌症登記資料庫${report.rule_version?.name || report.oral_rule_version_name ? `；指標定義：${escapeHtml(report.rule_version?.name || report.oral_rule_version_name)}` : ''}</span></caption><thead><tr><th>癌別</th><th>指標編號</th><th>指標名稱</th><th>分子定義</th><th>分母定義</th><th>分子件數</th><th>分母件數</th><th>監測結果(%)</th></tr></thead><tbody>${rows}</tbody></table></div>
         <div class="small text-secondary mb-3">符合年度與癌別 共 ${Number(report.input_count || 0).toLocaleString()} 筆；排除 Class 0 或 Class 3 共 ${classExclusionCount.toLocaleString()} 筆、跨院治療個案 共 ${crossHospitalCount.toLocaleString()} 筆、AJCC期別不明 共 ${ajccUnknownCount.toLocaleString()} 筆、AJCC期別不適用 共 ${ajccNotApplicableCount.toLocaleString()} 筆、${duplicateSummary}；<span class="text-danger">最終納入 ${Number(report.included_count || 0).toLocaleString()} 筆</span></div>
         <div class="indicators-chart-heading">
           <div class="indicators-chart-title">${escapeHtml(startSelect.value)}–${escapeHtml(endSelect.value)}年${escapeHtml(cancerName)}監測指標分析圖</div>
@@ -1784,9 +1836,44 @@
     if (activePreviewCancerKey) activateCancer(activePreviewCancerKey);
   };
 
+  const manageRuleVersions = document.querySelector('[data-indicator-definitions-link]');
+  const syncDefinitionManagementLink = () => {
+    if (!manageRuleVersions) return;
+    const cancerKey = cancerInputs.find(input => input.checked)?.value || 'Oral_Cavity';
+    const target = new URL(manageRuleVersions.href, window.location.origin);
+    target.searchParams.set('cancer', cancerKey);
+    target.searchParams.set('version', definitionVersionSelect.value);
+    manageRuleVersions.href = target.href;
+  };
+  const loadRuleVersions = async (selected = '') => {
+    ruleVersionsLoaded = false;
+    try {
+      const data = await fetchJson('/api/indicators/definition-versions');
+      availableDefinitionVersions = data.versions;
+      definitionCancerLabels = Object.fromEntries(data.cancers.map(cancer => [cancer.key, cancer.name]));
+      if (!data.versions.some(version => version.id === selected)) throw new Error('找不到先前選用的整套指標定義版本，請聯絡系統管理員。');
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = '請先選擇指標定義版本';
+      placeholder.disabled = true;
+      definitionVersionSelect.replaceChildren(placeholder, ...data.versions.map(version => {
+        const option = document.createElement('option'); option.value = version.id; option.textContent = version.name; return option;
+      }));
+      definitionVersionSelect.value = selected;
+      ruleVersionsLoaded = true;
+    } catch (error) {
+      const hint = document.getElementById('ruleVersionHint');
+      hint.textContent = error.message || '無法載入指標定義版本，請確認資料庫更新。';
+      hint.className = 'text-danger small';
+      console.error('無法讀取指標定義版本', error);
+    }
+    syncDefinitionManagementLink();
+  };
+  definitionVersionSelect.addEventListener('change', () => { resetPreviewResult(); updateReadyState(); });
+  manageRuleVersions?.addEventListener('click', () => saveIndicatorsReturnState());
   const generateIndicatorsPreview = async () => {
     const cancers = cancerInputs.filter(input => input.checked).map(input => input.value);
-    if (!uploaded || !startSelect.value || !endSelect.value || !cancers.length) return;
+    if (!uploaded || !startSelect.value || !endSelect.value || !cancers.length || !ruleVersionsLoaded) return;
     if (previewInFlight) return;
     const requestId = ++previewRequestId;
     previewInFlight = true;
@@ -1798,7 +1885,7 @@
       const response = await fetch('/api/indicators/preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ year_start: startSelect.value, year_end: endSelect.value, cancers })
+        body: JSON.stringify({ year_start: startSelect.value, year_end: endSelect.value, cancers, definition_version: definitionVersionSelect.value })
       });
       const result = await response.json();
       if (!response.ok || !result.ok) throw new Error(result.error || '監測內容產生失敗。');
@@ -1869,7 +1956,8 @@
         body: JSON.stringify({
           year_start: startSelect.value,
           year_end: endSelect.value,
-          cancers
+          cancers,
+          definition_version: definitionVersionSelect.value
         })
       });
       if (!response.ok) {

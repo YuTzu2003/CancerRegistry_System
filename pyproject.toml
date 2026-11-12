@@ -22,4 +22,5 @@ dependencies = [
     "sqlalchemy>=2.0.52",
     "waitress>=3.0.2",
     "xlrd>=2.0.2",
+    "lifelines>=0.30.0",
 ]

@@ -1,3 +1,4 @@
+import json
 from zipfile import BadZipFile
 from datetime import datetime
 from uuid import UUID, uuid4
@@ -5,9 +6,9 @@ from flask import flash, redirect, render_template, request, session, url_for
 from openpyxl.utils.exceptions import InvalidFileException
 from modules.blueprint.auth.excel_import import load_import_workbook
 from modules.blueprint.auth.key_access import data_update_key_required
-from modules.services.auth import auth_bp, login_required
+from modules.services.auth import admin_required, auth_bp, login_required
 from modules.services.db import get_conn
-from modules.blueprint.auth.branch_versions import (commit_ids_equal, commit_changes, create_empty_commit_file, discard_staging_changes, ensure_initial_commit, finalize_staging_commit, has_any_staging_changes, latest_commit_id, record_change, record_changes, replace_staging_changes, save_staging_commit, version_changes)
+from modules.blueprint.auth.branch_versions import (commit_ids_equal, commit_changes, create_empty_commit_file, discard_staging_changes, ensure_initial_commit, latest_commit_id, record_change, record_changes, save_staging_commit, version_changes)
 
 _FIELD_CONFIG = (
     ("CodeYear", "年度", ("codeyear", "code_year"), True, True),
@@ -40,10 +41,25 @@ _IMPORT_COLUMNS = tuple(
     if allow_excel_import
 )
 
+_TEMPLATE_EXAMPLE_MARKER = "範例（請自行刪除本列；年度請填民國年，例如 116）"
+
 _NUMERIC_COLUMNS = frozenset({"codeyear", "code_year", "hist", "histcode", "behavior", "behaviorcode"})
 
+_DUPLICATE_KEY_COLUMN_ALIASES = (
+    ("codeyear", "code_year"),
+    ("cancergroupkey", "cancer_group_key"),
+    ("cancergroup_zh",),
+    ("cancergroup_en",),
+    ("hist", "histcode"),
+    ("behavior", "behaviorcode"),
+    ("hist_zh", "histologyzh"),
+    ("hist_en", "histologyen", "behavior_en", "histology"),
+    ("siteinclude", "site_include"),
+    ("siteexclude", "site_exclude"),
+)
+
 def record_staging_change(cursor, user_id, histcode_id, action, before=None, after=None):
-    record_change(cursor, "histology_code", user_id, histcode_id, action, before, after)
+    record_change(cursor, "histology_code", user_id, histcode_id, action, before, after, approved_only=True)
 
 def staging_count(user_id):
     return len(version_changes("histology_code", user_id))
@@ -63,6 +79,48 @@ def normalize_change(record, columns):
         change[f"Before{column}"] = record.get("before", {}).get(column)
         change[f"After{column}"] = record.get("after", {}).get(column)
     return change
+
+
+def _store_commit_changes(cursor, commit_id, changes):
+    """Store approved-workflow history in SQL Server with the commit itself."""
+    cursor.executemany(
+        """INSERT INTO dbo.BranchCommitChanges
+           (CommitId, ChangeOrder, RecordId, Action, BeforeJson, AfterJson)
+           VALUES (?, ?, ?, ?, ?, ?)""",
+        [
+            (
+                str(commit_id), order, str(change["record_id"]), change["action"],
+                json.dumps(change.get("before") or {}, ensure_ascii=False, default=str),
+                json.dumps(change.get("after") or {}, ensure_ascii=False, default=str),
+            )
+            for order, change in enumerate(changes, start=1)
+        ],
+    )
+
+
+def _replace_commit_changes(cursor, commit_id, changes):
+    """Replace detail rows after a Create action receives its database ID."""
+    cursor.execute("DELETE FROM dbo.BranchCommitChanges WHERE CommitId = ?", str(commit_id))
+    _store_commit_changes(cursor, commit_id, changes)
+
+
+def _load_commit_changes(cursor, commit_id):
+    """Read DB-backed history; fall back to legacy JSON files for old versions."""
+    cursor.execute(
+        """SELECT RecordId, Action, BeforeJson, AfterJson
+           FROM dbo.BranchCommitChanges
+           WHERE CommitId = ? ORDER BY ChangeOrder""",
+        str(commit_id),
+    )
+    stored_changes = cursor.fetchall()
+    if stored_changes:
+        return [
+            {"record_id": row[0], "action": row[1],
+             "before": json.loads(row[2]) if row[2] else {},
+             "after": json.loads(row[3]) if row[3] else {}}
+            for row in stored_changes
+        ]
+    return commit_changes("histology_code", commit_id)
 
 def _quote_identifier(identifier):
     return f"[{identifier.replace(']', ']]')}]"
@@ -137,6 +195,47 @@ def _editable_columns(columns):
     return [column for column in columns if column != primary_key]
 
 
+def _duplicate_key_columns(columns):
+    by_lower_name = {column.lower(): column for column in columns}
+    return tuple(
+        by_lower_name[alias]
+        for aliases in _DUPLICATE_KEY_COLUMN_ALIASES
+        for alias in aliases
+        if alias in by_lower_name
+    )
+
+
+def _normalise_duplicate_value(value):
+    return "" if value is None else str(value).strip()
+
+
+def _mapping_duplicate_key(columns, values):
+    return tuple(
+        _normalise_duplicate_value(values.get(column))
+        for column in _duplicate_key_columns(columns)
+    )
+
+
+def _ensure_no_duplicate_mappings(columns, candidate_rows, *, exclude_record_id=None):
+    """Reject exact mapping duplicates in the current user's visible working copy."""
+    editable_columns = _editable_columns(columns)
+    primary_key = _primary_key(columns)
+    _, existing_rows = _get_mapping_data(user_id=session["userid"])
+    primary_key_index = columns.index(primary_key)
+    existing_keys = {
+        _mapping_duplicate_key(columns, dict(zip(columns, row)))
+        for row in existing_rows
+        if str(row[primary_key_index]) != str(exclude_record_id)
+    }
+    candidate_keys = set()
+    for row in candidate_rows:
+        values = row if isinstance(row, dict) else dict(zip(editable_columns, row))
+        key = _mapping_duplicate_key(columns, values)
+        if key in existing_keys or key in candidate_keys:
+            raise ValueError("同年度、同癌別且組織型態資料完全相同，不能重複新增。")
+        candidate_keys.add(key)
+
+
 def _validated_mapping_values(columns, values):
     values = ["" if value is None else str(value).strip() for value in values]
     empty_columns = [
@@ -158,13 +257,14 @@ def _validated_mapping_values(columns, values):
 
 def _insert_mapping_rows(columns, rows):
     editable_columns = _editable_columns(columns)
+    _ensure_no_duplicate_mappings(columns, rows)
     conn = get_conn()
     try:
         cursor = conn.cursor()
         record_changes(cursor, "histology_code", session["userid"], [
             {"record_id": f"draft-{uuid4()}", "action": "Create", "after": dict(zip(editable_columns, row))}
             for row in rows
-        ])
+        ], approved_only=True)
     except Exception:
         conn.rollback()
         raise
@@ -183,6 +283,8 @@ def _read_import_rows(uploaded_file):
         for row_number, values in enumerate(worksheet.iter_rows(min_row=2, values_only=True), start=2):
             if all(value is None or str(value).strip() == "" for value in values):
                 continue
+            if values and str(values[0]).strip().startswith("範例（請自行刪除本列"):
+                raise ValueError("範本中的範例列尚未刪除，請先刪除第 2 列後再匯入。")
             if any(value is None or str(value).strip() == "" for value in values):
                 raise ValueError(f"第 {row_number} 列有未填寫欄位。")
             rows.append(tuple(str(value).strip() for value in values))
@@ -198,8 +300,6 @@ def _read_import_rows(uploaded_file):
 def histology_code_mapping():
     search_column = request.args.get("column", "")
     search_query = request.args.get("q", "")
-    if request.args.get("draft") != "1":
-        discard_staging_changes("histology_code", session["userid"])
     conn = get_conn()
     cursor = conn.cursor()
     initial_commit_id = ensure_initial_commit(cursor, "histology_code", session["userid"], session.get("name") or session["userid"])
@@ -237,6 +337,7 @@ def histology_code_mapping():
         editing_row=editing_row,
         numeric_columns=_NUMERIC_COLUMNS,
         pending_change_count=pending_change_count,
+        save_label="送出審核",
     )
 
 @auth_bp.route("/dashboard/histology-code/versions")
@@ -248,7 +349,14 @@ def histology_code_versions():
 
     conn = get_conn()
     cursor = conn.cursor()
-    cursor.execute("SELECT CommitId, CommitId AS VersionId, ParentCommitId, CreatedByUserID, CreatedByName, Info, CreatedAt, Action, ChangeCount, ChangeCount AS RecordCount, RevertUntil FROM dbo.BranchCommits WHERE DataType = 'histology_code' ORDER BY CreatedAt DESC")
+    cursor.execute("""
+        SELECT CommitId, CommitId AS VersionId, CreatedByUserID, CreatedByName, Info,
+               CreatedAt, Action, ChangeCount, ChangeCount AS RecordCount, RevertUntil,
+               ReviewStatus, ReviewedByName, ReviewedAt
+        FROM dbo.BranchCommits
+        WHERE DataType = 'histology_code'
+        ORDER BY CreatedAt DESC
+    """)
     versions = [dict(zip([column[0] for column in cursor.description], row)) for row in cursor.fetchall()]
     users = []
     seen_user_ids = set()
@@ -267,7 +375,26 @@ def histology_code_versions():
             for version in versions
             if version["CreatedAt"] and version["CreatedAt"].date().isoformat() == selected_date]
     conn.close()
-    return render_template("branch_version.html", active="data_update_access", title="組織型態版本紀錄", description="檢視與回復組織型態的已儲存版本。", back_url=url_for("auth.histology_code_mapping"), version_endpoint="auth.histology_code_versions", preview_endpoint="auth.preview_histology_code_version", restore_endpoint="auth.restore_histology_code_timeline", versions=versions, users=users, selected_user_id=selected_user_id, selected_date=selected_date, now=datetime.now(), show_filters=True)
+    return render_template(
+        "branch_version.html",
+        active="data_update_access",
+        title="組織型態版本紀錄",
+        description="查看已送審、已啟用與退回的組織型態變更，只有核准後才會影響正式資料。",
+        back_url=url_for("auth.histology_code_mapping"),
+        version_endpoint="auth.histology_code_versions",
+        preview_endpoint="auth.preview_histology_code_version",
+        restore_endpoint="auth.restore_histology_code_timeline",
+        approval_endpoint="auth.approve_histology_code_version",
+        rejection_endpoint="auth.reject_histology_code_version",
+        versions=versions,
+        users=users,
+        selected_user_id=selected_user_id,
+        selected_date=selected_date,
+        now=datetime.now(),
+        show_filters=True,
+        show_review_workflow=True,
+        can_approve=session.get("position") == "Admin",
+    )
 
 
 def apply_histology_changes(cursor, changes, columns):
@@ -303,18 +430,141 @@ def save_histology_code_version():
     try:
         cursor = conn.cursor()
         changes = version_changes("histology_code", session["userid"])
-        apply_histology_changes(cursor, changes, _get_mapping_columns())
-        commit_id, _ = save_staging_commit(cursor, "histology_code", session["userid"], session.get("name") or session["userid"], request.form.get("info", ""), changes)
+        if not changes:
+            flash("目前沒有可儲存的變更。", "warning")
+            return _return_to_mapping(draft=False)
+        commit_id, _ = save_staging_commit(
+            cursor,
+            "histology_code",
+            session["userid"],
+            session.get("name") or session["userid"],
+            request.form.get("info", ""),
+            changes,
+            review_status="Pending",
+        )
+        _store_commit_changes(cursor, commit_id, changes)
         conn.commit()
-        replace_staging_changes("histology_code", session["userid"], changes)
-        finalize_staging_commit("histology_code", session["userid"], commit_id)
-        flash(f"已儲存版本 {commit_id}。", "success")
+        try:
+            discard_staging_changes("histology_code", session["userid"])
+        except OSError:
+            flash("版本已送出審核，但暫存檔尚未清除；請重新整理後再確認。", "warning")
+        flash("已送出審核；核准前不會影響正式組織型態資料。", "success")
         return _return_to_mapping(draft=False)
+    except ValueError as error:
+        conn.rollback()
+        flash(str(error), "danger")
+        return _return_to_mapping()
     except Exception:
         conn.rollback()
         raise
     finally:
         conn.close()
+
+
+@auth_bp.route("/dashboard/histology-code/changes/discard", methods=["POST"])
+@login_required
+@data_update_key_required
+def discard_histology_code_changes():
+    if not version_changes("histology_code", session["userid"]):
+        flash("目前沒有未儲存變更。", "warning")
+        return _return_to_mapping(draft=False)
+    discard_staging_changes("histology_code", session["userid"])
+    flash("已捨棄本次未儲存變更；正式資料與已送審版本均未受影響。", "success")
+    return _return_to_mapping(draft=False)
+
+
+@auth_bp.route("/dashboard/histology-code/versions/<version_id>/approve", methods=["POST"])
+@login_required
+@data_update_key_required
+@admin_required
+def approve_histology_code_version(version_id):
+    try:
+        commit_id = UUID(version_id)
+    except ValueError:
+        flash("版本資料無效。", "danger")
+        return redirect(url_for("auth.histology_code_versions"))
+
+    conn = get_conn()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT ParentCommitId, ReviewStatus FROM dbo.BranchCommits WHERE CommitId = ? AND DataType = 'histology_code'",
+            str(commit_id),
+        )
+        version = cursor.fetchone()
+        if not version:
+            flash("找不到指定版本。", "danger")
+            return redirect(url_for("auth.histology_code_versions"))
+        if version[1] != "Pending":
+            flash("此版本不是待審核狀態。", "warning")
+            return redirect(url_for("auth.histology_code_versions"))
+
+        active_commit_id = latest_commit_id(cursor, "histology_code", approved_only=True)
+        if not commit_ids_equal(version[0], active_commit_id):
+            flash("正式資料已有較新的版本；此待審核版本已過期，請由最新版本重新修改後送審。", "warning")
+            return redirect(url_for("auth.histology_code_versions"))
+
+        changes = _load_commit_changes(cursor, commit_id)
+        if not changes:
+            flash("此待審核版本沒有可套用的變更。", "danger")
+            return redirect(url_for("auth.histology_code_versions"))
+        apply_histology_changes(cursor, changes, _get_mapping_columns())
+        # Create actions initially carry a temporary browser ID.  The apply step
+        # replaces it with the actual HistCodeId, which must be persisted for a
+        # later restore to locate the same row.
+        _replace_commit_changes(cursor, commit_id, changes)
+        cursor.execute(
+            """UPDATE dbo.BranchCommits
+               SET ReviewStatus = 'Approved', ReviewedByUserID = ?, ReviewedByName = ?, ReviewedAt = SYSDATETIME()
+               WHERE CommitId = ? AND DataType = 'histology_code' AND ReviewStatus = 'Pending'""",
+            session["userid"], session.get("name") or session["userid"], str(commit_id),
+        )
+        if cursor.rowcount != 1:
+            raise ValueError("版本狀態已變更，請重新整理後再試。")
+        conn.commit()
+        flash("已核准並啟用此版本；正式組織型態資料已更新。", "success")
+    except ValueError as error:
+        conn.rollback()
+        flash(str(error), "danger")
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+    return redirect(url_for("auth.histology_code_versions"))
+
+
+@auth_bp.route("/dashboard/histology-code/versions/<version_id>/reject", methods=["POST"])
+@login_required
+@data_update_key_required
+@admin_required
+def reject_histology_code_version(version_id):
+    try:
+        commit_id = UUID(version_id)
+    except ValueError:
+        flash("版本資料無效。", "danger")
+        return redirect(url_for("auth.histology_code_versions"))
+
+    conn = get_conn()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """UPDATE dbo.BranchCommits
+               SET ReviewStatus = 'Rejected', ReviewedByUserID = ?, ReviewedByName = ?, ReviewedAt = SYSDATETIME()
+               WHERE CommitId = ? AND DataType = 'histology_code' AND ReviewStatus = 'Pending'""",
+            session["userid"], session.get("name") or session["userid"], str(commit_id),
+        )
+        if cursor.rowcount != 1:
+            flash("此版本不是待審核狀態。", "warning")
+            return redirect(url_for("auth.histology_code_versions"))
+        conn.commit()
+        flash("已退回此版本；正式組織型態資料未變更。", "success")
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+    return redirect(url_for("auth.histology_code_versions"))
 
 @auth_bp.route("/dashboard/histology-code/versions/<version_id>/restore-timeline", methods=["POST"])
 @login_required
@@ -328,13 +578,13 @@ def restore_histology_code_timeline(version_id):
     conn = get_conn()
     try:
         cursor = conn.cursor()
-        if has_any_staging_changes("histology_code"):
+        if version_changes("histology_code", session["userid"]):
             flash("無法回到此時間點：仍有未儲存變更。", "danger")
             return redirect(url_for("auth.histology_code_versions"))
         reverse_commits = []
-        current_id = latest_commit_id(cursor, "histology_code")
+        current_id = latest_commit_id(cursor, "histology_code", approved_only=True)
         while current_id and not commit_ids_equal(current_id, target_id):
-            cursor.execute("SELECT ParentCommitId FROM dbo.BranchCommits WHERE CommitId = ? AND DataType = 'histology_code'", current_id)
+            cursor.execute("SELECT ParentCommitId FROM dbo.BranchCommits WHERE CommitId = ? AND DataType = 'histology_code' AND ReviewStatus = 'Approved'", current_id)
             parent = cursor.fetchone()
             if not parent:
                 break
@@ -347,7 +597,7 @@ def restore_histology_code_timeline(version_id):
         primary_key, editable_columns = _primary_key(columns), _editable_columns(columns)
         changes = []
         for commit_id in reverse_commits:
-            changes.extend(reversed(commit_changes("histology_code", commit_id)))
+            changes.extend(reversed(_load_commit_changes(cursor, commit_id)))
         changes = [normalize_change(change, editable_columns) for change in changes]
         for change in changes:
             cursor.execute(f"SELECT {', '.join(_quote_identifier(column) for column in editable_columns)} FROM dbo.Histology_code_mapping WHERE {_quote_identifier(primary_key)} = ?", change["HistCodeId"])
@@ -366,20 +616,20 @@ def restore_histology_code_timeline(version_id):
                 record_staging_change(cursor, session["userid"], histcode_id, "Update", before=after, after=before)
             else:
                 record_staging_change(cursor, session["userid"], histcode_id, "Create", after=before)
-        flash(f"已回到版本 {version_id} 的時間點；請確認或繼續修改後，再儲存目前版本。", "success")
+        flash("已恢復至所選版本內容；請確認或繼續修改後，再儲存目前版本。", "success")
     except Exception:
         conn.rollback()
         flash("回到指定時間點失敗，資料未變更。", "danger")
     finally:
         conn.close()
-    return redirect(url_for("auth.Histology_code_mapping", draft="1"))
+    return redirect(url_for("auth.histology_code_mapping", draft="1"))
 
 
 @auth_bp.route("/dashboard/histology-code/versions/<version_id>/preview")
 @login_required
 @data_update_key_required
 def preview_histology_code_version(version_id):
-    if has_any_staging_changes("histology_code"):
+    if version_changes("histology_code", session["userid"]):
         flash("有未儲存變更時無法預覽歷史版本。", "danger")
         return redirect(url_for("auth.histology_code_versions"))
     try:
@@ -390,17 +640,33 @@ def preview_histology_code_version(version_id):
     conn = get_conn()
     try:
         cursor = conn.cursor()
-        reverse_commits, current_id = [], latest_commit_id(cursor, "histology_code")
-        while current_id and not commit_ids_equal(current_id, target_id):
-            cursor.execute("SELECT ParentCommitId FROM dbo.BranchCommits WHERE CommitId = ? AND DataType = 'histology_code'", current_id)
-            parent = cursor.fetchone()
-            if not parent:
-                break
-            reverse_commits.append(current_id)
-            current_id = parent[0]
-        if not commit_ids_equal(current_id, target_id):
-            flash("選取版本不在目前版本紀錄。", "danger")
+        cursor.execute("SELECT ReviewStatus, ParentCommitId FROM dbo.BranchCommits WHERE CommitId = ? AND DataType = 'histology_code'", str(target_id))
+        target = cursor.fetchone()
+        if not target or target[0] not in {"Approved", "Pending"}:
+            flash("此版本已退回，無法預覽。", "warning")
             return redirect(url_for("auth.histology_code_versions"))
+        is_pending_preview = target[0] == "Pending"
+        reverse_commits, current_id = [], latest_commit_id(cursor, "histology_code", approved_only=True)
+        if is_pending_preview:
+            if not commit_ids_equal(target[1], current_id):
+                flash("正式資料已有較新的版本；此待審核版本已過期，無法預覽。", "warning")
+                return redirect(url_for("auth.histology_code_versions"))
+        else:
+            while current_id and not commit_ids_equal(current_id, target_id):
+                cursor.execute("SELECT ParentCommitId FROM dbo.BranchCommits WHERE CommitId = ? AND DataType = 'histology_code' AND ReviewStatus = 'Approved'", current_id)
+                parent = cursor.fetchone()
+                if not parent:
+                    break
+                reverse_commits.append(current_id)
+                current_id = parent[0]
+            if not commit_ids_equal(current_id, target_id):
+                flash("選取版本不在目前版本紀錄。", "danger")
+                return redirect(url_for("auth.histology_code_versions"))
+        changes_by_commit = {
+            str(commit_id): _load_commit_changes(cursor, commit_id)
+            for commit_id in reverse_commits
+        }
+        pending_changes = _load_commit_changes(cursor, target_id) if is_pending_preview else []
     finally:
         conn.close()
 
@@ -410,7 +676,7 @@ def preview_histology_code_version(version_id):
     key_index = columns.index(primary_key)
     state = {row[key_index]: dict(zip(columns, row)) for row in rows}
     for commit_id in reverse_commits:
-        for raw_change in reversed(commit_changes("histology_code", commit_id)):
+        for raw_change in reversed(changes_by_commit[str(commit_id)]):
             change = normalize_change(raw_change, editable_columns)
             histcode_id = change["HistCodeId"]
             if change["Action"] == "Create":
@@ -422,6 +688,17 @@ def preview_histology_code_version(version_id):
                 }
                 values[primary_key] = histcode_id
                 state[histcode_id] = values
+
+    if is_pending_preview:
+        for raw_change in pending_changes:
+            change = normalize_change(raw_change, editable_columns)
+            histcode_id = change["HistCodeId"]
+            if change["Action"] == "Delete":
+                state.pop(histcode_id, None)
+                continue
+            values = {column: change[f"After{column}"] for column in editable_columns}
+            values[primary_key] = histcode_id
+            state[histcode_id] = values
 
     code_year_column = next((column for column in columns if column.lower() in {"codeyear", "code_year"}), None)
     available_years = []
@@ -470,6 +747,7 @@ def preview_histology_code_version(version_id):
         pending_change_count=0,
         preview_mode=True,
         preview_commit_id=version_id,
+        preview_label="待審核變更" if is_pending_preview else "歷史版本",
     )
 
 @auth_bp.route("/dashboard/histology-code/create", methods=["POST"])
@@ -531,6 +809,11 @@ def update_histology_code_mapping(histcode_id):
     editable_columns = _editable_columns(columns)
     try:
         values = _validated_mapping_values(editable_columns,[request.form.get(column, "") for column in editable_columns],)
+    except ValueError as error:
+        flash(str(error), "danger")
+        return _return_to_mapping()
+    try:
+        _ensure_no_duplicate_mappings(columns, [values], exclude_record_id=histcode_id)
     except ValueError as error:
         flash(str(error), "danger")
         return _return_to_mapping()

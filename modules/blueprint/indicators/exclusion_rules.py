@@ -13,6 +13,7 @@ from collections import Counter
 import pandas as pd
 from modules.blueprint.dashboard.definition.cancer_grouping import classify_cancer_group
 from modules.blueprint.dashboard.definition.cancer_group_rules import CANCER_GROUP_RULES
+from modules.services.case_class_filter import is_case_class_h
 
 # ---------------------------------------------------------------------------
 # 全域排除常數定義 (115 年版定義標準)
@@ -244,22 +245,27 @@ def apply_global_indicators_exclusions(dataframe: pd.DataFrame,*,is_hospital_sel
     audit["指標模組納入統計"] = True
     audit["指標模組排除原因"] = ""
 
+    columns = _column_map(audit)
+    class_col = columns["case_class"]
+    is_h_class = audit[class_col].map(is_case_class_h) if class_col else pd.Series(False, index=audit.index)
+    _append_reason(audit, is_h_class, "個案分類為 H")
+
     if not is_hospital_self_reported:
-        return audit.copy(), audit, {
+        included = audit.loc[audit["指標模組納入統計"]].copy()
+        return included, audit, {
             "input_count": int(len(audit)),
-            "included_count": int(len(audit)),
-            "excluded_count": 0,
-            "excluded_by_reason": {},
+            "included_count": int(len(included)),
+            "excluded_count": int(len(audit) - len(included)),
+            "excluded_by_reason": {"case_class_h": int((~audit["指標模組納入統計"]).sum())} if class_col else {},
             "warnings": ["此指標非醫院自行申報資料來源，未套用共用排除規則。"],
         }
 
-    columns = _column_map(audit)
     warnings = []
 
-    class_col = columns["case_class"]
-    if class_col and exclude_case_class:
-        eligible_class = audit[class_col].map(_clean_code).isin(ELIGIBLE_CASE_CLASSES)
-        _append_reason(audit, ~eligible_class, "個案分類非 class 1、2")
+    if class_col:
+        if exclude_case_class:
+            eligible_class = audit[class_col].map(_clean_code).isin(ELIGIBLE_CASE_CLASSES)
+            _append_reason(audit, ~eligible_class & ~is_h_class, "個案分類非 class 1、2")
     elif not class_col:
         warnings.append("找不到個案分類(2.3)欄位，未套用 class=1、2 排除規則。")
 

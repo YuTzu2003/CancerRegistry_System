@@ -67,7 +67,7 @@ def _unique_case_count(frame, mask):
     return int(keys.loc[complete].drop_duplicates().shape[0] + (~complete).sum())
 
 
-def build_indicators_export_frame(frame, cancers, year_start, year_end, cancer_label_getter=None):
+def build_indicators_export_frame(frame, cancers, year_start, year_end, cancer_label_getter=None, oral_rules=None, rules_by_cancer=None):
     """Keep source rows intact and append row-level numerator/denominator flags."""
     source_frame = frame.reset_index(drop=True).copy()
     export_frame = source_frame.copy()
@@ -88,12 +88,13 @@ def build_indicators_export_frame(frame, cancers, year_start, year_end, cancer_l
         return candidate
 
     for cancer_key in selected:
-        metadata = get_indicator_metadata(cancer_key)
-        definitions = get_indicator_definitions(cancer_key, metadata)
+        override_rules = (rules_by_cancer or {}).get(cancer_key)
+        metadata = get_indicator_metadata(cancer_key, rules=override_rules)
+        definitions = get_indicator_definitions(cancer_key, metadata, oral_rules=oral_rules,
+                                                rule_override=override_rules)
         definition_by_id = {int(item["id"]): item for item in definitions}
-        indicator_ids = sorted({
-            *definition_by_id.keys(),
-            *(int(item["id"]) for item in metadata),
+        indicator_ids = sorted(definition_by_id if rules_by_cancer is not None and cancer_key in rules_by_cancer else {
+            *definition_by_id.keys(), *(int(item["id"]) for item in metadata),
         })
         cancer_label = cancer_label_getter(cancer_key) if cancer_label_getter else cancer_key
 
@@ -145,7 +146,7 @@ def build_indicators_export_frame(frame, cancers, year_start, year_end, cancer_l
 # ---------------------------------------------------------------------------
 # 指標分析主流程
 # ---------------------------------------------------------------------------
-def run_indicators_analysis(frame, cancers, year_start, year_end):
+def run_indicators_analysis(frame, cancers, year_start, year_end, oral_rules=None, rules_by_cancer=None):
     year_mask, error = _year_mask(frame, year_start, year_end)
     if error:
         return {"ok": False, "error": error}
@@ -153,8 +154,13 @@ def run_indicators_analysis(frame, cancers, year_start, year_end):
     selected = [str(key) for key in (cancers or []) if str(key).strip()]
     reports = []
     for cancer_key in selected:
-        metadata = get_indicator_metadata(cancer_key)
-        definitions = get_indicator_definitions(cancer_key, metadata)
+        override_rules = (rules_by_cancer or {}).get(cancer_key)
+        metadata = get_indicator_metadata(cancer_key, rules=override_rules)
+        definitions = get_indicator_definitions(cancer_key, metadata, oral_rules=oral_rules,
+                                                rule_override=override_rules)
+        if rules_by_cancer is not None and cancer_key in rules_by_cancer:
+            active_ids = {item['id'] for item in definitions}
+            metadata = [item for item in metadata if item['id'] in active_ids]
         cancer_cases = frame.loc[year_mask & cancer_case_mask(frame, cancer_key)]
         included_cases, audit_cases, global_summary = apply_global_indicators_exclusions(
             cancer_cases,

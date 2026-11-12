@@ -111,6 +111,10 @@ if ($InitializeDatabase) {
     if ($LASTEXITCODE -ne 0) { throw "Database initialization failed. IIS has not been changed." }
 }
 
+Write-Host "Phase: applying idempotent database migrations."
+& (Join-Path $projectRoot ".venv\Scripts\python.exe") .\deploy\apply_database_migrations.py
+if ($LASTEXITCODE -ne 0) { throw "Database migration failed. IIS has not been changed." }
+
 Write-Host "Phase: configuring IIS, ARR, static files, and the firewall rule."
 & (Join-Path $PSScriptRoot "prepare-iis.ps1")
 & (Join-Path $PSScriptRoot "configure-iis.ps1") -PublicPort $publicPort

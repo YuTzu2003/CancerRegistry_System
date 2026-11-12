@@ -308,7 +308,7 @@ def create_filtered_pbix(source_path, output_dir, *, cancers, year_start, year_e
 
     output_dir = Path(output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=False)
-    excel_path = output_dir / "powerbi_dataset.xlsx"
+    excel_path = output_dir / "dataset.xlsx"
     pbix_path = output_dir / "annual_report.pbix"
     result = export_pbi_dataset(source_path, excel_path, cancers=cancers,
                                 year_start=year_start, year_end=year_end, behavior=behavior)
