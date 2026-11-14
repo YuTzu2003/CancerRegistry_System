@@ -32,6 +32,16 @@
         if (document.getElementById('chk_group_Lung_and_Bronchus')?.checked) {
             selectedValues.push('Lung_and_Bronchus');
         }
+
+        // Keep checked aggregate groups in the filter payload as well as their
+        // leaf values.  Some records (for example C051 with AJCC ED=99999)
+        // classify to a generic subgroup such as Oropharynx rather than a
+        // P16+/- leaf, so the parent group key is needed to include them.
+        document.querySelectorAll('.cancer-cb-group:not([data-group="All_Cancers"]), .cancer-cb-subgroup').forEach(group => {
+            if (group.checked && !hasCheckedAncestor(group)) {
+                selectedValues.push(group.dataset.group);
+            }
+        });
         
         if (specificSelectedCount === leafNodes.length && leafNodes.length > 0) {
             window.dashboardSelectedCancerTitle = '全癌別';
