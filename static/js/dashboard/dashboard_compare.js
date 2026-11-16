@@ -2466,7 +2466,7 @@
         series: [...sexSeries, topLabelSeries]
       });
     } else if (report.view === 'age') {
-      const colors = ['#F3AE9F', '#E9CB92', '#C3E4C3', '#A7B9DF', '#C8B0DC'];
+      const colors = window.AnnualReportRenderer.STAGE_COLORS;
       const labels = report.chart_stage_labels;
       const ageStagePercentages = report.chart_age_rows.map(row => {
         const total = (row.values || []).reduce((sumValue, value) => sumValue + Number(value || 0), 0);
@@ -2508,10 +2508,28 @@
           ] };
         }
       };
+      const stageSeparatorSeries = {
+        name: '__stageSeparators',
+        type: 'custom',
+        silent: true,
+        tooltip: { show: false },
+        z: 15,
+        data: window.AnnualReportRenderer.stageSeparatorData(
+          report.chart_age_rows.map((row, index) => ({ age: row.age, values: ageStagePercentages[index] }))
+        ),
+        renderItem: (params, api) => {
+          const point = api.coord([api.value(0), api.value(1)]);
+          return {
+            type: 'line',
+            shape: { x1: point[0], y1: point[1] - 11, x2: point[0], y2: point[1] + 11 },
+            style: { stroke: '#FFFFFF', lineWidth: 1 }
+          };
+        }
+      };
       chartEl.style.height = '680px';
       chart.setOption({ ...common, tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } }, legend: { top: 55, data: labels }, grid: { left: 62, right: 28, top: 95, bottom: 45 },
         xAxis: { type: 'value', min: 0, max: 100, axisLabel: { formatter: '{value}%' } }, yAxis: { type: 'category', data: report.chart_age_rows.map(row => row.age) },
-        series: [...labels.map((label, index) => ({ name: label, type: 'bar', stack: 'age-stage', barMaxWidth: 22, data: ageStagePercentages.map(values => values[index]), itemStyle: { color: colors[index % colors.length] }, label: {
+        series: [...labels.map((label, index) => ({ name: label, type: 'bar', stack: 'age-stage', barMaxWidth: 22, data: ageStagePercentages.map(values => values[index]), itemStyle: window.AnnualReportRenderer.stageSegmentStyle(index), label: {
           show: true,
           position: 'inside',
           align: 'center',
@@ -2526,7 +2544,7 @@
           textBorderWidth: 0,
           textShadowBlur: 0,
           formatter: params => Number(params.value || 0) > 3 ? `${Number(params.value).toFixed(1)}%` : ''
-        } })), smallStageLabelSeries] });
+        } })), stageSeparatorSeries, smallStageLabelSeries] });
     } else {
       chart.setOption({ ...common, tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } }, grid: { left: 58, right: 28, top: 82, bottom: 55 },
         xAxis: { type: 'category', data: report.stage_labels }, yAxis: { type: 'value', min: 0, max: 100, interval: 10, axisLabel: { formatter: '{value}%' } },
