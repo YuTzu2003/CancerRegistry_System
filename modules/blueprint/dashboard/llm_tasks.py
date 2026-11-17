@@ -204,6 +204,35 @@ def _row(cursor, row):
     return dict(zip([column[0] for column in cursor.description], row))
 
 
+def _analysis_item_label(item):
+    label = str(item.get('title') or item.get('analysis_item') or item.get('field_key') or '')
+    if label.startswith('::'):
+        parts = label.split('::')
+        system = parts[1].strip() if len(parts) > 1 else ''
+        return f'{system} 期別與手術術式'.strip()
+    if '|' not in label:
+        return label
+    topic, detail = label.split('|', 1)
+    if topic != '期別與手術術式':
+        return topic
+    parts = detail.split('::')
+    system = parts[1].strip() if len(parts) > 1 else ''
+    return f'{system} 期別與手術術式'.strip()
+
+
+def _analysis_info(payload):
+    items = payload.get('items') if isinstance(payload.get('items'), list) else []
+    return {
+        'year_title': str(payload.get('year_title') or ''),
+        'cancer_title': str(payload.get('cancer_title') or ''),
+        'analysis_items': [
+            _analysis_item_label(item)
+            for item in items if isinstance(item, dict)
+            and (item.get('field_key') or item.get('analysis_item') or item.get('title'))
+        ],
+    }
+
+
 def create_llm_task(owner_id, task_type, payload):
     if task_type not in TASK_TYPES:
         raise ValueError('Unsupported LLM task type')
@@ -256,6 +285,7 @@ def _task(cursor, row):
     )
     task['DocumentLabel'] = payload.get('_document_label', '')
     task['TaskTitle'] = payload.get('job_title') or payload.get('field_key') or payload.get('analysis_item') or 'LLM 分析'
+    task['AnalysisInfo'] = _analysis_info(payload)
     items = payload.get('items') if isinstance(payload.get('items'), list) else []
     first_item = items[0] if items and isinstance(items[0], dict) else {}
     task['InsightModule'] = payload.get('insight_module') or first_item.get('insight_module') or 'dashboard'
