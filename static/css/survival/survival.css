@@ -736,6 +736,90 @@
 }
 .recalc-error i { margin-right: 6px; }
 
+/* Curves upload follows the annual-report upload and filter rhythm. */
+.survival-curves {
+  --sr-blue: var(--gray-800);
+  --sr-accent: var(--gray-700);
+  --sr-pale: var(--gray-100);
+}
+.survival-curves .curves-page-head { margin: 0; }
+.survival-curves .recalc-upload-card {
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+.survival-curves .recalc-upload-card__head {
+  padding: 14px 18px;
+  background: var(--gray-50);
+}
+.survival-curves .recalc-upload-card__head i { color: var(--gray-700); }
+.survival-curves .recalc-upload-card__body {
+  display: grid;
+  grid-template-columns: minmax(240px, .9fr) minmax(320px, 1.1fr);
+  align-items: start;
+  gap: 12px 16px;
+  padding: 18px;
+}
+.survival-curves .recalc-file-zone {
+  grid-row: 1 / span 3;
+  min-height: 172px;
+  padding: 16px;
+  border-color: var(--border);
+  background: var(--gray-50);
+}
+.survival-curves .recalc-file-zone:hover,
+.survival-curves .recalc-file-zone:focus-within {
+  border-color: var(--gray-500);
+  background: var(--gray-100);
+}
+.survival-curves .recalc-file-zone i { color: var(--gray-700); font-size: 24px; }
+.survival-curves .curves-filter-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(128px, 180px) minmax(128px, 180px);
+  width: 100%;
+  grid-column: 2;
+  gap: 12px;
+  margin: 0;
+}
+.survival-curves .curves-filter-field { min-width: 0; padding: 0; }
+.survival-curves .curves-filter-field .form-label {
+  margin-bottom: 5px;
+  color: var(--gray-600);
+  font-size: 12px;
+  font-weight: 600;
+}
+.survival-curves .curves-filter-field .form-select {
+  border-color: var(--border);
+  color: var(--text);
+  box-shadow: none;
+}
+.survival-curves .curves-filter-field .form-select:focus {
+  border-color: var(--gray-500);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--gray-300) 70%, transparent);
+}
+.survival-curves #recalc-file-status { grid-column: 2; margin: 0; }
+.survival-curves .recalc-submit-btn {
+  grid-column: 2;
+  justify-self: end;
+  padding: 10px 18px;
+  background: var(--gray-800);
+  box-shadow: none;
+}
+.survival-curves .recalc-submit-btn:hover { background: var(--gray-900); }
+.survival-curves .recalc-submit-btn:focus-visible,
+.survival-curves .recalc-file-zone:focus-within {
+  outline: 2px solid var(--gray-700);
+  outline-offset: 2px;
+}
+@media (max-width: 768px) {
+  .survival-curves .recalc-upload-card__body { grid-template-columns: 1fr; }
+  .survival-curves .recalc-file-zone,
+  .survival-curves .curves-filter-grid,
+  .survival-curves #recalc-file-status,
+  .survival-curves .recalc-submit-btn { grid-column: 1; grid-row: auto; }
+  .survival-curves .curves-filter-grid { grid-template-columns: 1fr; }
+  .survival-curves .recalc-submit-btn { width: 100%; justify-content: center; }
+}
+
 /* results header */
 .recalc-results-header {
   display: flex;

@@ -6,18 +6,14 @@
 {% endblock %}
 {% block content %}
 <section class="survival-module survival-curves" aria-labelledby="curvesHeading">
-  <a href="{{ url_for('survival_report.index') }}" class="recalc-back"><i class="bi bi-arrow-left"></i> 返回存活率模組</a>
-
-  <header class="recalc-hero">
-    <div class="recalc-hero__icon"><i class="bi bi-graph-down"></i></div>
-    <div class="recalc-hero__text">
-      <span class="recalc-badge">存活率圖表</span>
+  <div class="page-head curves-page-head">
+    <div>
       <h1 id="curvesHeading">存活曲線與生命表</h1>
-      <p>上傳存活率個案清單，依癌別與期別繪製 Kaplan–Meier 存活曲線、年度存活率與生命表。</p>
+      <p class="lead">依上傳個案資料、院所與年度，產製存活曲線與生命表。</p>
     </div>
-  </header>
+  </div>
 
-  <form class="recalc-upload-card" id="curves-form">
+  <form class="recalc-upload-card curves-upload" id="curves-form">
     <div class="recalc-upload-card__head">
       <i class="bi bi-file-earmark-spreadsheet"></i>
       <div>
@@ -32,14 +28,14 @@
         <small id="recalc-file-name">尚未選擇檔案</small>
         <input id="case-file" name="case_file" type="file" accept=".xlsx" required>
       </label>
-      <div class="row g-2" id="recalc-filters" data-options-url="{{ url_for('survival_report.recalculate_options') }}"
-        data-curves-url="{{ url_for('survival_report.curves_data') }}" hidden>
-        <div class="col-sm"><label for="recalc-hospital" class="form-label">院所</label><select id="recalc-hospital"
-            name="hospital" class="form-select" required></select></div>
-        <div class="col-sm"><label for="recalc-start-year" class="form-label">民國起年</label><select id="recalc-start-year"
-            name="start_year" class="form-select" required></select></div>
-        <div class="col-sm"><label for="recalc-end-year" class="form-label">民國迄年</label><select id="recalc-end-year"
-            name="end_year" class="form-select" required></select></div>
+      <div class="row g-2 curves-filter-grid" id="recalc-filters" data-options-url="{{ url_for('survival_report.recalculate_options') }}"
+        data-curves-url="{{ url_for('survival_report.curves_data') }}">
+        <div class="col-sm curves-filter-field"><label for="recalc-hospital" class="form-label">院所</label><select id="recalc-hospital"
+            name="hospital" class="form-select" required disabled><option>請先讀取檔案</option></select></div>
+        <div class="col-sm curves-filter-field"><label for="recalc-start-year" class="form-label">民國起年</label><select id="recalc-start-year"
+            name="start_year" class="form-select" required disabled><option>請先讀取檔案</option></select></div>
+        <div class="col-sm curves-filter-field"><label for="recalc-end-year" class="form-label">民國迄年</label><select id="recalc-end-year"
+            name="end_year" class="form-select" required disabled><option>請先讀取檔案</option></select></div>
       </div>
       <p id="recalc-file-status" role="status"></p>
       <button class="recalc-submit-btn" type="submit" disabled><i class="bi bi-graph-down"></i> 產生存活曲線</button>

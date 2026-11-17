@@ -34,6 +34,13 @@ function updateYears() {
   updateEndYears();
 }
 
+function resetFilters() {
+  for (const field of [hospital, startYear, endYear]) {
+    field.replaceChildren(new Option("請先讀取檔案", ""));
+    field.disabled = true;
+  }
+}
+
 hospital.addEventListener("change", updateYears);
 startYear.addEventListener("change", updateEndYears);
 
@@ -41,7 +48,7 @@ fileInput.addEventListener("change", async () => {
   pendingRequest?.abort();
   const file = fileInput.files[0];
   document.getElementById("recalc-file-name").textContent = file?.name || "尚未選擇檔案";
-  filters.hidden = true;
+  resetFilters();
   submitButton.disabled = true;
   statusMessage.textContent = file ? "正在讀取院所及年度…" : "";
   if (!file) return;
@@ -57,8 +64,10 @@ fileInput.addEventListener("change", async () => {
     if (!response.ok) throw new Error(data.error || "無法讀取清單。");
     hospitals = data.hospitals;
     hospital.replaceChildren(...hospitals.map(item => new Option(item.label, item.label)));
+    hospital.disabled = false;
+    startYear.disabled = false;
+    endYear.disabled = false;
     updateYears();
-    filters.hidden = false;
     submitButton.disabled = false;
     statusMessage.textContent = "";
   } catch (error) {
