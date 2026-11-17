@@ -14,7 +14,8 @@
     const selectedNames = [];
     
     const isAllSelected = allCancersNode && allCancersNode.checked;
-    
+    window.dashboardCancerKeyLabels = {};
+
     if (isAllSelected) {
         leafNodes.forEach(node => {
             selectedValues.push(node.value);
@@ -38,26 +39,31 @@
             selectedValues.push('All_Cancers');
         } else if (specificSelectedCount > 0) {
             const groupNodes = document.querySelectorAll('.cancer-cb-group:not([data-group="All_Cancers"]), .cancer-cb-subgroup');
+            const cleanLabel = text => text.replace(/\s*\([^)]*\)/g, '').replace(/\s+[A-Za-z][A-Za-z0-9\s,./&+-]*$/g, '').trim();
+            const keyLabels = {};
             const groupedNames = [];
             groupNodes.forEach(group => {
                if(group.checked && !hasCheckedAncestor(group)) {
-                   const label = group.nextElementSibling.textContent.replace('(全選)', '').trim();
-                   groupedNames.push(label.replace(/\s*\([^)]*\)/g, '').replace(/\s+[A-Za-z][A-Za-z0-9\s,./&+-]*$/g, '').trim());
-               } 
+                   const label = cleanLabel(group.nextElementSibling.textContent.replace('(全選)', '').trim());
+                   groupedNames.push(label);
+                   if (group.dataset.group) keyLabels[group.dataset.group] = label;
+               }
             });
-            
+
             const independentLeaves = [];
             leafNodes.forEach(node => {
                if(node.checked) {
-                   const parentGrp = document.getElementById('chk_group_' + node.getAttribute('data-parent')) || 
+                   const parentGrp = document.getElementById('chk_group_' + node.getAttribute('data-parent')) ||
                                      document.getElementById('chk_group_' + node.getAttribute('data-grandparent'));
                    if(!parentGrp || !parentGrp.checked) {
-                       const label = node.nextElementSibling.textContent.trim();
-                       independentLeaves.push(label.replace(/\s*\([^)]*\)/g, '').replace(/\s+[A-Za-z][A-Za-z0-9\s,./&+-]*$/g, '').trim());
+                       const label = cleanLabel(node.nextElementSibling.textContent.trim());
+                       independentLeaves.push(label);
+                       if (node.value) keyLabels[node.value] = label;
                    }
                }
             });
             window.dashboardSelectedCancerTitle = [...groupedNames, ...independentLeaves].join('、');
+            window.dashboardCancerKeyLabels = keyLabels;
         } else {
             window.dashboardSelectedCancerTitle = 'XX';
         }

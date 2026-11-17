@@ -191,6 +191,17 @@ STAGE_FUNCTIONS = {
     "Breast Cancer Prognostic Stage": breast_stages, "Binet": binet_stages,
 }
 
+STAGE_SYSTEM_CANCER_KEYS = {
+    "FIGO": {"Cervix_Uteri", "Corpus_Uteri", "Ovary"},
+    "MAC": {"Colon", "Rectum"},
+    "BCLC": {"Liver"},
+    "SCLC": {"Lung_and_Bronchus", "Small_cell_carcinoma", "Adenocarcinoma", "Squamous_cell_carcinoma"},
+    "DSS": {"Plasma_cell_neoplasms"},
+    "DRE": {"Prostate"},
+    "Breast Cancer Prognostic Stage": {"Breast_Female", "Breast_Male"},
+    "Binet": {"CLL"},
+}
+
 # Manual keys follow resolve_surgery_manual_key; these mirror the site and
 # histology eligibility in the stage functions above and the selection UI.
 SURGERY_STAGE_MANUALS = {
@@ -288,7 +299,48 @@ def _stage_sort_key(label):
     return (order.get(upper, 999), "", text)
 
 
-def build_stage_report(stage_result, option, period_codes=None):
+def _resolve_applicable_cancer_keys(rows, cancers, system):
+    """Return selected cancer keys applicable to a stage-system title.
+
+    Prefer actual matching cases. When none exist, retain selected keys that
+    are eligible for the stage system so a zero-count report is titled correctly.
+    """
+    if not cancers:
+        return []
+    from modules.blueprint.dashboard.definition.cancer_grouping import classify_cancer_group
+    selected_order = [str(key).strip() for key in cancers if key and str(key).strip()]
+    selected_set = set(selected_order)
+    if "All_Cancers" in selected_set:
+        return ["All_Cancers"]
+    applicable = set()
+    for row in rows:
+        case = row.get("case") or {}
+        site = _case_value(case, "原發部位", "site")
+        hist = _case_value(case, "組織型態", "hist")
+        cancer = classify_cancer_group(
+            site,
+            hist,
+            behavior=_case_value(case, "性態碼", "behavior"),
+            didiag=_case_value(case, "最初診斷日期", "診斷年度", "didiag"),
+            ajcc_ed=_case_value(case, "ajcc 癌症分期版本與章節", "ajcc_ed"),
+            sex=_case_value(case, "性別", "sex"),
+        )
+        if not cancer:
+            continue
+        for candidate in [cancer.get("subgroup_key"), *(cancer.get("ancestor_subgroup_keys") or []), cancer.get("group_key")]:
+            if candidate and candidate in selected_set:
+                applicable.add(candidate)
+                break
+    if applicable:
+        return [key for key in selected_order if key in applicable]
+
+    eligible_keys = STAGE_SYSTEM_CANCER_KEYS.get(system)
+    if eligible_keys:
+        return [key for key in selected_order if key in eligible_keys]
+    return []
+
+
+def build_stage_report(stage_result, option, period_codes=None, cancers=None):
     """把 2.4 分期結果整理成前端三種表圖共用的資料契約。"""
     rows = stage_result.get("rows", [])
     option_name = option.get("option") or option["system"]
@@ -359,6 +411,9 @@ def build_stage_report(stage_result, option, period_codes=None):
         "unknown_count": unknown_count,
         "not_applicable_count": not_applicable_count,
         "included_count": len(included_rows),
+        # Names of user-selected cancer groups whose cases appear in this stage
+        # system, so titles only list applicable cancers (e.g. MAC excludes Larynx).
+        "applicable_cancer_keys": _resolve_applicable_cancer_keys(rows, cancers, option["system"]),
         "is_preview": False,
     }
 
@@ -373,7 +428,7 @@ def load_period_codes():
         conn.close()
 
 
-def calculate_stage_reports(cases, options, period_codes=None):
+def calculate_stage_reports(cases, options, period_codes=None, cancers=None):
     """依勾選選項計算期別、性別期別及年齡層期別報表資料。"""
     cases = filter_class(cases)
     period_codes = load_period_codes() if period_codes is None else period_codes
@@ -385,7 +440,7 @@ def calculate_stage_reports(cases, options, period_codes=None):
             continue
         if system not in results_by_system:
             results_by_system[system] = STAGE_FUNCTIONS[system](cases, period_codes)
-        reports.append(build_stage_report(results_by_system[system], option, period_codes))
+        reports.append(build_stage_report(results_by_system[system], option, period_codes, cancers=cancers))
     return reports
 
 
@@ -461,7 +516,7 @@ def _available_stage_labels(system, detailed, period_codes, manual_key=None):
     return sorted(set(labels), key=_stage_sort_key)
 
 
-def calculate_stage_first_course_distribution(cases, options, period_codes=None):
+def calculate_stage_first_course_distribution(cases, options, period_codes=None, cancers=None):
     """Create first-course-treatment crosstabs for the selected stage systems."""
     from modules.blueprint.dashboard.definition.treatment_rules import (
         classify_first_course_treatments,
@@ -532,6 +587,7 @@ def calculate_stage_first_course_distribution(cases, options, period_codes=None)
             "excluded_not_applicable": excluded_not_applicable,
             "excluded_unmapped": excluded_unmapped,
             "excluded_unclassified_treatment": excluded_unclassified_treatment,
+            "applicable_cancer_keys": _resolve_applicable_cancer_keys(stage_result.get("rows", []), cancers, system),
         })
     return tables
 

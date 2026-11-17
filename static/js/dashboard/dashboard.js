@@ -1,4 +1,3 @@
-// 年報頁共用狀態：保存 ECharts 實例與圖表 renderer。
 window.dashboardChartInstance = null;
 window.dashboardHistologyChartInstance = null;
 window.dashboardSurvivalChartInstance = null;
@@ -7,10 +6,7 @@ window.dashboardStageSexChartInstance = null;
 window.dashboardStageAgeChartInstance = null;
 window.DashboardRenderer = {};
 
-
-// 首次載入時建立性別年齡與組織型態的空白圖表。
 document.addEventListener('DOMContentLoaded', function() {
-    /* ── 性別與年齡分佈圖表 ── */
     var chartDom = document.getElementById('main');
     if (chartDom) {
         var myChart = echarts.init(chartDom);
@@ -339,6 +335,46 @@ window.DashboardRenderer.getCancerTitleForSentence = function(cancerTitle) {
         if (window.DashboardI18n?.getLanguage() === 'en' && (window.dashboardSelectedCancerDisplayKeys || []).length > 0) return cancerTitle;
         if (cancerTitle.includes('癌') || /cancer/i.test(cancerTitle) || cancerTitle.includes('全部癌症')) return cancerTitle;
         return `${cancerTitle}${this.t('cancer')}`;
+    };
+
+// Non-AJCC stage systems only apply to a subset of the user's cancer selection
+// (e.g. MAC excludes Larynx). Narrow the title to the cancers that actually
+// contribute cases. Saved previews created before that metadata existed fall
+// back to their stored selection and the stage system's eligible cancer keys.
+window.DashboardRenderer.getStageReportCancerTitle = function(report, cancerTitle) {
+        const stageSystemCancerKeys = {
+            FIGO: ['Cervix_Uteri', 'Corpus_Uteri', 'Ovary'],
+            MAC: ['Colon', 'Rectum'],
+            BCLC: ['Liver'],
+            SCLC: ['Lung_and_Bronchus', 'Small_cell_carcinoma', 'Adenocarcinoma', 'Squamous_cell_carcinoma'],
+            DSS: ['Plasma_cell_neoplasms'],
+            DRE: ['Prostate'],
+            'Breast Cancer Prognostic Stage': ['Breast_Female', 'Breast_Male'],
+            Binet: ['CLL']
+        };
+        const reportedKeys = Array.isArray(report?.applicable_cancer_keys) ? report.applicable_cancer_keys : [];
+        const selectedKeys = window.dashboardSelectedCancerDisplayKeys || [];
+        const isEnglish = window.DashboardI18n?.getLanguage() === 'en';
+        const nameMap = window.dashboardCancerNameTranslations || {};
+        if (reportedKeys.includes('All_Cancers') || selectedKeys.includes('All_Cancers')) {
+            return nameMap.All_Cancers?.[isEnglish ? 'en' : 'zh'] || cancerTitle;
+        }
+        const applicable = reportedKeys.length
+            ? reportedKeys
+            : selectedKeys.filter(key => stageSystemCancerKeys[report?.staging_system]?.includes(key));
+        if (!applicable.length) {
+            return isEnglish ? this.getEnglishCancerPatientLabel(cancerTitle) : this.getCancerTitleForSentence(cancerTitle);
+        }
+        if (isEnglish) {
+            const names = applicable.map(key => nameMap[key]?.en).filter(Boolean);
+            if (!names.length) return this.getEnglishCancerPatientLabel(cancerTitle);
+            const joined = names.join(', ');
+            return /cancer|carcinoma|lymphoma|leukemia/i.test(joined) ? joined : `${joined} Cancer`;
+        }
+        const labels = window.dashboardCancerKeyLabels || {};
+        const names = applicable.map(key => labels[key] || nameMap[key]?.zh).filter(Boolean);
+        if (!names.length) return this.getCancerTitleForSentence(cancerTitle);
+        return this.getCancerTitleForSentence(names.join('、'));
     };
 
 window.DashboardRenderer.insightCache = new Map();
@@ -1634,9 +1670,7 @@ window.DashboardRenderer.configureStageInsight = function(stageReport, { generat
 
 window.DashboardRenderer.renderStageDistributionReport = function(stageData, yearTitle, cancerTitle) {
         const data = this.normalizeStageDistributionData(stageData);
-        const selectedCancer = this.getCancerTitleForSentence(cancerTitle);
-        const isEnglish = window.DashboardI18n?.getLanguage() === 'en';
-        const titleCancer = isEnglish ? this.getEnglishCancerPatientLabel(cancerTitle) : selectedCancer;
+        const titleCancer = this.getStageReportCancerTitle(stageData, cancerTitle);
         const systemName = data.staging_system;
         const percentage = value => data.included_count > 0 ? Number(value) / data.included_count * 100 : 0;
         const tableCaption = document.getElementById('annualStageDistributionCaption');
@@ -1738,8 +1772,7 @@ window.DashboardRenderer.renderStageDistributionReport = function(stageData, yea
 
 window.DashboardRenderer.renderStageSexReport = function(stageData, yearTitle, cancerTitle) {
         const data = this.normalizeStageDistributionData(stageData);
-        const isEnglish = window.DashboardI18n?.getLanguage() === 'en';
-        const titleCancer = isEnglish ? this.getEnglishCancerPatientLabel(cancerTitle) : cancerTitle;
+        const titleCancer = this.getStageReportCancerTitle(stageData, cancerTitle);
         const systemName = data.staging_system;
         const tableCaption = document.getElementById('annualStageSexCaption');
         const chartCaption = document.getElementById('annualStageSexChartCaption');
@@ -1892,8 +1925,7 @@ window.DashboardRenderer.renderStageSexReport = function(stageData, yearTitle, c
 
 window.DashboardRenderer.renderStageAgeReport = function(stageData, yearTitle, cancerTitle) {
         const data = this.normalizeStageDistributionData(stageData);
-        const isEnglish = window.DashboardI18n?.getLanguage() === 'en';
-        const titleCancer = isEnglish ? this.getEnglishCancerPatientLabel(cancerTitle) : cancerTitle;
+        const titleCancer = this.getStageReportCancerTitle(stageData, cancerTitle);
         const chartStageLabels = data.chart_stage_labels;
         const chartAgeRows = data.chart_age_rows;
         const systemName = data.staging_system;
@@ -2099,7 +2131,6 @@ window.DashboardRenderer.renderStageFirstCourseTables = function(tables, yearTit
             return;
         }
         const isEnglish = window.DashboardI18n?.getLanguage() === 'en';
-        const selectedCancer = this.getCancerTitleForSentence(cancerTitle);
         const systems = tables.map(item => item.system);
         const activeSystem = systems.includes(window.stageFirstCourseActiveSystem)
             ? window.stageFirstCourseActiveSystem
@@ -2132,9 +2163,10 @@ window.DashboardRenderer.renderStageFirstCourseTables = function(tables, yearTit
             const displayTreatment = (treatment) => isEnglish
                 ? String(treatment || '').split('、').map(item => treatmentEnglish[item] || item).join('、')
                 : treatment;
+        const itemCancer = this.getStageReportCancerTitle(item, cancerTitle);
         const title = isEnglish
-                ? `Table . ${this.escapeHtml(item.system)} Stage and First Course Treatment Distribution of Newly Diagnosed ${this.getEnglishCancerPatientLabel(selectedCancer)} Cases,\u00a0${yearTitle}${this.sourceLine()}`
-                : this.reportCaption('table', yearTitle, selectedCancer, `${item.system}期別與首次療程`);
+                ? `Table . ${this.escapeHtml(item.system)} Stage and First Course Treatment Distribution of Newly Diagnosed ${this.escapeHtml(itemCancer)} Cases,\u00a0${yearTitle}${this.sourceLine()}`
+                : this.reportCaption('table', yearTitle, itemCancer, `${item.system}期別與首次療程`);
             const rowPercentage = row => item.total_count
                 ? `${(Number(row.subtotal || 0) / Number(item.total_count) * 100).toFixed(1)}%`
                 : '0.0%';
