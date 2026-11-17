@@ -315,16 +315,26 @@ def find_reusable_llm_task(owner_id, task_type, request_key):
         conn.close()
 
 
-def list_llm_tasks(owner_id, limit=50):
+def list_llm_tasks(owner_id, limit=20, offset=0):
+    page_size = min(max(int(limit), 1), 20)
+    page_offset = max(int(offset), 0)
     conn = get_conn()
     try:
         cursor = conn.cursor()
         cursor.execute(
-            'SELECT TOP (?) TaskID,TaskType,Status,ProgressTotal,WorkerID,CreatedAt,CompletedAt '
-            'FROM dbo.LLMTaskWorker WHERE OwnerID=? ORDER BY CreatedAt DESC',
-            (min(max(int(limit), 1), 100), str(owner_id)),
+            '''WITH ordered_tasks AS (
+                   SELECT TaskID,TaskType,Status,ProgressTotal,WorkerID,CreatedAt,CompletedAt,
+                          ROW_NUMBER() OVER (ORDER BY CreatedAt DESC, TaskID DESC) AS row_number
+                   FROM dbo.LLMTaskWorker WHERE OwnerID=?
+               )
+               SELECT TaskID,TaskType,Status,ProgressTotal,WorkerID,CreatedAt,CompletedAt
+               FROM ordered_tasks
+               WHERE row_number > ? AND row_number <= ?
+               ORDER BY row_number''',
+            (str(owner_id), page_offset, page_offset + page_size + 1),
         )
-        return [_task(cursor, row) for row in cursor.fetchall()]
+        rows = cursor.fetchall()
+        return ([_task(cursor, row) for row in rows[:page_size]], len(rows) > page_size)
     finally:
         conn.close()
 

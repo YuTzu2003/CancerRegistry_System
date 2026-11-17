@@ -30,9 +30,11 @@
                 specificSelectedCount++;
             }
         });
-        if (document.getElementById('chk_group_Lung_and_Bronchus')?.checked) {
-            selectedValues.push('Lung_and_Bronchus');
-        }
+        document.querySelectorAll('.cancer-cb-group:not([data-group="All_Cancers"]), .cancer-cb-subgroup').forEach(group => {
+            if (group.checked && !hasCheckedAncestor(group) && group.dataset.group) {
+                selectedValues.push(group.dataset.group);
+            }
+        });
         
         if (specificSelectedCount === leafNodes.length && leafNodes.length > 0) {
             window.dashboardSelectedCancerTitle = '全癌別';

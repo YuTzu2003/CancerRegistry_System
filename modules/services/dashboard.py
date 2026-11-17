@@ -31,6 +31,28 @@ LEGACY_DASHBOARD_DATA = os.path.join(BASE_DIR, 'tasks', 'data', 'dashboard')
 os.makedirs(DASHBOARD_DATA, exist_ok=True)
 PBIP_EXPORT_ROOT = Path(DASHBOARD_DATA) / 'pbip_exports'
 PBIP_EXPORT_LOCK = threading.Lock()
+EXPORT_DRAFT_ROOT = Path(DASHBOARD_DATA) / 'export_drafts'
+EXPORT_DRAFT_TTL_SECONDS = 3600
+
+
+def _export_draft_directory(user_id):
+    safe_owner = re.sub(r'[^A-Za-z0-9_-]', '_', str(user_id))
+    directory = EXPORT_DRAFT_ROOT / safe_owner
+    directory.mkdir(parents=True, exist_ok=True)
+    return directory
+
+
+def _export_draft_path(user_id, draft_id):
+    if not re.fullmatch(r'[0-9a-f]{32}', str(draft_id or '')):
+        return None
+    return _export_draft_directory(user_id) / f'{draft_id}.json'
+
+
+def _cleanup_export_drafts(user_id):
+    cutoff = time.time() - EXPORT_DRAFT_TTL_SECONDS
+    for draft_path in _export_draft_directory(user_id).glob('*.json'):
+        if draft_path.stat().st_mtime < cutoff:
+            draft_path.unlink(missing_ok=True)
 
 def _dashboard_storage_path(file_id, stored_name):
     return os.path.join('file', str(stored_name))
@@ -429,7 +451,13 @@ def llm_task_preview(task_id):
 @dashboard_bp.route("/api/llm-tasks")
 @login_required
 def llm_task_history():
-    return jsonify({"success": True, "tasks": list_llm_tasks(session.get("id"), request.args.get("limit", 50))})
+    try:
+        limit = int(request.args.get("limit", 20))
+        offset = int(request.args.get("offset", 0))
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "error": "分頁參數格式錯誤"}), 400
+    tasks, has_more = list_llm_tasks(session.get("id"), limit, offset)
+    return jsonify({"success": True, "tasks": tasks, "has_more": has_more})
 @dashboard_bp.route('/api/favorites', methods=['GET'])
 @login_required
 def get_favorites():
@@ -824,7 +852,47 @@ def compare_dashboard_files_route():
 @dashboard_bp.route('/dashboard/export_report', methods=['GET'])
 @login_required
 def export_report_page():
-    return render_template('export_report.html', active='dashboard')
+    return render_template('export_report.html', active='dashboard', export_draft_id=request.args.get('draft_id', ''))
+
+
+@dashboard_bp.route('/api/dashboard/export-drafts', methods=['POST'])
+@login_required
+def create_export_draft():
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict) or not isinstance(payload.get('languages'), dict):
+        return jsonify({'success': False, 'error': '匯出資料格式錯誤'}), 400
+
+    owner_id = session.get('id')
+    _cleanup_export_drafts(owner_id)
+    draft_id = uuid.uuid4().hex
+    draft_path = _export_draft_path(owner_id, draft_id)
+    temporary_path = draft_path.with_suffix('.tmp')
+    try:
+        temporary_path.write_text(json.dumps(payload, ensure_ascii=False), encoding='utf-8')
+        temporary_path.replace(draft_path)
+    except (OSError, TypeError, ValueError) as exc:
+        temporary_path.unlink(missing_ok=True)
+        logging.exception('Unable to save dashboard export draft')
+        return jsonify({'success': False, 'error': f'無法暫存匯出資料：{exc}'}), 500
+
+    return jsonify({'success': True, 'draft_id': draft_id})
+
+
+@dashboard_bp.route('/api/dashboard/export-drafts/<draft_id>', methods=['GET', 'DELETE'])
+@login_required
+def export_draft(draft_id):
+    draft_path = _export_draft_path(session.get('id'), draft_id)
+    if draft_path is None or not draft_path.is_file():
+        return jsonify({'success': False, 'error': '找不到匯出資料，請回到年報重新準備。'}), 404
+
+    if request.method == 'DELETE':
+        draft_path.unlink(missing_ok=True)
+        return jsonify({'success': True})
+
+    try:
+        return jsonify({'success': True, 'data': json.loads(draft_path.read_text(encoding='utf-8'))})
+    except (OSError, ValueError):
+        return jsonify({'success': False, 'error': '匯出資料已損毀，請回到年報重新準備。'}), 500
 
 @dashboard_bp.route('/api/dashboard/export', methods=['POST'])
 @login_required

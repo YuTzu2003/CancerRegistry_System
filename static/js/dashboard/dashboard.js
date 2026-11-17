@@ -1060,12 +1060,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            localStorage.setItem('dashboard_export_data', JSON.stringify({
-                version: 3,
-                languages: exportDataByLanguage,
-                sharedChartImages: sharedChartImages
-            }));
-            window.location.href = '/dashboard/export_report';
+            try {
+                const response = await fetch('/api/dashboard/export-drafts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        version: 3,
+                        languages: exportDataByLanguage,
+                        sharedChartImages: sharedChartImages
+                    })
+                });
+                const draft = await response.json();
+                if (!response.ok || !draft.success) {
+                    throw new Error(draft.error || '無法暫存匯出資料');
+                }
+                window.location.href = '/dashboard/export_report?draft_id=' + encodeURIComponent(draft.draft_id);
+            } catch (error) {
+                console.error('Export draft save failed:', error);
+                if (window.utils?.hideLoading) window.utils.hideLoading();
+                utils.alert('匯出資料暫存失敗，請再試一次。', 'error');
+            }
         });
     }
 });
@@ -2632,7 +2646,7 @@ window.DashboardRenderer.renderAnalyzableConfirmedTable = function(tableData, ye
         if (caption) {
             caption.innerHTML = isEnglish
                 ? `Table . Analysis-Eligible and Confirmed Cases of ${this.getEnglishCancerPatientLabel(selectedCancer)} in the Cancer Registry,\u00a0${yearTitle}${this.sourceLine()}`
-                : this.reportCaption('table', yearTitle, selectedCancer, this.t('analyzableConfirmed'));
+                : this.reportCaption('table', yearTitle, selectedCancer, ` - ${this.t('analyzableConfirmed')}`);
         }
 
         const totalCasesHeader = isEnglish ? `${this.t('cancerTotal')}, ${yearTitle}` : `${yearTitle} ${this.t('cancerTotal')}`;

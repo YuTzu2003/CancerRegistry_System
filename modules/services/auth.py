@@ -51,13 +51,12 @@ def password_matches(stored_password, password):
         return False
 
 
-PASSWORD_POLICY_MESSAGE = '密碼至少 8 碼，且需同時包含英文字母與數字。'
+PASSWORD_POLICY_MESSAGE = '密碼不可為空白。'
 
 
 def password_acceptable(password):
-    """At least 8 characters with both a letter and a digit."""
-    text = str(password or '')
-    return len(text) >= 8 and re.search(r'[A-Za-z]', text) and re.search(r'\d', text)
+    """A password only needs to be non-empty."""
+    return bool(str(password or ''))
 
 
 def _wants_json_response():

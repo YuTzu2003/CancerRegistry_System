@@ -98,7 +98,7 @@ def recalculate():
 @survival_report_bp.get("/survival-report/curves")
 @login_required
 def curves():
-    return render_template("survival/curves.html", active="survival_report.index")
+    return render_template("survival/curves.html", active="survival_report.curves")
 
 
 @survival_report_bp.post("/api/survival-report/curves")

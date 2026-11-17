@@ -1671,7 +1671,7 @@
     return `
       <div class="annual-report-table-wrap compare-analyzable-table">
         <table class="annual-report-table">
-          <caption>${isEnglish() ? `Table . Analysis-Eligible and Confirmed Cases of ${cancer} in the Cancer Registry,\u00a0${yearTitle}` : `表、${yearTitle}年${cancer}-癌症登記可分析個案與確診個案`}${sourceLine()}</caption>
+          <caption>${isEnglish() ? `Table . Analysis-Eligible and Confirmed Cases of ${cancer} in the Cancer Registry,\u00a0${yearTitle}` : `表、${yearTitle}年${cancer} - 癌症登記可分析個案與確診個案`}${sourceLine()}</caption>
           <thead>
             <tr>
               <th>${isEnglish() ? `${t('cancerTotal')}, ${yearTitle}` : `${yearTitle}年癌症總數`}<br>(A)</th>
