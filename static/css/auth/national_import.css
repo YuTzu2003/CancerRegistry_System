@@ -17,7 +17,7 @@
   .national-inline-input { min-width: 92px; }
   .national-empty { color: var(--muted); padding: 48px 24px; text-align: center; }
   [data-theme="dark"] .national-search-card, [data-theme="dark"] .national-year-card, [data-theme="dark"] .national-entry-pane { background: var(--surface); color: var(--text); }
-  [data-theme="dark"] .national-table { --bs-table-bg: var(--surface); --bs-table-color: var(--text); --bs-table-striped-bg: #151518; --bs-table-hover-bg: #1f1f23; --bs-table-border-color: var(--border); }
+  [data-theme="dark"] .national-table { --bs-table-bg: var(--surface); --bs-table-color: var(--text); --bs-table-striped-bg: #151518; --bs-table-hover-bg: var(--dark-surface-1); --bs-table-border-color: var(--border); }
   [data-theme="dark"] .national-table th { background: var(--gray-100); color: var(--text); }
 .national-preview-mode .national-import-uploader, .national-preview-mode form[action*="/versions/save"], .national-preview-mode .national-preview-hide, .national-preview-mode .national-table th:first-child, .national-preview-mode .national-table td:first-child, .national-preview-mode .national-table th:last-child, .national-preview-mode .national-table td:last-child { display: none; }
 .national-import-uploader, form[action*="/versions/save"], .national-preview-hide, .national-table th:first-child, .national-table td:first-child, .national-table th:last-child, .national-table td:last-child { display: none; }

@@ -42,7 +42,10 @@
   const visibleTasks = () => tasks.filter((task) => {
     const status = String(value(task, 'Status') || '');
     const text = [value(task, 'DocumentLabel'), value(task, 'TaskTitle'), value(task, 'TaskID'), labels[status]].join(' ').toLocaleLowerCase();
-    return (!filters.query || text.includes(filters.query.toLocaleLowerCase())) && (!filters.status || status === filters.status);
+    const statusMatches = filters.status === 'processing'
+      ? ['queued', 'running', 'retrying'].includes(status)
+      : !filters.status || status === filters.status;
+    return (!filters.query || text.includes(filters.query.toLocaleLowerCase())) && statusMatches;
   });
   const render = () => {
     if (!taskPanel || !taskList) return;

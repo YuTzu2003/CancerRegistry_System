@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}存活曲線與生命表{% endblock %}
+{% block page_title %}存活曲線與生命表{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/survival/survival.css') }}">
+{% endblock %}
+{% block content %}
+<section class="survival-module survival-curves" aria-labelledby="curvesHeading">
+  <a href="{{ url_for('survival_report.index') }}" class="recalc-back"><i class="bi bi-arrow-left"></i> 返回存活率模組</a>
+
+  <header class="recalc-hero">
+    <div class="recalc-hero__icon"><i class="bi bi-graph-down"></i></div>
+    <div class="recalc-hero__text">
+      <span class="recalc-badge">存活率圖表</span>
+      <h1 id="curvesHeading">存活曲線與生命表</h1>
+      <p>上傳存活率個案清單，依癌別與期別繪製 Kaplan–Meier 存活曲線、年度存活率與生命表。</p>
+    </div>
+  </header>
+
+  <form class="recalc-upload-card" id="curves-form">
+    <div class="recalc-upload-card__head">
+      <i class="bi bi-file-earmark-spreadsheet"></i>
+      <div>
+        <strong>上傳存活率個案清單</strong>
+        <span>支援 .xlsx 格式，與「個案清單重算與對帳」使用相同清單</span>
+      </div>
+    </div>
+    <div class="recalc-upload-card__body">
+      <label class="recalc-file-zone" for="case-file">
+        <i class="bi bi-cloud-arrow-up"></i>
+        <span>點擊或拖曳檔案至此處</span>
+        <small id="recalc-file-name">尚未選擇檔案</small>
+        <input id="case-file" name="case_file" type="file" accept=".xlsx" required>
+      </label>
+      <div class="row g-2" id="recalc-filters" data-options-url="{{ url_for('survival_report.recalculate_options') }}"
+        data-curves-url="{{ url_for('survival_report.curves_data') }}" hidden>
+        <div class="col-sm"><label for="recalc-hospital" class="form-label">院所</label><select id="recalc-hospital"
+            name="hospital" class="form-select" required></select></div>
+        <div class="col-sm"><label for="recalc-start-year" class="form-label">民國起年</label><select id="recalc-start-year"
+            name="start_year" class="form-select" required></select></div>
+        <div class="col-sm"><label for="recalc-end-year" class="form-label">民國迄年</label><select id="recalc-end-year"
+            name="end_year" class="form-select" required></select></div>
+      </div>
+      <p id="recalc-file-status" role="status"></p>
+      <button class="recalc-submit-btn" type="submit" disabled><i class="bi bi-graph-down"></i> 產生存活曲線</button>
+    </div>
+    <p class="recalc-error" id="curves-error" role="alert" hidden><i class="bi bi-exclamation-triangle"></i>
+      <span></span></p>
+  </form>
+
+  <div id="curves-results" hidden>
+    <div class="recalc-results-header">
+      <h2><i class="bi bi-graph-down"></i> 存活曲線結果</h2>
+      <span class="recalc-count-badge" id="curves-count"></span>
+    </div>
+
+    <nav class="recalc-index" id="curves-index" aria-label="癌別索引"></nav>
+
+    <p class="recalc-note"><i class="bi bi-info-circle"></i> 期別取分期欄位首碼
+      1–4（含不詳期別個案僅納入「不分期別」）。曲線上的「+」記號為設限個案：該時點仍存活但追蹤結束。存活率以 Kaplan–Meier 法估計；生命表以 12 個月為區間、有效風險數 = 進入人數 − 設限數/2 的精算法估計。
+    </p>
+
+    <section class="survival-step">
+      <div class="survival-step-title">
+        <span class="survival-step-marker" aria-hidden="true"></span>
+        <span>Kaplan–Meier 存活曲線</span>
+        <span class="survival-step-hint">點選圖例可顯示或隱藏期別</span>
+        <select id="curves-cancer" class="form-select form-select-sm curves-cancer-select" aria-label="選擇癌別"></select>
+      </div>
+      <div class="survival-step-body">
+        <div id="curves-chart" class="curves-chart" role="img" aria-label="Kaplan–Meier 存活曲線圖"></div>
+      </div>
+    </section>
+
+    <section class="survival-step">
+      <div class="survival-step-title">
+        <span class="survival-step-marker" aria-hidden="true"></span>
+        <span>期別存活率摘要</span>
+        <span class="survival-step-hint">各期別個案數、死亡、設限與 1–5 年觀察存活率</span>
+      </div>
+      <div class="survival-step-body">
+        <div class="recalc-report-scroll">
+          <table class="recalc-report-table" id="curves-summary-table"></table>
+        </div>
+      </div>
+    </section>
+
+    <section class="survival-step">
+      <div class="survival-step-title">
+        <span class="survival-step-marker" aria-hidden="true"></span>
+        <span>生命表（12 個月區間）</span>
+        <span class="survival-step-hint">精算法：有效風險數 = 進入人數 − 設限數/2</span>
+      </div>
+      <div class="survival-step-body" id="curves-life-tables"></div>
+    </section>
+  </div>
+
+  <script src="{{ url_for('static', filename='vendor/echarts/echarts.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/survival/survival_curves.js') }}" defer></script>
+</section>
+{% endblock %}

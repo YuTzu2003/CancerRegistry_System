@@ -51,6 +51,15 @@ def password_matches(stored_password, password):
         return False
 
 
+PASSWORD_POLICY_MESSAGE = '密碼至少 8 碼，且需同時包含英文字母與數字。'
+
+
+def password_acceptable(password):
+    """At least 8 characters with both a letter and a digit."""
+    text = str(password or '')
+    return len(text) >= 8 and re.search(r'[A-Za-z]', text) and re.search(r'\d', text)
+
+
 def _wants_json_response():
     return (
         request.path.startswith('/api/')
@@ -61,19 +70,37 @@ def _wants_json_response():
     )
 
 
-def _login_rate_limited(remote_addr):
+def _escape_like(value):
+    return re.sub(r'([\[%_])', r'[\1]', str(value or ''))
+
+
+def _login_rate_limited(remote_addr, login_id=None):
+    """Too many recent failures from this address, or against this account."""
     conn = None
     try:
         conn = get_conn()
         cursor = conn.cursor()
+        window = -BaseConfig.LOGIN_ATTEMPT_WINDOW_SECONDS
         cursor.execute(
             "SELECT COUNT(*) FROM dbo.Audit_logs "
             "WHERE [Action] = ? AND [Remote_addr] = ? "
             "AND [CreatedAt] >= DATEADD(second, ?, SYSDATETIMEOFFSET())",
-            ('auth_login_failed', remote_addr or '', -BaseConfig.LOGIN_ATTEMPT_WINDOW_SECONDS),
+            ('auth_login_failed', remote_addr or '', window),
         )
         row = cursor.fetchone()
-        return bool(row and int(row[0]) >= BaseConfig.LOGIN_MAX_ATTEMPTS)
+        if bool(row and int(row[0]) >= BaseConfig.LOGIN_MAX_ATTEMPTS):
+            return True
+        if login_id:
+            cursor.execute(
+                "SELECT COUNT(*) FROM dbo.Audit_logs "
+                "WHERE [Action] = ? AND [detail_json] LIKE ? "
+                "AND [CreatedAt] >= DATEADD(second, ?, SYSDATETIMEOFFSET())",
+                ('auth_login_failed', f'%"login_id": "{_escape_like(login_id)}"%', window),
+            )
+            row = cursor.fetchone()
+            if bool(row and int(row[0]) >= BaseConfig.LOGIN_MAX_ATTEMPTS):
+                return True
+        return False
     except Exception:
         logging.exception('Unable to check login rate limit')
         return False
@@ -319,7 +346,7 @@ def login():
     if request.method == 'POST':
         user_id = request.form.get('userid', '').strip()
         password = request.form.get('password', '')
-        if _login_rate_limited(request.remote_addr):
+        if _login_rate_limited(request.remote_addr, user_id):
             return render_template('login.html', error='登入嘗試次數過多，請稍後再試。'), 429
 
         user = _fetch_user(user_id=user_id)
@@ -356,8 +383,12 @@ def login():
     return render_template('login.html')
 
 
-@auth_bp.route('/logout')
+@auth_bp.route('/logout', methods=['GET', 'POST'])
 def logout():
+    if request.method == 'GET':
+        # A GET must not change state: old bookmarks land on the login page
+        # when anonymous, or back home when still signed in.
+        return redirect(url_for('index') if current_session_user() else url_for('auth.login'))
     write_audit_log('auth_logout_success', {'result': 'success'}, user_id=session.get('id'), remote_addr=request.remote_addr)
     session.clear()
     return redirect(url_for('auth.login'))
@@ -467,6 +498,8 @@ def reset_password():
         confirm_password = request.form.get('confirm_password', '')
         if not password:
             flash('請輸入新密碼。', 'danger')
+        elif not password_acceptable(password):
+            flash(PASSWORD_POLICY_MESSAGE, 'danger')
         elif password != confirm_password:
             flash('兩次輸入的新密碼不一致。', 'danger')
         else:
@@ -503,6 +536,8 @@ def profile():
         confirm_password = request.form.get('confirm_password', '')
         if not current_password or not new_password:
             flash('請輸入目前密碼與新密碼', 'danger')
+        elif not password_acceptable(new_password):
+            flash(PASSWORD_POLICY_MESSAGE, 'danger')
         elif new_password != confirm_password:
             flash('新密碼與確認密碼不一致', 'danger')
         else:

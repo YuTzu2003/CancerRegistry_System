@@ -15,6 +15,7 @@ from modules.services.auth import login_required
 
 from .export_bundle import build_pptx_download
 from .case_recalculation import case_file_options, recalculate_cases
+from .survival_curves import compute_curves
 from .job_store import JobNotFound, JobStore
 from .parser import UnsupportedSourceFormat, parse_survival_workbook
 from .report_builder import (
@@ -30,12 +31,13 @@ survival_report_bp = Blueprint(
     "survival_report",
     __name__,
     template_folder="templates",
-    static_folder="static",
-    static_url_path="/survival-report/static",
 )
 
 _ALLOWED_EXTENSIONS = {".xls", ".xlsx"}
-_TEMPLATE_PATH = Path(__file__).with_name("assets") / "survival_report_template.pptx"
+
+
+def _template_path() -> Path:
+    return Path(current_app.static_folder).parent / "document" / "survival_report_template.pptx"
 
 
 def _owner_id() -> str:
@@ -59,13 +61,13 @@ def _not_found():
 @survival_report_bp.get("/survival-report")
 @login_required
 def index():
-    return render_template("survival_report/index.html", active="survival_report.index")
+    return render_template("survival/index.html", active="survival_report.index")
 
 
 @survival_report_bp.get("/survival-report/powerpoint")
 @login_required
 def powerpoint():
-    return render_template("survival_report/powerpoint.html", active="survival_report.index")
+    return render_template("survival/powerpoint.html", active="survival_report.index")
 
 
 @survival_report_bp.route("/survival-report/recalculate", methods=["GET", "POST"])
@@ -89,8 +91,34 @@ def recalculate():
                 error = str(exc)
             except (BadZipFile, InvalidFileException, KeyError, OSError):
                 error = "無法讀取此 Excel 檔案。"
-    return render_template("survival_report/recalculate.html", result=result, error=error,
+    return render_template("survival/recalculate.html", result=result, error=error,
                            hospital=hospital, start_year=start_year, end_year=end_year), 400 if error else 200
+
+
+@survival_report_bp.get("/survival-report/curves")
+@login_required
+def curves():
+    return render_template("survival/curves.html", active="survival_report.index")
+
+
+@survival_report_bp.post("/api/survival-report/curves")
+@login_required
+def curves_data():
+    upload = request.files.get("case_file")
+    hospital = request.form.get("hospital", "").strip()
+    start_year = request.form.get("start_year", type=int)
+    end_year = request.form.get("end_year", type=int)
+    if not upload or Path(upload.filename).suffix.lower() != ".xlsx":
+        return jsonify(error="請選擇 .xlsx 個案清單。"), 400
+    if not hospital or start_year is None or end_year is None or not 1 <= start_year <= end_year <= 999:
+        return jsonify(error="請選擇院所及有效的民國起訖年度。"), 400
+    try:
+        results = compute_curves(upload.stream, hospital, start_year, end_year)
+    except ValueError as exc:
+        return jsonify(error=str(exc)), 400
+    except (BadZipFile, InvalidFileException, KeyError, OSError):
+        return jsonify(error="無法讀取此 Excel 檔案。"), 400
+    return jsonify(results=results, start_year=start_year, end_year=end_year)
 
 
 @survival_report_bp.post("/api/survival-report/case-options")
@@ -235,7 +263,7 @@ def _load_selected_job(job_id: str):
 def export_pptx(job_id: str):
     try:
         stored = _load_selected_job(job_id)
-        artifact = build_pptx_download(stored.batch, _TEMPLATE_PATH)
+        artifact = build_pptx_download(stored.batch, _template_path())
     except JobNotFound:
         return _not_found()
     except ValueError as error:

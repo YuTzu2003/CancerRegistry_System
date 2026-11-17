@@ -8,7 +8,7 @@
   }
   [data-theme="dark"] .nav-link.submenu-active {
     background: rgba(255, 255, 255, 0.2) !important;
-    color: #ffffff !important;
+    color: var(--white) !important;
   }
   [data-theme="dark"] .nav-link.submenu-active .nav-icon {
     color: #e2e8f0 !important;

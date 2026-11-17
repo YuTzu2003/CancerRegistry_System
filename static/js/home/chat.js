@@ -7,8 +7,9 @@ function addMessage(text, type) {
     const msgDiv = document.createElement('div');
     msgDiv.className = `chat-msg ${type}`;
     if (type === 'ai') {msgDiv.innerHTML = `<div class="avatar"><i class="bi bi-emoji-smile-fill"></i></div>
-                            <div class="msg-content">${text}</div>`;} 
-    else {msgDiv.innerHTML = `<div class="msg-content">${text}</div>`;}
+                            <div class="msg-content"></div>`;}
+    else {msgDiv.innerHTML = `<div class="msg-content"></div>`;}
+    msgDiv.querySelector('.msg-content').textContent = text;
     chatDisplay.appendChild(msgDiv);
     chatDisplay.scrollTop = chatDisplay.scrollHeight;
 }
