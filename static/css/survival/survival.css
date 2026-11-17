@@ -17,6 +17,10 @@
   margin: 0 auto;
 }
 
+[data-theme="dark"] .survival-module {
+  --sr-line: var(--gray-300);
+}
+
 .upload-card {
   background: var(--surface, #fff);
   border: 1px solid var(--sr-line);

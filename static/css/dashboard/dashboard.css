@@ -1,10 +1,3 @@
-/* Hallmark · v2.0.0 · built: the project · redesign: polish · scope: app · theme: system (style.css tokens) */
-/* critique: transition:all x4 and two sub-threshold text colours fixed in place; layout untouched */
-/* waive 48: shared literals tokenized to the extended palette (exact values); remaining are rgba shadows and a few dark-mode shades. waive 24b: kept the project's spacing. */
-/* =========================================================================
-   control.html - 資料上傳、篩選條件、按鈕、Modal 等樣式
-   ========================================================================= */
-
 /* --- 上傳區塊與檔案清單 --- */
 .upload-grid {
   display: grid;
@@ -806,7 +799,7 @@
 
 [data-theme="dark"] .annual-report-table th,
 [data-theme="dark"] .annual-report-table td {
-  border-color: var(--gray-300);
+  border-color: var(--gray-300) !important;
 }
 
 [data-theme="dark"] .annual-report-table caption,
