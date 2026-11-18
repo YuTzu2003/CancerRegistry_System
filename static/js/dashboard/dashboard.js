@@ -261,6 +261,12 @@ window.DashboardRenderer.getSelectedYearTitle = function() {
 window.DashboardRenderer.getSelectedCancerTitle = function() {
         const language = window.DashboardI18n?.getLanguage();
         const cancerNameMap = window.dashboardCancerNameTranslations || {};
+        const activeReportKey = window.dashboardActiveCancerKey;
+        if (activeReportKey) {
+            if (language === 'en' && cancerNameMap[activeReportKey]?.en) return cancerNameMap[activeReportKey].en;
+            if (language !== 'en' && cancerNameMap[activeReportKey]?.zh) return cancerNameMap[activeReportKey].zh;
+            if (window.dashboardActiveCancerTitle) return window.dashboardActiveCancerTitle;
+        }
         const selectedKeys = window.dashboardSelectedCancerDisplayKeys || [];
         if (window.dashboardPreviewMode && window.dashboardPreviewCancerTitle) {
             const previewTitle = window.dashboardPreviewCancerTitle;
@@ -341,6 +347,35 @@ window.DashboardRenderer.getCancerTitleForSentence = function(cancerTitle) {
 // (e.g. MAC excludes Larynx). Narrow the title to the cancers that actually
 // contribute cases. Saved previews created before that metadata existed fall
 // back to their stored selection and the stage system's eligible cancer keys.
+window.DashboardRenderer.isStageReportApplicableToActiveCancer = function(report) {
+        const stageSystemCancerKeys = {
+            FIGO: ['Cervix_Uteri', 'Corpus_Uteri', 'Ovary'],
+            MAC: ['Colon', 'Rectum'],
+            BCLC: ['Liver'],
+            SCLC: ['Lung_and_Bronchus', 'Small_cell_carcinoma', 'Adenocarcinoma', 'Squamous_cell_carcinoma'],
+            DSS: ['Plasma_cell_neoplasms'],
+            DRE: ['Prostate'],
+            'Breast Cancer Prognostic Stage': ['Breast_Female', 'Breast_Male'],
+            Binet: ['CLL']
+        };
+        const activeKey = String(window.dashboardActiveCancerKey || '').trim();
+        if (!activeKey || activeKey === 'All_Cancers') return true;
+
+        // Specialised systems have a fixed eligibility rule.  Apply it before
+        // reading old report metadata because legacy reports may have recorded
+        // every inspected case as "applicable", even when the system was not.
+        const stageSystem = report?.staging_system || report?.system;
+        const eligibleKeys = stageSystemCancerKeys[stageSystem];
+        if (eligibleKeys && !eligibleKeys.includes(activeKey)) return false;
+
+        const reportedKeys = Array.isArray(report?.applicable_cancer_keys)
+            ? report.applicable_cancer_keys
+            : [];
+        if (reportedKeys.length) return reportedKeys.includes(activeKey);
+
+        return !eligibleKeys || eligibleKeys.includes(activeKey);
+    };
+
 window.DashboardRenderer.getStageReportCancerTitle = function(report, cancerTitle) {
         const stageSystemCancerKeys = {
             FIGO: ['Cervix_Uteri', 'Corpus_Uteri', 'Ovary'],
@@ -588,6 +623,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 animationDuration: 0,
                 animationDurationUpdate: 0
             };
+            // 工具列屬於網頁互動功能；getDataURL 會把它也畫進 PNG，
+            // 因此僅在報表擷取時暫時隱藏，完成後會還原原始圖表設定。
+            captureOption.toolbox = (originalOption.toolbox || []).map(toolbox => ({
+                ...toolbox,
+                show: false
+            }));
             if (optionOverrides.title?.show === false) {
                 captureOption.title = (originalOption.title || []).map(title => ({ ...title, show: false }));
             }
@@ -932,7 +973,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     } else if (paneId === 'chartPane-DiagnosisHistology' && window.dashboardHistologyChartInstance) {
                         // The labels inside the histogram change with the selected language,
                         // so Chinese and English exports must not share the same image cache.
-                        chartImageKey = `histology-full-${exportLanguage}`;
+                        chartImageKey = `${window.dashboardActiveCancerKey || 'all'}-histology-full-${exportLanguage}`;
                         if (!sharedChartImages[chartImageKey]) {
                             sharedChartImages[chartImageKey] = await captureChartImage(
                                 window.dashboardHistologyChartInstance,
@@ -957,7 +998,9 @@ document.addEventListener('DOMContentLoaded', function() {
                             if (!insightResult?.success) throw new Error('Insight generation failed.');
                             options.onInsightComplete?.();
                         }
-                        const fieldKey = insightButton?.dataset.insightFieldKey || insightFieldKeys[paneId];
+                        const fieldKey = window.dashboardPreviewMode
+                            ? insightFieldKeys[paneId]
+                            : insightButton?.dataset.insightFieldKey || insightFieldKeys[paneId];
                         llmText = getExportInsight(fieldKey, exportLanguage === 'en'
                             ? ''
                             : llmDiv.textContent || llmDiv.innerText);
@@ -993,6 +1036,31 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             return exportData;
+    };
+
+    const collectAllReportExportData = async (sharedChartImages = {}, options = {}) => {
+        const reports = Array.isArray(window.dashboardReportEntries) ? window.dashboardReportEntries : [];
+        if (reports.length < 2 || typeof window.dashboardSetActiveReport !== 'function') {
+            return collectExportData(sharedChartImages, options);
+        }
+
+        const originalReportKey = window.dashboardActiveCancerKey || reports[0]?.key;
+        const allExportData = [];
+        for (const report of reports) {
+            await window.dashboardSetActiveReport(report.key);
+            const sectionTitle = window.DashboardRenderer.getSelectedCancerTitle();
+            const reportExportData = await collectExportData(sharedChartImages, options);
+            reportExportData.forEach((item) => {
+                item.sourceId = item.id;
+                item.id = `${report.key || 'cancer'}::${item.id}`;
+                item.title = `${sectionTitle}｜${item.title}`;
+                item.cancerSectionKey = report.key || sectionTitle;
+                item.cancerSectionTitle = sectionTitle;
+            });
+            allExportData.push(...reportExportData);
+        }
+        await window.dashboardSetActiveReport(originalReportKey);
+        return allExportData;
     };
 
     const btnPrepareExport = document.getElementById('btnPrepareExport');
@@ -1035,9 +1103,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     updateInsightProgress();
                 };
                 await window.DashboardI18n?.setLanguage('zh-TW');
-                exportDataByLanguage['zh-TW'] = await collectExportData(sharedChartImages, { generateInsights: !isPreviewExport, onInsightComplete });
+                exportDataByLanguage['zh-TW'] = await collectAllReportExportData(sharedChartImages, { generateInsights: !isPreviewExport, onInsightComplete });
                 await window.DashboardI18n?.setLanguage('en');
-                exportDataByLanguage.en = await collectExportData(sharedChartImages);
+                exportDataByLanguage.en = await collectAllReportExportData(sharedChartImages);
             } catch (error) {
                 console.error('Export preparation failed:', error);
                 preparationError = error;
@@ -1290,23 +1358,25 @@ window.DashboardRenderer.getGenderAgeChartOption = function(genderAgeData) {
               name: this.t('male'),
               type: 'bar',
               data: male,
-              barWidth: 20,
-              barGap: '20%',
-              barCategoryGap: '42%',
+              // 十五個年齡層中需並排顯示男、女與總計，保留組內及組間間距，
+              // 避免柱狀圖在較窄的匯出頁面互相貼齊或重疊。
+              barMaxWidth: 14,
+              barGap: '25%',
+              barCategoryGap: '28%',
               itemStyle: { color: '#5470C6' }
             },
             {
               name: this.t('female'),
               type: 'bar',
               data: female,
-              barWidth: 20,
+              barMaxWidth: 14,
               itemStyle: { color: '#EE6666' }
             },
             {
               name: this.t('total'),
               type: 'bar',
               data: total,
-              barWidth: 20,
+              barMaxWidth: 14,
               z: 5,
               itemStyle: { color: '#91CC75' }
             }
@@ -1583,7 +1653,8 @@ window.DashboardRenderer.getStageSystemTitle = function(systemName) {
 
 window.DashboardRenderer.renderStageReportTabs = function(stageReports, yearTitle, cancerTitle) {
         const tabs = document.getElementById('annualStageReportTabs');
-        const reports = Array.isArray(stageReports) ? stageReports : [];
+        const reports = (Array.isArray(stageReports) ? stageReports : [])
+            .filter(report => this.isStageReportApplicableToActiveCancer(report));
         if (!tabs) return;
         tabs.replaceChildren();
 
@@ -1592,6 +1663,10 @@ window.DashboardRenderer.renderStageReportTabs = function(stageReports, yearTitl
             sex: document.getElementById('annualStageSexSection'),
             age: document.getElementById('annualStageAgeSection')
         };
+        if (!reports.length) {
+            Object.values(sections).forEach(section => section?.classList.add('d-none'));
+            return;
+        }
         const showReport = (report, button, { generateInsight = false } = {}) => {
             Object.values(sections).forEach(section => section?.classList.add('d-none'));
             tabs.querySelectorAll('button').forEach(item => item.classList.remove('active'));
@@ -1687,6 +1762,9 @@ window.DashboardRenderer.renderStageDistributionReport = function(stageData, yea
         const titleCancer = this.getStageReportCancerTitle(stageData, cancerTitle);
         const systemName = data.staging_system;
         const percentage = value => data.included_count > 0 ? Number(value) / data.included_count * 100 : 0;
+        // 柱狀圖接近滿格時，頂端百分比標籤會超出繪圖區；
+        // 額外保留上方空間，避免遮住資料來源文字。
+        const needsLabelHeadroom = data.stage_totals.some(value => percentage(value) >= 95);
         const tableCaption = document.getElementById('annualStageDistributionCaption');
         const chartCaption = document.getElementById('annualStageDistributionChartCaption');
         const tableHead = document.getElementById('annualStageDistributionTableHead');
@@ -1743,7 +1821,7 @@ window.DashboardRenderer.renderStageDistributionReport = function(stageData, yea
                         saveAsImage: { show: true, title: this.t('downloadImage') }
                     }
                 },
-                grid: { left: 70, right: 50, top: 60, bottom: 40, containLabel: true },
+                grid: { left: 70, right: 50, top: needsLabelHeadroom ? 88 : 60, bottom: 40, containLabel: true },
                 xAxis: {
                     type: 'category',
                     data: data.stage_labels
@@ -1852,6 +1930,9 @@ window.DashboardRenderer.renderStageSexReport = function(stageData, yearTitle, c
                     femalePercent
                 };
             });
+            // 堆疊總和接近 100% 時，兩行性別標籤需要較多上方空間，
+            // 否則會與圖例重疊。
+            const needsTopLabelHeadroom = topLabelData.some(item => item.value >= 95);
             const topLabelSeries = {
                 name: '__stageSexLabels',
                 type: 'bar',
@@ -1917,7 +1998,7 @@ window.DashboardRenderer.renderStageSexReport = function(stageData, yearTitle, c
                         saveAsImage: { show: true, title: this.t('downloadImage') }
                     }
                 },
-                grid: { left: 70, right: 50, top: 95, bottom: 40, containLabel: true },
+                grid: { left: 70, right: 50, top: needsTopLabelHeadroom ? 128 : 95, bottom: 40, containLabel: true },
                 xAxis: {
                     type: 'category',
                     data: data.stage_labels
@@ -2140,7 +2221,9 @@ window.DashboardRenderer.renderStageAgeReport = function(stageData, yearTitle, c
 window.DashboardRenderer.renderStageFirstCourseTables = function(tables, yearTitle, cancerTitle) {
         const container = document.getElementById('annualStageFirstCourseTables');
         if (!container) return;
-        if (!Array.isArray(tables) || !tables.length) {
+        tables = (Array.isArray(tables) ? tables : [])
+            .filter(table => this.isStageReportApplicableToActiveCancer(table));
+        if (!tables.length) {
             container.innerHTML = '<div class="text-secondary">目前沒有符合所選分期系統的首次療程資料。</div>';
             return;
         }

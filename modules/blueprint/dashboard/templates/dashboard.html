@@ -27,6 +27,10 @@
 <!-- 圖表分頁按鈕區 -->
 <div id="chartTabsArea" class="row mb-1 mt-0 d-none">
   <div class="col-12">
+    <div id="cancerReportTabsArea" class="d-none mb-3">
+      <div class="small text-secondary mb-2">癌別結果</div>
+      <div id="cancerReportTabs" class="d-flex flex-wrap justify-content-start gap-2"></div>
+    </div>
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
       <div id="chartTabsContainer" class="d-flex flex-wrap justify-content-start gap-3"></div>
       <div id="dashboardLanguageControl" class="d-flex align-items-center gap-2">
@@ -212,54 +216,54 @@
           </div>
           <div id="annualStageReportTabs" class="d-flex flex-wrap gap-2 mb-4"></div>
 
-          <!--表一：期別分布表-->
+          <!--表一：期別分佈表-->
           <section id="annualStageDistributionSection" class="d-none">
           <div class="annual-report-table-wrap">
             <table class="annual-report-table">
-              <caption id="annualStageDistributionCaption">表、XXXX年新診斷XX癌病患期別分布表</caption>
+              <caption id="annualStageDistributionCaption">表、XXXX年新診斷XX癌病患期別分佈表</caption>
               <thead id="annualStageDistributionTableHead"></thead>
               <tbody id="annualStageDistributionTableBody"></tbody>
             </table>
             <div id="annualStageDistributionNote" class="annual-stage-report-note small text-secondary mt-2 mb-0 text-start"></div>
           </div>
 
-          <!--圖一：期別分布圖-->
+          <!--圖一：期別分佈圖-->
           <div id="annualStageDistributionChart" class="annual-stage-chart"></div>
-          <div id="annualStageDistributionChartCaption" class="annual-chart-caption">圖、XXXX年新診斷XX癌病患期別分布圖</div>
+          <div id="annualStageDistributionChartCaption" class="annual-chart-caption">圖、XXXX年新診斷XX癌病患期別分佈圖</div>
           <div id="annualStageDistributionChartNote" class="annual-stage-chart-note small text-secondary mt-2 mb-0"></div>
           </section>
 
-          <!--表二：性別及期別分布表-->
+          <!--表二：性別及期別分佈表-->
           <section id="annualStageSexSection" class="d-none">
           <div class="annual-report-table-wrap">
             <table class="annual-report-table">
-              <caption id="annualStageSexCaption">表、XXXX年新診斷XX癌病患性別及期別分布表</caption>
+              <caption id="annualStageSexCaption">表、XXXX年新診斷XX癌病患性別及期別分佈表</caption>
               <thead id="annualStageSexTableHead"></thead>
               <tbody id="annualStageSexTableBody"></tbody>
             </table>
             <div id="annualStageSexNote" class="annual-stage-report-note small text-secondary mt-2 mb-0 text-start"></div>
           </div>
 
-          <!--圖二：性別及期別分布圖-->
+          <!--圖二：性別及期別分佈圖-->
           <div id="annualStageSexChart" class="annual-stage-chart"></div>
-          <div id="annualStageSexChartCaption" class="annual-chart-caption">圖、XXXX年新診斷XX癌病患性別及期別分布圖</div>
+          <div id="annualStageSexChartCaption" class="annual-chart-caption">圖、XXXX年新診斷XX癌病患性別及期別分佈圖</div>
           <div id="annualStageSexChartNote" class="annual-stage-chart-note small text-secondary mt-2 mb-0"></div>
           </section>
 
-          <!--表三：年齡層及期別分布表-->
+          <!--表三：年齡層及期別分佈表-->
           <section id="annualStageAgeSection" class="d-none">
           <div class="annual-report-table-wrap">
             <table class="annual-report-table">
-              <caption id="annualStageAgeCaption">表、XXXX年新診斷XX癌病患年齡層及期別分布表</caption>
+              <caption id="annualStageAgeCaption">表、XXXX年新診斷XX癌病患年齡層及期別分佈表</caption>
               <thead id="annualStageAgeTableHead"></thead>
               <tbody id="annualStageAgeTableBody"></tbody>
             </table>
             <div id="annualStageAgeNote" class="annual-stage-report-note small text-secondary mt-2 mb-0 text-start"></div>
           </div>
 
-          <!--圖三：年齡層及期別分布圖-->
+          <!--圖三：年齡層及期別分佈圖-->
           <div id="annualStageAgeChart" class="annual-stage-chart annual-stage-age-chart"></div>
-          <div id="annualStageAgeChartCaption" class="annual-chart-caption">圖、XXXX年新診斷XX癌病患年齡層及期別分布圖</div>
+          <div id="annualStageAgeChartCaption" class="annual-chart-caption">圖、XXXX年新診斷XX癌病患年齡層及期別分佈圖</div>
           <div id="annualStageAgeChartNote" class="annual-stage-chart-note small text-secondary mt-2 mb-0"></div>
           </section>
 
@@ -352,9 +356,9 @@
 <script src="{{ url_for('static', filename='js/dashboard/llm_task_panel.js', v='20261029-comparison-progress') }}"></script>
 <script src="{{ url_for('static', filename='js/dashboard/dashboard_i18n.js') }}"></script>
 <script src="{{ url_for('static', filename='js/dashboard/annual_report_renderer.js', v='20261112-stage-palette') }}"></script>
-<script src="{{ url_for('static', filename='js/dashboard/dashboard.js', v='20261112-stage-palette') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard/dashboard.js', v='20261118-stage-treatment-per-cancer') }}"></script>
 {% if preview_task %}
 <script id="dashboardPreviewData" type="application/json">{{ {"task": preview_task, "payload": preview_payload} | tojson }}</script>
-<script src="{{ url_for('static', filename='js/dashboard/dashboard_preview.js', v='20261029-surgery-insights') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard/dashboard_preview.js', v='20261118-stage-treatment-per-cancer') }}"></script>
 {% endif %}
 {% endblock %}

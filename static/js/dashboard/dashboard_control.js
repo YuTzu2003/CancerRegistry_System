@@ -1317,7 +1317,7 @@ function initDashboardControl() {
               const contentType = response.headers.get('content-type') || '';
               if (!response.ok) {
                   const result = contentType.includes('application/json') ? await response.json() : {};
-                  throw new Error(result.error || 'Power BI 資料檔產生失敗');
+                  throw new Error(result.error || 'Excel 資料檔產生失敗');
               }
               const blob = await response.blob();
               const url = URL.createObjectURL(blob);
@@ -1328,9 +1328,12 @@ function initDashboardControl() {
               link.click();
               link.remove();
               URL.revokeObjectURL(url);
-              utils.alert('Excel資料已開始下載。', 'success');
+              utils.alert('Excel資料已下載完成。', 'success');
           } catch (error) {
-              utils.alert(`無法下載 Power BI 資料檔：${error.message}`, 'error');
+              const message = error instanceof TypeError && error.message === 'Failed to fetch'
+                  ? '無法連線至伺服器，請確認伺服器仍在執行後再試一次。'
+                  : error.message;
+              utils.alert(`無法下載 Excel 資料：${message}`, 'error');
           } finally {
               window.utils?.hideLoading?.();
               btnDownloadPbiDataset.disabled = false;
@@ -1453,6 +1456,10 @@ function initDashboardControl() {
           const dashboardAnalyzePayload = {
               file_id: selectedFileId,
               cancers: Array.from(window.selectedCancers || []),
+              // Keep the result and annual-report sections separate for every
+              // top-level cancer selection. `cancers` remains the full filter
+              // set so parent groups can include their generic subgroups.
+              report_cancers: Array.from(window.dashboardSelectedCancerDisplayKeys || []),
               year_start: yearStartVal,
               year_end: yearEndVal,
               behavior: behaviorVal,
@@ -1473,7 +1480,25 @@ function initDashboardControl() {
           .then(res => res.json())
           .then(data => {
               if (data.ok) {
-                  const chartData = data.data;
+                  const reportEntries = Array.isArray(data.data?.reports)
+                      ? data.data.reports
+                      : [{
+                          key: (window.dashboardSelectedCancerDisplayKeys || [])[0] || '',
+                          title: window.DashboardRenderer?.getSelectedCancerTitle?.() || '癌症',
+                          data: data.data
+                      }];
+                  const usableReports = reportEntries.filter(entry => !entry?.data?.noDataWarning);
+                  const chartData = usableReports[0]?.data;
+                  window.dashboardReportEntries = usableReports;
+                  if (usableReports.length !== reportEntries.length) {
+                      const unavailableTitles = reportEntries
+                          .filter(entry => entry?.data?.noDataWarning)
+                          .map(entry => entry.title)
+                          .filter(Boolean);
+                      if (unavailableTitles.length) {
+                          console.warn('No matching cases for selected cancer reports:', unavailableTitles.join('、'));
+                      }
+                  }
                   if (chartData && chartData.noDataWarning) {
                       // Do not leave a previous query's report visible when this query has no cases.
                       window.lastChartData = null;
@@ -1486,6 +1511,11 @@ function initDashboardControl() {
                           window.dashboardChartInstance.hideLoading();
                       }
                       utils.alert(chartData.noDataWarning, 'warning');
+                      return;
+                  }
+                  if (!chartData) {
+                      if (window.utils && window.utils.hideLoading) window.utils.hideLoading();
+                      utils.alert('依目前選擇的年度、癌別與性態碼查無符合個案，無法產生分析結果。', 'warning');
                       return;
                   }
                   window.lastChartData = chartData;
@@ -1615,6 +1645,113 @@ function initDashboardControl() {
                               return index >= 0 ? window.AnnualReportRenderer.surgeryInsightKey(item, index) : '期別與手術術式';
                           }
                       }                  ];
+
+                  const collectAnnualReportItems = (reports) => {
+                      const items = [];
+                      const modeAi = document.getElementById('mode_ai')?.value || 'balanced';
+                      const addItem = (reportEntry, fieldKey, insightData, fields) => {
+                          items.push({
+                              item_id: `${reportEntry.key || 'cancer'}::${fieldKey}::${items.length + 1}`,
+                              report_key: reportEntry.key || '',
+                              report_title: reportEntry.title || '癌症',
+                              field_key: fieldKey,
+                              data: insightData,
+                              fields,
+                              mode_ai: modeAi,
+                              year_start: yearStartVal,
+                              year_end: yearEndVal,
+                              language: 'zh-TW'
+                          });
+                      };
+                      const checked = (id) => document.getElementById(id)?.checked === true;
+
+                      reports.forEach((reportEntry) => {
+                          const reportData = reportEntry.data || {};
+                          if (reportData.noDataWarning) return;
+
+                          if (checked('chkIncidenceAge')) {
+                              addItem(reportEntry, '性別與年齡分佈', reportData.genderAgeData || {}, ['性別', '年齡']);
+                          }
+                          if (checked('chkIncidenceMedian')) {
+                              addItem(reportEntry, '年齡中位數', reportData.ageMedianData || {}, ['年齡', '性別']);
+                          }
+                          if (checked('chkDiagnosisAnalyzable')) {
+                              addItem(reportEntry, '癌症登記可分析個案與確診個案', reportData.analyzableConfirmedData || {}, ['可分析個案', '確診個案']);
+                          }
+                          if (checked('chkDiagnosisHistology')) {
+                              const validHistology = (reportData.histologyData || [])
+                                  .filter(item => item.name !== 'Unknown / 未對應組織型態');
+                              const total = validHistology.reduce((sum, item) => sum + Number(item.count || 0), 0);
+                              addItem(reportEntry, '組織型態分佈', validHistology.map(item => ({
+                                  code: item.code,
+                                  name: item.name,
+                                  count: item.count,
+                                  percentage: total > 0 ? `${(Number(item.count || 0) / total * 100).toFixed(1)}%` : '0.0%'
+                              })), ['組織型態', '個案數']);
+                          }
+                          if (checked('chkDiagnosisClassification')) {
+                              addItem(reportEntry, '個案分類', reportData.diagnosisClassificationData || {}, ['個案分類']);
+                          }
+                          if (checked('chkStageDetailed') || checked('chkStageSummary')) {
+                              (reportData.stageReports || []).forEach((stageReport) => {
+                                  const normalized = window.DashboardRenderer.normalizeStageDistributionData(stageReport);
+                                  const view = stageReport.view || 'stage';
+                                  const fieldKey = `${normalized.staging_system || ''} Stage Distribution${view === 'sex' ? ' by Sex' : view === 'age' ? ' by Age Group' : ''}`;
+                                  addItem(reportEntry, fieldKey, {
+                                      staging_system: normalized.staging_system,
+                                      stage_labels: normalized.stage_labels,
+                                      stage_totals: normalized.stage_totals,
+                                      sex_rows: view === 'sex' ? normalized.sex_rows : undefined,
+                                      age_rows: view === 'age' ? normalized.age_rows : undefined,
+                                      analyzable_count: normalized.analyzable_count,
+                                      unknown_count: normalized.unknown_count,
+                                      not_applicable_count: normalized.not_applicable_count,
+                                      included_count: normalized.included_count
+                                  }, view === 'sex'
+                                      ? ['期別', '性別', '個案數', '百分比']
+                                      : view === 'age'
+                                          ? ['期別', '年齡層', '個案數', '百分比']
+                                          : ['期別', '個案數', '百分比']);
+                              });
+                          }
+                          if (checked('chkTreatmentFirstCourse')) {
+                              (reportData.stageFirstCourseData || []).forEach((table) => {
+                                  if (!table.system) return;
+                                  addItem(reportEntry, `期別與首次療程（${table.system}期別）`, {
+                                      stage_system: table.system,
+                                      stage_mode: table.stage_mode || '',
+                                      stage_columns: table.stage_columns || [],
+                                      treatment_rows: table.rows || [],
+                                      totals: table.totals || [],
+                                      total_count: table.total_count || 0,
+                                      analyzable_count: table.analyzable_count || 0,
+                                      excluded_unknown: table.excluded_unknown || 0,
+                                      excluded_not_applicable: table.excluded_not_applicable || 0,
+                                      excluded_unclassified_treatment: table.excluded_unclassified_treatment || 0
+                                  }, []);
+                              });
+                          }
+                          if (checked('chkTreatmentSurgery')) {
+                              (reportData.stageSurgeryData || []).forEach((table, index) => {
+                                  addItem(reportEntry, window.AnnualReportRenderer.surgeryInsightKey(table, index), {
+                                      cancer: table.cancer_name || table.manual_key || '',
+                                      cancer_en: table.cancer_name_en || '',
+                                      stage_system: table.system || '',
+                                      stage_mode: table.stage_mode || '',
+                                      stage_columns: table.stage_columns || [],
+                                      surgery_rows: table.rows || [],
+                                      totals: table.totals || [],
+                                      total_count: table.total_count || 0,
+                                      analyzable_count: table.analyzable_count || 0,
+                                      excluded_unknown: table.excluded_unknown || 0,
+                                      excluded_not_applicable: table.excluded_not_applicable || 0,
+                                      excluded_unmapped_surgery: table.excluded_unmapped_surgery || 0
+                                  }, []);
+                              });
+                          }
+                      });
+                      return items;
+                  };
 
                   llmConfigs.forEach(cfg => {
                       const btn = document.getElementById(cfg.btnId);
@@ -1747,49 +1884,18 @@ function initDashboardControl() {
 
                   if (window.DashboardRenderer) window.DashboardRenderer.updateHistologyChart(chartData.histologyData, chartData.histologyNoDataReason);
 
-                  // Generate narratives one at a time so a local LLM is not overloaded.
-                  const completeInsight = async (task) => {
-                      const result = await task();
-                      if (!result?.success) throw new Error(result?.error || 'LLM insight generation failed.');
-                      return result;
-                  };
-                  window.annualLlmJobItems = [];
-                  const insightTasks = [...variantInsightTasks];
-                  document.querySelectorAll('.item-checkbox').forEach(itemChk => {
-                      if (itemChk.checked) {
-                          const targetSelector = itemChk.getAttribute('data-target');
-                          if (targetSelector && !['#chartPane-StageSummary', '#chartPane-TreatmentFirstCourse', '#chartPane-TreatmentSurgery'].includes(targetSelector)) {
-                              const targetPane = document.querySelector(targetSelector);
-                              if (targetPane) {
-                                  const aiBtn = targetPane.querySelector('button[id^="btnAi"]');
-                                  const llmDiv = targetPane.querySelector('div[id^="llmResponse"]');
-                                  if (aiBtn && llmDiv && llmDiv.innerText.includes('自動產生')) {
-                                      if (typeof aiBtn.onclick === 'function') {
-                                          insightTasks.push(() => aiBtn.onclick());
-                                      }
-                                  }
-                              }
-                          }
-                      }
-                  });
-
                   (async () => {
-                      for (const task of insightTasks) {
-                          try {
-                              await completeInsight(task);
-                          } catch (error) {
-                              console.error('LLM insight generation failed:', error);
-                          }
-                      }
-                      const annualItems = window.annualLlmJobItems || [];
-                      window.annualLlmJobItems = null;
+                      // Each selected cancer has its own data and narrative items.
+                      // They are still queued together so the preview and Word export
+                      // remain one annual-report task and one document.
+                      const annualItems = collectAnnualReportItems(usableReports);
                       const queued = await fetch('/api/dashboard/annual-report-job', {
                           method: 'POST', headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({
                               items: annualItems,
                               file_id: selectedFileId,
                               _document_label: '年報分析',
-                              chart_data: chartData,
+                              chart_data: { reports: usableReports },
                               year_title: window.DashboardRenderer?.getSelectedYearTitle() || '',
                               cancer_title: window.DashboardRenderer?.getSelectedCancerTitle() || '',
                               cancer_display_keys: window.dashboardSelectedCancerDisplayKeys || []

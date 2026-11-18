@@ -204,12 +204,54 @@ def _row(cursor, row):
     return dict(zip([column[0] for column in cursor.description], row))
 
 
+def _display_label(value):
+    """Normalize punctuation used only in the task-information display."""
+    return str(value or '').replace('（', '(').replace('）', ')')
+
+
+_SPECIAL_STAGE_SYSTEM_CANCER_KEYS = {
+    'FIGO': {'Cervix_Uteri', 'Corpus_Uteri', 'Ovary'},
+    'MAC': {'Colon', 'Rectum'},
+    'BCLC': {'Liver'},
+    'SCLC': {'Lung_and_Bronchus', 'Small_cell_carcinoma', 'Adenocarcinoma', 'Squamous_cell_carcinoma'},
+    'DSS': {'Plasma_cell_neoplasms'},
+    'DRE': {'Prostate'},
+    'Breast Cancer Prognostic Stage': {'Breast_Female', 'Breast_Male'},
+    'Binet': {'CLL'},
+}
+
+
+def _task_item_is_applicable(item):
+    """Hide obsolete specialised-stage items from annual-task information."""
+    report_key = str(item.get('report_key') or '').strip()
+    if not report_key or report_key == 'All_Cancers':
+        return True
+    field_key = str(item.get('field_key') or '')
+    for system, cancer_keys in _SPECIAL_STAGE_SYSTEM_CANCER_KEYS.items():
+        if (
+            field_key.startswith(f'{system} Stage Distribution')
+            or f'（{system}期別）' in field_key
+            or f'({system}期別)' in field_key
+        ):
+            return report_key in cancer_keys
+    return True
+
+
 def _analysis_item_label(item):
-    label = str(item.get('title') or item.get('analysis_item') or item.get('field_key') or '')
+    label = _display_label(item.get('title') or item.get('analysis_item') or item.get('field_key'))
     if label.startswith('::'):
         parts = label.split('::')
         system = parts[1].strip() if len(parts) > 1 else ''
         return f'{system} 期別與手術術式'.strip()
+    # field_key 是提供任務配對使用的英文識別碼；在中文「資訊」視窗中，
+    # 顯示與年報頁籤一致的中文名稱即可，不變更實際的 field_key。
+    for suffix, display_suffix in (
+        (' Stage Distribution by Age Group', '年齡層期別'),
+        (' Stage Distribution by Sex', '性別期別'),
+        (' Stage Distribution', '期別'),
+    ):
+        if label.endswith(suffix):
+            return f'{label[:-len(suffix)].strip()}{display_suffix}'
     if '|' not in label:
         return label
     topic, detail = label.split('|', 1)
@@ -226,8 +268,12 @@ def _analysis_info(payload):
         'year_title': str(payload.get('year_title') or ''),
         'cancer_title': str(payload.get('cancer_title') or ''),
         'analysis_items': [
-            _analysis_item_label(item)
+            '｜'.join(part for part in (
+                _display_label(item.get('report_title')).strip(),
+                _analysis_item_label(item),
+            ) if part)
             for item in items if isinstance(item, dict)
+            and _task_item_is_applicable(item)
             and (item.get('field_key') or item.get('analysis_item') or item.get('title'))
         ],
     }
