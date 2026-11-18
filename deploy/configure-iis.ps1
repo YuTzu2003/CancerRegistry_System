@@ -44,6 +44,12 @@ $webConfig = @"
 <?xml version="1.0" encoding="utf-8"?>
 <configuration>
   <system.webServer>
+    <security>
+      <requestFiltering>
+        <!-- Export drafts include chart images and may exceed IIS's default request limit. -->
+        <requestLimits maxAllowedContentLength="104857600" />
+      </requestFiltering>
+    </security>
     <rewrite>
       <rules>
         <rule name="Serve static files directly" stopProcessing="true">
