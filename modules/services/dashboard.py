@@ -655,6 +655,7 @@ def download_dashboard_pbi_dataset():
             year_start=year_start,
             year_end=year_end,
             behavior=behavior,
+            separate_cancer_sheets=True,
         )
         # Keep the completed workbook in memory while it is sent.  This avoids
         # a Windows file-lock race with cleanup of the temporary directory.
