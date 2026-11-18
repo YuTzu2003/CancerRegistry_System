@@ -144,19 +144,24 @@ def get_chart_insight_logic(data):
                 Notes:
                 1. without opening remarks or greetings.
                 2. Base all conclusions strictly on the supplied data.
-                3. Do not infer causes that cannot be supported by the data.
-                4. Do not include irrelevant background information.
-                5. Treat the selected year range as the scope of the analysis.
-                6. Keep each language version within 130 words.
-                7. When regenerating, vary sentence structure and presentation order while
+                3. The narrative must strictly match the displayed chart and table data.
+                   Before replying, verify that every count, percentage, age group, stage,
+                   treatment, and sex-specific statement is directly supported by [Data Content].
+                   Do not output internal field names, placeholders, or technical variable names
+                   such as total_count. If a value cannot be confirmed, omit that statement.
+                4. Do not infer causes that cannot be supported by the data.
+                5. Do not include irrelevant background information.
+                6. Treat the selected year range as the scope of the analysis.
+                7. Keep each language version within 130 words.
+                8. When regenerating, vary sentence structure and presentation order while
                    preserving every number, percentage, trend, and conclusion supported by the data.
-                8. Use Traditional Chinese for zh-TW and professional medical English for en.
-                9. Return valid JSON only, without markdown or explanatory text, using exactly:
+                9. Use Traditional Chinese for zh-TW and professional medical English for en.
+                10. Return valid JSON only, without markdown or explanatory text, using exactly:
                    {{"zh-TW":"中文分析敘述","en":"English analysis narrative"}}
-                10. This is an annual analysis, not a year-to-year comparison. Describe only
+                11. This is an annual analysis, not a year-to-year comparison. Describe only
                     the selected year's data (or the selected range as a whole). Do not
                     compare different years or mention changes from previous years.
-                11. [Sex category rule — STRICT]
+                12. [Sex category rule — STRICT]
                     The supplied data only contains counts for male (男) and female (女).
                     Treat sex analysis as a male/female-only topic by default.
                     You MUST NOT mention, list, enumerate, or reference any of the following
