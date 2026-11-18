@@ -36,7 +36,9 @@ class BaseConfig:
     SESSION_COOKIE_SECURE = parse_bool(_required_env("SESSION_COOKIE_SECURE"))
     SESSION_COOKIE_SAMESITE = _required_env("SESSION_COOKIE_SAMESITE")
     SESSION_LIFETIME_SECONDS = _parse_int(_required_env("SESSION_LIFETIME_SECONDS"), "SESSION_LIFETIME_SECONDS")
-    MAX_UPLOAD_MB = 50
+    # Applies to file uploads and dashboard export drafts containing chart images.
+    # Keep this in sync with IIS requestFiltering/requestLimits.
+    MAX_UPLOAD_MB = 100
     LOGIN_MAX_ATTEMPTS = 5
     LOGIN_ATTEMPT_WINDOW_SECONDS = 900
     MAX_CONTENT_LENGTH = MAX_UPLOAD_MB * 1024 * 1024
