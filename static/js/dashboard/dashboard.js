@@ -349,14 +349,14 @@ window.DashboardRenderer.getCancerTitleForSentence = function(cancerTitle) {
 // back to their stored selection and the stage system's eligible cancer keys.
 window.DashboardRenderer.isStageReportApplicableToActiveCancer = function(report) {
         const stageSystemCancerKeys = {
-            FIGO: ['Cervix_Uteri', 'Corpus_Uteri', 'Ovary'],
-            MAC: ['Colon', 'Rectum'],
-            BCLC: ['Liver'],
-            SCLC: ['Lung_and_Bronchus', 'Small_cell_carcinoma', 'Adenocarcinoma', 'Squamous_cell_carcinoma'],
-            DSS: ['Plasma_cell_neoplasms'],
+            FIGO: ['Cervix_Uteri', 'Cervix_cin3_in_situ', 'Cervix_invasive', 'Corpus_Uteri', 'Ovary'],
+            MAC: ['Colon_and_Rectum_Anus', 'Colon', 'Rectum'],
+            BCLC: ['Liver_and_Intrahepatic_bile_duct', 'Liver'],
+            SCLC: ['Lung_and_Bronchus_Trachea', 'Trachea', 'Lung_and_Bronchus', 'Small_cell_carcinoma', 'Adenocarcinoma', 'Squamous_cell_carcinoma'],
+            DSS: ['Lymphoma', 'Plasma_cell_neoplasms'],
             DRE: ['Prostate'],
-            'Breast Cancer Prognostic Stage': ['Breast_Female', 'Breast_Male'],
-            Binet: ['CLL']
+            'Breast Cancer Prognostic Stage': ['Breast', 'Breast_Female', 'Breast_Male', 'Breast_in_situ', 'Breast_invasive'],
+            Binet: ['Leukemia_and_myeloid_neoplasm', 'CLL']
         };
         const activeKey = String(window.dashboardActiveCancerKey || '').trim();
         if (!activeKey || activeKey === 'All_Cancers') return true;
@@ -378,14 +378,14 @@ window.DashboardRenderer.isStageReportApplicableToActiveCancer = function(report
 
 window.DashboardRenderer.getStageReportCancerTitle = function(report, cancerTitle) {
         const stageSystemCancerKeys = {
-            FIGO: ['Cervix_Uteri', 'Corpus_Uteri', 'Ovary'],
-            MAC: ['Colon', 'Rectum'],
-            BCLC: ['Liver'],
-            SCLC: ['Lung_and_Bronchus', 'Small_cell_carcinoma', 'Adenocarcinoma', 'Squamous_cell_carcinoma'],
-            DSS: ['Plasma_cell_neoplasms'],
+            FIGO: ['Cervix_Uteri', 'Cervix_cin3_in_situ', 'Cervix_invasive', 'Corpus_Uteri', 'Ovary'],
+            MAC: ['Colon_and_Rectum_Anus', 'Colon', 'Rectum'],
+            BCLC: ['Liver_and_Intrahepatic_bile_duct', 'Liver'],
+            SCLC: ['Lung_and_Bronchus_Trachea', 'Trachea', 'Lung_and_Bronchus', 'Small_cell_carcinoma', 'Adenocarcinoma', 'Squamous_cell_carcinoma'],
+            DSS: ['Lymphoma', 'Plasma_cell_neoplasms'],
             DRE: ['Prostate'],
-            'Breast Cancer Prognostic Stage': ['Breast_Female', 'Breast_Male'],
-            Binet: ['CLL']
+            'Breast Cancer Prognostic Stage': ['Breast', 'Breast_Female', 'Breast_Male', 'Breast_in_situ', 'Breast_invasive'],
+            Binet: ['Leukemia_and_myeloid_neoplasm', 'CLL']
         };
         const reportedKeys = Array.isArray(report?.applicable_cancer_keys) ? report.applicable_cancer_keys : [];
         const selectedKeys = window.dashboardSelectedCancerDisplayKeys || [];
