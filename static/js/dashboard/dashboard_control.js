@@ -953,22 +953,21 @@
     const selectedCancers = new Set(window.selectedCancers || []);
     const appliesToSelectedCancer = {
       AJCC: () => selectedCancers.size > 0,
-      FIGO: () => ['Cervix_Uteri', 'Corpus_Uteri', 'Ovary'].some(value => selectedCancers.has(value)),
-      BCLC: () => selectedCancers.has('Liver'),
-      MAC: () => ['Colon', 'Rectum'].some(value => selectedCancers.has(value)),
+      FIGO: () => ['Cervix_Uteri', 'Cervix_cin3_in_situ', 'Cervix_invasive', 'Corpus_Uteri', 'Ovary'].some(value => selectedCancers.has(value)),
+      BCLC: () => ['Liver_and_Intrahepatic_bile_duct', 'Liver'].some(value => selectedCancers.has(value)),
+      MAC: () => ['Colon_and_Rectum_Anus', 'Colon', 'Rectum'].some(value => selectedCancers.has(value)),
       SCLC: () => [
-        'Lung_and_Bronchus',
+        'Lung_and_Bronchus_Trachea', 'Trachea', 'Lung_and_Bronchus',
         'Small_cell_carcinoma',
         'Adenocarcinoma',
         'Squamous_cell_carcinoma'
       ].some(value => selectedCancers.has(value)),
-      DSS: () => selectedCancers.has('Plasma_cell_neoplasms'),
+      DSS: () => ['Lymphoma', 'Plasma_cell_neoplasms'].some(value => selectedCancers.has(value)),
       DRE: () => selectedCancers.has('Prostate'),
       'Breast Cancer Prognostic Stage': () => [
-        'Breast_Female',
-        'Breast_Male'
+        'Breast', 'Breast_Female', 'Breast_Male', 'Breast_in_situ', 'Breast_invasive'
       ].some(value => selectedCancers.has(value)),
-      Binet: () => selectedCancers.has('CLL')
+      Binet: () => ['Leukemia_and_myeloid_neoplasm', 'CLL'].some(value => selectedCancers.has(value))
     };
     const allCancersSelected = selectedCancers.has('All_Cancers');
 

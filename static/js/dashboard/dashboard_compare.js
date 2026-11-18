@@ -224,14 +224,14 @@
     const allSelected = selected.has('All_Cancers');
     const applicable = {
       AJCC: () => selected.size > 0,
-      FIGO: () => ['Cervix_Uteri', 'Corpus_Uteri', 'Ovary'].some(value => selected.has(value)),
-      BCLC: () => selected.has('Liver'),
-      MAC: () => ['Colon', 'Rectum'].some(value => selected.has(value)),
-      SCLC: () => ['Lung_and_Bronchus', 'Small_cell_carcinoma', 'Adenocarcinoma', 'Squamous_cell_carcinoma'].some(value => selected.has(value)),
-      DSS: () => selected.has('Plasma_cell_neoplasms'),
+      FIGO: () => ['Cervix_Uteri', 'Cervix_cin3_in_situ', 'Cervix_invasive', 'Corpus_Uteri', 'Ovary'].some(value => selected.has(value)),
+      BCLC: () => ['Liver_and_Intrahepatic_bile_duct', 'Liver'].some(value => selected.has(value)),
+      MAC: () => ['Colon_and_Rectum_Anus', 'Colon', 'Rectum'].some(value => selected.has(value)),
+      SCLC: () => ['Lung_and_Bronchus_Trachea', 'Trachea', 'Lung_and_Bronchus', 'Small_cell_carcinoma', 'Adenocarcinoma', 'Squamous_cell_carcinoma'].some(value => selected.has(value)),
+      DSS: () => ['Lymphoma', 'Plasma_cell_neoplasms'].some(value => selected.has(value)),
       DRE: () => selected.has('Prostate'),
-      'Breast Cancer Prognostic Stage': () => ['Breast_Female', 'Breast_Male'].some(value => selected.has(value)),
-      Binet: () => selected.has('CLL')
+      'Breast Cancer Prognostic Stage': () => ['Breast', 'Breast_Female', 'Breast_Male', 'Breast_in_situ', 'Breast_invasive'].some(value => selected.has(value)),
+      Binet: () => ['Leukemia_and_myeloid_neoplasm', 'CLL'].some(value => selected.has(value))
     };
     return Object.keys(applicable)
       .filter(system => allSelected || applicable[system]())
@@ -270,16 +270,16 @@
     const selectedCancers = new Set(selectedCancerValues());
     const applicable = {
       AJCC: () => selectedCancers.size > 0,
-      FIGO: () => ['Cervix_Uteri', 'Corpus_Uteri', 'Ovary'].some(value => selectedCancers.has(value)),
-      BCLC: () => selectedCancers.has('Liver'),
-      MAC: () => ['Colon', 'Rectum'].some(value => selectedCancers.has(value)),
-      SCLC: () => ['Lung_and_Bronchus', 'Small_cell_carcinoma', 'Adenocarcinoma', 'Squamous_cell_carcinoma']
+      FIGO: () => ['Cervix_Uteri', 'Cervix_cin3_in_situ', 'Cervix_invasive', 'Corpus_Uteri', 'Ovary'].some(value => selectedCancers.has(value)),
+      BCLC: () => ['Liver_and_Intrahepatic_bile_duct', 'Liver'].some(value => selectedCancers.has(value)),
+      MAC: () => ['Colon_and_Rectum_Anus', 'Colon', 'Rectum'].some(value => selectedCancers.has(value)),
+      SCLC: () => ['Lung_and_Bronchus_Trachea', 'Trachea', 'Lung_and_Bronchus', 'Small_cell_carcinoma', 'Adenocarcinoma', 'Squamous_cell_carcinoma']
         .some(value => selectedCancers.has(value)),
-      DSS: () => selectedCancers.has('Plasma_cell_neoplasms'),
+      DSS: () => ['Lymphoma', 'Plasma_cell_neoplasms'].some(value => selectedCancers.has(value)),
       DRE: () => selectedCancers.has('Prostate'),
-      'Breast Cancer Prognostic Stage': () => ['Breast_Female', 'Breast_Male']
+      'Breast Cancer Prognostic Stage': () => ['Breast', 'Breast_Female', 'Breast_Male', 'Breast_in_situ', 'Breast_invasive']
         .some(value => selectedCancers.has(value)),
-      Binet: () => selectedCancers.has('CLL')
+      Binet: () => ['Leukemia_and_myeloid_neoplasm', 'CLL'].some(value => selectedCancers.has(value))
     };
     const allSelected = selectedCancers.has('All_Cancers');
 

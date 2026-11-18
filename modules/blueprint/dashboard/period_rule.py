@@ -1,6 +1,11 @@
 import re
 import pandas as pd
 from modules.services.db import get_conn
+from modules.blueprint.dashboard.definition.stage_systems import (
+    STAGE_SYSTEM_CANCER_KEYS,
+    cancer_key_applies_to_stage_system,
+    stage_system_applies_to_selection,
+)
 def normalize_code(value, width=0):
     if pd.isna(value):
         return ""
@@ -191,17 +196,6 @@ STAGE_FUNCTIONS = {
     "Breast Cancer Prognostic Stage": breast_stages, "Binet": binet_stages,
 }
 
-STAGE_SYSTEM_CANCER_KEYS = {
-    "FIGO": {"Cervix_Uteri", "Corpus_Uteri", "Ovary"},
-    "MAC": {"Colon", "Rectum"},
-    "BCLC": {"Liver"},
-    "SCLC": {"Lung_and_Bronchus", "Small_cell_carcinoma", "Adenocarcinoma", "Squamous_cell_carcinoma"},
-    "DSS": {"Plasma_cell_neoplasms"},
-    "DRE": {"Prostate"},
-    "Breast Cancer Prognostic Stage": {"Breast_Female", "Breast_Male"},
-    "Binet": {"CLL"},
-}
-
 # Manual keys follow resolve_surgery_manual_key; these mirror the site and
 # histology eligibility in the stage functions above and the selection UI.
 SURGERY_STAGE_MANUALS = {
@@ -334,9 +328,11 @@ def _resolve_applicable_cancer_keys(rows, cancers, system):
     if applicable:
         return [key for key in selected_order if key in applicable]
 
-    eligible_keys = STAGE_SYSTEM_CANCER_KEYS.get(system)
-    if eligible_keys:
-        return [key for key in selected_order if key in eligible_keys]
+    if STAGE_SYSTEM_CANCER_KEYS.get(system):
+        return [
+            key for key in selected_order
+            if cancer_key_applies_to_stage_system(system, key)
+        ]
     return []
 
 
@@ -435,11 +431,63 @@ def _stage_system_applies_to_selection(system, cancers):
     to their designated cancer groups.  Avoid returning a misleading all-zero
     report when a per-cancer dashboard report selects an unrelated cancer.
     """
+    return stage_system_applies_to_selection(system, cancers)
+
+
+def _classify_stage_case_cancer(case):
+    """Classify one stage-result case using the normalized dashboard fields."""
+    from modules.blueprint.dashboard.definition.cancer_grouping import classify_cancer_group
+
+    return classify_cancer_group(
+        _case_value(case, "site", "原發部位"),
+        _case_value(case, "hist", "組織型態"),
+        behavior=_case_value(case, "behavior", "性態碼"),
+        didiag=_case_value(case, "didiag", "最初診斷日期", "診斷年度"),
+        ajcc_ed=_case_value(case, "ajcc_ed", "AJCC 癌症分期版本與章節"),
+        sex=_case_value(case, "sex", "性別"),
+    )
+
+
+def _stage_result_for_system(stage_result, system):
+    """Keep specialised-stage rows within their clinically eligible cancers.
+
+    A parent picker such as ``Liver_and_Intrahepatic_bile_duct`` can request
+    BCLC, but only its ``Liver`` cases may appear in the BCLC result.
+    """
     eligible_keys = STAGE_SYSTEM_CANCER_KEYS.get(system)
-    if not eligible_keys or not cancers:
-        return True
-    selected_keys = {str(key).strip() for key in cancers if key and str(key).strip()}
-    return "All_Cancers" in selected_keys or bool(selected_keys & eligible_keys)
+    if not eligible_keys:
+        return stage_result
+
+    rows = []
+    for row in stage_result.get("rows", []):
+        cancer = _classify_stage_case_cancer(row.get("case") or {})
+        if not cancer:
+            continue
+        case_keys = {
+            cancer.get("group_key"), cancer.get("subgroup_key"),
+            *(cancer.get("ancestor_subgroup_keys") or []),
+        }
+        if case_keys.intersection(eligible_keys):
+            rows.append(row)
+
+    filtered = dict(stage_result)
+    filtered["rows"] = rows
+    filtered["total_count"] = len(rows)
+    if "stage_unknown_count" in filtered:
+        filtered["stage_unknown_count"] = sum(
+            row.get("ajcc_stage_category") == "Stage Unknown" for row in rows
+        )
+    if "stage_not_applicable_count" in filtered:
+        filtered["stage_not_applicable_count"] = sum(
+            row.get("ajcc_stage_category") == "Stage Not Applicable" for row in rows
+        )
+    if "included_in_stage_statistics_count" in filtered:
+        filtered["included_in_stage_statistics_count"] = (
+            len(rows)
+            - filtered.get("stage_unknown_count", 0)
+            - filtered.get("stage_not_applicable_count", 0)
+        )
+    return filtered
 
 
 def calculate_stage_reports(cases, options, period_codes=None, cancers=None):
@@ -455,7 +503,9 @@ def calculate_stage_reports(cases, options, period_codes=None, cancers=None):
         if not _stage_system_applies_to_selection(system, cancers):
             continue
         if system not in results_by_system:
-            results_by_system[system] = STAGE_FUNCTIONS[system](cases, period_codes)
+            results_by_system[system] = _stage_result_for_system(
+                STAGE_FUNCTIONS[system](cases, period_codes), system
+            )
         reports.append(build_stage_report(results_by_system[system], option, period_codes, cancers=cancers))
     return reports
 
@@ -551,7 +601,9 @@ def calculate_stage_first_course_distribution(cases, options, period_codes=None,
         seen_systems.add(system)
         detailed = option.get("detailed", False)
         stage_column = "stage_detail" if detailed else "stage_detail_hide"
-        stage_result = STAGE_FUNCTIONS[system](cases, period_codes)
+        stage_result = _stage_result_for_system(
+            STAGE_FUNCTIONS[system](cases, period_codes), system
+        )
         counts = {}
         stage_columns = set()
         excluded_unknown = excluded_not_applicable = excluded_unmapped = 0

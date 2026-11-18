@@ -10,6 +10,10 @@ import traceback
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from modules.blueprint.dashboard.definition.stage_systems import (
+    STAGE_SYSTEM_CANCER_KEYS,
+    cancer_key_applies_to_stage_system,
+)
 
 # ── LLM 任務佇列、JSONL 保存、取消與重試 ────────────────────────────
 TASK_ROOT = Path(__file__).resolve().parents[3] / 'tasks' / 'dashboard'
@@ -209,31 +213,19 @@ def _display_label(value):
     return str(value or '').replace('（', '(').replace('）', ')')
 
 
-_SPECIAL_STAGE_SYSTEM_CANCER_KEYS = {
-    'FIGO': {'Cervix_Uteri', 'Corpus_Uteri', 'Ovary'},
-    'MAC': {'Colon', 'Rectum'},
-    'BCLC': {'Liver'},
-    'SCLC': {'Lung_and_Bronchus', 'Small_cell_carcinoma', 'Adenocarcinoma', 'Squamous_cell_carcinoma'},
-    'DSS': {'Plasma_cell_neoplasms'},
-    'DRE': {'Prostate'},
-    'Breast Cancer Prognostic Stage': {'Breast_Female', 'Breast_Male'},
-    'Binet': {'CLL'},
-}
-
-
 def _task_item_is_applicable(item):
     """Hide obsolete specialised-stage items from annual-task information."""
     report_key = str(item.get('report_key') or '').strip()
     if not report_key or report_key == 'All_Cancers':
         return True
     field_key = str(item.get('field_key') or '')
-    for system, cancer_keys in _SPECIAL_STAGE_SYSTEM_CANCER_KEYS.items():
+    for system in STAGE_SYSTEM_CANCER_KEYS:
         if (
             field_key.startswith(f'{system} Stage Distribution')
             or f'（{system}期別）' in field_key
             or f'({system}期別)' in field_key
         ):
-            return report_key in cancer_keys
+            return cancer_key_applies_to_stage_system(system, report_key)
     return True
 
 
