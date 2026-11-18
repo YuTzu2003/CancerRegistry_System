@@ -41,6 +41,25 @@
   const stageResultGroupItem = '__stage_reports__';
   let activeStageReportOption = '';
 
+  // Cross-year result panels can be rendered while their chart panel is still
+  // hidden or before the comparison card has its final width.  ECharts keeps
+  // that first (often very small) canvas size unless it is explicitly resized
+  // after the panel is visible.
+  function scheduleCompareChartResize(chart, chartEl) {
+    if (!chart || !chartEl) return;
+    const resize = () => {
+      const rect = chartEl.getBoundingClientRect();
+      const width = Math.round(rect.width || chartEl.clientWidth || 0);
+      const height = Math.round(rect.height || chartEl.clientHeight || 0);
+      if (width > 0 && height > 0) chart.resize({ width, height });
+    };
+    requestAnimationFrame(() => {
+      resize();
+      requestAnimationFrame(resize);
+    });
+    window.setTimeout(resize, 120);
+  }
+
 
   // 自訂年度下拉選單。
   function closeCustomYearMenus(exceptSelect = null) {
@@ -918,7 +937,7 @@
         }
       ]
     }, true);
-    setTimeout(() => chart.resize(), 0);
+    scheduleCompareChartResize(chart, container);
   }
 
   // 比較結果渲染與差異摘要卡片。
@@ -1881,7 +1900,7 @@
       });
       if (selectedView === 'chart' && window.echarts) {
         setTimeout(() => container.querySelectorAll('.compare-chart').forEach(chartEl => {
-          echarts.getInstanceByDom(chartEl)?.resize();
+          scheduleCompareChartResize(echarts.getInstanceByDom(chartEl), chartEl);
         }), 0);
       }
     }
@@ -1902,7 +1921,7 @@
     if (oldChart) oldChart.dispose();
     const chart = echarts.init(chartEl);
     chart.setOption(getUpdatedGenderAgeChartOption(chartData?.genderAgeData || {}, sharedScale?.genderAgeMax, yearTitle, cancerTitle));
-    setTimeout(() => chart.resize(), 50);
+    scheduleCompareChartResize(chart, chartEl);
   }
 
 
@@ -1959,7 +1978,7 @@
           }
         }]
       });
-      setTimeout(() => chart.resize(), 50);
+      scheduleCompareChartResize(chart, chartEl);
       return;
     }
     chart.setOption({
@@ -2021,7 +2040,7 @@
         }
       }]
     });
-    setTimeout(() => chart.resize(), 50);
+    scheduleCompareChartResize(chart, chartEl);
   }
 
 
@@ -2059,7 +2078,7 @@
         { name: labels[3], type: 'bar', stack: 'total', barWidth: '60%', data: ['-', '-', '-', calcPctNum(data.class3_total)], itemStyle: { borderRadius: [6, 6, 0, 0], color: colors[3] }, label: { show: true, position: 'top', color: '#333', fontSize: 14, fontWeight: 'bold', formatter: '{c}%' } }
       ]
     });
-    setTimeout(() => chart.resize(), 50);
+    scheduleCompareChartResize(chart, chartEl);
   }
 
 
@@ -2525,7 +2544,7 @@
           },
           label: { show: true, position: 'top', fontSize: 13, fontWeight: 'bold', formatter: params => `${Number(params.value || 0).toFixed(1)}%` } }] });
     }
-    setTimeout(() => chart.resize(), 50);
+    scheduleCompareChartResize(chart, chartEl);
   }
 
 
