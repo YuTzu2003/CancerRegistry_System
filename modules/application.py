@@ -9,10 +9,11 @@ from modules.blueprint.admin.audit_logs import audit_logs_bp
 from modules.blueprint.admin.key_approval import key_approval_bp
 from modules.blueprint.admin.member import member_bp
 from modules.blueprint.auth.key_application import key_application_bp
-from modules.blueprint.survival_report import survival_report_bp
+from modules.blueprint.survival import survival_report_bp
 from modules.config import BaseConfig, CONFIG_BY_NAME
 from modules.services import auth_bp, clean_bp, dashboard_bp, data_gen_bp, indicators_bp, login_required
 from modules.services.audit import register_audit_logging
+from modules.services.security import register_security
 from modules.services.home import register_main_routes
 from modules.services.data_gen import cleanup_abandoned_data_gen_uploads
 import modules.blueprint.auth.histology_code
@@ -41,7 +42,11 @@ def create_app():
     if app_env == "production" and (len(BaseConfig.SECRET_KEY) < 32 or BaseConfig.SECRET_KEY == "development-only-change-before-production"):
         raise RuntimeError("Production SECRET_KEY must contain at least 32 characters")
     flask_app.secret_key = BaseConfig.SECRET_KEY
-    flask_app.config.update(PERMANENT_SESSION_LIFETIME=timedelta(seconds=runtime_config.SESSION_LIFETIME_SECONDS), SESSION_REFRESH_EACH_REQUEST=True, SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE=runtime_config.SESSION_COOKIE_SAMESITE, SESSION_COOKIE_SECURE=runtime_config.SESSION_COOKIE_SECURE, MAX_CONTENT_LENGTH=runtime_config.MAX_CONTENT_LENGTH, TESTING=runtime_config.TESTING)
+    # Force the session cookie to at least SameSite=Lax regardless of the env
+    # value: a misconfigured "None" would otherwise strip CSRF protection.
+    configured_samesite = str(runtime_config.SESSION_COOKIE_SAMESITE or "").strip().capitalize()
+    session_samesite = configured_samesite if configured_samesite in ("Lax", "Strict") else "Lax"
+    flask_app.config.update(PERMANENT_SESSION_LIFETIME=timedelta(seconds=runtime_config.SESSION_LIFETIME_SECONDS), SESSION_REFRESH_EACH_REQUEST=True, SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE=session_samesite, SESSION_COOKIE_SECURE=runtime_config.SESSION_COOKIE_SECURE, MAX_CONTENT_LENGTH=runtime_config.MAX_CONTENT_LENGTH, TESTING=runtime_config.TESTING)
 
     @flask_app.errorhandler(413)
     def request_too_large(_error):
@@ -59,6 +64,7 @@ def create_app():
         flask_app.register_blueprint(blueprint)
     register_main_routes(flask_app, app_env, login_required)
     register_audit_logging(flask_app)
+    register_security(flask_app)
     os.makedirs("tasks/Jobs", exist_ok=True)
     os.makedirs(os.path.join(project_root, "tasks", "data"), exist_ok=True)
 

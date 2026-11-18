@@ -4,7 +4,7 @@
 {% block page_title %}存活率模組{% endblock %}
 
 {% block extra_head %}
-<link rel="stylesheet" href="{{ url_for('survival_report.static', filename='css/survival_report.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/survival/survival.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -74,7 +74,8 @@
       <span>報表預覽與匯出</span>
       <span class="survival-step-hint">確認辨識結果、調整顯示名稱與投影片順序後下載報表</span>
     </div>
-    <section id="yearComparisonSettings" class="year-comparison-settings preview-year-comparison-settings" aria-labelledby="yearComparisonHeading">
+    <section id="yearComparisonSettings" class="year-comparison-settings preview-year-comparison-settings"
+      aria-labelledby="yearComparisonHeading">
       <div class="year-comparison-settings__heading">
         <div>
           <strong id="yearComparisonHeading">年份比較</strong>
@@ -200,6 +201,6 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script src="{{ url_for('survival_report.static', filename='js/survival_report_decks.js') }}"></script>
-<script src="{{ url_for('survival_report.static', filename='js/survival_report.js') }}"></script>
+<script src="{{ url_for('static', filename='js/survival/survival_report_decks.js') }}"></script>
+<script src="{{ url_for('static', filename='js/survival/survival_report.js') }}"></script>
 {% endblock %}

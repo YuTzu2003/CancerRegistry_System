@@ -3,7 +3,7 @@ from pathlib import Path, PurePosixPath
 from urllib.parse import unquote, urljoin, urlparse
 from urllib.request import Request, urlopen
 from bs4 import BeautifulSoup
-from flask import jsonify, render_template, session
+from flask import jsonify, render_template, send_from_directory, session
 from modules.services.audit import write_audit_log
 from modules.services.db import get_conn
 
@@ -81,6 +81,12 @@ def register_main_routes(app, app_env, login_required):
     @app.get("/health")
     def health():
         return jsonify({"status": "ok", "environment": app_env})
+
+    @app.get("/documents/<path:filename>")
+    @login_required
+    def documents(filename):
+        root = Path(app.static_folder).parent / "document"
+        return send_from_directory(root, filename)
 
     @app.route("/")
     @login_required

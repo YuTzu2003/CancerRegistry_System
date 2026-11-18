@@ -1,10 +1,24 @@
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     document.getElementById('btnBackToDashboard')?.addEventListener('click', function() {
         sessionStorage.setItem('dashboard_reset_filters_on_return', '1');
         history.back();
     });
 
-    const rawData = localStorage.getItem('dashboard_export_data');
+    const draftId = document.getElementById('exportReportContext')?.dataset.draftId || '';
+    let rawData = draftId ? '' : localStorage.getItem('dashboard_export_data');
+    if (draftId) {
+        try {
+            const response = await fetch('/api/dashboard/export-drafts/' + encodeURIComponent(draftId));
+            const draft = await response.json();
+            if (!response.ok || !draft.success) {
+                throw new Error(draft.error || '找不到匯出資料');
+            }
+            rawData = JSON.stringify(draft.data);
+        } catch (error) {
+            console.error('Export draft load failed:', error);
+            rawData = '';
+        }
+    }
     if (!rawData) {
         utils.alert('找不到可匯出的資料！將返回上一頁。', 'error').then(() => {
             sessionStorage.setItem('dashboard_reset_filters_on_return', '1');
@@ -202,7 +216,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 setTimeout(() => {
                     window.URL.revokeObjectURL(url);
-                    localStorage.removeItem('dashboard_export_data');
+                    if (draftId) {
+                        fetch('/api/dashboard/export-drafts/' + encodeURIComponent(draftId), { method: 'DELETE' })
+                            .catch(() => {});
+                    } else {
+                        localStorage.removeItem('dashboard_export_data');
+                    }
                 }, 1000);
             }
         })

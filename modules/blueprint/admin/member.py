@@ -4,7 +4,7 @@ import logging
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from modules.services.db import get_conn
 from modules.services.audit import write_audit_log
-from modules.services.auth import login_required, admin_required
+from modules.services.auth import login_required, admin_required, password_acceptable, PASSWORD_POLICY_MESSAGE
 from werkzeug.security import generate_password_hash
 
 member_bp = Blueprint('member', __name__, template_folder='templates')
@@ -57,6 +57,10 @@ def admin_save_user():
     name = request.form.get("Name")
     position = request.form.get("Position")
     location = request.form.get("Location")
+
+    if password and not password_acceptable(password):
+        flash(PASSWORD_POLICY_MESSAGE, "danger")
+        return redirect(url_for("member.member"))
 
     conn = get_conn()
     cursor = conn.cursor()

@@ -1,19 +1,21 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}癌症資料登記{% endblock %}</title>
-  <link href="/static/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet"/>
-  <link rel="stylesheet" href="/static/vendor/bootstrap-icons/font/bootstrap-icons.min.css"/>
-  <link rel="stylesheet" href="/static/vendor/noto-sans-tc/noto-sans-tc.css"/>
+  <link href="/static/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/vendor/bootstrap-icons/font/bootstrap-icons.min.css" />
+  <link rel="stylesheet" href="/static/vendor/noto-sans-tc/noto-sans-tc.css" />
   <link rel="stylesheet" href="/static/vendor/sweetalert2/sweetalert2.min.css">
   <link rel="stylesheet" href="/static/css/core/style.css" />
   <script src="{{ url_for('static', filename='js/core/base.js') }}"></script>
 
-<link rel="stylesheet" href="{{ url_for('static', filename='css/core/base.css') }}">
-{% block extra_head %}{% endblock %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/core/base.css') }}">
+  {% block extra_head %}{% endblock %}
 </head>
+
 <body>
   <div class="app-shell">
     <aside class="sidebar" id="sidebar">
@@ -22,7 +24,7 @@
           if (window.matchMedia("(min-width: 769px)").matches && localStorage.getItem("sidebarCollapsed") === "true") {
             document.currentScript.parentElement.classList.add("collapsed");
           }
-        } catch (_) {}
+        } catch (_) { }
       </script>
       <div class="sidebar-brand">
         <a href="/" class="brand-link">
@@ -41,50 +43,63 @@
 
       <nav class="sidebar-nav">
         {% set nav_items = [
-          {"title": "資料審核", "icon": "bi-funnel", "subitems": [
-            {"endpoint": "clean.clean", "title": "資料清洗", "icon": "bi-play-circle"},
-            {"endpoint": "clean.history", "title": "資料審核紀錄", "icon": "bi-file-earmark-text"},
-          ]},
-          {"title": "統計報表", "icon": "bi-bar-chart", "subitems": [
-            {"endpoint": "dashboard.dashboard", "title": "年報分析", "icon": "bi-bar-chart"},
-            {"endpoint": "dashboard.compare", "title": "年度比較", "icon": "bi-columns-gap"},
-            {"endpoint": "auth.data_update_access", "title": "資料維護", "icon": "bi-database-gear"},
-          ]},
-          {"endpoint": "data_gen.dataGen", "title": "虛擬資料", "icon": "bi-database-add"},
-          {"title": "監測指標", "icon": "bi-clipboard2-pulse", "subitems": [
-            {"endpoint": "indicators.indicators", "title": "指標分析", "icon": "bi-clipboard2-pulse"},
-            {"endpoint": "indicators.indicator_definitions_page", "title": "資料維護", "icon": "bi-database-gear"},
-          ]},
-          {"endpoint": "survival_report.index", "title": "存活分析", "icon": "bi-file-earmark-bar-graph"},
-          {"endpoint": "key_application.application", "title": "權限申請", "icon": "bi-key"},
+        {"title": "資料審核", "icon": "bi-funnel", "subitems": [
+        {"endpoint": "clean.clean", "title": "資料清洗", "icon": "bi-play-circle"},
+        {"endpoint": "clean.history", "title": "資料審核紀錄", "icon": "bi-file-earmark-text"},
+        ]},
+        {"title": "統計報表", "icon": "bi-bar-chart", "subitems": [
+        {"endpoint": "dashboard.dashboard", "title": "年報分析", "icon": "bi-bar-chart"},
+        {"endpoint": "dashboard.compare", "title": "年度比較", "icon": "bi-columns-gap"},
+        {"endpoint": "auth.data_update_access", "title": "資料維護", "icon": "bi-database-gear"},
+        ]},
+        {"endpoint": "data_gen.dataGen", "title": "虛擬資料", "icon": "bi-database-add"},
+        {"title": "監測指標", "icon": "bi-clipboard2-pulse", "subitems": [
+        {"endpoint": "indicators.indicators", "title": "指標分析", "icon": "bi-clipboard2-pulse"},
+        {"endpoint": "indicators.indicator_definitions_page", "title": "資料維護", "icon": "bi-database-gear"},
+        ]},
+        {"title": "存活分析", "icon": "bi-file-earmark-bar-graph", "subitems": [
+        {"endpoint": "survival_report.index", "title": "存活率報表", "icon": "bi-file-earmark-bar-graph"},
+        {"endpoint": "survival_report.curves", "title": "存活曲線與生命表", "icon": "bi-graph-down"},
+        ]},
+        {"endpoint": "key_application.application", "title": "權限申請", "icon": "bi-key"},
         ] %}
         {% if session.get('position') == 'Admin' %}
-          {% set nav_items = nav_items + [{"title": "權限管理", "icon": "bi-shield-lock", "subitems": [
-            {"endpoint": "member.member", "title": "使用者管理", "icon": "bi-people"},
-            {"endpoint": "key_approval.key_approval", "title": "金鑰申請審核", "icon": "bi-key-fill"},
-            {"endpoint": "audit_logs.audit_logs", "title": "系統操作日誌", "icon": "bi-journal-text"},
-          ]}] %}
+        {% set nav_items = nav_items + [{"title": "權限管理", "icon": "bi-shield-lock", "subitems": [
+        {"endpoint": "member.member", "title": "使用者管理", "icon": "bi-people"},
+        {"endpoint": "key_approval.key_approval", "title": "金鑰申請審核", "icon": "bi-key-fill"},
+        {"endpoint": "audit_logs.audit_logs", "title": "系統操作日誌", "icon": "bi-journal-text"},
+        ]}] %}
         {% endif %}
         <ul>
           {% for item in nav_items %}
           {% if item.subitems %}
           {% set ns = namespace(is_active=false) %}
           {% for sub in item.subitems %}
-            {% if active == sub.endpoint or active == sub.endpoint.split('.')[-1] or (item.subitems[0].endpoint == 'indicators.indicators' and active == 'indicators.indicator_definition_review_page') %}
-              {% set ns.is_active = true %}
-            {% endif %}
+          {% if active == sub.endpoint or active == sub.endpoint.split('.')[-1] or request.endpoint == sub.endpoint or (item.subitems[0].endpoint ==
+          'indicators.indicators' and active == 'indicators.indicator_definition_review_page') %}
+          {% set ns.is_active = true %}
+          {% endif %}
           {% endfor %}
           <li class="nav-group">
-            <a href="#submenu-{{ loop.index }}" data-bs-toggle="collapse" class="nav-link {% if ns.is_active %}active{% endif %}" aria-expanded="{% if ns.is_active %}true{% else %}false{% endif %}" data-sidebar-label="{{ item.title }}" aria-label="{{ item.title }}" title="{{ item.title }}">
+            <a href="#submenu-{{ loop.index }}" data-bs-toggle="collapse"
+              class="nav-link nav-group-link {% if ns.is_active %}group-open{% endif %}"
+              aria-expanded="{% if ns.is_active %}true{% else %}false{% endif %}" data-sidebar-label="{{ item.title }}"
+              aria-label="{{ item.title }}" title="{{ item.title }}">
               <span class="nav-icon"><i class="bi {{ item.icon }}"></i></span>
               <span class="nav-text">{{ item.title }}</span>
-              <i class="bi bi-chevron-down ms-auto submenu-icon" style="transition: transform 0.3s; font-size: 0.8rem;"></i>
+              <i class="bi bi-chevron-down ms-auto submenu-icon"
+                style="transition: transform 0.3s; font-size: 0.8rem;"></i>
             </a>
-            <ul class="collapse {% if ns.is_active %}show{% endif %} list-unstyled m-0 p-0" id="submenu-{{ loop.index }}">
+            <ul class="collapse {% if ns.is_active %}show{% endif %} list-unstyled m-0 p-0"
+              id="submenu-{{ loop.index }}">
               {% for subitem in item.subitems %}
               <li>
-                <a href="{{ url_for(subitem.endpoint) }}" {% if subitem.endpoint == 'indicators.indicator_definitions_page' %}data-indicator-definitions-link{% endif %} class="nav-link {% if active == subitem.endpoint or active == subitem.endpoint.split('.')[-1] %}submenu-active{% endif %}" style="padding-left: 48px; height: 38px; margin-top: 4px;">
-                  <span class="nav-icon" style="width: 16px; font-size: 16px;"><i class="bi {{ subitem.icon }}"></i></span>
+                <a href="{{ url_for(subitem.endpoint) }}" {% if
+                  subitem.endpoint=='indicators.indicator_definitions_page' %}data-indicator-definitions-link{% endif %}
+                  class="nav-link {% if active == subitem.endpoint or active == subitem.endpoint.split('.')[-1] or request.endpoint == subitem.endpoint %}submenu-active{% endif %}"
+                  style="padding-left: 48px; height: 38px; margin-top: 4px;">
+                  <span class="nav-icon" style="width: 16px; font-size: 16px;"><i
+                      class="bi {{ subitem.icon }}"></i></span>
                   <span class="nav-text">{{ subitem.title }}</span>
                 </a>
               </li>
@@ -93,7 +108,9 @@
           </li>
           {% else %}
           <li>
-            <a href="{{ url_for(item.endpoint) }}" class="nav-link {% if active == item.endpoint or active == item.endpoint.split('.')[-1] %}active{% endif %}" data-sidebar-label="{{ item.title }}" aria-label="{{ item.title }}" title="{{ item.title }}">
+            <a href="{{ url_for(item.endpoint) }}"
+              class="nav-link {% if active == item.endpoint or active == item.endpoint.split('.')[-1] %}active{% endif %}"
+              data-sidebar-label="{{ item.title }}" aria-label="{{ item.title }}" title="{{ item.title }}">
               <span class="nav-icon"><i class="bi {{ item.icon }}"></i></span>
               <span class="nav-text">{{ item.title }}</span>
             </a>
@@ -106,7 +123,8 @@
       <div class="sidebar-footer">
         {%if session.get('name')%}
         <div class="dropdown dropup w-100">
-          <a href="#" class="user-chip text-decoration-none" data-bs-toggle="dropdown" aria-expanded="false" style="cursor: pointer; width: 100%; display: flex; align-items: center;">
+          <a href="#" class="user-chip text-decoration-none" data-bs-toggle="dropdown" aria-expanded="false"
+            style="cursor: pointer; width: 100%; display: flex; align-items: center;">
             <div class="user-avatar">{{session.get('name')[0]}}</div>
             <div class="user-meta">
               <div class="user-name">{{session.get('name')}}</div>
@@ -114,18 +132,24 @@
             </div>
             <i class="bi bi-three-dots ms-auto text-secondary" style="font-size: 1.2rem;"></i>
           </a>
-          <ul class="dropdown-menu shadow-sm" style="width: 100%; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px;">
+          <ul class="dropdown-menu shadow-sm"
+            style="width: 100%; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px;">
             <li>
-              <a class="dropdown-item py-2" href="{{ url_for('auth.profile') }}" style="font-size: 13px; font-weight: 500;">
+              <a class="dropdown-item py-2" href="{{ url_for('auth.profile') }}"
+                style="font-size: 13px; font-weight: 500;">
                 <i class="bi bi-person-gear me-2" style="color: var(--blue-600);"></i>我的資訊
               </a>
             </li>
 
-            <li><hr class="dropdown-divider"></li>
             <li>
-              <a class="dropdown-item py-2 text-danger" href="/logout" style="font-size: 13px; font-weight: 500;">
-                <i class="bi bi-box-arrow-right me-2"></i>登出系統
-              </a>
+              <hr class="dropdown-divider">
+            </li>
+            <li>
+              <form method="post" action="/logout" class="m-0">
+                <button type="submit" class="dropdown-item py-2 text-danger" style="font-size: 13px; font-weight: 500;">
+                  <i class="bi bi-box-arrow-right me-2"></i>登出系統
+                </button>
+              </form>
             </li>
           </ul>
         </div>
@@ -157,9 +181,9 @@
       </header>
       <main class="content">
         {% with messages = get_flashed_messages(with_categories=true) %}
-          {% if messages %}
-            <script id="flashMessagesData" type="application/json">{{ messages | tojson }}</script>
-          {% endif %}
+        {% if messages %}
+        <script id="flashMessagesData" type="application/json">{{ messages | tojson }}</script>
+        {% endif %}
         {% endwith %}
         {% block content %}{% endblock %}
       </main>
@@ -173,11 +197,12 @@
     </div>
   </div>
 
-  <div id="globalLoadingOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 9999; justify-content: center; align-items: center; flex-direction: column; color: white; backdrop-filter: blur(2px);">
-      <div class="spinner-border text-light" role="status" style="width: 3rem; height: 3rem;">
-          <span class="visually-hidden">Loading...</span>
-      </div>
-      <h5 class="mt-3 fw-bold" id="globalLoadingText" style="letter-spacing: 1px;">正在處理中，請稍候...</h5>
+  <div id="globalLoadingOverlay"
+    style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 9999; justify-content: center; align-items: center; flex-direction: column; color: white; backdrop-filter: blur(2px);">
+    <div class="spinner-border text-light" role="status" style="width: 3rem; height: 3rem;">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+    <h5 class="mt-3 fw-bold" id="globalLoadingText" style="letter-spacing: 1px;">正在處理中，請稍候...</h5>
   </div>
 
   <script src="/static/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
@@ -186,4 +211,5 @@
   <script src="{{ url_for('static', filename='js/core/flash_messages.js') }}"></script>
   {% block extra_scripts %}{% endblock %}
 </body>
+
 </html>

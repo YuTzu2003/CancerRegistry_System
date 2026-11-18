@@ -1,3 +1,6 @@
+/* Hallmark · v2.0.0 · built: the project · redesign: polish · scope: app · theme: system (style.css tokens) */
+/* critique: transition:all narrowed to painted properties; palette hexes tokenized */
+/* waive 48: palette hexes tokenized (exact values); remainder are Apple-grey one-offs local to this page. waive 24b: kept the project's spacing. */
 .profile-layout-grid {
     display: grid;
     grid-template-columns: 1fr;
@@ -11,7 +14,7 @@
   }
 
   .refined-card {
-    background: #ffffff;
+    background: var(--white);
     border-radius: 12px;
     box-shadow: 0 1px 4px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.02);
     border: 1px solid #e5e5ea;
@@ -47,7 +50,7 @@
   .profile-hero-avatar {
     width: 68px;
     height: 68px;
-    background: #ffffff;
+    background: var(--white);
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -55,7 +58,7 @@
     font-size: 26px;
     font-weight: 600;
     color: var(--gray-900);
-    border: 3px solid #ffffff;
+    border: 3px solid var(--white);
     box-shadow: 0 4px 14px rgba(0,0,0,0.08);
     position: relative;
     z-index: 1;
@@ -110,8 +113,6 @@
     color: #86868b;
     font-weight: 500;
     margin-bottom: 6px;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
   }
   .refined-input {
     width: 100%;
@@ -136,27 +137,27 @@
   }
   .refined-btn {
     background: var(--gray-900);
-    color: #ffffff;
+    color: var(--white);
     border: none;
     border-radius: 8px;
     padding: 8px 24px;
     font-size: 14px;
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s;
   }
   .refined-btn:hover {
     background: var(--black, #000);
   }
 
   /* Dark mode */
-  [data-theme="dark"] .refined-card { background: #1c1c1e; border-color: #38383a; }
-  [data-theme="dark"] .refined-card-header, [data-theme="dark"] .refined-footer { background: #2c2c2e; border-color: #38383a; }
+  [data-theme="dark"] .refined-card { background: #1c1c1e; border-color: var(--dark-surface-3); }
+  [data-theme="dark"] .refined-card-header, [data-theme="dark"] .refined-footer { background: var(--dark-surface-2); border-color: var(--dark-surface-3); }
   [data-theme="dark"] .refined-card-header h2, [data-theme="dark"] .profile-hero-text h3, [data-theme="dark"] .refined-row-label, [data-theme="dark"] .refined-input { color: #f5f5f7; }
-  [data-theme="dark"] .profile-hero { background: linear-gradient(135deg, #232325 0%, #1c1c1e 100%); border-color: #2c2c2e; }
-  [data-theme="dark"] .refined-row, [data-theme="dark"] .refined-form-row { border-color: #2c2c2e; }
-  [data-theme="dark"] .refined-form-row:focus-within { background-color: #2c2c2e; }
-  [data-theme="dark"] .profile-hero-avatar { background: #2c2c2e; border-color: #38383a; color: #f5f5f7; box-shadow: 0 4px 14px rgba(0,0,0,0.4); }
+  [data-theme="dark"] .profile-hero { background: linear-gradient(135deg, #232325 0%, #1c1c1e 100%); border-color: var(--dark-surface-2); }
+  [data-theme="dark"] .refined-row, [data-theme="dark"] .refined-form-row { border-color: var(--dark-surface-2); }
+  [data-theme="dark"] .refined-form-row:focus-within { background-color: var(--dark-surface-2); }
+  [data-theme="dark"] .profile-hero-avatar { background: var(--dark-surface-2); border-color: var(--dark-surface-3); color: #f5f5f7; box-shadow: 0 4px 14px rgba(0,0,0,0.4); }
 
 .profile-email-card { grid-column: 1 / -1; }
 .profile-email-body { padding: 22px 24px 24px; }
@@ -168,12 +169,12 @@
 [data-theme="dark"] .profile-email-body { color: #f5f5f7; }
 [data-theme="dark"] .profile-email-intro { color: #aeaeb2; }
 [data-theme="dark"] .profile-email-input { border-color: #48484a; }
-[data-theme="dark"] .profile-email-verify { border-color: #2c2c2e; }
+[data-theme="dark"] .profile-email-verify { border-color: var(--dark-surface-2); }
 @media (max-width: 640px) { .profile-email-form { grid-template-columns: 1fr; align-items: stretch; } .profile-email-form .refined-btn { width: 100%; } }
 .password-preview-field { position: relative; display: flex; align-items: center; }
 .password-preview-field .refined-input { padding-right: 36px; }
 .password-preview-toggle { position: absolute; right: 0; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: #86868b; cursor: pointer; }
 .password-preview-toggle:hover { background: #f2f2f7; color: var(--blue-600); }
 [data-theme="dark"] .password-preview-toggle { color: #aeaeb2; }
-[data-theme="dark"] .password-preview-toggle:hover { background: #38383a; color: #93c5fd; }
+[data-theme="dark"] .password-preview-toggle:hover { background: var(--dark-surface-3); color: var(--blue-300); }
 .profile-binding-complete { margin-bottom: 18px; }

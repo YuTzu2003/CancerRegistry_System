@@ -3,9 +3,17 @@ from datetime import datetime, timedelta
 import logging
 from pathlib import Path
 from modules.services.audit import write_audit_log
-from modules.services.db import get_conn
+from modules.services.db import get_engine
 
 BACKUP_DIRECTORY = Path(__file__).resolve().parents[2] / "tasks" / "backups"
+
+
+def _open_autocommit_connection():
+    engine = get_engine()
+    args, kwargs = engine.dialect.create_connect_args(engine.url)
+    kwargs = dict(kwargs)
+    kwargs["autocommit"] = True
+    return engine.dialect.dbapi.connect(*args, **kwargs)
 
 def _remove_expired_backups(now):
     cutoff = now - timedelta(days=3)
@@ -20,9 +28,7 @@ def run_database_backup():
     connection = None
     try:
         BACKUP_DIRECTORY.mkdir(parents=True, exist_ok=True)
-        connection = get_conn()
-        connection.rollback()
-        connection.autocommit = True
+        connection = _open_autocommit_connection()
         cursor = connection.cursor()
         cursor.execute("SET IMPLICIT_TRANSACTIONS OFF")
         cursor.execute("IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION")
@@ -62,5 +68,5 @@ def run_database_backup():
         logging.exception("Automatic database backup failed")
         raise
     finally:
-        if connection:
+        if connection is not None:
             connection.close()

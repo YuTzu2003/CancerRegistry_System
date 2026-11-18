@@ -21,6 +21,7 @@ other/
 Jobs/
 *.bak
 *.doc
+*.docx
 *.txt
 *.json
 *.jsonl

@@ -42,11 +42,6 @@
   let activeStageReportOption = '';
 
 
-
-
-
-
-
   // 自訂年度下拉選單。
   function closeCustomYearMenus(exceptSelect = null) {
     customYearControls.forEach((control, select) => {
@@ -565,53 +560,6 @@
       })
       .finally(updateButtonState);
   }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
   // 比較結果容器：建立各分析項目的圖表、表格與 LLM 敘述區。
@@ -1723,7 +1671,7 @@
     return `
       <div class="annual-report-table-wrap compare-analyzable-table">
         <table class="annual-report-table">
-          <caption>${isEnglish() ? `Table . Analysis-Eligible and Confirmed Cases of ${cancer} in the Cancer Registry,\u00a0${yearTitle}` : `表、${yearTitle}年${cancer}-癌症登記可分析個案與確診個案`}${sourceLine()}</caption>
+          <caption>${isEnglish() ? `Table . Analysis-Eligible and Confirmed Cases of ${cancer} in the Cancer Registry,\u00a0${yearTitle}` : `表、${yearTitle}年${cancer} - 癌症登記可分析個案與確診個案`}${sourceLine()}</caption>
           <thead>
             <tr>
               <th>${isEnglish() ? `${t('cancerTotal')}, ${yearTitle}` : `${yearTitle}年癌症總數`}<br>(A)</th>
@@ -2152,9 +2100,10 @@
     const stageNote = isEnglish()
       ? `Note: Of ${Number(item.analyzable_count || 0)} analyzable cases (Class 1–2), ${unknown} had unknown stage and ${notApplicable} had non-applicable stage${unclassified ? `; ${unclassified} case(s) could not be classified using the defined treatment codes` : ''}. A total of ${excluded} case(s) were excluded (percentage denominator = ${Number(item.included_count ?? totalCount)}).`
       : `註：可分析個案數（Class 1–2）共計 ${Number(item.analyzable_count || 0)} 例，其中分期不明 ${unknown} 例、分期不適用 ${notApplicable} 例${unclassified ? `；另有 ${unclassified} 例治療方式無法依既定治療代碼判定` : ''}。上述共 ${excluded} 例未納入期別與首次療程分佈百分比計算（百分比分母＝${Number(item.included_count ?? totalCount)}）。`;
+    const resolvedCancer = filteredReportCancerTitle(item, cancerTitle);
     const caption = isEnglish()
-      ? `Table . ${escapeHtml(item.system)} Stage and First Course Treatment Distribution of Newly Diagnosed ${escapeHtml(reportCancerTitle(cancerTitle))} Cases, ${yearTitle}${sourceLine()}`
-      : `表、${yearTitle}年新診斷${escapeHtml(reportCancerTitle(cancerTitle))}${escapeHtml(item.system)}期別與首次療程表${sourceLine()}`;
+      ? `Table . ${escapeHtml(item.system)} Stage and First Course Treatment Distribution of Newly Diagnosed ${escapeHtml(resolvedCancer)} Cases, ${yearTitle}${sourceLine()}`
+      : `表、${yearTitle}年新診斷${escapeHtml(resolvedCancer)}${escapeHtml(item.system)}期別與首次療程表${sourceLine()}`;
     const bodyRows = rows.map(row => `<tr><td class="text-start ps-3">${escapeHtml(treatmentLabel(row.treatment))}</td>${(row.values || []).map(value => `<td>${value}</td>`).join('')}<td>${row.subtotal}</td><td>${rowPercentage(row)}</td></tr>`).join('');
     const totals = (item.totals || []).map(value => `<td>${value}</td>`).join('');
     const percentages = (item.percentages || []).map(value => `<td>${value}%</td>`).join('');
@@ -2297,9 +2246,29 @@
   function stageReportTitleOptions(report, yearTitle, cancerTitle) {
     return {
       year: yearTitle,
-      cancer: reportCancerTitle(cancerTitle),
+      cancer: filteredReportCancerTitle(report, cancerTitle),
       system: stageSystemTitle(report.staging_system)
     };
+  }
+
+  // Non-AJCC stage systems only apply to a subset of the user's cancer selection
+  // (e.g. MAC excludes Larynx), so narrow the title to the cancers that actually
+  // contribute cases to this report. Falls back to the aggregate cancerTitle
+  // when the backend did not narrow the list or the subset equals the selection.
+  function filteredReportCancerTitle(report, cancerTitle) {
+    const applicable = Array.isArray(report?.applicable_cancer_keys) ? report.applicable_cancer_keys : [];
+    if (!applicable.length) return reportCancerTitle(cancerTitle);
+    if (isEnglish()) {
+      const nameMap = window.dashboardCancerNameTranslations || {};
+      const names = applicable.map(key => nameMap[key]?.en).filter(Boolean);
+      if (!names.length) return reportCancerTitle(cancerTitle);
+      const joined = names.join(', ');
+      return /cancer|carcinoma|lymphoma|leukemia/i.test(joined) ? joined : `${joined} Cancer`;
+    }
+    const labels = window.dashboardCancerKeyLabels || {};
+    const names = applicable.map(key => labels[key]).filter(Boolean);
+    if (!names.length) return reportCancerTitle(cancerTitle);
+    return getCancerTitleForSentence(names.join('、'));
   }
 
 
@@ -3095,40 +3064,6 @@
     }
   }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   function histologyAxisLabel(value) {
     const text = String(value ?? '').replace(/\s*\n\s*/g, ' ').trim();
     // The in-situ suffix is part of the histology name, so keep it on one line.
@@ -3136,9 +3071,6 @@
       ? `{right|${text}}`
       : rightAlignedAxisLabel(text);
   }
-
-
-
 
 
   function getGenderAgeChartOption(genderAgeData, sharedMax = null) {
@@ -3188,99 +3120,6 @@
       ]
     };
   }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
   function summaryParentheses(text) {
@@ -3340,24 +3179,5 @@
       '區間個案數趨勢差異'
     ]
   };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 })();

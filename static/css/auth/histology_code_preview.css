@@ -30,6 +30,6 @@
   [data-theme="dark"] .histology-entry-tabs .nav-link.active { background: var(--gray-800); color: var(--white); }
   [data-theme="dark"] .histology-year-tabs .nav-link { background: var(--surface); color: var(--text); border-color: var(--border); }
   [data-theme="dark"] .histology-year-tabs .nav-link.active { background: var(--gray-800); color: var(--white); }
-  [data-theme="dark"] .histology-table { --bs-table-bg: var(--surface); --bs-table-color: var(--text); --bs-table-striped-bg: #151518; --bs-table-hover-bg: #1f1f23; --bs-table-border-color: var(--border); }
+  [data-theme="dark"] .histology-table { --bs-table-bg: var(--surface); --bs-table-color: var(--text); --bs-table-striped-bg: #151518; --bs-table-hover-bg: var(--dark-surface-1); --bs-table-border-color: var(--border); }
   [data-theme="dark"] .histology-table th { background: var(--gray-100); color: var(--text); }
 form[action*="/versions/save"] { display: none; }

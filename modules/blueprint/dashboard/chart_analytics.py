@@ -765,7 +765,7 @@ def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", beh
                     treatment_key = treatment_aliases.get(str(column).strip())
                     if treatment_key and treatment_key not in chinese_df.columns:
                         chinese_df[treatment_key] = chinese_df[column]
-                stage_reports = calculate_stage_reports(chinese_df, stage_options)
+                stage_reports = calculate_stage_reports(chinese_df, stage_options, cancers=cancers)
                 result["stageReports"] = stage_reports
                 result["stageTotals"] = [
                     {"option": report["option"], "total_count": report["analyzable_count"]}
@@ -773,7 +773,7 @@ def analyze_dashboard_file(filename, cancers=[], year_start="", year_end="", beh
                 ]
                 if treatment_selected:
                     result["stageFirstCourseData"] = calculate_stage_first_course_distribution(
-                        chinese_df, stage_options
+                        chinese_df, stage_options, cancers=cancers
                     )
                 if surgery_selected:
                     result["stageSurgeryData"] = calculate_stage_surgery_distribution(
