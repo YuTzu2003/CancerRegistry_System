@@ -157,11 +157,36 @@ def _age_group(value):
     return f"{start:02d}-{start + 4:02d}", start
 
 
-def export_pbi_dataset(source_path, output_path, cancers=None, year_start="", year_end="", behavior=""):
+def _worksheet_name(value, used_names):
+    """Return an Excel-safe, unique worksheet name."""
+    name = re.sub(r"[\\\\/:*?\[\]]", "_", _text(value)) or "未分類"
+    name = name[:31]
+    candidate, suffix = name, 2
+    while candidate in used_names:
+        suffix_text = f" ({suffix})"
+        candidate = f"{name[:31 - len(suffix_text)]}{suffix_text}"
+        suffix += 1
+    used_names.add(candidate)
+    return candidate
+
+
+def export_pbi_dataset(
+    source_path,
+    output_path,
+    cancers=None,
+    year_start="",
+    year_end="",
+    behavior="",
+    separate_cancer_sheets=False,
+):
     """Export source Excel with reusable Power BI helper columns.
 
     The original Excel remains unchanged. Cancer grouping is calculated with the
     same ``cancer_group_rules.py`` logic used by the Flask dashboard.
+
+    ``separate_cancer_sheets`` is for the browser-download workflow: it writes
+    one worksheet per selected cancer parent group. Power BI publishing keeps
+    the existing single ``Sheet1`` contract for PBIX compatibility.
     """
     source = Path(source_path).resolve()
     output = Path(output_path).resolve()
@@ -230,14 +255,27 @@ def export_pbi_dataset(source_path, output_path, cancers=None, year_start="", ye
     temporary = output.with_name(f".{output.stem}.{uuid.uuid4().hex}.tmp.xlsx")
     try:
         with pd.ExcelWriter(temporary, engine="openpyxl") as writer:
-            # Match the existing source workbook's main sheet name so the
-            # published PBIX only needs a path change, not query remapping.
-            result.to_excel(writer, sheet_name="Sheet1", index=False)
+            if separate_cancer_sheets:
+                used_sheet_names = {"ReportMeta"}
+                # CancerParentGroupName is the same parent grouping used by
+                # the annual-report cancer buttons.  It prevents a parent
+                # selection and its checked leaf nodes from creating duplicate
+                # worksheets in one downloaded workbook.
+                for cancer_name, cancer_rows in result.groupby(
+                    "CancerParentGroupName", sort=False, dropna=False
+                ):
+                    sheet_name = _worksheet_name(cancer_name, used_sheet_names)
+                    cancer_rows.to_excel(writer, sheet_name=sheet_name, index=False)
+            else:
+                # Match the existing source workbook's main sheet name so the
+                # published PBIX only needs a path change, not query remapping.
+                result.to_excel(writer, sheet_name="Sheet1", index=False)
             pd.DataFrame([{
                 "YearStart": year_start,
                 "YearEnd": year_end,
                 "BehaviorCode": behavior,
                 "CancerKeys": ",".join(cancers),
+                "SeparateCancerSheets": bool(separate_cancer_sheets),
                 "PublishedAt": pd.Timestamp.now(),
             }]).to_excel(writer, sheet_name="ReportMeta", index=False)
         os.replace(temporary, output)
@@ -250,4 +288,5 @@ def export_pbi_dataset(source_path, output_path, cancers=None, year_start="", ye
         "output": str(output),
         "rows": len(result),
         "classified_rows": int((result["CancerGroupKey"] != "").sum()),
+        "sheets": int(result["CancerParentGroupName"].nunique(dropna=False)) if separate_cancer_sheets else 1,
     }
