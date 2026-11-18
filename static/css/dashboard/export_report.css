@@ -42,6 +42,79 @@
     font-weight: 500;
     color: var(--text);
   }
+  .export-cancer-group {
+    background: var(--gray-50);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 10px;
+    overflow: hidden;
+  }
+  .export-cancer-group > summary {
+    align-items: center;
+    cursor: pointer;
+    display: flex;
+    gap: 10px;
+    list-style: none;
+    min-height: 56px;
+    padding: 10px 16px;
+  }
+  .export-cancer-group > summary::-webkit-details-marker { display: none; }
+  .export-cancer-group > summary::before {
+    border: solid var(--gray-600);
+    border-width: 0 1px 1px 0;
+    content: '';
+    height: 7px;
+    margin-right: 2px;
+    transform: rotate(-45deg);
+    transition: transform .15s ease;
+    width: 7px;
+  }
+  .export-cancer-group[open] > summary::before { transform: rotate(45deg); }
+  .export-cancer-group > summary:hover { background: var(--white); }
+  .export-group-title {
+    color: var(--text);
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .export-group-drag-handle {
+    color: var(--gray-500);
+    cursor: grab;
+    font-size: 20px;
+    line-height: 1;
+  }
+  .export-group-drag-handle:active { cursor: grabbing; }
+  .export-group-count {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    color: var(--gray-600);
+    font-size: 12px;
+    padding: 2px 8px;
+  }
+  .export-group-toolbar {
+    align-items: center;
+    color: var(--gray-600);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 12px;
+    padding: 0 4px 10px;
+  }
+  .export-group-toolbar .form-check-label { cursor: pointer; }
+  .export-group-items {
+    background: var(--white);
+    border-top: 1px solid var(--border);
+    padding: 10px 12px 2px;
+  }
+  .export-group-items .export-item:last-child { margin-bottom: 8px; }
+  .drag-handle-icon { cursor: grab; }
+  .drag-handle-icon:active { cursor: grabbing; }
+  @media (max-width: 768px) {
+    .export-cancer-group > summary { align-items: flex-start; flex-wrap: wrap; }
+    .export-group-toolbar { width: 100%; }
+    .export-item { align-items: flex-start; }
+    .export-item-controls { margin-left: 0 !important; margin-top: 8px; }
+  }
   .export-actions .badge {
     font-size: 12px;
     font-weight: 400;

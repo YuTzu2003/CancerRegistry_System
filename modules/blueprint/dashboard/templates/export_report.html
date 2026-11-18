@@ -3,7 +3,7 @@
 {% block page_title %}圖表匯出設定{% endblock %}
 
 {% block extra_head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/export_report.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/export_report.css', v='20261118-grouped-cancer-export') }}">
 <script src="/static/vendor/sortablejs/Sortable.min.js"></script>
 {% endblock %}
 
@@ -26,11 +26,11 @@
       <i class="bi bi-info-circle me-2"></i>使用說明與注意事項
     </h5>
     <ul class="mb-0" style="color: var(--muted); line-height: 1.8; font-size: 14px;">
-      <li><strong>調整順序：</strong>您可以直接點選下方任一圖表區塊並上下拖曳，即可改變匯出報表的排列順序。</li>
-      <li><strong>自訂內容：</strong>每個分析項目右側的勾選框，可讓您自由決定是否要在報告中包含該項目的「圖表」、「表格」或「AI 描述」。</li>
-      <li><strong>匯出語言：</strong>可選擇繁體中文或 English，預覽及下載的報表會依所選語言產生。</li>
-      <li><strong>預覽功能：</strong>建議在正式下載前，先點擊「預覽 PDF」以確認排版與圖表呈現是否符合您的需求。</li>
-      <li><strong>產生時間：</strong>若勾選的圖表數量較多，產生 PDF 或 Word 檔案可能需要數秒鐘，請耐心等候。</li>
+      <li><strong>調整癌別與項目順序：</strong>癌別標題左側的把手可拖曳調整癌別章節順序；展開癌別後，可拖曳各分析項目左側把手，調整該癌別內的排列順序。</li>
+      <li><strong>展開與選取內容：</strong>癌別預設為收合狀態，點選癌別標題可展開內容；可使用「全選本癌別」一次選取或取消該癌別下所有可匯出的內容，也可逐項勾選圖表、表格或分析敘述。</li>
+      <li><strong>匯出語言與格式：</strong>可選擇繁體中文或English，可輸出PDF、Word，或同時勾選兩者；同時選擇時會下載包含兩種檔案的ZIP壓縮檔。</li>
+      <li><strong>預覽與下載：</strong>建議先使用「預覽 PDF」確認圖表、文字與分頁呈現，再點選「確認匯出」下載正式檔案，勾選項目較多時，產生檔案可能需要數秒鐘。</li>
+      <li><strong>後續編修：</strong>PDF適合作為固定版面檢視；Word檔可再自行調整文字、圖表大小、表格與分頁。</li>
     </ul>
   </div>
 </div>
@@ -82,5 +82,5 @@
 
 
 
-<script src="{{ url_for('static', filename='js/dashboard/export_report.js', v='20261029-export-description-label') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard/export_report.js', v='20261118-grouped-cancer-export') }}"></script>
 {% endblock %}

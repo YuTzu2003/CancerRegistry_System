@@ -36,7 +36,7 @@
   }
   // ECharts calculates one uniform width for every age group in a chart.
   // The maximum keeps the bars from becoming oversized on wide displays.
-  const GENDER_AGE_BAR_MAX_WIDTH = 16;
+  const GENDER_AGE_BAR_MAX_WIDTH = 14;
   const RESULT_TAB_ENGLISH = Object.freeze({
     '性別年齡分佈': 'Sex and age distribution',
     '性別年齡分布': 'Sex and age distribution',
@@ -246,10 +246,10 @@
           type: 'bar',
           data: data.male,
           barMaxWidth: GENDER_AGE_BAR_MAX_WIDTH,
-          // Keep the three series visually grouped, while leaving a clearer
-          // separation before the next age group.
-          barGap: '10%',
-          barCategoryGap: '48%',
+          // Keep the three series visually grouped, while leaving a clear
+          // separation both within and between age groups.
+          barGap: '25%',
+          barCategoryGap: '28%',
           itemStyle: { color: GENDER_AGE_COLORS.male }
         },
         {

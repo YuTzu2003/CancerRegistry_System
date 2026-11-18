@@ -144,6 +144,37 @@ def resolve_surgery_manual_key(cancer_key):
     key = str(cancer_key or "").strip()
     return SURGERY_MANUAL_KEY_ALIASES.get(key, key)
 
+
+def surgery_manual_keys_for_selection(cancer_keys):
+    """Expand dashboard parent groups to their Appendix-B surgical manuals."""
+    from modules.blueprint.dashboard.definition.cancer_group_rules import CANCER_GROUP_RULES
+
+    group_by_key = {str(rule.get("key") or ""): rule for rule in CANCER_GROUP_RULES}
+    manual_keys = []
+    for selected_key in (str(key or "").strip() for key in cancer_keys or []):
+        if not selected_key:
+            continue
+        group = group_by_key.get(selected_key)
+        if group:
+            child_keys = {
+                str(child_key)
+                for subgroup in group.get("subgroups") or []
+                for child_key in subgroup.get("child_keys") or []
+            }
+            keys_to_resolve = [
+                str(subgroup.get("key") or "").strip()
+                for subgroup in group.get("subgroups") or []
+                if str(subgroup.get("key") or "").strip() not in child_keys
+            ] or [selected_key]
+        else:
+            keys_to_resolve = [selected_key]
+
+        for key in keys_to_resolve:
+            manual_key = resolve_surgery_manual_key(key)
+            if manual_key and manual_key not in manual_keys:
+                manual_keys.append(manual_key)
+    return manual_keys
+
 SURGERY_MANUAL_LABEL_OVERRIDES = {
     "Lung": ("肺癌", "Lung"),
 }

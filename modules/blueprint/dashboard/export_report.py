@@ -244,7 +244,13 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir, expo
     
     image_bytes_map = {}
     
+    current_cancer_section = None
     for idx, chart in enumerate(charts_data):
+        cancer_section_key = chart.get('cancerSectionKey')
+        cancer_section_title = chart.get('cancerSectionTitle')
+        if cancer_section_title and cancer_section_key != current_cancer_section:
+            html_content += f'<h1 class="cancer-section-title">{html.escape(str(cancer_section_title))}</h1>'
+            current_cancer_section = cancer_section_key
         html_content += f'<div class="chart-section" id="section-{idx}">'
         html_content += f'<h2>{chart.get("title", "")}</h2>'
         
@@ -262,7 +268,7 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir, expo
                 header, encoded = b64_image.split(",", 1)
                 image_bytes = base64.b64decode(encoded)
                 image_parts = (_split_tall_chart_at_blank_rows(image_bytes)
-                               if chart.get("id") == "chartPane-DiagnosisHistology"
+                               if chart.get("sourceId", chart.get("id")) == "chartPane-DiagnosisHistology"
                                else [image_bytes])
                 image_bytes_map[str(idx)] = image_parts
                 wrapper_class = "chart-img-wrapper tall-chart" if len(image_parts) > 1 else "chart-img-wrapper"
@@ -366,11 +372,18 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir, expo
             section.bottom_margin = Inches(0.5)
             
             sections = soup.find_all('div', class_='chart-section')
+            current_cancer_section = None
             for sec_idx, sec in enumerate(sections):
                 chart_data = charts_data[sec_idx] if sec_idx < len(charts_data) else {}
                 is_indicator_export = chart_data.get('exportKind') == 'indicators'
                 if sec_idx > 0:
                     doc.add_page_break()
+
+                cancer_section_key = chart_data.get('cancerSectionKey')
+                cancer_section_title = chart_data.get('cancerSectionTitle')
+                if cancer_section_title and cancer_section_key != current_cancer_section:
+                    doc.add_heading(str(cancer_section_title), level=1)
+                    current_cancer_section = cancer_section_key
                     
                 title = sec.find('h2')
                 if title:

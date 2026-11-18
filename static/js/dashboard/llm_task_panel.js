@@ -79,7 +79,7 @@
     ].join('\n');
     if (!window.bootstrap?.Modal) return window.alert(text);
     const modal = taskInfoModal();
-    modal.querySelector('[data-analysis-info-body]').innerHTML = `<section class="analysis-info" aria-label="分析資訊明細"><section class="analysis-info__focus" aria-label="篩選條件"><dl class="analysis-info__selection"><div><dt>癌別</dt><dd>${esc(cancerTitle)}</dd></div><div><dt>分析年度</dt><dd>${esc(yearTitle)}</dd></div></dl></section><section class="analysis-info__items"><h3>分析項目</h3><ul>${analysisItems.map((item) => `<li>${esc(item)}</li>`).join('')}</ul></section><dl class="analysis-info__facts">${rows.map(([label, detail]) => `<div class="analysis-info__fact"><dt>${esc(label)}</dt><dd>${esc(detail)}</dd></div>`).join('')}</dl></section>`;
+    modal.querySelector('[data-analysis-info-body]').innerHTML = `<section class="analysis-info" aria-label="分析資訊明細"><section class="analysis-info__focus" aria-label="篩選條件"><dl class="analysis-info__selection"><div><dt>癌別</dt><dd>${esc(cancerTitle)}</dd></div><div><dt>分析年度</dt><dd>${esc(yearTitle)}</dd></div></dl></section><section class="analysis-info__items"><h3>分析項目（癌別｜項目）</h3><ul>${analysisItems.map((item) => `<li>${esc(item)}</li>`).join('')}</ul></section><dl class="analysis-info__facts">${rows.map(([label, detail]) => `<div class="analysis-info__fact"><dt>${esc(label)}</dt><dd>${esc(detail)}</dd></div>`).join('')}</dl></section>`;
     window.bootstrap.Modal.getOrCreateInstance(modal).show();
   };
   const render = () => {

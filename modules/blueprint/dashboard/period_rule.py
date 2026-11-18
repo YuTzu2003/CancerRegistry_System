@@ -428,6 +428,20 @@ def load_period_codes():
         conn.close()
 
 
+def _stage_system_applies_to_selection(system, cancers):
+    """Return whether a specialised stage system applies to this selection.
+
+    AJCC is broadly available, while systems such as DRE and FIGO only apply
+    to their designated cancer groups.  Avoid returning a misleading all-zero
+    report when a per-cancer dashboard report selects an unrelated cancer.
+    """
+    eligible_keys = STAGE_SYSTEM_CANCER_KEYS.get(system)
+    if not eligible_keys or not cancers:
+        return True
+    selected_keys = {str(key).strip() for key in cancers if key and str(key).strip()}
+    return "All_Cancers" in selected_keys or bool(selected_keys & eligible_keys)
+
+
 def calculate_stage_reports(cases, options, period_codes=None, cancers=None):
     """依勾選選項計算期別、性別期別及年齡層期別報表資料。"""
     cases = filter_class(cases)
@@ -437,6 +451,8 @@ def calculate_stage_reports(cases, options, period_codes=None, cancers=None):
     for option in options:
         system = option.get("system")
         if system not in STAGE_FUNCTIONS:
+            continue
+        if not _stage_system_applies_to_selection(system, cancers):
             continue
         if system not in results_by_system:
             results_by_system[system] = STAGE_FUNCTIONS[system](cases, period_codes)
@@ -530,6 +546,8 @@ def calculate_stage_first_course_distribution(cases, options, period_codes=None,
         system = option.get("system")
         if system not in STAGE_FUNCTIONS or system in seen_systems:
             continue
+        if not _stage_system_applies_to_selection(system, cancers):
+            continue
         seen_systems.add(system)
         detailed = option.get("detailed", False)
         stage_column = "stage_detail" if detailed else "stage_detail_hide"
@@ -601,15 +619,12 @@ def calculate_stage_surgery_distribution(cases, options, period_codes=None, manu
         surgery_display_name,
         select_highest_ranked_surgery,
         resolve_surgery_manual_key,
+        surgery_manual_keys_for_selection,
         get_surgery_manual_labels,
     )
 
     raw_manual_keys = manual_keys or ([manual_key] if manual_key else [])
-    requested_manual_keys = []
-    for key in raw_manual_keys:
-        resolved = resolve_surgery_manual_key(key)
-        if resolved and resolved not in requested_manual_keys:
-            requested_manual_keys.append(resolved)
+    requested_manual_keys = surgery_manual_keys_for_selection(raw_manual_keys)
 
     if not requested_manual_keys:
         for record in cases.to_dict("records"):

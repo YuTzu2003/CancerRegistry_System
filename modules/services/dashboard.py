@@ -19,6 +19,7 @@ import threading
 import shutil
 import tempfile
 import time
+from io import BytesIO
 from pathlib import Path
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 import pandas as pd
@@ -533,6 +534,7 @@ def analyze_dashboard_file_route():
     behavior = data.get("behavior", "")
     analysis_items = data.get("analysis_items", [])
     stage_options = data.get("stage_options", [])
+    report_cancers = data.get("report_cancers", [])
 
     if not isinstance(cancers, list) or not cancers:
         return jsonify({"ok": False, "error": "請先選擇癌別"}), 400
@@ -546,7 +548,38 @@ def analyze_dashboard_file_route():
         return jsonify({"ok": False, "error": "未提供檔案名稱"}), 400
         
     try:
-        from modules.blueprint.dashboard.chart_analytics import analyze_dashboard_file
+        from modules.blueprint.dashboard.chart_analytics import (
+            _read_dashboard_excel,
+            analyze_dashboard_file,
+            get_column_names,
+        )
+        if isinstance(report_cancers, list) and report_cancers:
+            translations = _get_cancer_name_translations()
+            report_keys = []
+            seen = set()
+            for raw_key in report_cancers:
+                key = str(raw_key or "").strip()
+                if key and key not in seen and key in translations:
+                    seen.add(key)
+                    report_keys.append(key)
+
+            if report_keys:
+                source_df = _read_dashboard_excel(owned_file["storage_path"])
+                cols = get_column_names(source_df)
+                reports = []
+                for key in report_keys:
+                    reports.append({
+                        "key": key,
+                        "title": translations[key]["zh"],
+                        "title_en": translations[key]["en"],
+                        "data": analyze_dashboard_file(
+                            owned_file["storage_path"], [key], year_start, year_end, behavior,
+                            analysis_items, source_df=source_df.copy(), cols=cols,
+                            stage_options=stage_options,
+                        ),
+                    })
+                return jsonify({"ok": True, "data": {"reports": reports}}), 200
+
         chart_data = analyze_dashboard_file(
             owned_file["storage_path"], cancers, year_start, year_end, behavior, analysis_items,
             stage_options=stage_options,
@@ -597,7 +630,7 @@ def publish_dashboard_selection_to_pbi():
 @dashboard_bp.route('/api/dashboard/download_pbi_dataset', methods=['POST'])
 @login_required
 def download_dashboard_pbi_dataset():
-    """Generate the filtered Power BI workbook and download it to the browser."""
+    """Generate the filtered Excel dataset and download it to the browser."""
     data = request.get_json(silent=True) or {}
     file_id = data.get("file_id", "")
     cancers = data.get("cancers", [])
@@ -623,22 +656,26 @@ def download_dashboard_pbi_dataset():
             year_end=year_end,
             behavior=behavior,
         )
+        # Keep the completed workbook in memory while it is sent.  This avoids
+        # a Windows file-lock race with cleanup of the temporary directory.
+        workbook = BytesIO(output_path.read_bytes())
+        shutil.rmtree(output_dir, ignore_errors=True)
+        workbook.seek(0)
         response = send_file(
-            output_path,
+            workbook,
             as_attachment=True,
             download_name=f"{cancer_title if cancer_title and cancer_title != 'XX' else 'dataset'}_dataset.xlsx",
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
-        response.call_on_close(lambda: shutil.rmtree(output_dir, ignore_errors=True))
-        logging.info("Power BI dataset downloaded by user %s: %s rows", session.get("userid"), result["rows"])
+        logging.info("Excel dataset downloaded by user %s: %s rows", session.get("userid"), result["rows"])
         return response
     except (ValueError, FileNotFoundError, OSError) as exc:
         shutil.rmtree(output_dir, ignore_errors=True)
         return jsonify({"ok": False, "error": str(exc)}), 400
     except Exception as exc:
         shutil.rmtree(output_dir, ignore_errors=True)
-        logging.exception("Failed to create downloadable Power BI dataset")
-        return jsonify({"ok": False, "error": f"Power BI 資料產生失敗：{exc}"}), 500
+        logging.exception("Failed to create downloadable Excel dataset")
+        return jsonify({"ok": False, "error": f"Excel 資料檔產生失敗：{exc}"}), 500
 
 
 @dashboard_bp.route('/api/dashboard/export_pbip', methods=['POST'])
