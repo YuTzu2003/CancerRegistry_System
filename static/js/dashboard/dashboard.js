@@ -616,6 +616,48 @@ document.addEventListener('DOMContentLoaded', function() {
         window.DashboardRenderer.rerenderDashboardLanguage();
     }
     const captureChartImage = async (chart, optionOverrides = {}) => {
+            const chartDom = chart?.getDom?.();
+            const originalDomStyle = chartDom ? {
+                width: chartDom.style.width,
+                minWidth: chartDom.style.minWidth,
+                height: chartDom.style.height,
+                minHeight: chartDom.style.minHeight
+            } : null;
+
+            // ECharts may be initialized while its pane is hidden.  In that case
+            // clientWidth can be 0 (or a very small temporary width), and the
+            // resulting PNG keeps that narrow canvas even after the pane opens.
+            // Give export captures a stable canvas width before resizing.
+            const getCaptureSize = () => {
+                const measuredWidth = Math.max(
+                    chartDom?.getBoundingClientRect?.().width || 0,
+                    chartDom?.parentElement?.getBoundingClientRect?.().width || 0,
+                    chartDom?.closest?.('.chart-pane')?.getBoundingClientRect?.().width || 0
+                );
+                const currentWidth = Number(chart?.getWidth?.() || 0);
+                const width = Math.max(1100, Math.round(measuredWidth || currentWidth || 0));
+                const measuredHeight = Math.max(
+                    chartDom?.getBoundingClientRect?.().height || 0,
+                    Number(chart?.getHeight?.() || 0),
+                    380
+                );
+                return { width, height: Math.round(measuredHeight) };
+            };
+
+            const resizeForCapture = () => {
+                if (!chartDom) {
+                    chart.resize();
+                    return;
+                }
+                const { width, height } = getCaptureSize();
+                chartDom.style.width = `${width}px`;
+                chartDom.style.minWidth = `${width}px`;
+                chartDom.style.height = `${height}px`;
+                chartDom.style.minHeight = `${height}px`;
+                chart.resize({ width, height });
+            };
+
+            try {
             const originalOption = chart.getOption();
             const captureOption = {
                 ...originalOption,
@@ -638,14 +680,26 @@ document.addEventListener('DOMContentLoaded', function() {
             chart.getZr()?.animation?.stop?.();
             chart.clear();
             chart.setOption(captureOption, true);
-            chart.resize();
+            resizeForCapture();
             await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+            // A second resize is intentional: fonts and the surrounding pane may
+            // finish layout during the two animation frames above.
+            resizeForCapture();
             chart.getZr()?.flush?.();
             const image = chart.getDataURL({ type: 'png', backgroundColor: '#fff', pixelRatio: 2 });
             chart.clear();
             chart.setOption(originalOption, true);
             chart.resize();
             return image;
+            } finally {
+                if (chartDom && originalDomStyle) {
+                    chartDom.style.width = originalDomStyle.width;
+                    chartDom.style.minWidth = originalDomStyle.minWidth;
+                    chartDom.style.height = originalDomStyle.height;
+                    chartDom.style.minHeight = originalDomStyle.minHeight;
+                    chart.resize();
+                }
+            }
     };
 
     /* 將期別圖名與統計註解合成進匯出圖片，避免 PDF／Word 只擷取 ECharts 畫布。 */
