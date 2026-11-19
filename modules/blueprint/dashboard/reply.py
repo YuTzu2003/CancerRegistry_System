@@ -67,6 +67,72 @@ def _parse_bilingual_insights(content):
         raise ValueError('AI response is missing a Chinese or English narrative')
     return insights
 
+_STAGE_ROW_KEYS = ("rows", "treatment_rows", "surgery_rows")
+def _expand_gender_age(node):
+    categories = node.get("categories")
+    series_keys = [key for key in ("male", "female", "total") if isinstance(node.get(key), list)]
+    if not isinstance(categories, list) or not series_keys:
+        return None
+    rows = []
+    for index, category in enumerate(categories):
+        row = {"age_group": category}
+        for key in series_keys:
+            values = node[key]
+            row[key] = values[index] if index < len(values) else 0
+        rows.append(row)
+    result = {"per_age_group": rows}
+    for key, value in node.items():
+        if key not in {"categories", "male", "female", "total"}:
+            result[key] = value
+    return result
+
+
+def _expand_stage_table(node):
+    columns = node.get("stage_columns")
+    if not isinstance(columns, list):
+        return None
+    rows_key = next(
+        (key for key in _STAGE_ROW_KEYS
+         if isinstance(node.get(key), list)
+         and any(isinstance(row, dict) and isinstance(row.get("values"), list) for row in node[key])),
+        None,
+    )
+    if rows_key is None:
+        return None
+
+    def label_by_stage(values):
+        return {columns[index]: (values[index] if index < len(values) else 0) for index in range(len(columns))}
+
+    result = dict(node)
+    new_rows = []
+    for row in node[rows_key]:
+        if isinstance(row, dict) and isinstance(row.get("values"), list):
+            new_row = {key: value for key, value in row.items() if key != "values"}
+            new_row["by_stage"] = label_by_stage(row["values"])
+            new_rows.append(new_row)
+        else:
+            new_rows.append(row)
+    result[rows_key] = new_rows
+    if isinstance(node.get("totals"), list):
+        result["totals_by_stage"] = label_by_stage(node["totals"])
+    if isinstance(node.get("percentages"), list):
+        result["percentages_by_stage"] = label_by_stage(node["percentages"])
+    return result
+
+
+def _expand_parallel_arrays(value):
+    if isinstance(value, dict):
+        value = _expand_gender_age(value) or _expand_stage_table(value) or value
+        return {key: _expand_parallel_arrays(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_expand_parallel_arrays(item) for item in value]
+    return value
+
+
+def _dump_chart_data(value):
+    return json.dumps(_expand_parallel_arrays(value), ensure_ascii=False)
+
+
 def get_chart_insight_logic(data):
     field_key = data.get("field_key", "")
     chart_data = data.get("data", {})
@@ -131,7 +197,7 @@ def get_chart_insight_logic(data):
                 [Chart Topic]{field_key}
                 [Definition]{def_section}
                 [Selected Year Range]{selected_year_range}
-                [Data Content]{json.dumps(chart_data, ensure_ascii=False)}
+                [Data Content]{_dump_chart_data(chart_data)}
                 [Writing Style]{style_instruction}
                 [Topic Specific Requirements]{treatment_instruction}
 
@@ -245,9 +311,9 @@ def get_compare_insight_logic(data):
                 [Analysis Item]{analysis_item}
                 [Comparison Direction]{comparison_direction}
                 [Selected Conditions]{json.dumps(selected_conditions, ensure_ascii=False)}
-                [Baseline Data]{json.dumps(baseline_data, ensure_ascii=False)}
-                [Comparison Data]{json.dumps(comparison_data, ensure_ascii=False)}
-                [Calculated Differences]{json.dumps(total_difference, ensure_ascii=False)}
+                [Baseline Data]{_dump_chart_data(baseline_data)}
+                [Comparison Data]{_dump_chart_data(comparison_data)}
+                [Calculated Differences]{_dump_chart_data(total_difference)}
                 [Writing Style]{style_instruction}
 
                 [Comparison Requirements]
