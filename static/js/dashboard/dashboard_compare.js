@@ -669,6 +669,423 @@
     });
   }
 
+  // 比較頁 LLM 敘述使用的固定摘要。原始 display data 仍保留在 payload，
+  // 但交給 LLM 的數字以這裡的程式計算結果為準，避免模型自行加總或重算。
+  function comparisonNumber(value, fallback = 0) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : fallback;
+  }
+
+  function comparisonSum(values) {
+    return Array.isArray(values)
+      ? values.reduce((sum, value) => sum + comparisonNumber(value), 0)
+      : 0;
+  }
+
+  function comparisonPercent(value, denominator) {
+    const amount = comparisonNumber(value);
+    const total = comparisonNumber(denominator);
+    return total ? Number((amount / total * 100).toFixed(1)) : 0;
+  }
+
+  function comparisonPercentValue(value) {
+    const number = Number.parseFloat(String(value ?? '').replace('%', '').trim());
+    return Number.isFinite(number) ? number : 0;
+  }
+
+  function comparisonArray(values, length) {
+    return Array.from({ length }, (_, index) => comparisonNumber(values?.[index]));
+  }
+
+  function comparisonRows(rows, labels, denominator, labelOf) {
+    return (Array.isArray(rows) ? rows : []).map(row => {
+      const values = comparisonArray(row?.values, labels.length);
+      const subtotal = comparisonNumber(row?.subtotal, comparisonSum(values));
+      return {
+        label: String(labelOf ? labelOf(row) : (row?.label || row?.name || row?.treatment || row?.procedure || '')),
+        values,
+        subtotal,
+        percent: comparisonPercent(subtotal, denominator),
+        row_type: row?.row_type || undefined
+      };
+    });
+  }
+
+  function comparisonDifference(target, baseline) {
+    const value = comparisonNumber(target) - comparisonNumber(baseline);
+    return Number(value.toFixed(1));
+  }
+
+  function comparisonRowMap(rows) {
+    return new Map((Array.isArray(rows) ? rows : []).map(row => [String(row?.label || ''), row]));
+  }
+
+  function buildComparisonVerifiedDifference(analysisItem, baseline, comparison) {
+    const difference = {
+      summary_version: 1,
+      field_key: analysisItem,
+      direction: 'comparison_minus_baseline',
+      numeric_authority: 'program_calculated'
+    };
+    if (!baseline || !comparison) return difference;
+
+    if (baseline.type === 'gender_age' && comparison.type === 'gender_age') {
+      const labels = [...new Set([
+        ...(baseline.age_groups || []).map(row => row.label),
+        ...(comparison.age_groups || []).map(row => row.label)
+      ])];
+      const mainRows = comparisonRowMap(baseline.age_groups);
+      const targetRows = comparisonRowMap(comparison.age_groups);
+      return {
+        ...difference,
+        type: 'gender_age',
+        total_count_difference: comparisonDifference(comparison.total_count, baseline.total_count),
+        male: {
+          count_difference: comparisonDifference(comparison.male?.count, baseline.male?.count),
+          percentage_point_difference: comparisonDifference(comparison.male?.percent, baseline.male?.percent)
+        },
+        female: {
+          count_difference: comparisonDifference(comparison.female?.count, baseline.female?.count),
+          percentage_point_difference: comparisonDifference(comparison.female?.percent, baseline.female?.percent)
+        },
+        age_groups: labels.map(label => {
+          const main = mainRows.get(label) || {};
+          const target = targetRows.get(label) || {};
+          return {
+            label,
+            count_difference: comparisonDifference(target.total, main.total),
+            percentage_point_difference: comparisonDifference(target.percent, main.percent)
+          };
+        })
+      };
+    }
+
+    if (baseline.type === 'age_median' && comparison.type === 'age_median') {
+      return {
+        ...difference,
+        type: 'age_median',
+        total_count_difference: comparisonDifference(comparison.total_count, baseline.total_count),
+        male_count_difference: comparisonDifference(comparison.male?.count, baseline.male?.count),
+        female_count_difference: comparisonDifference(comparison.female?.count, baseline.female?.count),
+        male_median_age_difference: comparisonDifference(comparison.male?.median_age, baseline.male?.median_age),
+        female_median_age_difference: comparisonDifference(comparison.female?.median_age, baseline.female?.median_age),
+        total_median_age_difference: comparisonDifference(comparison.total?.median_age, baseline.total?.median_age)
+      };
+    }
+
+    if (baseline.type === 'analyzable_confirmed' && comparison.type === 'analyzable_confirmed') {
+      return {
+        ...difference,
+        type: 'analyzable_confirmed',
+        total_count_difference: comparisonDifference(comparison.total_count, baseline.total_count),
+        analyzable: {
+          count_difference: comparisonDifference(comparison.analyzable?.count, baseline.analyzable?.count),
+          percentage_point_difference: comparisonDifference(comparison.analyzable?.percent, baseline.analyzable?.percent)
+        },
+        confirmed: {
+          count_difference: comparisonDifference(comparison.confirmed?.count, baseline.confirmed?.count),
+          percentage_point_difference: comparisonDifference(comparison.confirmed?.percent, baseline.confirmed?.percent)
+        }
+      };
+    }
+
+    if (baseline.type === 'histology' && comparison.type === 'histology') {
+      const labels = [...new Set([
+        ...(baseline.rows || []).map(row => row.name),
+        ...(comparison.rows || []).map(row => row.name)
+      ])];
+      const mainRows = new Map((baseline.rows || []).map(row => [row.name, row]));
+      const targetRows = new Map((comparison.rows || []).map(row => [row.name, row]));
+      return {
+        ...difference,
+        type: 'histology',
+        total_count_difference: comparisonDifference(comparison.total_count, baseline.total_count),
+        rows: labels.map(label => ({
+          name: label,
+          count_difference: comparisonDifference(targetRows.get(label)?.count, mainRows.get(label)?.count),
+          percentage_point_difference: comparisonDifference(targetRows.get(label)?.percent, mainRows.get(label)?.percent)
+        }))
+      };
+    }
+
+    if (baseline.type === 'diagnosis_classification' && comparison.type === 'diagnosis_classification') {
+      return {
+        ...difference,
+        type: 'diagnosis_classification',
+        total_count_difference: comparisonDifference(comparison.total_count, baseline.total_count),
+        classes: (baseline.classes || comparison.classes || []).map(row => {
+          const main = (baseline.classes || []).find(item => item.class === row.class) || {};
+          const target = (comparison.classes || []).find(item => item.class === row.class) || {};
+          return {
+            class: row.class,
+            count_difference: comparisonDifference(target.count, main.count),
+            percentage_point_difference: comparisonDifference(target.percent, main.percent)
+          };
+        })
+      };
+    }
+
+    if (baseline.type === comparison.type && ['stage_report', 'stage_first_course', 'stage_surgery'].includes(baseline.type)) {
+      const labels = [...new Set([...(baseline.stage_labels || []), ...(comparison.stage_labels || [])])];
+      const stageDifference = labels.map(label => {
+        const mainIndex = (baseline.stage_labels || []).indexOf(label);
+        const targetIndex = (comparison.stage_labels || []).indexOf(label);
+        const mainCount = mainIndex >= 0 ? baseline.stage_totals?.[mainIndex] : 0;
+        const targetCount = targetIndex >= 0 ? comparison.stage_totals?.[targetIndex] : 0;
+        const mainPercent = mainIndex >= 0 ? baseline.stage_percentages?.[mainIndex] : 0;
+        const targetPercent = targetIndex >= 0 ? comparison.stage_percentages?.[targetIndex] : 0;
+        return {
+          label,
+          count_difference: comparisonDifference(targetCount, mainCount),
+          percentage_point_difference: comparisonDifference(targetPercent, mainPercent)
+        };
+      });
+      const rowDifference = (leftRows, rightRows) => {
+        const names = [...new Set([...(leftRows || []).map(row => row.label), ...(rightRows || []).map(row => row.label)])];
+        const mainRows = comparisonRowMap(leftRows);
+        const targetRows = comparisonRowMap(rightRows);
+        return names.map(label => ({
+          label,
+          count_difference: comparisonDifference(targetRows.get(label)?.subtotal, mainRows.get(label)?.subtotal),
+          percentage_point_difference: comparisonDifference(targetRows.get(label)?.percent, mainRows.get(label)?.percent)
+        }));
+      };
+      const result = {
+        ...difference,
+        type: baseline.type,
+        total_count_difference: comparisonDifference(comparison.total_count, baseline.total_count),
+        stage_columns: stageDifference,
+        rows: rowDifference(baseline.rows, comparison.rows)
+      };
+      if (baseline.type === 'stage_report') {
+        result.sex_rows = rowDifference(baseline.sex_rows, comparison.sex_rows);
+        result.age_rows = rowDifference(baseline.age_rows, comparison.age_rows);
+      }
+      return result;
+    }
+
+    return {
+      ...difference,
+      total_count_difference: comparisonDifference(comparison.total_count, baseline.total_count)
+    };
+  }
+
+  function buildComparisonVerifiedSummary(analysisItem, selectedAnalysis) {
+    const summary = {
+      summary_version: 1,
+      field_key: analysisItem,
+      numeric_authority: 'program_calculated'
+    };
+
+    if (analysisItem === '性別年齡分佈') {
+      const source = selectedAnalysis.gender_age || {};
+      const labels = Array.isArray(source.categories) ? source.categories.map(String) : [];
+      const male = comparisonArray(source.male, labels.length);
+      const female = comparisonArray(source.female, labels.length);
+      const total = comparisonArray(source.total, labels.length);
+      const totalCount = comparisonSum(total);
+      const maleCount = comparisonSum(male);
+      const femaleCount = comparisonSum(female);
+      return {
+        ...summary,
+        type: 'gender_age',
+        total_count: totalCount,
+        male: { count: maleCount, percent: comparisonPercent(maleCount, totalCount) },
+        female: { count: femaleCount, percent: comparisonPercent(femaleCount, totalCount) },
+        age_groups: labels.map((label, index) => ({
+          label,
+          male: male[index],
+          female: female[index],
+          total: total[index],
+          percent: comparisonPercent(total[index], totalCount)
+        })),
+        top_age_groups: labels.map((label, index) => ({
+          label,
+          count: total[index],
+          percent: comparisonPercent(total[index], totalCount)
+        })).filter(row => row.count > 0).sort((left, right) => right.count - left.count),
+        consistency: {
+          sex_sum_matches_total: maleCount + femaleCount === totalCount,
+          category_count: labels.length
+        }
+      };
+    }
+
+    if (analysisItem === '年齡中位數') {
+      const source = selectedAnalysis.age_median || {};
+      return {
+        ...summary,
+        type: 'age_median',
+        total_count: comparisonNumber(source.total_count),
+        male: {
+          count: comparisonNumber(source.male_count),
+          median_age: source.male ?? null,
+          male_to_female_ratio: source.male_ratio ?? '0.00'
+        },
+        female: {
+          count: comparisonNumber(source.female_count),
+          median_age: source.female ?? null,
+          female_to_male_ratio: source.female_ratio ?? '0.00'
+        },
+        total: { median_age: source.total ?? null }
+      };
+    }
+
+    if (analysisItem === '可分析個案與確診個案') {
+      const source = selectedAnalysis.analyzable_confirmed || {};
+      return {
+        ...summary,
+        type: 'analyzable_confirmed',
+        total_count: comparisonNumber(source.total_count),
+        analyzable: {
+          count: comparisonNumber(source.analyzable_count),
+          percent: comparisonPercentValue(source.analyzable_percent)
+        },
+        confirmed: {
+          count: comparisonNumber(source.confirmed_count),
+          percent: comparisonPercentValue(source.confirmed_percent)
+        }
+      };
+    }
+
+    if (analysisItem === '組織型態') {
+      const rows = Array.isArray(selectedAnalysis.histology) ? selectedAnalysis.histology : [];
+      const normalizedRows = rows.map(row => ({
+        name: String(row?.name || ''),
+        name_zh: row?.name_zh || '',
+        name_en: row?.name_en || '',
+        code: row?.code || '',
+        count: comparisonNumber(row?.count)
+      }));
+      const totalCount = comparisonSum(normalizedRows.map(row => row.count));
+      normalizedRows.forEach(row => { row.percent = comparisonPercent(row.count, totalCount); });
+      return {
+        ...summary,
+        type: 'histology',
+        total_count: totalCount,
+        rows: normalizedRows,
+        top_rows: [...normalizedRows].sort((left, right) => right.count - left.count),
+        no_data_reason: selectedAnalysis.no_data_reason || ''
+      };
+    }
+
+    if (analysisItem === '個案分類') {
+      const source = selectedAnalysis.diagnosis_classification || {};
+      const classRows = [0, 1, 2, 3].map(classNumber => ({
+        class: classNumber,
+        count: comparisonNumber(source[`class${classNumber}_total`])
+      }));
+      const totalCount = comparisonNumber(source.total_count, comparisonSum(classRows.map(row => row.count)));
+      classRows.forEach(row => { row.percent = comparisonPercent(row.count, totalCount); });
+      return {
+        ...summary,
+        type: 'diagnosis_classification',
+        total_count: totalCount,
+        classes: classRows,
+        detail_counts: Object.fromEntries(Object.entries(source)
+          .filter(([key]) => /^(?:[0123]_)/.test(key))
+          .map(([key, value]) => [key, comparisonNumber(value)]))
+      };
+    }
+
+    if (analysisItem === '期別與首次療程' && selectedAnalysis.stage_first_course) {
+      const table = selectedAnalysis.stage_first_course;
+      const labels = Array.isArray(table.stage_columns) ? table.stage_columns.map(String) : [];
+      const totals = comparisonArray(table.totals, labels.length);
+      const totalCount = comparisonNumber(table.total_count, comparisonSum(totals));
+      return {
+        ...summary,
+        type: 'stage_first_course',
+        system: table.system || '',
+        stage_labels: labels,
+        stage_totals: totals,
+        stage_percentages: totals.map(value => comparisonPercent(value, totalCount)),
+        total_count: totalCount,
+        rows: comparisonRows(table.rows, labels, totalCount, row => row?.treatment || ''),
+        analyzable_count: comparisonNumber(table.analyzable_count),
+        included_count: comparisonNumber(table.included_count, totalCount),
+        exclusions: {
+          unknown_stage: comparisonNumber(table.excluded_unknown),
+          not_applicable_stage: comparisonNumber(table.excluded_not_applicable),
+          unclassified_treatment: comparisonNumber(table.excluded_unclassified_treatment)
+        }
+      };
+    }
+
+    if (analysisItem === '期別與手術術式' && selectedAnalysis.stage_surgery) {
+      const table = selectedAnalysis.stage_surgery;
+      const labels = Array.isArray(table.stage_columns) ? table.stage_columns.map(String) : [];
+      const totals = comparisonArray(table.totals, labels.length);
+      const totalCount = comparisonNumber(table.total_count, comparisonSum(totals));
+      return {
+        ...summary,
+        type: 'stage_surgery',
+        cancer: table.cancer_name || table.manual_key || '',
+        system: table.system || '',
+        stage_labels: labels,
+        stage_totals: totals,
+        stage_percentages: totals.map(value => comparisonPercent(value, totalCount)),
+        total_count: totalCount,
+        rows: comparisonRows(table.rows, labels, totalCount, row => {
+          const code = row?.code_short && row?.code_long
+            ? `${row.code_short}/${row.code_long}`
+            : (row?.code_short || row?.code_long || '');
+          return `${code}${code && row?.procedure ? ' ' : ''}${row?.procedure || ''}`.trim();
+        }),
+        included_count: comparisonNumber(table.included_count, totalCount),
+        exclusions: {
+          unknown_stage: comparisonNumber(table.excluded_unknown),
+          not_applicable_stage: comparisonNumber(table.excluded_not_applicable),
+          unmapped_surgery: comparisonNumber(table.excluded_unmapped_surgery)
+        }
+      };
+    }
+
+    if (selectedAnalysis.stage_report) {
+      const report = normalizeStageReport(selectedAnalysis.stage_report);
+      const labels = report.stage_labels;
+      const totalCount = comparisonNumber(report.included_count, comparisonSum(report.stage_totals));
+      const rows = (report.sex_rows || []).map(row => ({
+        label: String(row.sex || ''),
+        values: comparisonArray(row.values, labels.length),
+        subtotal: comparisonSum(row.values),
+        percent: comparisonPercent(comparisonSum(row.values), totalCount)
+      }));
+      const ageRows = (report.age_rows || []).map(row => ({
+        label: String(row.age || ''),
+        values: comparisonArray(row.values, labels.length),
+        subtotal: comparisonSum(row.values),
+        percent: comparisonPercent(comparisonSum(row.values), totalCount)
+      }));
+      return {
+        ...summary,
+        type: 'stage_report',
+        option: selectedAnalysis.stage_report.option || analysisItem,
+        staging_system: report.staging_system,
+        stage_labels: labels,
+        stage_totals: report.stage_totals,
+        stage_percentages: report.stage_totals.map(value => comparisonPercent(value, totalCount)),
+        total_count: totalCount,
+        sex_rows: rows,
+        age_rows: ageRows,
+        analyzable_count: comparisonNumber(report.analyzable_count),
+        included_count: totalCount,
+        exclusions: {
+          unknown_stage: comparisonNumber(report.unknown_count),
+          not_applicable_stage: comparisonNumber(report.not_applicable_count)
+        }
+      };
+    }
+
+    return {
+      ...summary,
+      type: 'raw_numeric_fields',
+      values: Object.fromEntries(Object.entries(selectedAnalysis)
+        .filter(([, value]) => typeof value === 'number' || typeof value === 'string')
+        .map(([key, value]) => [key, typeof value === 'number' ? value : comparisonNumber(value)]))
+    };
+  }
+
   // 比較頁 LLM 敘述：組裝資料、快取、重新產生與任務預覽同步。
   function buildAiComparisonPayload(data, analysisItem) {
     const pickAnalysis = analysis => {
@@ -692,8 +1109,11 @@
       }
       const stageReport = (analysis?.stageReports || []).find(report => report.option === analysisItem);
       if (stageReport) selectedAnalysis.stage_report = stageReport;
+      selectedAnalysis.verified_summary = buildComparisonVerifiedSummary(analysisItem, selectedAnalysis);
       return selectedAnalysis;
     };
+    const baselineAnalysis = pickAnalysis(data.analysis_data?.main);
+    const comparisonAnalysis = pickAnalysis(data.analysis_data?.target);
     return {
       comparison_definition: '所有差異均以比較期資料減去基準期資料計算；正值代表比較期資料較高，負值代表比較期資料較低。',
       comparison_direction: `${data.target?.year_label || '比較期年度'}相較於${data.main?.year_label || '基準期年度'}`,
@@ -707,16 +1127,21 @@
         total_count: data.main?.total_count,
         annual_average: data.main?.annual_average,
         yearly_counts: data.main?.yearly_counts,
-        analysis: pickAnalysis(data.analysis_data?.main)
+        analysis: baselineAnalysis
       },
       comparison: {
         year: data.target?.year_label,
         total_count: data.target?.total_count,
         annual_average: data.target?.annual_average,
         yearly_counts: data.target?.yearly_counts,
-        analysis: pickAnalysis(data.analysis_data?.target)
+        analysis: comparisonAnalysis
       },
-      total_difference: data.diff || {}
+      total_difference: data.diff || {},
+      verified_difference: buildComparisonVerifiedDifference(
+        analysisItem,
+        baselineAnalysis.verified_summary,
+        comparisonAnalysis.verified_summary
+      )
     };
   }
 
@@ -802,6 +1227,7 @@
         baseline: comparisonPayload.baseline,
         comparison: comparisonPayload.comparison,
         total_difference: comparisonPayload.total_difference,
+        verified_difference: comparisonPayload.verified_difference,
         mode_ai: modeAi.value,
         language: window.DashboardI18n?.getLanguage() || 'zh-TW'
       })
@@ -1356,6 +1782,7 @@
             baseline: comparisonPayload.baseline,
             comparison: comparisonPayload.comparison,
             total_difference: comparisonPayload.total_difference,
+            verified_difference: comparisonPayload.verified_difference,
             mode_ai: modeAi.value,
             language: window.DashboardI18n?.getLanguage() || 'zh-TW'
           };
