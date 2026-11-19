@@ -150,12 +150,23 @@ window.DashboardRenderer.fetchLlmInsight = function(fieldKey, chartData, fields,
             if (button) button.style.display = 'none';
             return Promise.resolve({ success: true, preview: true });
         }
-        const sessionKey = this.getInsightSessionKey(fieldKey, chartData, fields, modeAi, yearStart, yearEnd);
-        const cacheKey = `${language}|${modeAi}|${fieldKey}`;
+        // The same field key is reused for every cancer report.  Scope the
+        // cache by the active report and chart context so another cancer's
+        // narrative cannot be shown for this chart.
+        const reportScope = this.getInsightReportScope(options.reportKey);
+        const sessionKey = this.getInsightSessionKey(fieldKey, chartData, fields, modeAi, yearStart, yearEnd, reportScope);
+        const cacheKey = this.getInsightCacheKey(fieldKey, chartData, fields, modeAi, yearStart, yearEnd, language, reportScope);
         const storedInsights = options.forceRefresh === true ? null : this.getSessionInsights(sessionKey);
         if (storedInsights) {
             Object.entries(storedInsights).forEach(([storedLanguage, insight]) => {
-                this.insightCache.set(`${storedLanguage}|${modeAi}|${fieldKey}`, insight);
+                this.insightCache.set(
+                    this.getInsightCacheKey(fieldKey, chartData, fields, modeAi, yearStart, yearEnd, storedLanguage, reportScope),
+                    insight
+                );
+                this.insightDisplayCache.set(
+                    this.getInsightDisplayCacheKey(fieldKey, modeAi, storedLanguage, reportScope),
+                    insight
+                );
             });
         }
         const cachedInsight = storedInsights?.[language] || this.insightCache.get(cacheKey);
@@ -212,7 +223,14 @@ window.DashboardRenderer.fetchLlmInsight = function(fieldKey, chartData, fields,
             if (data.success) {
                 if (this.insightCacheGeneration === cacheGeneration) {
                     Object.entries(data.insights || {}).forEach(([resultLanguage, insight]) => {
-                        this.insightCache.set(`${resultLanguage}|${modeAi}|${fieldKey}`, insight);
+                        this.insightCache.set(
+                            this.getInsightCacheKey(fieldKey, chartData, fields, modeAi, yearStart, yearEnd, resultLanguage, reportScope),
+                            insight
+                        );
+                        this.insightDisplayCache.set(
+                            this.getInsightDisplayCacheKey(fieldKey, modeAi, resultLanguage, reportScope),
+                            insight
+                        );
                     });
                     this.setSessionInsights(sessionKey, data.insights);
                 }
@@ -413,9 +431,13 @@ window.DashboardRenderer.getStageReportCancerTitle = function(report, cancerTitl
     };
 
 window.DashboardRenderer.insightCache = new Map();
+window.DashboardRenderer.insightDisplayCache = new Map();
 window.DashboardRenderer.insightRequests = new Map();
 window.DashboardRenderer.insightCacheGeneration = 0;
-window.DashboardRenderer.insightSessionPrefix = 'dashboard-bilingual-insight-v1:';
+// Include the complete chart context in insight caches.  A field key such as
+// "性別與年齡分佈" is reused by every cancer report, so field-only cache keys
+// can show one cancer's narrative under another cancer's chart.
+window.DashboardRenderer.insightSessionPrefix = 'dashboard-bilingual-insight-v2:';
 
 window.DashboardRenderer.hashInsightContext = function(value) {
         let first = 0x811c9dc5;
@@ -428,10 +450,23 @@ window.DashboardRenderer.hashInsightContext = function(value) {
         return `${(first >>> 0).toString(16).padStart(8, '0')}${(second >>> 0).toString(16).padStart(8, '0')}`;
     };
 
-window.DashboardRenderer.getInsightSessionKey = function(fieldKey, chartData, fields, modeAi, yearStart, yearEnd) {
+window.DashboardRenderer.getInsightReportScope = function(reportKey = '') {
+        const explicitKey = String(reportKey || '').trim();
+        if (explicitKey) return explicitKey;
+        const activeKey = String(window.dashboardActiveCancerKey || '').trim();
+        if (activeKey) return activeKey;
+        const selectedKeys = window.dashboardSelectedCancerDisplayKeys;
+        if (Array.isArray(selectedKeys) && selectedKeys.length) {
+            return selectedKeys.map(key => String(key || '').trim()).filter(Boolean).sort().join(',');
+        }
+        return String(window.dashboardSelectedCancerTitle || '').trim();
+    };
+
+window.DashboardRenderer.getInsightSessionKey = function(fieldKey, chartData, fields, modeAi, yearStart, yearEnd, reportKey = '') {
         const context = JSON.stringify({
-            version: 'v1-bilingual',
+            version: 'v2-bilingual',
             fileId: window.dashboardAnalysisFileId || '',
+            reportKey: this.getInsightReportScope(reportKey),
             fieldKey,
             chartData,
             fields,
@@ -440,6 +475,17 @@ window.DashboardRenderer.getInsightSessionKey = function(fieldKey, chartData, fi
             yearEnd
         });
         return `${this.insightSessionPrefix}${this.hashInsightContext(context)}`;
+    };
+
+window.DashboardRenderer.getInsightCacheKey = function(fieldKey, chartData, fields, modeAi, yearStart, yearEnd, language, reportKey = '') {
+        const sessionKey = this.getInsightSessionKey(
+            fieldKey, chartData, fields, modeAi, yearStart, yearEnd, reportKey
+        );
+        return `${language}|${sessionKey}`;
+    };
+
+window.DashboardRenderer.getInsightDisplayCacheKey = function(fieldKey, modeAi, language, reportKey = '') {
+        return `${language}|${modeAi}|${this.getInsightReportScope(reportKey)}|${fieldKey}`;
     };
 
 window.DashboardRenderer.getSessionInsights = function(sessionKey) {
@@ -678,7 +724,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 captureOption.xAxis = (originalOption.xAxis || []).map(axis => ({ ...axis, name: '' }));
             }
             chart.getZr()?.animation?.stop?.();
-            chart.clear();
+            // setOption(..., true) replaces the whole option, so an explicit
+            // clear() would cause an unnecessary extra render during export.
             chart.setOption(captureOption, true);
             resizeForCapture();
             await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
@@ -686,8 +733,9 @@ document.addEventListener('DOMContentLoaded', function() {
             // finish layout during the two animation frames above.
             resizeForCapture();
             chart.getZr()?.flush?.();
-            const image = chart.getDataURL({ type: 'png', backgroundColor: '#fff', pixelRatio: 2 });
-            chart.clear();
+            // 1.5x keeps text sharp in PDF/Word while avoiding the 4x pixel
+            // workload of a 2x canvas on every chart capture.
+            const image = chart.getDataURL({ type: 'png', backgroundColor: '#fff', pixelRatio: 1.5 });
             chart.setOption(originalOption, true);
             chart.resize();
             return image;
@@ -780,8 +828,20 @@ document.addEventListener('DOMContentLoaded', function() {
             const generateInsights = options.generateInsights === true;
             const getExportInsight = (fieldKey, responseText = '') => {
                 if (!fieldKey) return '';
-                if (window.dashboardPreviewMode) return window.dashboardPreviewNarratives?.[fieldKey] || '';
-                const insight = window.DashboardRenderer?.insightCache?.get(`${exportLanguage}|${modeAi}|${fieldKey}`) || responseText;
+                if (window.dashboardPreviewMode) {
+                    const reportKey = window.dashboardActiveCancerKey || '';
+                    return window.dashboardPreviewNarratives?.[`${reportKey}::${fieldKey}`] || '';
+                }
+                // Use the current chart text first.  English export may not
+                // have rendered English text in the DOM yet, so use the
+                // report-scoped display cache as a fallback.  It includes the
+                // cancer report and cannot collide with another report's
+                // same-named field.
+                const reportKey = window.dashboardActiveCancerKey || '';
+                const scopedKey = window.DashboardRenderer?.getInsightDisplayCacheKey?.(
+                    fieldKey, modeAi, exportLanguage, reportKey
+                );
+                const insight = responseText || window.DashboardRenderer?.insightDisplayCache?.get(scopedKey) || '';
                 return insight.trim() === '定義還沒串接使用。' ? '' : insight;
             };
             const insightFieldKeys = {
@@ -1102,7 +1162,15 @@ document.addEventListener('DOMContentLoaded', function() {
         const allExportData = [];
         for (const report of reports) {
             await window.dashboardSetActiveReport(report.key);
-            const sectionTitle = window.DashboardRenderer.getSelectedCancerTitle();
+            const language = window.DashboardI18n?.getLanguage() || 'zh-TW';
+            const translations = window.dashboardCancerNameTranslations || {};
+            // Use the report's own bilingual title instead of the currently
+            // rendered picker label.  The latter can remain in Chinese after
+            // switching to a later cancer report, which made only the first
+            // English export section translate correctly.
+            const sectionTitle = language === 'en'
+                ? (report.title_en || translations[report.key]?.en || report.title || window.DashboardRenderer.getSelectedCancerTitle())
+                : (report.title || translations[report.key]?.zh || window.DashboardRenderer.getSelectedCancerTitle());
             const reportExportData = await collectExportData(sharedChartImages, options);
             reportExportData.forEach((item) => {
                 item.sourceId = item.id;

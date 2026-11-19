@@ -239,10 +239,33 @@
       exportButton.title = exportButton.disabled ? '所有癌別與表格的中英文敘述完成後才能匯出。' : '';
     }
     const language = window.DashboardI18n?.getLanguage() || 'zh-TW';
-    window.dashboardPreviewNarratives = Object.fromEntries(selected.map(item => [item.field_key, insightFor(item, language)]));
+    window.dashboardPreviewNarratives = Object.fromEntries(selected.map(item => {
+      const reportKey = item.report_key || activeReport.key || '';
+      return [`${reportKey}::${item.field_key}`, insightFor(item, language)];
+    }));
     selected.forEach((item) => {
       const insight = insightFor(item, language);
-      if (insight) window.DashboardRenderer?.insightCache?.set(`${language}|${item.mode_ai || 'balanced'}|${item.field_key}`, insight);
+      if (insight) {
+        const reportKey = item.report_key || activeReport.key || '';
+        const cacheKey = window.DashboardRenderer?.getInsightCacheKey?.(
+          item.field_key,
+          item.data || {},
+          item.fields || [],
+          item.mode_ai || 'balanced',
+          item.year_start || '',
+          item.year_end || '',
+          language,
+          reportKey
+        );
+        if (cacheKey) window.DashboardRenderer?.insightCache?.set(cacheKey, insight);
+        const displayCacheKey = window.DashboardRenderer?.getInsightDisplayCacheKey?.(
+          item.field_key,
+          item.mode_ai || 'balanced',
+          language,
+          reportKey
+        );
+        if (displayCacheKey) window.DashboardRenderer?.insightDisplayCache?.set(displayCacheKey, insight);
+      }
     });
     const responseItems = new Map();
     selected.forEach((item) => {
