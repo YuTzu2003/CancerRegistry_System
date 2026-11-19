@@ -135,6 +135,8 @@ def _dump_chart_data(value):
 
 def get_chart_insight_logic(data):
     field_key = data.get("field_key", "")
+    report_title = str(data.get("report_title") or data.get("cancer") or "").strip()
+    report_key = str(data.get("report_key") or "").strip()
     chart_data = data.get("data", {})
     fields = data.get("fields", [])
     mode_ai = data.get("mode_ai", "balanced")
@@ -174,6 +176,27 @@ def get_chart_insight_logic(data):
     else:
         def_section = ""
     style_instruction = STYLE_PROMPTS.get(mode_ai, STYLE_PROMPTS["balanced"])
+    verified_summary = chart_data.get("verified_summary") if isinstance(chart_data, dict) else None
+    if isinstance(verified_summary, dict):
+        data_label = "Program-Calculated Authoritative Summary"
+        prompt_data = verified_summary
+        numeric_authority_instruction = """
+            This item contains a Program-Calculated Authoritative Summary. It is the
+            only authority for numeric statements. Use its totals, row counts,
+            percentages, age groups, stages, and exclusions exactly as supplied.
+            Do not add rows together, recompute a percentage, infer a denominator,
+            or replace an authoritative total with a value calculated from another
+            field. If a consistency check is false, preserve the supplied values and
+            do not try to correct them yourself.
+        """
+    else:
+        data_label = "Data Content"
+        prompt_data = chart_data
+        numeric_authority_instruction = """
+            No program-calculated summary is available for this request. Use only
+            values explicitly present in the supplied data and do not perform new
+            totals or percentage calculations when a value is not provided.
+        """
     treatment_instruction = ""
     if "期別與首次療程" in field_key or "Stage and First Course Treatment" in field_key:
         treatment_instruction = """
@@ -195,9 +218,10 @@ def get_chart_insight_logic(data):
                 cancer-registry chart data. Both versions must contain exactly the same
                 facts, numbers, percentages, trends, level of certainty, and conclusions.
                 [Chart Topic]{field_key}
+                [Cancer / Report]{report_title or report_key or 'Not specified'}
                 [Definition]{def_section}
                 [Selected Year Range]{selected_year_range}
-                [Data Content]{_dump_chart_data(chart_data)}
+                [{data_label}]{_dump_chart_data(prompt_data)}
                 [Writing Style]{style_instruction}
                 [Topic Specific Requirements]{treatment_instruction}
 
@@ -212,7 +236,8 @@ def get_chart_insight_logic(data):
                 2. Base all conclusions strictly on the supplied data.
                 3. The narrative must strictly match the displayed chart and table data.
                    Before replying, verify that every count, percentage, age group, stage,
-                   treatment, and sex-specific statement is directly supported by [Data Content].
+                   treatment, and sex-specific statement is directly supported by the supplied
+                   summary or display data.
                    Do not output internal field names, placeholders, or technical variable names
                    such as total_count. If a value cannot be confirmed, omit that statement.
                 4. Do not infer causes that cannot be supported by the data.
@@ -227,7 +252,8 @@ def get_chart_insight_logic(data):
                 11. This is an annual analysis, not a year-to-year comparison. Describe only
                     the selected year's data (or the selected range as a whole). Do not
                     compare different years or mention changes from previous years.
-                12. [Sex category rule — STRICT]
+                12. {numeric_authority_instruction}
+                13. [Sex category rule — STRICT]
                     The supplied data only contains counts for male (男) and female (女).
                     Treat sex analysis as a male/female-only topic by default.
                     You MUST NOT mention, list, enumerate, or reference any of the following
@@ -270,6 +296,7 @@ def get_compare_insight_logic(data):
     baseline_data = data.get("baseline", {})
     comparison_data = data.get("comparison", {})
     total_difference = data.get("total_difference", {})
+    verified_difference = data.get("verified_difference", {})
     mode_ai = data.get("mode_ai", "balanced")
     insight_language = data.get("language", "zh-TW")
     if insight_language not in INSIGHT_LANGUAGES:
@@ -277,6 +304,54 @@ def get_compare_insight_logic(data):
 
     if not analysis_item or not isinstance(baseline_data, dict) or not isinstance(comparison_data, dict):
         return {"success": False, "error": "比較分析資料不完整"}
+
+    baseline_analysis = baseline_data.get("analysis", {})
+    comparison_analysis = comparison_data.get("analysis", {})
+    baseline_summary = baseline_analysis.get("verified_summary") if isinstance(baseline_analysis, dict) else None
+    comparison_summary = comparison_analysis.get("verified_summary") if isinstance(comparison_analysis, dict) else None
+    has_verified_summaries = isinstance(baseline_summary, dict) and isinstance(comparison_summary, dict)
+    if has_verified_summaries:
+        # Keep the period metadata, but send only the program-calculated summary for
+        # the selected comparison item. Raw display arrays remain available in the
+        # stored task payload for audit/debugging and are not a second numeric source.
+        baseline_prompt_data = {
+            "year": baseline_data.get("year"),
+            "total_count": baseline_data.get("total_count"),
+            "annual_average": baseline_data.get("annual_average"),
+            "yearly_counts": baseline_data.get("yearly_counts"),
+            "verified_summary": baseline_summary,
+        }
+        comparison_prompt_data = {
+            "year": comparison_data.get("year"),
+            "total_count": comparison_data.get("total_count"),
+            "annual_average": comparison_data.get("annual_average"),
+            "yearly_counts": comparison_data.get("yearly_counts"),
+            "verified_summary": comparison_summary,
+        }
+        numeric_authority_instruction = """
+                [Program-Calculated Comparison Summary — Numeric Authority]
+                The verified_summary in both periods was calculated by the application
+                for the selected comparison item and is the sole numeric authority.
+                Use its totals, row counts, percentages, stage columns, treatment rows,
+                and exclusions exactly as supplied. Do not add rows together, recompute
+                a percentage, infer a denominator, or replace a supplied total with a
+                value calculated from another field. The baseline and comparison values
+                already represent the intended aggregation for their own period. Use the
+                supplied Calculated Differences for overall changes when applicable.
+                The period-level total_count is the overall filtered case count; the
+                verified_summary total_count is the denominator for the selected item
+                and must not be substituted for the other one.
+                If a value is zero, missing, excluded, or a consistency check is false,
+                report that state without trying to correct or reinterpret it.
+            """
+    else:
+        baseline_prompt_data = baseline_data
+        comparison_prompt_data = comparison_data
+        numeric_authority_instruction = """
+                No program-calculated comparison summary is available for this request.
+                Use only values explicitly present in the supplied period data and do not
+                perform new totals or percentage calculations when a value is not provided.
+            """
 
     style_instruction = STYLE_PROMPTS.get(mode_ai, STYLE_PROMPTS["balanced"])
     histology_no_data_instruction = ""
@@ -311,9 +386,9 @@ def get_compare_insight_logic(data):
                 [Analysis Item]{analysis_item}
                 [Comparison Direction]{comparison_direction}
                 [Selected Conditions]{json.dumps(selected_conditions, ensure_ascii=False)}
-                [Baseline Data]{_dump_chart_data(baseline_data)}
-                [Comparison Data]{_dump_chart_data(comparison_data)}
-                [Calculated Differences]{_dump_chart_data(total_difference)}
+                [Baseline Data]{_dump_chart_data(baseline_prompt_data)}
+                [Comparison Data]{_dump_chart_data(comparison_prompt_data)}
+                [Calculated Differences]{_dump_chart_data(verified_difference if isinstance(verified_difference, dict) and verified_difference else total_difference)}
                 [Writing Style]{style_instruction}
 
                 [Comparison Requirements]
@@ -330,7 +405,8 @@ def get_compare_insight_logic(data):
                 5. Keep each language version within 160 words.
                 6. Return valid JSON only, without markdown or explanatory text, using exactly:
                    {{"zh-TW": "Traditional Chinese narrative", "en": "English narrative"}}
-                7. [Sex category rule — STRICT]
+                7. {numeric_authority_instruction}
+                8. [Sex category rule — STRICT]
                    Sex analysis in the supplied datasets only contains male (男) and
                    female (女) counts. You MUST NOT mention 雙性人、雙性人或其他、變性人、
                    性別不詳, intersex, transgender, other, or unknown unless BOTH datasets
