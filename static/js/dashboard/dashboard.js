@@ -136,12 +136,17 @@ window.DashboardRenderer.fetchLlmInsight = function(fieldKey, chartData, fields,
         const language = options.language || window.DashboardI18n?.getLanguage() || 'zh-TW';
         const shouldDisplay = options.display !== false;
         const shouldManageButton = options.manageButton !== false;
+        const reportKey = options.reportKey || window.dashboardActiveCancerKey || '';
+        const reportTitle = options.reportTitle
+            || window.DashboardRenderer?.getSelectedCancerTitle?.()
+            || '';
         const yearStart = document.getElementById('filterYearStart')?.value.trim() || '';
         const yearEnd = document.getElementById('filterYearEnd')?.value.trim() || '';
         if (Array.isArray(window.annualLlmJobItems)) {
             window.annualLlmJobItems.push({
                 item_id: `${fieldKey}-${window.annualLlmJobItems.length + 1}`,
-                field_key: fieldKey, data: chartData, fields: fields, mode_ai: modeAi,
+                field_key: fieldKey, report_key: reportKey, report_title: reportTitle,
+                data: chartData, fields: fields, mode_ai: modeAi,
                 year_start: yearStart, year_end: yearEnd, language: language
             });
             return Promise.resolve({ success: true, collected: true });
@@ -207,7 +212,18 @@ window.DashboardRenderer.fetchLlmInsight = function(fieldKey, chartData, fields,
         if (shouldManageButton && button) button.disabled = true;
 
         const cacheGeneration = this.insightCacheGeneration;
-        const request = fetch('/api/chart_insight', {method: 'POST',headers: { 'Content-Type': 'application/json' },body: JSON.stringify({ field_key: fieldKey, data: chartData, fields: fields, mode_ai: modeAi, year_start: yearStart, year_end: yearEnd, language, chart_preview: getChartPreview() })})
+        const request = fetch('/api/chart_insight', {method: 'POST',headers: { 'Content-Type': 'application/json' },body: JSON.stringify({
+            field_key: fieldKey,
+            report_key: reportKey,
+            report_title: reportTitle,
+            data: chartData,
+            fields: fields,
+            mode_ai: modeAi,
+            year_start: yearStart,
+            year_end: yearEnd,
+            language,
+            chart_preview: getChartPreview()
+        })})
         .then(async res => {
             try {
                 return await res.json();
@@ -1855,6 +1871,9 @@ window.DashboardRenderer.configureStageInsight = function(stageReport, { generat
             not_applicable_count: data.not_applicable_count,
             included_count: data.included_count
         };
+        const verifiedInsightData = this.buildVerifiedInsightPayload
+            ? this.buildVerifiedInsightPayload(fieldKey, insightData)
+            : insightData;
 
         const reportChanged = button.dataset.insightFieldKey !== fieldKey;
         button.style.display = 'block';
@@ -1862,11 +1881,15 @@ window.DashboardRenderer.configureStageInsight = function(stageReport, { generat
         button.dataset.insightFieldKey = fieldKey;
         button.onclick = event => this.fetchLlmInsightWithRetry(
             fieldKey,
-            insightData,
+            verifiedInsightData,
             fields,
             'llmResponseStageSummary',
             'btnAiStageSummary',
-            { forceRefresh: event?.isTrusted === true }
+            {
+                forceRefresh: event?.isTrusted === true,
+                reportKey: window.dashboardActiveCancerKey || '',
+                reportTitle: this.getSelectedCancerTitle?.() || ''
+            }
         );
         if (window.dashboardPreviewMode) {
             window.showDashboardPreviewNarrative?.(fieldKey);
