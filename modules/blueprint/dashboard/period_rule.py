@@ -15,6 +15,16 @@ def normalize_code(value, width=0):
         return str(value).strip()
 
 
+def normalize_other_stage_code(value):
+    """Normalize an other-stage code without merging 0 and 0000."""
+    if pd.isna(value):
+        return ""
+    text = str(value).strip()
+    if text == "0000":
+        return text
+    return normalize_code(value).upper()
+
+
 def normalize_registry_date(value):
     """將癌登日期統一為 CCYYMMDD，包含 0000/00/00 等特殊日期格式。"""
     if pd.isna(value):
@@ -74,23 +84,22 @@ def figo_stages(cases, period_codes):
         is_female = normalize_code(case["性別"]) == "2"
         if not is_female or site not in {"C53", "C54", "C56"} or normalize_code(case["其他分期系統"], 2) != "01":
             continue
-        ostagec = normalize_code(case["其他分期系統期別(臨床分期)"])
+        ostagec = normalize_other_stage_code(case["其他分期系統期別(臨床分期)"])
         if site == "C53":
             stage_value, label = ostagec, "FIGO(ostagec)"
         else:
             # C54、C56 原則上採病理分期；臨床分期有值且不為 0000 時改採臨床值。
             # 無論選到哪個值，皆使用該癌別的 FIGO(ostagep) 碼表進行對照。
-            ostagec_padded = normalize_code(case["其他分期系統期別(臨床分期)"], 4)
             stage_value = (
                 ostagec
-                if ostagec_padded not in {"", "0000"}
-                else normalize_code(case["其他分期系統期別(病理分期)"])
+                if ostagec not in {"", "0000"}
+                else normalize_other_stage_code(case["其他分期系統期別(病理分期)"])
             )
             label = "FIGO(ostagep)"
         matched_stage = period_codes[(period_codes["site"].astype(str).str.strip().str.upper().eq(site))
             & period_codes["ostage"].map(lambda value: normalize_code(value, 2)).eq("01")
             & period_codes["label"].astype(str).str.strip().eq(label)
-            & period_codes["stage_value"].map(normalize_code).eq(stage_value)]
+            & period_codes["stage_value"].map(normalize_other_stage_code).eq(stage_value)]
         row = {"row_index": index, "case": case.to_dict(), "figo_stage": stage_value,
                "stage_value": None, "stage_detail": None, "stage_detail_hide": None}
         if not matched_stage.empty:
@@ -108,8 +117,8 @@ def mac_stages(cases, period_codes):
         site = str(case["原發部位"]).strip().upper()[:3]
         if site not in {"C18", "C19", "C20"} or normalize_code(case["其他分期系統"], 2) != "02":
             continue
-        stage_value = normalize_code(case["其他分期系統期別(病理分期)"])
-        matched_stage = stage_codes[stage_codes["stage_value"].map(normalize_code).eq(stage_value)]
+        stage_value = normalize_other_stage_code(case["其他分期系統期別(病理分期)"])
+        matched_stage = stage_codes[stage_codes["stage_value"].map(normalize_other_stage_code).eq(stage_value)]
         row = {"row_index": index, "case": case.to_dict(), "mac_stage": stage_value,
                "stage_value": None, "stage_detail": None, "stage_detail_hide": None}
         if not matched_stage.empty:
@@ -123,8 +132,8 @@ def create_stage_results(cases, stage_codes, stage_name, is_applicable, select_s
     for index, case in cases.iterrows():
         if not is_applicable(case):
             continue
-        stage_value = select_stage(case)
-        matched_stage = stage_codes[stage_codes["stage_value"].map(normalize_code).eq(stage_value)]
+        stage_value = normalize_other_stage_code(select_stage(case))
+        matched_stage = stage_codes[stage_codes["stage_value"].map(normalize_other_stage_code).eq(stage_value)]
         row = {"row_index": index, "case": case.to_dict(), f"{stage_name}_stage": stage_value,
                "stage_value": None, "stage_detail": None, "stage_detail_hide": None}
         if not matched_stage.empty:
@@ -137,7 +146,7 @@ def bclc_stages(cases, period_codes):
     codes = period_codes[(period_codes["site"].astype(str).str.strip() == "C22") & (period_codes["label"] == "BCLC(ostagec)")]
     return create_stage_results(cases, codes, "bclc",
         lambda case: str(case["原發部位"]).strip().upper()[:3] == "C22" and normalize_code(case["其他分期系統"], 2) == "06",
-        lambda case: normalize_code(case["其他分期系統期別(臨床分期)"]))
+        lambda case: case["其他分期系統期別(臨床分期)"])
 
 
 # SCLC分期
@@ -148,14 +157,14 @@ def sclc_stages(cases, period_codes):
     ]
     return create_stage_results(cases, codes, "sclc",
         lambda case: str(case["原發部位"]).strip().upper()[:3] in {"C33", "C34"} and normalize_code(case["其他分期系統"], 2) == "07",
-        lambda case: normalize_code(case["其他分期系統期別(臨床分期)"]).upper())
+        lambda case: case["其他分期系統期別(臨床分期)"])
 
 # DSS分期
 def dss_stages(cases, period_codes):
     codes = period_codes[(period_codes["site"].astype(str).str.strip() == "C00-C80") & (period_codes["hist"].astype(str).str.strip() == "9731-9734") & (period_codes["label"] == "DSS(ostagec)")]
     return create_stage_results(cases, codes, "dss",
         lambda case: bool(re.fullmatch(r"C(?:0\d|[1-7]\d|80)\d", str(case["原發部位"]).strip().upper())) and normalize_code(case["組織型態"]) in {"9731", "9732", "9733", "9734"} and normalize_code(case["其他分期系統"], 2) == "09",
-        lambda case: normalize_code(case["其他分期系統期別(臨床分期)"]))
+        lambda case: case["其他分期系統期別(臨床分期)"])
 
 # DRE分期
 def dre_stages(cases, period_codes):
@@ -165,7 +174,7 @@ def dre_stages(cases, period_codes):
         lambda case: normalize_code(case["性別"]) == "1"
             and str(case["原發部位"]).strip().upper() == "C619"
             and normalize_code(case["其他分期系統"], 2) == "11",
-        lambda case: normalize_code(case["其他分期系統期別(臨床分期)"]))
+        lambda case: case["其他分期系統期別(臨床分期)"])
 
 # Breast Cancer Prognostic Stage分期
 def breast_stages(cases, period_codes):
@@ -177,8 +186,8 @@ def breast_stages(cases, period_codes):
         )
     ]
     def select_stage(case):
-        stage_value = normalize_code(case["其他分期系統期別(病理分期)"])
-        return normalize_code(case["其他分期系統期別(臨床分期)"]) if normalize_code(stage_value, 4) == "8888" else stage_value
+        stage_value = normalize_other_stage_code(case["其他分期系統期別(病理分期)"])
+        return normalize_other_stage_code(case["其他分期系統期別(臨床分期)"]) if normalize_code(stage_value, 4) == "8888" else stage_value
     return create_stage_results(cases, codes, "breast",
         lambda case: str(case["原發部位"]).strip().upper()[:3] == "C50" and normalize_code(case["其他分期系統"], 2) == "12", select_stage)
 
@@ -187,7 +196,7 @@ def binet_stages(cases, period_codes):
     codes = period_codes[(period_codes["site"].astype(str).str.strip() == "C00-C80") & (period_codes["hist"].astype(str).str.strip() == "9823") & (period_codes["label"] == "Binet(ostagec)")]
     return create_stage_results(cases, codes, "binet",
         lambda case: bool(re.fullmatch(r"C(?:0\d|[1-7]\d|80)\d", str(case["原發部位"]).strip().upper())) and normalize_code(case["組織型態"]) == "9823" and normalize_code(case["其他分期系統"], 2) == "13",
-        lambda case: normalize_code(case["其他分期系統期別(臨床分期)"]))
+        lambda case: case["其他分期系統期別(臨床分期)"])
 
 
 STAGE_FUNCTIONS = {
@@ -263,8 +272,19 @@ def _stage_report_label(row, detailed=False):
 def _raw_stage_code(row):
     for key, value in row.items():
         if key.endswith("_stage") and key not in {"stage_value", "stage_detail", "stage_detail_hide"}:
-            return normalize_code(value).replace(",", "")
+            return normalize_other_stage_code(value).replace(",", "")
     return ""
+
+
+def _is_unknown_stage_code(raw_code, system):
+    """Return whether a selected stage code must be excluded as unknown.
+
+    AJCC stage 0 is a valid stage.  For the registry's other staging
+    systems, however, an effective code of 0000 has the same meaning as
+    9999 and must not be included in stage statistics.
+    """
+    code = normalize_other_stage_code(raw_code).replace(",", "")
+    return code in {"999", "9999"} or (system != "AJCC" and code == "0000")
 
 
 def _stage_sort_key(label):
@@ -357,7 +377,7 @@ def build_stage_report(stage_result, option, period_codes=None, cancers=None):
         label = _stage_report_label(row, detailed)
         if category == "Stage Not Applicable" or raw_code in {"888", "8888"}:
             not_applicable_count += 1
-        elif category == "Stage Unknown" or raw_code in {"999", "9999"} or not label:
+        elif category == "Stage Unknown" or _is_unknown_stage_code(raw_code, option["system"]) or not label:
             unknown_count += 1
         else:
             included_rows.append((row, label))
@@ -573,7 +593,8 @@ def _available_stage_labels(system, detailed, period_codes, manual_key=None):
     stage_column = "stage_detail" if detailed else "stage_detail_hide"
     labels = []
     for _, code in codes.iterrows():
-        if normalize_code(code.get("stage_value")).replace(",", "") in {"888", "8888", "999", "9999"}:
+        raw_code = normalize_other_stage_code(code.get("stage_value")).replace(",", "")
+        if raw_code in {"888", "8888"} or _is_unknown_stage_code(raw_code, system):
             continue
         value = str(code.get(stage_column) or "").strip()
         if value.lower() not in {"", "nan", "none"}:
@@ -615,7 +636,7 @@ def calculate_stage_first_course_distribution(cases, options, period_codes=None,
                 excluded_not_applicable += 1
                 continue
             stage = str(row.get(stage_column) or "").strip()
-            if category == "Stage Unknown" or raw_code in {"999", "9999"} or not stage:
+            if category == "Stage Unknown" or _is_unknown_stage_code(raw_code, system) or not stage:
                 # Keep the same convention as the stage distribution tables:
                 # a blank Period_Code mapping is counted as an unknown stage.
                 excluded_unknown += 1
@@ -733,7 +754,7 @@ def calculate_stage_surgery_distribution(cases, options, period_codes=None, manu
                 summary["excluded_not_applicable"] += 1
                 continue
             stage = str(row.get(stage_column) or "").strip()
-            if category == "Stage Unknown" or raw_code in {"999", "9999"} or not stage:
+            if category == "Stage Unknown" or _is_unknown_stage_code(raw_code, system) or not stage:
                 summary["excluded_unknown"] += 1
                 continue
             surgery = select_highest_ranked_surgery(
