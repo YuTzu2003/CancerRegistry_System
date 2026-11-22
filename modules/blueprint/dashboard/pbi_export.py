@@ -41,9 +41,15 @@ def _pbix_column_name(column):
     return _PBIX_HEADER_ALIASES.get(name, name)
 
 
-def _coerce_template_integer_fields(frame):
-    """Blank non-numeric values only in fields the existing PBIX types as Int64."""
-    for column in _PBIX_INTEGER_FIELDS.intersection(frame.columns):
+def _coerce_template_integer_fields(frame, preserve_text_fields=()):
+    """Blank non-numeric values only in fields the existing PBIX types as Int64.
+
+    The browser download must preserve registry text codes such as ``2M`` in
+    the original surgery field.  Power BI publication can still opt into the
+    legacy integer coercion by leaving ``preserve_text_fields`` empty.
+    """
+    preserved = {str(field) for field in preserve_text_fields}
+    for column in _PBIX_INTEGER_FIELDS.intersection(frame.columns) - preserved:
         numeric = pd.to_numeric(frame[column], errors="coerce")
         has_value = frame[column].notna() & frame[column].astype(str).str.strip().ne("")
         frame.loc[has_value & numeric.isna(), column] = None
@@ -178,6 +184,7 @@ def export_pbi_dataset(
     year_end="",
     behavior="",
     separate_cancer_sheets=False,
+    preserve_registry_text=False,
 ):
     """Export source Excel with reusable Power BI helper columns.
 
@@ -250,7 +257,18 @@ def export_pbi_dataset(
     if len(translated) != len(set(translated)):
         raise ValueError("年報欄位轉換後出現重複名稱，無法提供給 Power BI 公版。")
     result.columns = translated
-    result = _coerce_template_integer_fields(result)
+    # The downloadable workbook is intended to retain the registry's original
+    # text codes (for example 2M/2E).  Keep the existing integer coercion for
+    # Power BI publishing unless the caller explicitly requests preservation.
+    preserve_text_fields = (
+        {"申報醫院原發部位手術方式"}
+        if preserve_registry_text
+        else set()
+    )
+    result = _coerce_template_integer_fields(
+        result,
+        preserve_text_fields=preserve_text_fields,
+    )
     output.parent.mkdir(parents=True, exist_ok=True)
     temporary = output.with_name(f".{output.stem}.{uuid.uuid4().hex}.tmp.xlsx")
     try:
