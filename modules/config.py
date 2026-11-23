@@ -36,13 +36,10 @@ class BaseConfig:
     SESSION_COOKIE_SECURE = parse_bool(_required_env("SESSION_COOKIE_SECURE"))
     SESSION_COOKIE_SAMESITE = _required_env("SESSION_COOKIE_SAMESITE")
     SESSION_LIFETIME_SECONDS = _parse_int(_required_env("SESSION_LIFETIME_SECONDS"), "SESSION_LIFETIME_SECONDS")
-    # Applies to file uploads and dashboard export drafts containing chart images.
-    # Keep this in sync with IIS requestFiltering/requestLimits.
     MAX_UPLOAD_MB = 100
     LOGIN_MAX_ATTEMPTS = 5
     LOGIN_ATTEMPT_WINDOW_SECONDS = 900
     MAX_CONTENT_LENGTH = MAX_UPLOAD_MB * 1024 * 1024
-
     FLASK_HOST = _required_env("FLASK_HOST")
     FLASK_PORT = _parse_int(_required_env("FLASK_PORT"), "FLASK_PORT")
     BACKEND_BASE_PORT = _optional_int("BACKEND_BASE_PORT")
@@ -78,8 +75,8 @@ class BaseConfig:
         missing = [name for name in required if getattr(cls, name) is None]
         if missing:
             raise RuntimeError(f"Missing required production environment settings: {', '.join(missing)}")
-        if cls.LLM_WORKERS != 1:
-            raise RuntimeError("LLM_WORKERS must be 1 until the LLM task schema migration is applied")
+        if cls.LLM_WORKERS is None or cls.LLM_WORKERS < 1 or cls.LLM_WORKERS > 8:
+            raise RuntimeError("LLM_WORKERS must be between 1 and 8")
 
 class TestingConfig(BaseConfig):
     APP_ENV = "testing"

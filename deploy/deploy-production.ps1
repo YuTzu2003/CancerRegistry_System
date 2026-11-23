@@ -78,7 +78,7 @@ if ([string]::IsNullOrWhiteSpace($databaseUri) -or $databaseUri -match 'user:pas
 if ($publicPort -lt 1 -or $publicPort -gt 65535) { throw "PUBLIC_HTTP_PORT must be between 1 and 65535." }
 if ($backendBasePort -lt 1 -or ($backendBasePort + $workerCount - 1) -gt 65535) { throw "BACKEND_BASE_PORT and APP_WORKERS must stay within TCP port range." }
 if ($workerCount -lt 1 -or $workerCount -gt 8) { throw "APP_WORKERS must be between 1 and 8." }
-if ($llmWorkerCount -ne 1) { throw "LLM_WORKERS must be 1 until the LLM task schema migration is applied." }
+if ($llmWorkerCount -lt 1 -or $llmWorkerCount -gt 8) { throw "LLM_WORKERS must be between 1 and 8." }
 if ($waitressHost -notmatch '^127\.0\.0\.1$' -or $trustedProxy -notmatch '^127\.0\.0\.1$') { throw "WAITRESS_HOST and TRUSTED_PROXY must be 127.0.0.1 in production." }
 if ((Get-EnvironmentValue "PROXY_COUNT") -ne "1") { throw "PROXY_COUNT must be 1 in production." }
 if ($databaseUri -match 'ODBC\+Driver\+18' -and -not $driver18) { throw "SQLALCHEMY_DATABASE_URI requires ODBC Driver 18, but it is not installed." }

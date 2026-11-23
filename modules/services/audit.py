@@ -25,6 +25,22 @@ def write_audit_log(action, detail=None, user_id=None, remote_addr=None):
         logging.exception("Unable to write audit log for action %s", action)
 
 
+def cleanup_expired_audit_logs():
+    conn = get_conn()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "DELETE FROM dbo.Audit_logs WHERE CreatedAt < DATEADD(month, -1, SYSDATETIMEOFFSET())"
+        )
+        deleted_count = cursor.rowcount
+        conn.commit()
+        if deleted_count:
+            logging.info("Deleted %s expired audit logs", deleted_count)
+        return deleted_count
+    finally:
+        conn.close()
+
+
 def register_audit_logging(app):
     @app.after_request
     def record_request(response):

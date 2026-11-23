@@ -27,7 +27,7 @@ $workerCount = [int](Get-EnvironmentValue "APP_WORKERS")
 $backendBasePort = [int](Get-EnvironmentValue "BACKEND_BASE_PORT")
 $llmWorkerCount = [int](Get-EnvironmentValue "LLM_WORKERS")
 if ($workerCount -lt 1 -or $workerCount -gt 8) { throw "APP_WORKERS must be between 1 and 8." }
-if ($llmWorkerCount -ne 1) { throw "LLM_WORKERS must be 1 until the LLM task schema migration is applied." }
+if ($llmWorkerCount -lt 1 -or $llmWorkerCount -gt 8) { throw "LLM_WORKERS must be between 1 and 8." }
 
 Get-ScheduledTask -TaskName "CancerRegistrySystem-??" -ErrorAction SilentlyContinue | Unregister-ScheduledTask -Confirm:$false
 Get-ScheduledTask -TaskName "CancerRegistrySystem-LLM-??" -ErrorAction SilentlyContinue | Unregister-ScheduledTask -Confirm:$false
