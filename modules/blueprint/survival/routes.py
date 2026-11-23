@@ -1,74 +1,48 @@
-"""HTTP seam for the isolated survival report workflow."""
-
 from __future__ import annotations
-
 import logging
 import tempfile
 import uuid
 from pathlib import Path
-
 from flask import Blueprint, current_app, jsonify, render_template, request, send_file, session
 from openpyxl.utils.exceptions import InvalidFileException
 from zipfile import BadZipFile
-
 from modules.services.auth import login_required
-
 from .export_bundle import build_pptx_download
 from .case_recalculation import case_file_options, recalculate_cases
 from .survival_curves import compute_curves
 from .job_store import JobNotFound, JobStore
 from .parser import UnsupportedSourceFormat, parse_survival_workbook
-from .report_builder import (
-    DeckOverride,
-    DisplayOverride,
-    apply_display_overrides,
-    build_report_batch,
-)
+from .report_builder import ( DeckOverride, DisplayOverride, apply_display_overrides, build_report_batch,)
 from .models import YearComparisonSettings
-
-
-survival_report_bp = Blueprint(
-    "survival_report",
-    __name__,
-    template_folder="templates",
-)
-
+survival_report_bp = Blueprint( "survival_report", __name__, template_folder="templates",)
 _ALLOWED_EXTENSIONS = {".xls", ".xlsx"}
-
 
 def _template_path() -> Path:
     return Path(current_app.static_folder).parent / "document" / "survival_report_template.pptx"
 
-
 def _owner_id() -> str:
     return str(session.get("id", ""))
-
 
 def _job_store() -> JobStore:
     configured = current_app.config.get("SURVIVAL_REPORT_JOB_ROOT")
     ttl = current_app.config.get("SURVIVAL_REPORT_JOB_TTL_SECONDS", 3600)
     return JobStore(Path(configured) if configured else None, ttl_seconds=ttl)
 
-
 def _safe_original_filename(filename: str) -> str:
     return str(filename or "").replace("\\", "/").split("/")[-1].strip()
 
-
 def _not_found():
     return jsonify({"ok": False, "error": "找不到作業。"}), 404
-
 
 @survival_report_bp.get("/survival-report")
 @login_required
 def index():
     return render_template("survival/index.html", active="survival_report.index")
 
-
 @survival_report_bp.get("/survival-report/powerpoint")
 @login_required
 def powerpoint():
     return render_template("survival/powerpoint.html", active="survival_report.index")
-
 
 @survival_report_bp.route("/survival-report/recalculate", methods=["GET", "POST"])
 @login_required
@@ -94,32 +68,28 @@ def recalculate():
     return render_template("survival/recalculate.html", result=result, error=error,
                            hospital=hospital, start_year=start_year, end_year=end_year), 400 if error else 200
 
-
 @survival_report_bp.get("/survival-report/curves")
 @login_required
 def curves():
     return render_template("survival/curves.html", active="survival_report.curves")
 
-
 @survival_report_bp.post("/api/survival-report/curves")
 @login_required
 def curves_data():
     upload = request.files.get("case_file")
-    hospital = request.form.get("hospital", "").strip()
     start_year = request.form.get("start_year", type=int)
     end_year = request.form.get("end_year", type=int)
     if not upload or Path(upload.filename).suffix.lower() != ".xlsx":
         return jsonify(error="請選擇 .xlsx 個案清單。"), 400
-    if not hospital or start_year is None or end_year is None or not 1 <= start_year <= end_year <= 999:
-        return jsonify(error="請選擇院所及有效的民國起訖年度。"), 400
+    if start_year is None or end_year is None or not 1 <= start_year <= end_year <= 999:
+        return jsonify(error="請選擇有效的起訖年度。"), 400
     try:
-        results = compute_curves(upload.stream, hospital, start_year, end_year)
+        results = compute_curves(upload.stream, start_year, end_year)
     except ValueError as exc:
         return jsonify(error=str(exc)), 400
     except (BadZipFile, InvalidFileException, KeyError, OSError):
         return jsonify(error="無法讀取此 Excel 檔案。"), 400
     return jsonify(results=results, start_year=start_year, end_year=end_year)
-
 
 @survival_report_bp.post("/api/survival-report/case-options")
 @login_required
@@ -133,7 +103,6 @@ def recalculate_options():
         return jsonify(error=str(exc)), 400
     except (BadZipFile, InvalidFileException, KeyError, OSError):
         return jsonify(error="無法讀取此 Excel 檔案。"), 400
-
 
 @survival_report_bp.post("/api/survival-report/preview")
 @login_required
@@ -197,7 +166,6 @@ def preview():
     job_id = store.create(_owner_id(), batch)
     return jsonify({"ok": True, "job_id": job_id, "files": results, "batch": batch.to_dict()})
 
-
 @survival_report_bp.get("/api/survival-report/jobs/<job_id>")
 @login_required
 def get_job(job_id: str):
@@ -206,7 +174,6 @@ def get_job(job_id: str):
     except JobNotFound:
         return _not_found()
     return jsonify({"ok": True, "job_id": stored.job_id, "batch": stored.batch.to_dict()})
-
 
 @survival_report_bp.patch("/api/survival-report/jobs/<job_id>")
 @login_required
@@ -237,7 +204,6 @@ def update_job(job_id: str):
         return jsonify({"ok": False, "error": f"預覽設定無效：{error}"}), 400
     return jsonify({"ok": True, "job_id": job_id, "batch": batch.to_dict()})
 
-
 @survival_report_bp.delete("/api/survival-report/jobs/<job_id>")
 @login_required
 def delete_job(job_id: str):
@@ -257,7 +223,6 @@ def _load_selected_job(job_id: str):
         raise ValueError("沒有已選取的 PPT。")
     return stored
 
-
 @survival_report_bp.post("/api/survival-report/jobs/<job_id>/export/pptx")
 @login_required
 def export_pptx(job_id: str):
@@ -268,9 +233,4 @@ def export_pptx(job_id: str):
         return _not_found()
     except ValueError as error:
         return jsonify({"ok": False, "error": str(error)}), 400
-    return send_file(
-        artifact.content,
-        mimetype=artifact.mimetype,
-        as_attachment=True,
-        download_name=artifact.filename,
-    )
+    return send_file(artifact.content,mimetype=artifact.mimetype,as_attachment=True,download_name=artifact.filename,)

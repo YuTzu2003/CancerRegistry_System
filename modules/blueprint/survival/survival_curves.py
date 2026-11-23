@@ -1,26 +1,14 @@
-"""Kaplan-Meier curves and 12-month actuarial life tables for the case list.
-
-Verified against lifelines (max diff 3e-15) and an independent actuarial
-recomputation on 2026存活率個案清單.xlsx before integration.
-"""
-
 from bisect import bisect_right
 from collections import Counter, defaultdict
 from fractions import Fraction
 from math import floor, isfinite
-
 from openpyxl import load_workbook
-
 from modules.services.case_class_filter import find_case_class_column, is_case_class_h
-
-from .case_recalculation import WEIGHTS, _hospital_id
+from .case_recalculation import WEIGHTS, _km_median_survival
 
 _STAGES = ("I", "II", "III", "IV")
-_STAGE_LABELS = {"I": "第1期", "II": "第2期", "III": "第3期", "IV": "第4期"}
-
 
 def _km_curve(cases):
-    """Unrounded step-curve points [[month, survival]] plus censor marks."""
     deaths = Counter(time for time, died in cases if died)
     points = [[0.0, Fraction(1)]]
     survival = Fraction(1)
@@ -38,9 +26,7 @@ def _km_curve(cases):
         censors.append([censor_time, points[index][1]])
     return points, censors
 
-
 def _km_at(points, last_x, month):
-    """KM estimate at *month* from curve points; None when not estimable."""
     if month > last_x:
         value = points[-1][1]
         return 0.0 if value == 0 else None
@@ -49,7 +35,6 @@ def _km_at(points, last_x, month):
 
 
 def _life_table(cases):
-    """12-month actuarial life table (effective n = at-risk - censored / 2)."""
     times = [time for time, _ in cases]
     max_follow_up = max(times)
     rows = []
@@ -85,7 +70,6 @@ def _life_table(cases):
 
 
 def _half_up_percent(rate):
-    """Exact rate (Fraction) to a percentage with one decimal, half rounded up."""
     return float(floor(rate * 1000 + Fraction(1, 2))) / 10
 
 
@@ -101,13 +85,13 @@ def _stage_block(cases):
         "points": [[round(x, 4), round(float(s), 6)] for x, s in points],
         "censors": [[round(x, 4), round(float(s), 6)] for x, s in censors],
         "annual": [None if rate is None else _half_up_percent(rate) for rate in annual],
+        "median": _km_median_survival(cases),
         "life_table": _life_table(cases),
     }
 
 
-def compute_curves(stream, hospital_id, start_year, end_year):
-    """Per-cancer KM curves, stage summaries and life tables for the period."""
-    required = ("hospid", "year", "pri_site", "fnstage", "select_memo", "Status_OS", "Surv_Months")
+def compute_curves(stream, start_year, end_year):
+    required = ("year", "pri_site", "fnstage", "select_memo", "Status_OS", "Surv_Months")
     workbook = load_workbook(stream, read_only=True, data_only=True)
     try:
         rows = workbook.active.values
@@ -119,12 +103,11 @@ def compute_curves(stream, hospital_id, start_year, end_year):
         columns = [headers.index(field) for field in required]
         cases = defaultdict(list)
         for row in rows:
-            hospital, year, cancer, stage, memo, status, months = (
+            year, cancer, stage, memo, status, months = (
                 str(row[column]).strip() for column in columns
             )
             case_class = row[class_col] if class_col is not None else None
-            if (is_case_class_h(case_class)
-                    or _hospital_id(hospital) != _hospital_id(hospital_id) or not year.isdecimal()
+            if (is_case_class_h(case_class) or not year.isdecimal()
                     or not start_year <= int(year) <= end_year
                     or cancer not in WEIGHTS or not memo.startswith("15")):
                 continue
