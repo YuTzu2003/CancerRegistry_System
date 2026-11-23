@@ -75,4 +75,6 @@ def create_app():
     return flask_app, app_env, app_debug
 
 def should_start_background_worker(app_debug):
-    return not app_debug or BaseConfig.WERKZEUG_RUN_MAIN
+    # LLM workers run as dedicated scheduled tasks in production; the Flask
+    # process only spawns in-process workers for local development.
+    return app_debug and BaseConfig.WERKZEUG_RUN_MAIN

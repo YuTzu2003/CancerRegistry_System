@@ -78,8 +78,8 @@ class BaseConfig:
         missing = [name for name in required if getattr(cls, name) is None]
         if missing:
             raise RuntimeError(f"Missing required production environment settings: {', '.join(missing)}")
-        if cls.LLM_WORKERS != 1:
-            raise RuntimeError("LLM_WORKERS must be 1 until the LLM task schema migration is applied")
+        if cls.LLM_WORKERS is None or cls.LLM_WORKERS < 1 or cls.LLM_WORKERS > 8:
+            raise RuntimeError("LLM_WORKERS must be between 1 and 8")
 
 class TestingConfig(BaseConfig):
     APP_ENV = "testing"

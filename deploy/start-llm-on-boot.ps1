@@ -24,6 +24,7 @@ try {
 
     Set-Location -LiteralPath $projectRoot
     $env:APP_ENV = "production"
+    $env:LLM_WORKER_NUMBER = "$WorkerNumber"
     $attempt = 0
     while ($true) {
         $attempt++

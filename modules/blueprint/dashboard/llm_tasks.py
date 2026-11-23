@@ -415,9 +415,6 @@ def claim_next_llm_task(worker_id):
             """;WITH candidate AS (
                     SELECT TOP (1) * FROM dbo.LLMTaskWorker WITH (UPDLOCK, READPAST, ROWLOCK)
                     WHERE Status='queued'
-                      AND NOT EXISTS (
-                          SELECT 1 FROM dbo.LLMTaskWorker WITH (UPDLOCK, HOLDLOCK) WHERE Status='running'
-                      )
                     ORDER BY CreatedAt
                 )
                 UPDATE candidate SET Status='running', WorkerID=?
@@ -547,20 +544,33 @@ def requeue_annual_report_item(task_id, owner_id, item_id):
         conn.close()
 
 
-def recover_running_llm_tasks():
+def recover_running_llm_tasks(worker_id):
+    """Requeue only this worker's own abandoned tasks, so restarting one worker
+    never steals a task another worker is actively processing."""
     conn = get_conn()
     try:
         cursor = conn.cursor()
-        cursor.execute("UPDATE dbo.LLMTaskWorker SET Status='queued', WorkerID=NULL WHERE Status='running'")
+        cursor.execute(
+            "UPDATE dbo.LLMTaskWorker SET Status='queued', WorkerID=NULL "
+            "WHERE Status='running' AND WorkerID=?",
+            (worker_id,),
+        )
         conn.commit()
         return cursor.rowcount
     finally:
         conn.close()
 
 
+def _default_worker_id():
+    number = os.environ.get('LLM_WORKER_NUMBER')
+    if number and number.strip():
+        return f"worker-{int(number):02d}"
+    return f"{os.environ.get('COMPUTERNAME', 'worker')}-{os.getpid()}"
+
+
 def run_worker(worker_id=None, poll_seconds=2):
-    worker_id = worker_id or f"{os.environ.get('COMPUTERNAME', 'worker')}-{os.getpid()}"
-    recovered = recover_running_llm_tasks()
+    worker_id = worker_id or _default_worker_id()
+    recovered = recover_running_llm_tasks(worker_id)
     logging.info("LLM worker %s is ready; recovered %s running task(s)", worker_id, recovered)
     while True:
         result = process_next_llm_task(worker_id)
