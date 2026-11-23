@@ -1645,16 +1645,194 @@ function initDashboardControl() {
                           }
                       }                  ];
 
+                  // 年報送交 LLM 前，先把畫面表格使用的數值固定整理成摘要。
+                  // LLM 只負責把已驗證的數字改寫成敘述，不再自行重算小計或百分比。
+                  const annualNumber = (value) => {
+                      const number = Number(value);
+                      return Number.isFinite(number) ? number : 0;
+                  };
+
+                  const annualSum = (values) => Array.isArray(values)
+                      ? values.reduce((sum, value) => sum + annualNumber(value), 0)
+                      : 0;
+
+                  const annualPercent = (value, total) => total
+                      ? `${((annualNumber(value) / annualNumber(total)) * 100).toFixed(1)}%`
+                      : '0.0%';
+
+                  const annualLabels = (values, length) => Array.from(
+                      { length: Math.max(Array.isArray(values) ? values.length : 0, length || 0) },
+                      (_, index) => String((Array.isArray(values) ? values[index] : '') ?? '')
+                  );
+
+                  const annualRowsByColumns = (rows, columns) => (Array.isArray(rows) ? rows : []).map((row) => {
+                      const values = Array.isArray(row?.values) ? row.values.map(annualNumber) : [];
+                      const byColumn = {};
+                      columns.forEach((column, index) => {
+                          byColumn[String(column)] = values[index] || 0;
+                      });
+                      return {
+                          label: row?.treatment || row?.surgery || row?.procedure || row?.sex || row?.age || row?.name || row?.label || '',
+                          by_column: byColumn,
+                          row_total: annualSum(values),
+                          row_percentage: null
+                      };
+                  });
+
+                  const buildAnnualInsightPayload = (fieldKey, sourceData) => {
+                      const source = sourceData && typeof sourceData === 'object' ? sourceData : {};
+                      let verifiedSummary = { summary_version: 1, field_key: fieldKey };
+
+                      if (fieldKey === '性別與年齡分佈') {
+                          const male = Array.isArray(source.male) ? source.male.map(annualNumber) : [];
+                          const female = Array.isArray(source.female) ? source.female.map(annualNumber) : [];
+                          const total = Array.isArray(source.total) ? source.total.map(annualNumber) : [];
+                          const categories = annualLabels(source.categories, Math.max(male.length, female.length, total.length));
+                          const ageGroups = categories.map((label, index) => ({
+                              label,
+                              male_count: male[index] || 0,
+                              female_count: female[index] || 0,
+                              total_count: total[index] || 0
+                          }));
+                          const maleCount = annualSum(male);
+                          const femaleCount = annualSum(female);
+                          const totalCount = annualSum(total);
+                          ageGroups.forEach((group) => {
+                              group.percentage = annualPercent(group.total_count, totalCount);
+                          });
+                          const nonzeroAgeGroups = ageGroups.filter(group => group.total_count > 0);
+                          const topAgeGroups = [...nonzeroAgeGroups]
+                              .sort((left, right) => right.total_count - left.total_count)
+                              .slice(0, 3);
+                          const ageTotalsMatch = ageGroups.every(group => (
+                              group.male_count + group.female_count === group.total_count
+                          ));
+                          verifiedSummary = {
+                              ...verifiedSummary,
+                              summary_type: 'gender_age_distribution',
+                              denominator: 'genderAgeData.total 的總和',
+                              total_count: totalCount,
+                              male_count: maleCount,
+                              female_count: femaleCount,
+                              male_percentage: annualPercent(maleCount, totalCount),
+                              female_percentage: annualPercent(femaleCount, totalCount),
+                              age_groups: ageGroups,
+                              top_age_groups: topAgeGroups,
+                              consistency_check: {
+                                  male_plus_female_equals_total: maleCount + femaleCount === totalCount,
+                                  each_age_total_equals_male_plus_female: ageTotalsMatch
+                              }
+                          };
+                      } else if (fieldKey === '年齡中位數') {
+                          const maleCount = annualNumber(source.male_count);
+                          const femaleCount = annualNumber(source.female_count);
+                          const totalCount = annualNumber(source.total_count) || maleCount + femaleCount;
+                          verifiedSummary = {
+                              ...verifiedSummary,
+                              summary_type: 'median_age',
+                              total_count: totalCount,
+                              male_count: maleCount,
+                              female_count: femaleCount,
+                              male_median_age: source.male ?? 0,
+                              female_median_age: source.female ?? 0,
+                              total_median_age: source.total ?? 0,
+                              male_to_female_ratio: source.male_ratio ?? '0.00',
+                              female_to_male_ratio: source.female_ratio ?? '0.00'
+                          };
+                      } else if (fieldKey === '組織型態分佈' && Array.isArray(source)) {
+                          const rows = source.map((row) => ({
+                              label: row?.name || row?.code || '',
+                              code: row?.code || '',
+                              count: annualNumber(row?.count)
+                          }));
+                          const totalCount = annualSum(rows.map(row => row.count));
+                          rows.forEach(row => { row.percentage = annualPercent(row.count, totalCount); });
+                          verifiedSummary = {
+                              ...verifiedSummary,
+                              summary_type: 'histology_distribution',
+                              total_count: totalCount,
+                              rows,
+                              top_rows: [...rows].sort((left, right) => right.count - left.count).slice(0, 5)
+                          };
+                      } else if (source && (Array.isArray(source.stage_labels) || Array.isArray(source.stage_columns))) {
+                          const columns = Array.isArray(source.stage_labels)
+                              ? source.stage_labels
+                              : source.stage_columns;
+                          const totals = Array.isArray(source.stage_totals)
+                              ? source.stage_totals.map(annualNumber)
+                              : Array.isArray(source.totals)
+                                  ? source.totals.map(annualNumber)
+                                  : [];
+                          const rowKey = Array.isArray(source.sex_rows)
+                              ? 'sex_rows'
+                              : Array.isArray(source.age_rows)
+                                  ? 'age_rows'
+                                  : Array.isArray(source.treatment_rows)
+                                      ? 'treatment_rows'
+                                      : 'surgery_rows';
+                          const rows = annualRowsByColumns(source[rowKey], columns);
+                          const totalCount = annualNumber(source.total_count) || annualSum(totals);
+                          rows.forEach(row => { row.row_percentage = annualPercent(row.row_total, totalCount); });
+                          const columnTotals = {};
+                          columns.forEach((column, index) => {
+                              columnTotals[String(column)] = totals[index] || 0;
+                          });
+                          verifiedSummary = {
+                              ...verifiedSummary,
+                              summary_type: rowKey === 'treatment_rows' || rowKey === 'surgery_rows'
+                                  ? 'stage_treatment_distribution'
+                                  : 'stage_distribution',
+                              stage_columns: columns,
+                              column_totals: columnTotals,
+                              column_percentages: columns.reduce((result, column, index) => {
+                                  result[String(column)] = annualPercent(totals[index] || 0, totalCount);
+                                  return result;
+                              }, {}),
+                              total_count: totalCount,
+                              analyzable_count: annualNumber(source.analyzable_count),
+                              included_count: annualNumber(source.included_count) || totalCount,
+                              rows,
+                              excluded_unknown: annualNumber(source.excluded_unknown),
+                              excluded_not_applicable: annualNumber(source.excluded_not_applicable),
+                              excluded_unmapped_surgery: annualNumber(source.excluded_unmapped_surgery),
+                              excluded_unclassified_treatment: annualNumber(source.excluded_unclassified_treatment)
+                          };
+                      } else if (source && typeof source === 'object') {
+                          const numericFields = Object.entries(source)
+                              .filter(([, value]) => Number.isFinite(Number(value)))
+                              .reduce((result, [key, value]) => {
+                                  result[key] = annualNumber(value);
+                                  return result;
+                              }, {});
+                          verifiedSummary = {
+                              ...verifiedSummary,
+                              summary_type: 'display_data_summary',
+                              numeric_fields: numericFields
+                          };
+                      }
+
+                      return {
+                          verified_summary: verifiedSummary,
+                          display_data: source
+                      };
+                  };
+
+                  // 單張圖表的「重新產生敘述」也共用年報批次使用的驗證摘要。
+                  // 暴露成 Renderer 方法，讓 dashboard.js 的期別分頁也能使用同一套規則。
+                  window.DashboardRenderer = window.DashboardRenderer || {};
+                  window.DashboardRenderer.buildVerifiedInsightPayload = buildAnnualInsightPayload;
+
                   const collectAnnualReportItems = (reports) => {
                       const items = [];
                       const modeAi = document.getElementById('mode_ai')?.value || 'balanced';
                       const addItem = (reportEntry, fieldKey, insightData, fields) => {
+                          const llmData = buildAnnualInsightPayload(fieldKey, insightData);
                           items.push({
                               item_id: `${reportEntry.key || 'cancer'}::${fieldKey}::${items.length + 1}`,
                               report_key: reportEntry.key || '',
                               report_title: reportEntry.title || '癌症',
                               field_key: fieldKey,
-                              data: insightData,
+                              data: llmData,
                               fields,
                               mode_ai: modeAi,
                               year_start: yearStartVal,
@@ -1779,9 +1957,14 @@ function initDashboardControl() {
                                       };
                                   });
                               }
+                              const llmData = buildAnnualInsightPayload(fieldKey, dataToSend);
                               const currentRequest = window.DashboardRenderer.fetchLlmInsightWithRetry(
-                                  fieldKey, dataToSend, cfg.fields, cfg.respId, cfg.btnId,
-                                  { forceRefresh: event?.isTrusted === true }
+                                  fieldKey, llmData, cfg.fields, cfg.respId, cfg.btnId,
+                                  {
+                                      forceRefresh: event?.isTrusted === true,
+                                      reportKey: window.dashboardActiveCancerKey || '',
+                                      reportTitle: window.DashboardRenderer.getSelectedCancerTitle?.() || ''
+                                  }
                               );
                               return currentRequest;
                           };
