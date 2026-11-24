@@ -42,8 +42,6 @@ def create_app():
     if app_env == "production" and (len(BaseConfig.SECRET_KEY) < 32 or BaseConfig.SECRET_KEY == "development-only-change-before-production"):
         raise RuntimeError("Production SECRET_KEY must contain at least 32 characters")
     flask_app.secret_key = BaseConfig.SECRET_KEY
-    # Force the session cookie to at least SameSite=Lax regardless of the env
-    # value: a misconfigured "None" would otherwise strip CSRF protection.
     configured_samesite = str(runtime_config.SESSION_COOKIE_SAMESITE or "").strip().capitalize()
     session_samesite = configured_samesite if configured_samesite in ("Lax", "Strict") else "Lax"
     flask_app.config.update(PERMANENT_SESSION_LIFETIME=timedelta(seconds=runtime_config.SESSION_LIFETIME_SECONDS), SESSION_REFRESH_EACH_REQUEST=True, SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE=session_samesite, SESSION_COOKIE_SECURE=runtime_config.SESSION_COOKIE_SECURE, MAX_CONTENT_LENGTH=runtime_config.MAX_CONTENT_LENGTH, TESTING=runtime_config.TESTING)
@@ -75,4 +73,4 @@ def create_app():
     return flask_app, app_env, app_debug
 
 def should_start_background_worker(app_debug):
-    return not app_debug or BaseConfig.WERKZEUG_RUN_MAIN
+    return app_debug and BaseConfig.WERKZEUG_RUN_MAIN
