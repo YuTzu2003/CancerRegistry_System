@@ -1239,6 +1239,10 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   white-space: nowrap;
 }
 
+.swal2-actions > .swal2-cancel {
+  order: 1;
+}
+
 /* ==========================================================
    Accessibility: keyboard focus, pressed state, reduced motion
    ========================================================== */

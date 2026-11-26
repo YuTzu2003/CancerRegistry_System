@@ -25,7 +25,7 @@ const CHART_TOOLBOX = {
   right: 16,
   top: 0,
   feature: {
-    dataView: { show: true, readOnly: false, title: "資料檢視", lang: ["資料檢視", "關閉", "重新整理"] },
+    dataView: { show: true, readOnly: true, title: "資料檢視", lang: ["資料檢視", "關閉", "重新整理"], ...window.EChartsDataView.viewOnly },
     saveAsImage: { show: true, title: "下載圖片" },
   },
 };

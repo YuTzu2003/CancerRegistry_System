@@ -52,7 +52,7 @@ document.addEventListener('DOMContentLoaded', function() {
           legend: { show: false },
           toolbox: {
             feature: {
-              dataView: { show: true, readOnly: false, title: window.DashboardRenderer.t('dataView'), lang: [window.DashboardRenderer.t('dataView'), window.DashboardRenderer.t('close'), window.DashboardRenderer.t('refresh')] },
+              dataView: { show: true, readOnly: true, title: window.DashboardRenderer.t('dataView'), lang: [window.DashboardRenderer.t('dataView'), window.DashboardRenderer.t('close'), window.DashboardRenderer.t('refresh')], ...window.EChartsDataView.viewOnly },
               saveAsImage: { show: true, title: window.DashboardRenderer.t('downloadImage') }
             }
           },
@@ -1468,7 +1468,7 @@ window.DashboardRenderer.getGenderAgeChartOption = function(genderAgeData) {
             right: 16,
             top: 0,
             feature: {
-              dataView: { show: true, readOnly: false, title: this.t('dataView'), lang: [this.t('dataView'), this.t('close'), this.t('refresh')] },
+              dataView: { show: true, readOnly: true, title: this.t('dataView'), lang: [this.t('dataView'), this.t('close'), this.t('refresh')], ...window.EChartsDataView.viewOnly },
               saveAsImage: { show: true, title: this.t('downloadImage') }
             }
           },
@@ -1577,7 +1577,7 @@ window.DashboardRenderer.renderDiagnosisClassificationChart = function(chartData
             toolbox: {
                 show: true,
                 feature: {
-                    dataView: { show: true, readOnly: false, title: this.t('dataView'), lang: [this.t('dataView'), this.t('close'), this.t('refresh')] },
+                    dataView: { show: true, readOnly: true, title: this.t('dataView'), lang: [this.t('dataView'), this.t('close'), this.t('refresh')], ...window.EChartsDataView.viewOnly },
                     saveAsImage: { show: true, title: this.t('downloadImage') }
                 }
             },
@@ -1962,7 +1962,7 @@ window.DashboardRenderer.renderStageDistributionReport = function(stageData, yea
                 toolbox: {
                     right: 16,
                     feature: {
-                        dataView: { show: true, readOnly: true, title: this.t('dataView') },
+                        dataView: { show: true, readOnly: true, title: this.t('dataView'), ...window.EChartsDataView.viewOnly },
                         saveAsImage: { show: true, title: this.t('downloadImage') }
                     }
                 },
@@ -2139,7 +2139,7 @@ window.DashboardRenderer.renderStageSexReport = function(stageData, yearTitle, c
                 toolbox: {
                     right: 16,
                     feature: {
-                        dataView: { show: true, readOnly: true, title: this.t('dataView') },
+                        dataView: { show: true, readOnly: true, title: this.t('dataView'), ...window.EChartsDataView.viewOnly },
                         saveAsImage: { show: true, title: this.t('downloadImage') }
                     }
                 },
@@ -2313,7 +2313,7 @@ window.DashboardRenderer.renderStageAgeReport = function(stageData, yearTitle, c
                 toolbox: {
                     right: 16,
                     feature: {
-                        dataView: { show: true, readOnly: true, title: this.t('dataView') },
+                        dataView: { show: true, readOnly: true, title: this.t('dataView'), ...window.EChartsDataView.viewOnly },
                         saveAsImage: { show: true, title: this.t('downloadImage') }
                     }
                 },
@@ -2778,7 +2778,7 @@ window.DashboardRenderer.renderSurvivalChart = function(survivalData, yearTitle,
             toolbox: {
                 right: 12,
                 feature: {
-                    dataView: { show: true, readOnly: true, title: this.t('dataView'), lang: [this.t('dataView'), this.t('close'), this.t('refresh')] },
+                    dataView: { show: true, readOnly: true, title: this.t('dataView'), lang: [this.t('dataView'), this.t('close'), this.t('refresh')], ...window.EChartsDataView.viewOnly },
                     saveAsImage: { show: true, title: this.t('downloadImage') }
                 }
             },
@@ -3027,7 +3027,7 @@ window.DashboardRenderer.updateHistologyChart = function(histologyData, noDataRe
             toolbox: {
                 show: true,
                 feature: {
-                    dataView: { show: true, readOnly: false, title: this.t('dataView'), lang: [this.t('dataView'), this.t('close'), this.t('refresh')] },
+                    dataView: { show: true, readOnly: true, title: this.t('dataView'), lang: [this.t('dataView'), this.t('close'), this.t('refresh')], ...window.EChartsDataView.viewOnly },
                     saveAsImage: { show: true, title: this.t('downloadImage') }
                 }
             },

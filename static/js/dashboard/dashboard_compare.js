@@ -2030,7 +2030,7 @@
       tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
       grid: { left: 72, right: 72, top: 98, bottom: 74, containLabel: false },
       legend: { data: legendLabels, top: 52, left: 'center', itemGap: 12 },
-      toolbox: { right: 16, top: 0, feature: { dataView: { show: true, readOnly: false, title: t('dataView'), lang: [t('dataView'), t('close'), t('refresh')] }, saveAsImage: { show: true, title: t('downloadImage') } } },
+      toolbox: { right: 16, top: 0, feature: { dataView: { show: true, readOnly: true, title: t('dataView'), lang: [t('dataView'), t('close'), t('refresh')], ...window.EChartsDataView.viewOnly }, saveAsImage: { show: true, title: t('downloadImage') } } },
       xAxis: [{ type: 'category', data: data.categories, name: t('age'), nameLocation: 'middle', nameGap: 30, axisPointer: { type: 'shadow' }, axisTick: { alignWithLabel: true }, axisLabel: { interval: 0 } }],
       yAxis: [{ type: 'value', min: 0, max: yMax, minInterval: 1, splitNumber: 5, splitLine: { lineStyle: { color: '#e5eaf3' } } }],
       series: [
@@ -2432,7 +2432,7 @@
       legend: { show: false },
       toolbox: {
         feature: {
-          dataView: { show: true, readOnly: false, title: t('dataView'), lang: [t('dataView'), t('close'), t('refresh')] },
+          dataView: { show: true, readOnly: true, title: t('dataView'), lang: [t('dataView'), t('close'), t('refresh')], ...window.EChartsDataView.viewOnly },
           saveAsImage: { show: true, title: t('downloadImage') }
         }
       },
@@ -2491,7 +2491,7 @@
     const chart = echarts.init(chartEl);
     chart.setOption({
       animation: false,
-      toolbox: { show: true, feature: { dataView: { show: true, readOnly: false, title: t('dataView'), lang: [t('dataView'), t('close'), t('refresh')] }, saveAsImage: { show: true, title: t('downloadImage') } } },
+      toolbox: { show: true, feature: { dataView: { show: true, readOnly: true, title: t('dataView'), lang: [t('dataView'), t('close'), t('refresh')], ...window.EChartsDataView.viewOnly }, saveAsImage: { show: true, title: t('downloadImage') } } },
       title: { text: chartTitle, subtext: t('source'), left: 'center', textStyle: { fontSize: 18, fontWeight: 'bold', color: '#333' } },
       legend: { orient: 'vertical', right: '2%', top: 'middle', itemWidth: 14, itemHeight: 14, data: labels, textStyle: { fontSize: 14, lineHeight: 22, width: 450, overflow: 'break' } },
       tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
@@ -2803,7 +2803,7 @@
     const common = {
       animation: false,
       title: { text: t(chartTitleKey, titleOptions), subtext: t('source'), left: 'center', textStyle: { fontSize: 18, fontWeight: 'bold' } },
-      toolbox: { right: 12, top: 0, feature: { dataView: { show: true, readOnly: false, title: t('dataView'), lang: [t('dataView'), t('close'), t('refresh')] }, saveAsImage: { show: true, title: t('downloadImage') } } }
+      toolbox: { right: 12, top: 0, feature: { dataView: { show: true, readOnly: true, title: t('dataView'), lang: [t('dataView'), t('close'), t('refresh')], ...window.EChartsDataView.viewOnly }, saveAsImage: { show: true, title: t('downloadImage') } } }
     };
 
     if (report.view === 'sex') {
@@ -3539,7 +3539,7 @@
         right: 16,
         top: 0,
         feature: {
-          dataView: { show: true, readOnly: false, title: '數據檢視', lang: ['數據檢視', '關閉', '更新'] },
+          dataView: { show: true, readOnly: true, title: '數據檢視', lang: ['數據檢視', '關閉', '更新'], ...window.EChartsDataView.viewOnly },
           saveAsImage: { show: true, title: '下載圖片' }
         }
       },

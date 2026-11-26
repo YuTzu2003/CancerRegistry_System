@@ -214,9 +214,10 @@
         feature: {
           dataView: {
             show: true,
-            readOnly: false,
+            readOnly: true,
             title: labels.dataView,
-            lang: [labels.dataView, labels.close, labels.refresh]
+            lang: [labels.dataView, labels.close, labels.refresh],
+            ...global.EChartsDataView.viewOnly
           },
           saveAsImage: { show: true, title: labels.downloadImage }
         }
