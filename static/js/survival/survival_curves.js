@@ -18,6 +18,9 @@ const STAGE_COLOR_TOKENS = {
   III: "--curves-stage-iii",
   IV: "--curves-stage-iv",
 };
+const SEX_ORDER = ["1", "2"];
+const SEX_COLOR_TOKENS = { 1: "--curves-sex-1", 2: "--curves-sex-2" };
+const RISK_CHECKPOINTS = [0, 12, 24, 36, 48, 60];
 const CHART_TOOLBOX = {
   right: 16,
   top: 0,
@@ -31,6 +34,9 @@ let availableYears = [];
 let pendingRequest;
 let payload = null;
 let chart = null;
+let sexChart = null;
+let riskChart = null;
+let activeView = "stage";
 
 function chartPalette() {
   const style = getComputedStyle(document.querySelector(".survival-curves"));
@@ -42,6 +48,8 @@ function chartPalette() {
     surface: value("--curves-chart-surface"),
     stages: Object.fromEntries(Object.entries(STAGE_COLOR_TOKENS)
       .map(([stage, token]) => [stage, value(token)])),
+    sex: Object.fromEntries(Object.entries(SEX_COLOR_TOKENS)
+      .map(([key, token]) => [key, value(token)])),
   };
 }
 
@@ -138,12 +146,39 @@ function clampCurve(points) {
 }
 
 
-function renderCancer() {
-  const item = payload.results[Number(cancerSelect.value) || cancerSelect.selectedIndex];
-  if (!item) return;
-  renderChart(item);
-  renderLifeTables(item);
+function currentItem() {
+  return payload?.results[Number(cancerSelect.value) || cancerSelect.selectedIndex] || null;
 }
+
+function renderCancer() {
+  const item = currentItem();
+  if (!item) return;
+  if (activeView === "sex") {
+    renderSexChart(item);
+    renderRiskChart(item);
+  } else {
+    renderChart(item);
+    renderLifeTables(item);
+  }
+}
+
+document.querySelectorAll(".curves-tab").forEach((tab) => {
+  tab.addEventListener("click", () => {
+    const view = tab.dataset.view;
+    if (view === activeView) return;
+    activeView = view;
+    document.querySelectorAll(".curves-tab").forEach((button) => {
+      const selected = button === tab;
+      button.classList.toggle("is-active", selected);
+      button.setAttribute("aria-selected", String(selected));
+    });
+    document.querySelectorAll(".curves-view").forEach((pane) => {
+      pane.hidden = pane.dataset.view !== view;
+    });
+    document.getElementById("curves-risk-card").hidden = view !== "sex";
+    renderCancer();
+  });
+});
 
 function renderChart(item) {
   if (!chart) {
@@ -230,6 +265,158 @@ function renderChart(item) {
     },
     series,
   }, true);
+}
+
+function formatPValue(p) {
+  if (p == null) return "p = NA";
+  if (p < 0.0001) return "p < 0.0001";
+  return `p = ${p.toFixed(4)}`;
+}
+
+function renderSexChart(item) {
+  if (!sexChart) {
+    sexChart = echarts.init(document.getElementById("curves-sex-chart"));
+    window.addEventListener("resize", () => sexChart.resize());
+  }
+  const palette = chartPalette();
+  const order = SEX_ORDER.filter(key => item.sexes && item.sexes[key]);
+  const series = [];
+  const legendData = [];
+  const medianLines = [{ yAxis: 0.5 }];
+
+  order.forEach((key) => {
+    const block = item.sexes[key];
+    const color = palette.sex[key];
+    const name = `sex=${key}`;
+    legendData.push(name);
+
+    const lower = clampCurve(block.ci_lower);
+    const upper = clampCurve(block.ci_upper);
+    series.push({
+      name: `__ci_band_${key}`, type: "custom", silent: true, z: 1,
+      encode: { x: [0, 1], y: [2, 3] },
+      data: lower.slice(0, -1).map(([start, low], index) =>
+        [start, lower[index + 1][0], low, upper[index][1]]),
+      renderItem: (_params, api) => {
+        const top = api.coord([api.value(0), api.value(3)]);
+        const bottom = api.coord([api.value(1), api.value(2)]);
+        return { type: "rect", shape: {
+          x: top[0], y: top[1], width: bottom[0] - top[0], height: bottom[1] - top[1],
+        }, style: { fill: color, opacity: 0.18 } };
+      },
+    });
+
+    series.push({
+      name, type: "line", step: "end", symbol: "emptyCircle", showSymbol: false,
+      lineStyle: { width: 2, color }, itemStyle: { color },
+      data: clampCurve(block.points), emphasis: { focus: "series" }, z: 3,
+    });
+
+    const censors = block.censors.filter(([x]) => x <= 60);
+    if (censors.length) {
+      series.push({
+        name: `__censor_${key}`, type: "scatter", symbol: "path://M0,-6 L0,6 M-6,0 L6,0",
+        symbolSize: 9, itemStyle: { color: "transparent", borderColor: color, borderWidth: 1.5 },
+        data: censors, tooltip: { show: false }, legendHoverLink: false, z: 4,
+      });
+    }
+
+    if (block.median != null && block.median <= 60) {
+      medianLines.push({ xAxis: block.median, lineStyle: { color } });
+    }
+
+  });
+
+  // Median crosshair lines ride on the first curve series (grid 0).
+  const firstCurve = series.find(entry => /^sex=/.test(entry.name));
+  if (firstCurve) {
+    firstCurve.markLine = {
+      silent: true, symbol: "none",
+      lineStyle: { type: "dashed", color: palette.muted, width: 1 },
+      label: { show: false }, data: medianLines,
+    };
+  }
+
+  sexChart.setOption({
+    title: {
+      text: `${payload.start_year}-${payload.end_year}年${item.name}性別存活率曲線圖`,
+      subtext: `資料來源：癌症登記資料庫　${formatPValue(item.logrank_p)}`,
+      left: "center", top: 0,
+      textStyle: { color: palette.ink, fontSize: 18, fontWeight: 700 },
+      subtextStyle: { color: palette.muted, fontSize: 12 },
+    },
+    tooltip: {
+      trigger: "axis",
+      axisPointer: { type: "line", lineStyle: { color: palette.muted, type: "solid", width: 1 } },
+      backgroundColor: palette.surface, borderColor: palette.rule, borderWidth: 1,
+      textStyle: { color: palette.ink },
+      formatter: (params) => {
+        const rows = params.filter(entry => /^sex=/.test(entry.seriesName));
+        if (!rows.length) return "";
+        const head = `第 ${Number(rows[0].axisValue).toFixed(0)} 個月`;
+        return head + rows.map(entry =>
+          `<br/>${entry.marker}${entry.seriesName}: ${(entry.value[1] * 100).toFixed(1)}%`).join("");
+      },
+    },
+    toolbox: CHART_TOOLBOX,
+    legend: {
+      type: "plain", orient: "horizontal", left: "center", bottom: 2, data: legendData,
+      textStyle: { color: palette.muted, fontSize: 13, lineHeight: 22 },
+      itemWidth: 24, itemHeight: 14, itemGap: 8,
+    },
+    grid: { left: 16, right: 24, top: 90, bottom: 86, containLabel: true },
+    xAxis: {
+      type: "value", name: "追蹤月數（月）", min: 0, max: 60, interval: 12,
+      nameLocation: "middle", nameGap: 28, nameTextStyle: { color: palette.muted, fontSize: 13 },
+      axisLine: { lineStyle: { color: palette.rule } }, axisTick: { show: false },
+      axisLabel: { color: palette.muted, fontSize: 12 }, splitLine: { show: false },
+    },
+    yAxis: {
+      type: "value", name: "累積存活率", min: 0, max: 1,
+      nameGap: 18, nameLocation: "end", nameTextStyle: { color: palette.muted, fontSize: 13 },
+      axisLine: { show: false }, axisTick: { show: false },
+      axisLabel: { color: palette.muted, formatter: value => `${(value * 100).toFixed(0)}%` },
+      splitLine: { lineStyle: { color: palette.rule, type: "solid" } },
+    },
+    series,
+  }, true);
+  sexChart.resize();
+}
+
+function renderRiskChart(item) {
+  if (!riskChart) {
+    riskChart = echarts.init(document.getElementById("curves-risk-chart"));
+    window.addEventListener("resize", () => {
+      riskChart.resize();
+      if (activeView === "sex") renderRiskChart(currentItem());
+    });
+  }
+  const palette = chartPalette();
+  const order = SEX_ORDER.filter(key => item.sexes && item.sexes[key]);
+  const compact = riskChart.getWidth() < 420;
+  riskChart.setOption({
+    tooltip: { show: false },
+    grid: { left: 16, right: 16, top: 16, bottom: 52, containLabel: true },
+    xAxis: { type: "category", name: "追蹤月數（月）", nameLocation: "middle", nameGap: 26,
+      data: RISK_CHECKPOINTS.map(String), nameTextStyle: { color: palette.muted, fontSize: 13 },
+      axisLine: { lineStyle: { color: palette.rule } }, axisTick: { show: false },
+      axisLabel: { color: palette.muted, fontSize: 12 },
+      splitLine: { show: true, lineStyle: { color: palette.rule } } },
+    yAxis: { type: "category", data: order.map(key => `sex=${key}`).reverse(),
+      axisLine: { show: false }, axisTick: { show: false },
+      axisLabel: { color: palette.muted, fontSize: 13, margin: 14 },
+      splitLine: { show: true, lineStyle: { color: palette.rule } } },
+    series: order.map(key => ({
+      name: `sex=${key}`, type: "scatter", symbolSize: 2, silent: true,
+      itemStyle: { color: "transparent" },
+      data: RISK_CHECKPOINTS.map((month, index) => [String(month), `sex=${key}`, item.sexes[key].risk[index]]),
+      label: { show: true, position: "top", distance: -10, color: palette.surface,
+        fontSize: compact ? 11 : 13, fontWeight: 700,
+        backgroundColor: palette.sex[key], padding: compact ? [5, 5] : [6, 10],
+        borderRadius: 6, formatter: params => params.value[2] },
+    })),
+  }, true);
+  riskChart.resize();
 }
 
 function renderLifeTables(item) {

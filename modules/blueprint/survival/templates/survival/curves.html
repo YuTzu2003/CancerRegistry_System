@@ -44,13 +44,28 @@
   <div id="curves-results" class="curves-results" hidden>
     <div class="curves-pane">
       <div class="bg-white border border-secondary-subtle rounded shadow-sm p-4 mt-2 curves-card">
-        <select id="curves-cancer" class="form-select form-select-sm curves-cancer-select" aria-label="選擇癌別"></select>
-        <div id="curves-chart" class="curves-chart" role="img" aria-label="Kaplan–Meier 存活曲線圖"></div>
-        <section class="curves-life-panel">
-          <h2 id="curves-life-caption" class="curves-life-caption"></h2>
-          <div id="curves-life-tables"></div>
-        </section>
+        <div class="curves-head">
+          <select id="curves-cancer" class="form-select form-select-sm curves-cancer-select" aria-label="選擇癌別"></select>
+          <div class="curves-tabs" role="tablist" aria-label="分析切換">
+            <button type="button" class="curves-tab is-active" data-view="stage" role="tab" aria-selected="true">期別存活曲線</button>
+            <button type="button" class="curves-tab" data-view="sex" role="tab" aria-selected="false">性別存活曲線</button>
+          </div>
+        </div>
+        <div class="curves-view" data-view="stage">
+          <div id="curves-chart" class="curves-chart" role="img" aria-label="Kaplan–Meier 期別存活曲線圖"></div>
+          <section class="curves-life-panel">
+            <h2 id="curves-life-caption" class="curves-life-caption"></h2>
+            <div id="curves-life-tables"></div>
+          </section>
+        </div>
+        <div class="curves-view" data-view="sex" hidden>
+          <div id="curves-sex-chart" class="curves-chart curves-sex-chart" role="img" aria-label="Kaplan–Meier 性別存活曲線圖"></div>
+        </div>
       </div>
+      <section id="curves-risk-card" class="bg-white border border-secondary-subtle rounded shadow-sm p-4 mt-3 curves-card curves-risk-card" hidden>
+        <h2 class="curves-risk-title">Number at risk <span>各追蹤月份仍在風險中的人數</span></h2>
+        <div id="curves-risk-chart" class="curves-risk-chart" role="img" aria-label="依性別與追蹤月份分組的風險人數圖"></div>
+      </section>
     </div>
 
   </div>
