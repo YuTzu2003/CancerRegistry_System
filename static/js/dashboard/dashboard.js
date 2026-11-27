@@ -1922,7 +1922,9 @@ window.DashboardRenderer.renderStageDistributionReport = function(stageData, yea
         const titleOptions = { year: yearTitle, cancer: titleCancer, system: this.getStageSystemTitle(systemName) };
         const noteText = this.t('stageStatisticsNote', {
             analyzable: data.analyzable_count, unknown: data.unknown_count,
-            notApplicable: data.not_applicable_count, included: data.included_count
+            notApplicable: data.not_applicable_count,
+            excluded: data.unknown_count + data.not_applicable_count,
+            included: data.included_count
         });
         if (tableCaption) tableCaption.innerHTML = `${this.t('stageTableTitle', titleOptions)}${this.sourceLine()}`;
         if (chartCaption) chartCaption.textContent = this.t('stageFigureTitle', titleOptions);
@@ -2024,7 +2026,9 @@ window.DashboardRenderer.renderStageSexReport = function(stageData, yearTitle, c
         const sexLabel = sex => sex === '男性' ? this.t('male') : sex === '女性' ? this.t('female') : sex;
         const noteText = this.t('stageStatisticsNote', {
             analyzable: data.analyzable_count, unknown: data.unknown_count,
-            notApplicable: data.not_applicable_count, included: data.included_count
+            notApplicable: data.not_applicable_count,
+            excluded: data.unknown_count + data.not_applicable_count,
+            included: data.included_count
         });
         if (tableCaption) tableCaption.innerHTML = `${this.t('stageSexTableTitle', titleOptions)}${this.sourceLine()}`;
         if (chartCaption) chartCaption.textContent = this.t('stageSexFigureTitle', titleOptions);
@@ -2180,7 +2184,9 @@ window.DashboardRenderer.renderStageAgeReport = function(stageData, yearTitle, c
         const titleOptions = { year: yearTitle, cancer: titleCancer, system: this.getStageSystemTitle(systemName) };
         const noteText = this.t('stageStatisticsNote', {
             analyzable: data.analyzable_count, unknown: data.unknown_count,
-            notApplicable: data.not_applicable_count, included: data.included_count
+            notApplicable: data.not_applicable_count,
+            excluded: data.unknown_count + data.not_applicable_count,
+            included: data.included_count
         });
 
         if (tableCaption) tableCaption.innerHTML = `${this.t('stageAgeTableTitle', titleOptions)}${this.sourceLine()}`;

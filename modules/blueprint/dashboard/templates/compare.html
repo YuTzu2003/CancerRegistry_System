@@ -5,7 +5,7 @@
   <script src="/static/vendor/echarts/echarts.min.js"></script>
   <script src="/static/vendor/i18next/i18next.min.js"></script>
   <link rel="stylesheet" href="/static/css/dashboard/dashboard.css">
-  <link rel="stylesheet" href="/static/css/dashboard/dashboard_compare.css?v=20261029-surgery-table-layout">
+  <link rel="stylesheet" href="/static/css/dashboard/dashboard_compare.css?v=20261127-preview-header-spacing">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard/llm_task_panel.css') }}">
 {% if preview_task %}
   <style>
@@ -18,17 +18,15 @@
 {% endblock %}
 
 {% block content %}
-<div class="page-head">
+<div class="page-head{% if preview_task %} compare-preview-page-head{% endif %}">
   <div>
     <h1>年度比較</h1>
     <p class="lead">選擇基準期資料與比較期資料，檢視不同年度間的癌別統計分析結果。</p>
   </div>
-</div>
-{% if preview_task %}
-<div class="d-flex justify-content-end mb-4">
+  {% if preview_task %}
   <button type="button" class="btn btn-outline-secondary" onclick="window.location.assign('/dashboard/compare')">返回上一頁</button>
+  {% endif %}
 </div>
-{% endif %}
 
 <div class="compare-mode-bar" aria-label="比較模式">
   <span class="compare-label">比較模式</span>
@@ -320,6 +318,10 @@
       </details>
     </div>
   </div>
+  <div id="compareCancerTabsArea" class="d-none mb-3">
+    <div class="small text-secondary mb-2">癌別結果</div>
+    <div id="compareCancerTabs" class="d-flex flex-wrap justify-content-start gap-2"></div>
+  </div>
   <div id="compareResultStale" class="alert alert-warning d-none" role="status">
     <i class="bi bi-exclamation-triangle me-1"></i>分析條件已變更，請重新按下「開始比較」以更新結果。
   </div>
@@ -354,10 +356,10 @@
 <script id="comparisonPreviewData" type="application/json">{{ {"task": preview_task, "payload": preview_payload} | tojson }}</script>
 {% endif %}
 <script src="{{ url_for('static', filename='js/dashboard/compare_page.js') }}"></script>
-<script src="{{ url_for('static', filename='js/dashboard/dashboard_i18n.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard/dashboard_i18n.js', v='20261127-stage-note') }}"></script>
 <script src="{{ url_for('static', filename='js/core/echarts_data_view.js') }}"></script>
 <script src="{{ url_for('static', filename='js/dashboard/annual_report_renderer.js', v='20261112-stage-palette') }}"></script>
-<script src="{{ url_for('static', filename='js/dashboard/dashboard_compare.js', v='20261119-verified-comparison-summary') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard/dashboard_compare.js', v='20261127-stage-note') }}"></script>
 {% if not preview_task %}
 <script src="{{ url_for('static', filename='js/dashboard/llm_task_panel.js', v='20261029-comparison-progress') }}"></script>
 {% endif %}
