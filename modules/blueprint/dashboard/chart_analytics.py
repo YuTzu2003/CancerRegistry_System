@@ -859,20 +859,18 @@ def summarize_dashboard_file(filename, behavior="", cancers=None, year_start="",
         "confirmed_percent": case_data["confirmed_percent"],
     }
 
-def compare_dashboard_files(main_filename, target_filename, behavior="", cancers=None, compare_items=None,
-                            main_year="", target_year="", main_year_end="", target_year_end="",
-                            compare_mode="single", stage_options=None):
+def _compare_dashboard_selection(main_source, target_source, main_filename, target_filename,
+                                 main_cols, target_cols, behavior="", cancers=None,
+                                 compare_items=None, main_year="", target_year="",
+                                 main_year_end="", target_year_end="", compare_mode="single",
+                                 stage_options=None):
     main_end = main_year if compare_mode == "single" else (main_year_end or main_year)
     target_end = target_year if compare_mode == "single" else (target_year_end or target_year)
-    main_source = _read_dashboard_excel(main_filename)
-    target_source = _read_dashboard_excel(target_filename)
-    main_cols = get_column_names(main_source)
-    target_cols = get_column_names(target_source)
     main_filtered = filter_dashboard_data(
-        main_source, main_cols, cancers or [], main_year, main_end, behavior
+        main_source.copy(), main_cols, cancers or [], main_year, main_end, behavior
     )
     target_filtered = filter_dashboard_data(
-        target_source, target_cols, cancers or [], target_year, target_end, behavior
+        target_source.copy(), target_cols, cancers or [], target_year, target_end, behavior
     )
     no_data_message = "依目前選擇的年度、癌別與性態碼查無符合個案，無法進行年度比較。"
     if main_filtered.empty or target_filtered.empty:
@@ -923,3 +921,68 @@ def compare_dashboard_files(main_filename, target_filename, behavior="", cancers
             "annual_average": annual_average_diff,
         }
     }
+
+
+def compare_dashboard_sources(main_source, target_source, main_filename="main.xlsx",
+                              target_filename="target.xlsx", behavior="", cancers=None,
+                              compare_items=None, main_year="", target_year="",
+                              main_year_end="", target_year_end="", compare_mode="single",
+                              stage_options=None, report_cancers=None):
+    """Compare shared source frames and optionally return one result per cancer key."""
+    main_cols = get_column_names(main_source)
+    target_cols = get_column_names(target_source)
+    common_args = {
+        "main_source": main_source,
+        "target_source": target_source,
+        "main_filename": main_filename,
+        "target_filename": target_filename,
+        "main_cols": main_cols,
+        "target_cols": target_cols,
+        "behavior": behavior,
+        "compare_items": compare_items,
+        "main_year": main_year,
+        "target_year": target_year,
+        "main_year_end": main_year_end,
+        "target_year_end": target_year_end,
+        "compare_mode": compare_mode,
+        "stage_options": stage_options,
+    }
+    result = _compare_dashboard_selection(cancers=cancers, **common_args)
+
+    report_keys = []
+    for raw_key in report_cancers or []:
+        key = str(raw_key or "").strip()
+        if key and key not in report_keys:
+            report_keys.append(key)
+    if report_keys:
+        result["reports"] = [
+            {
+                "key": key,
+                "data": _compare_dashboard_selection(cancers=[key], **common_args),
+            }
+            for key in report_keys
+        ]
+    return result
+
+
+def compare_dashboard_files(main_filename, target_filename, behavior="", cancers=None, compare_items=None,
+                            main_year="", target_year="", main_year_end="", target_year_end="",
+                            compare_mode="single", stage_options=None, report_cancers=None):
+    main_source = _read_dashboard_excel(main_filename)
+    target_source = _read_dashboard_excel(target_filename)
+    return compare_dashboard_sources(
+        main_source,
+        target_source,
+        main_filename,
+        target_filename,
+        behavior,
+        cancers,
+        compare_items,
+        main_year,
+        target_year,
+        main_year_end,
+        target_year_end,
+        compare_mode,
+        stage_options,
+        report_cancers,
+    )

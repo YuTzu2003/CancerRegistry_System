@@ -139,6 +139,16 @@ def _get_cancer_name_translations():
                 }
     return translations
 
+
+def _decorate_comparison_reports(result, translations=None):
+    translations = translations or _get_cancer_name_translations()
+    for report in result.get("reports", []) if isinstance(result, dict) else []:
+        key = str(report.get("key") or "").strip()
+        names = translations.get(key, {})
+        report["title"] = names.get("zh") or key or "癌症"
+        report["title_en"] = names.get("en") or names.get("zh") or key or "Cancer"
+    return result
+
 @dashboard_bp.route("/dashboard")
 @login_required
 def dashboard():
@@ -830,10 +840,13 @@ def compare_dashboard_files_route():
     compare_mode = str(data.get("compare_mode", "single")).strip()
     behavior = data.get("behavior", "")
     cancers = data.get("cancers", [])
+    report_cancers = data.get("report_cancers", [])
     compare_items = data.get("compare_items", [])
     stage_options = data.get("stage_options", [])
     if not isinstance(compare_items, list):
         return jsonify({"ok": False, "error": "分析項目格式錯誤"}), 400
+    if not isinstance(report_cancers, list):
+        return jsonify({"ok": False, "error": "癌別結果格式錯誤"}), 400
     if not isinstance(stage_options, list):
         return jsonify({"ok": False, "error": "期別選項格式錯誤"}), 400
     stage_options = [
@@ -871,6 +884,11 @@ def compare_dashboard_files_route():
 
     try:
         from modules.blueprint.dashboard.chart_analytics import compare_dashboard_files, get_dashboard_file_years
+        translations = _get_cancer_name_translations()
+        report_cancers = list(dict.fromkeys(
+            key for key in (str(value or "").strip() for value in report_cancers)
+            if key in translations
+        ))
         main_years = get_dashboard_file_years(main_file["storage_path"])
         target_years = get_dashboard_file_years(target_file["storage_path"])
         if (int(main_year) not in main_years or int(main_year_end) not in main_years
@@ -879,8 +897,10 @@ def compare_dashboard_files_route():
 
         result = compare_dashboard_files(
             main_file["storage_path"], target_file["storage_path"], behavior, cancers, compare_items,
-            main_year, target_year, main_year_end, target_year_end, compare_mode, stage_options
+            main_year, target_year, main_year_end, target_year_end, compare_mode, stage_options,
+            report_cancers,
         )
+        _decorate_comparison_reports(result, translations)
         return jsonify({"ok": True, "data": result}), 200
     except Exception as e:
         logging.error(f"Error comparing dashboard files: {e}")

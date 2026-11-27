@@ -28,6 +28,8 @@
   let targetYears = [];
   let hasRenderedResult = false;
   let lastComparisonData = null;
+  let comparisonReports = [];
+  let activeComparisonReport = null;
   let activeAiNarrativeItem = '';
   let aiNarrativeRequestId = 0;
   let activeResultIndex = 0;
@@ -182,11 +184,21 @@
     return selectedCompareStageOptions().options.map(item => item.option);
   }
 
-  function comparisonResultItems() {
-    const stageOptions = new Set(selectedStageReportOptions());
+  function availableStageReportOptions(data) {
+    const available = new Set([
+      ...(data?.analysis_data?.main?.stageReports || []).map(report => report.option),
+      ...(data?.analysis_data?.target?.stageReports || []).map(report => report.option)
+    ]);
+    return selectedStageReportOptions().filter(option => available.has(option));
+  }
+
+  function comparisonResultItems(data) {
+    const selectedStageOptions = new Set(selectedStageReportOptions());
+    const availableStageOptions = new Set(availableStageReportOptions(data));
     let stageGroupAdded = false;
     return selectedCompareItems().reduce((items, item) => {
-      if (!stageOptions.has(item)) return [...items, item];
+      if (!selectedStageOptions.has(item)) return [...items, item];
+      if (!availableStageOptions.has(item)) return items;
       if (stageGroupAdded) return items;
       stageGroupAdded = true;
       return [...items, stageResultGroupItem];
@@ -263,6 +275,12 @@
 
   function selectedCancerValues() {
     return Array.from(window.selectedCancers || []);
+  }
+
+  function selectedCancerReportKeys() {
+    const displayKeys = Array.from(window.dashboardSelectedCancerDisplayKeys || []);
+    if (displayKeys.length) return displayKeys;
+    return selectedCancerValues();
   }
 
   function updateCompareStageOptions() {
@@ -587,7 +605,7 @@
     document.querySelectorAll('.compare-result-tab').forEach((button, buttonIndex) => {
       button.classList.toggle('active', buttonIndex === index);
     });
-    const stageOptions = selectedStageReportOptions();
+    const stageOptions = availableStageReportOptions(data);
     const isStageGroup = item === stageResultGroupItem;
     if (isStageGroup && !stageOptions.includes(activeStageReportOption)) {
       activeStageReportOption = stageOptions[0] || '';
@@ -1087,7 +1105,7 @@
   }
 
   // 比較頁 LLM 敘述：組裝資料、快取、重新產生與任務預覽同步。
-  function buildAiComparisonPayload(data, analysisItem) {
+  function buildAiComparisonPayload(data, analysisItem, report = activeComparisonReport) {
     const pickAnalysis = analysis => {
       const selectedAnalysis = {};
       if (analysisItem === '性別年齡分佈') selectedAnalysis.gender_age = analysis?.genderAgeData || {};
@@ -1119,7 +1137,7 @@
       comparison_direction: `${data.target?.year_label || '比較期年度'}相較於${data.main?.year_label || '基準期年度'}`,
       selected_conditions: {
         behavior: behavior.selectedOptions[0]?.textContent?.trim() || '',
-        cancer: selectedCancerTitle(),
+        cancer: report?.title || selectedCancerTitle(),
         analysis_item: analysisItem
       },
       baseline: {
@@ -1149,19 +1167,28 @@
     const stageSystem = analysisItem === '期別與首次療程'
       ? `|${activeTreatmentStageSystem}`
       : analysisItem === '期別與手術術式' ? `|${activeSurgeryTableKey}` : '';
-    return `${window.DashboardI18n?.getLanguage() || 'zh-TW'}|${analysisItem}${stageSystem}`;
+    return `${window.DashboardI18n?.getLanguage() || 'zh-TW'}|${activeComparisonReport?.key || ''}|${analysisItem}${stageSystem}`;
+  }
+
+  function narrativeFieldKey(analysisItem, stageSystem = null) {
+    const detail = stageSystem !== null
+      ? stageSystem
+      : analysisItem === '期別與首次療程'
+        ? activeTreatmentStageSystem
+        : analysisItem === '期別與手術術式' ? activeSurgeryTableKey : '';
+    return `${analysisItem}|${detail || ''}`;
   }
 
   function previewNarrativeKey(analysisItem) {
-    const stageSystem = analysisItem === '期別與首次療程'
-      ? activeTreatmentStageSystem
-      : analysisItem === '期別與手術術式' ? activeSurgeryTableKey : '';
-    return `${analysisItem}|${stageSystem || ''}`;
+    return `${activeComparisonReport?.key || ''}::${narrativeFieldKey(analysisItem)}`;
   }
 
   function previewNarrativeItemId(analysisItem) {
-    const fieldKey = previewNarrativeKey(analysisItem);
-    return comparisonPreview?.payload?.items?.find(item => item.field_key === fieldKey)?.item_id || '';
+    const fieldKey = narrativeFieldKey(analysisItem);
+    const reportKey = activeComparisonReport?.key || '';
+    return comparisonPreview?.payload?.items?.find(item =>
+      (item.report_key || '') === reportKey && item.field_key === fieldKey
+    )?.item_id || '';
   }
 
   function regeneratePreviewNarrative() {
@@ -1189,7 +1216,9 @@
   function updatePreviewNarratives(task) {
     previewNarratives.clear();
     (task?.result || []).forEach(entry => {
-      if (entry?.field_key) previewNarratives.set(entry.field_key, entry.result || {});
+      if (!entry?.field_key) return;
+      const item = comparisonPreview?.payload?.items?.find(candidate => candidate.item_id === entry.custom_id);
+      previewNarratives.set(`${item?.report_key || ''}::${entry.field_key}`, entry.result || {});
     });
   }
   function fetchAiNarrative(data, analysisItem, force = false) {
@@ -1198,7 +1227,7 @@
       if (result?.success) {
         const stageSystemAtRequest = analysisItem === '期別與首次療程' ? activeTreatmentStageSystem : analysisItem === '期別與手術術式' ? activeSurgeryTableKey : '';
         const insights = result.insights || {};
-        Object.entries(insights).forEach(([language, insight]) => aiNarrativeCache.set(`${language}|${analysisItem}${stageSystemAtRequest ? `|${stageSystemAtRequest}` : ''}`, insight));
+        Object.entries(insights).forEach(([language, insight]) => aiNarrativeCache.set(`${language}|${activeComparisonReport?.key || ''}|${analysisItem}${stageSystemAtRequest ? `|${stageSystemAtRequest}` : ''}`, insight));
         return Promise.resolve(insights[window.DashboardI18n?.getLanguage() || 'zh-TW'] || result.insight || 'LLM 敘述正在處理中…');
       }
       const status = comparisonPreview?.task?.Status || comparisonPreview?.task?.status;
@@ -1208,7 +1237,7 @@
     }
     const stageSystemAtRequest = analysisItem === '期別與首次療程' ? activeTreatmentStageSystem : analysisItem === '期別與手術術式' ? activeSurgeryTableKey : '';
     const language = window.DashboardI18n?.getLanguage() || 'zh-TW';
-    const cacheKey = `${language}|${analysisItem}${stageSystemAtRequest ? `|${stageSystemAtRequest}` : ''}`;
+    const cacheKey = `${language}|${activeComparisonReport?.key || ''}|${analysisItem}${stageSystemAtRequest ? `|${stageSystemAtRequest}` : ''}`;
     if (!force && aiNarrativeCache.has(cacheKey)) {
       return Promise.resolve(aiNarrativeCache.get(cacheKey));
     }
@@ -1237,7 +1266,7 @@
         if (!result.success) throw new Error(result.error || '語言模型分析產生失敗');
         const insight = result.insight || '語言模型未回傳分析內容。';
         const insights = result.insights || {};
-        Object.entries(insights).forEach(([insightLanguage, value]) => aiNarrativeCache.set(`${insightLanguage}|${analysisItem}${stageSystemAtRequest ? `|${stageSystemAtRequest}` : ''}`, value));
+        Object.entries(insights).forEach(([insightLanguage, value]) => aiNarrativeCache.set(`${insightLanguage}|${activeComparisonReport?.key || ''}|${analysisItem}${stageSystemAtRequest ? `|${stageSystemAtRequest}` : ''}`, value));
         aiNarrativeCache.set(cacheKey, insight);
         return insight;
       })
@@ -1366,9 +1395,56 @@
     scheduleCompareChartResize(chart, container);
   }
 
+  function comparisonReportTitle(report) {
+    return isEnglish()
+      ? (report?.title_en || report?.title || report?.key || 'Cancer')
+      : (report?.title || report?.key || '癌症');
+  }
+
+  function usableComparisonReports(data) {
+    if (Array.isArray(data?.reports)) {
+      return data.reports.filter(report => report?.data && !report.data.noDataWarning);
+    }
+    if (!data || data.noDataWarning) return [];
+    return [{
+      key: '',
+      title: window.dashboardSelectedCancerTitle || '癌症',
+      title_en: selectedCancerEnglishTitle(),
+      data
+    }];
+  }
+
+  function renderComparisonCancerTabs() {
+    const area = document.getElementById('compareCancerTabsArea');
+    const container = document.getElementById('compareCancerTabs');
+    if (!area || !container) return;
+    container.replaceChildren();
+    if (comparisonReports.length < 2) {
+      area.classList.add('d-none');
+      return;
+    }
+    comparisonReports.forEach(report => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'btn btn-outline-dark btn-sm';
+      button.textContent = comparisonReportTitle(report);
+      button.dataset.reportKey = report.key || '';
+      button.classList.toggle('active', report === activeComparisonReport);
+      button.addEventListener('click', () => {
+        if (report === activeComparisonReport) return;
+        activeComparisonReport = report;
+        aiNarrativeRequestId += 1;
+        renderComparisonCancerTabs();
+        renderComparisonData(report.data);
+      });
+      container.appendChild(button);
+    });
+    area.classList.remove('d-none');
+  }
+
   // 比較結果渲染與差異摘要卡片。
-  function renderResult(data) {
-    const items = comparisonResultItems();
+  function renderComparisonData(data) {
+    const items = comparisonResultItems(data);
     // Older saved comparisons may contain the former cross-product of manuals
     // and stage systems; hide combinations the registry rules do not support.
     ['main', 'target'].forEach(period => {
@@ -1382,8 +1458,9 @@
     resultStale.classList.add('d-none');
     renderRangeTrend(data);
     const tabs = document.getElementById('compareResultTabs');
+    const selectedIndex = Math.min(activeResultIndex, Math.max(items.length - 1, 0));
     tabs.innerHTML = items.map((item, index) => `
-      <button type="button" class="compare-result-tab ${index === 0 ? 'active' : ''}" data-index="${index}">${comparisonItemTitle(item)}</button>
+      <button type="button" class="compare-result-tab ${index === selectedIndex ? 'active' : ''}" data-index="${index}">${comparisonItemTitle(item)}</button>
     `).join('');
     tabs.onclick = event => {
       const button = event.target.closest('.compare-result-tab');
@@ -1393,9 +1470,19 @@
       renderAiNarrative(data, activeComparisonItem(items[index]));
     };
 
-    if (items.length > 0) renderResultItem(data, items[0], 0);
+    if (items.length > 0) renderResultItem(data, items[selectedIndex], selectedIndex);
     resultBox.classList.remove('d-none');
-    if (items.length > 0) renderAiNarrative(data, activeComparisonItem(items[0]));
+    if (items.length > 0) renderAiNarrative(data, activeComparisonItem(items[selectedIndex]));
+  }
+
+  function renderResult(data) {
+    const previousKey = activeComparisonReport?.key || '';
+    comparisonReports = usableComparisonReports(data);
+    activeComparisonReport = comparisonReports.find(report => (report.key || '') === previousKey)
+      || comparisonReports[0]
+      || null;
+    renderComparisonCancerTabs();
+    if (activeComparisonReport) renderComparisonData(activeComparisonReport.data);
   }
 
   window.DashboardCompare = {
@@ -1406,8 +1493,9 @@
       if (narrativeHeading) narrativeHeading.textContent = t('llmInsight');
       const retryButton = document.getElementById('btnRetryAiNarrative');
       if (retryButton) retryButton.innerHTML = `<i class="bi bi-arrow-clockwise me-1"></i>${t('regenerateInsight')}`;
+      renderComparisonCancerTabs();
       if (!lastComparisonData || !hasRenderedResult) return;
-      const items = comparisonResultItems();
+      const items = comparisonResultItems(lastComparisonData);
       document.querySelectorAll('#compareResultTabs .compare-result-tab').forEach((button, index) => {
         if (items[index]) button.textContent = comparisonItemTitle(items[index]);
       });
@@ -1446,6 +1534,8 @@
     });
     hasRenderedResult = false;
     lastComparisonData = null;
+    comparisonReports = [];
+    activeComparisonReport = null;
     activeAiNarrativeItem = '';
     aiNarrativeRequestId += 1;
     aiNarrativeCache.clear();
@@ -1454,6 +1544,8 @@
     document.getElementById('compareResultSummary').replaceChildren();
     document.getElementById('compareResultTabs').replaceChildren();
     document.getElementById('compareResultPanel').replaceChildren();
+    document.getElementById('compareCancerTabs')?.replaceChildren();
+    document.getElementById('compareCancerTabsArea')?.classList.add('d-none');
     document.getElementById('compareAiNarrative').classList.add('d-none');
     document.getElementById('compareAiNarrativeText').textContent = '';
 
@@ -1594,6 +1686,7 @@
   function applyComparisonPreviewState() {
     const state = comparisonPreview?.payload?.comparison_state || {};
     window.selectedCancers = new Set(state.cancers || []);
+    window.dashboardSelectedCancerDisplayKeys = state.report_cancers || state.cancers || [];
     window.dashboardSelectedCancerTitle = state.cancer_title || 'XX';
     const modeInput = Array.from(document.querySelectorAll('input[name="compareMode"]')).find(input => input.value === state.compare_mode);
     const typeInput = Array.from(document.querySelectorAll('input[name="compareType"]')).find(input => input.value === state.compare_type);
@@ -1687,6 +1780,8 @@
     [mainPreview, targetPreview].forEach(preview => preview.classList.add('d-none'));
     document.querySelectorAll('.compare-preview-toggle').forEach(button => { button.textContent = '查看資料預覽'; });
     resultBox.classList.add('d-none');
+    comparisonReports = [];
+    activeComparisonReport = null;
     runButton.disabled = true;
     runButton.textContent = '正在建立任務…';
     const compareItems = selectedCompareItems();
@@ -1711,6 +1806,7 @@
         compare_mode: selectedCompareMode(),
         behavior: behavior.value,
         cancers: selectedCancerValues(),
+        report_cancers: selectedCancerReportKeys(),
         compare_type: selectedCompareType(),
         compare_items: compareItems,
         stage_options: stageOptions
@@ -1730,6 +1826,8 @@
           document.getElementById('compareResultSummary').replaceChildren();
           document.getElementById('compareResultTabs').replaceChildren();
           document.getElementById('compareResultPanel').replaceChildren();
+          document.getElementById('compareCancerTabs')?.replaceChildren();
+          document.getElementById('compareCancerTabsArea')?.classList.add('d-none');
           document.getElementById('compareAiNarrative').classList.add('d-none');
           document.getElementById('compareAiNarrativeText').textContent = '';
           showAlert('查無符合資料', data.data.noDataWarning);
@@ -1737,55 +1835,60 @@
         }
         const items = selectedCompareItems();
         const selectedStageOptions = selectedCompareStageOptions();
-        const stageOptions = [...selectedStageOptions.options];
-        if (items.includes('期別與首次療程') || items.includes('期別與手術術式')) {
-          treatmentStageOptions().forEach(option => {
-            if (!stageOptions.some(selected => selected.system === option.system && selected.option === option.option)) {
-              stageOptions.push(option);
-            }
-          });
-        }
-        const treatmentSystems = Array.from(new Set([
-          ...(data.data.analysis_data?.main?.stageFirstCourseData || []).map(table => table.system),
-          ...(data.data.analysis_data?.target?.stageFirstCourseData || []).map(table => table.system)
-        ]));
+        const selectedStageItems = new Set(selectedStageOptions.options.map(option => option.option));
         const originalTreatmentSystem = activeTreatmentStageSystem;
-        const surgeryTables = [
-          ...(data.data.analysis_data?.main?.stageSurgeryData || []),
-          ...(data.data.analysis_data?.target?.stageSurgeryData || [])
-        ];
-        const surgeryKeyOf = table => `${table.manual_key || 'unknown'}::${table.system || 'stage'}`;
-        if (!surgeryTables.some(table => surgeryKeyOf(table) === activeSurgeryTableKey)) {
-          activeSurgeryTableKey = surgeryKeyOf(surgeryTables[0] || {});
-        }
         const originalSurgeryKey = activeSurgeryTableKey;
-        const surgeryKeys = Array.from(new Set(surgeryTables.map(surgeryKeyOf)));
-        const narrativeRequests = items.flatMap(item => {
-          if (item === '期別與手術術式') return surgeryKeys.length
-            ? surgeryKeys.map(surgeryKey => ({ item, treatmentStageSystem: '', surgeryKey }))
-            : [{ item, treatmentStageSystem: '', surgeryKey: '' }];
-          if (item !== '期別與首次療程') return [{ item, treatmentStageSystem: '', surgeryKey: '' }];
-          return treatmentSystems.length
-            ? treatmentSystems.map(treatmentStageSystem => ({ item, treatmentStageSystem, surgeryKey: '' }))
-            : [{ item, treatmentStageSystem: '', surgeryKey: '' }];
-        });
-        const jobItems = narrativeRequests.map(({ item, treatmentStageSystem, surgeryKey }, index) => {
-          activeTreatmentStageSystem = treatmentStageSystem;
-          activeSurgeryTableKey = surgeryKey || originalSurgeryKey;
-          const comparisonPayload = buildAiComparisonPayload(data.data, item);
-          return {
-            item_id: `comparison-${index + 1}`,
-            field_key: previewNarrativeKey(item),
-            analysis_item: item,
-            comparison_direction: comparisonPayload.comparison_direction,
-            selected_conditions: comparisonPayload.selected_conditions,
-            baseline: comparisonPayload.baseline,
-            comparison: comparisonPayload.comparison,
-            total_difference: comparisonPayload.total_difference,
-            verified_difference: comparisonPayload.verified_difference,
-            mode_ai: modeAi.value,
-            language: window.DashboardI18n?.getLanguage() || 'zh-TW'
-          };
+        const reportEntries = usableComparisonReports(data.data);
+        if (!reportEntries.length) {
+          showAlert('查無符合資料', '所選癌別在基準期或比較期缺少可比較資料。');
+          return;
+        }
+        const surgeryKeyOf = table => `${table.manual_key || 'unknown'}::${table.system || 'stage'}`;
+        const jobItems = reportEntries.flatMap((report, reportIndex) => {
+          const reportData = report.data;
+          const availableStageItems = new Set([
+            ...(reportData.analysis_data?.main?.stageReports || []).map(stageReport => stageReport.option),
+            ...(reportData.analysis_data?.target?.stageReports || []).map(stageReport => stageReport.option)
+          ]);
+          const reportItems = items.filter(item => !selectedStageItems.has(item) || availableStageItems.has(item));
+          const treatmentSystems = Array.from(new Set([
+            ...(reportData.analysis_data?.main?.stageFirstCourseData || []).map(table => table.system),
+            ...(reportData.analysis_data?.target?.stageFirstCourseData || []).map(table => table.system)
+          ]));
+          const surgeryTables = [
+            ...(reportData.analysis_data?.main?.stageSurgeryData || []),
+            ...(reportData.analysis_data?.target?.stageSurgeryData || [])
+          ];
+          const surgeryKeys = Array.from(new Set(surgeryTables.map(surgeryKeyOf)));
+          const narrativeRequests = reportItems.flatMap(item => {
+            if (item === '期別與手術術式') return surgeryKeys.length
+              ? surgeryKeys.map(surgeryKey => ({ item, treatmentStageSystem: '', surgeryKey }))
+              : [{ item, treatmentStageSystem: '', surgeryKey: '' }];
+            if (item !== '期別與首次療程') return [{ item, treatmentStageSystem: '', surgeryKey: '' }];
+            return treatmentSystems.length
+              ? treatmentSystems.map(treatmentStageSystem => ({ item, treatmentStageSystem, surgeryKey: '' }))
+              : [{ item, treatmentStageSystem: '', surgeryKey: '' }];
+          });
+          return narrativeRequests.map(({ item, treatmentStageSystem, surgeryKey }, itemIndex) => {
+            activeTreatmentStageSystem = treatmentStageSystem;
+            activeSurgeryTableKey = surgeryKey;
+            const comparisonPayload = buildAiComparisonPayload(reportData, item, report);
+            return {
+              item_id: `comparison-${reportIndex + 1}-${itemIndex + 1}`,
+              report_key: report.key || '',
+              report_title: report.title || report.key || '癌症',
+              field_key: narrativeFieldKey(item, treatmentStageSystem || surgeryKey || ''),
+              analysis_item: item,
+              comparison_direction: comparisonPayload.comparison_direction,
+              selected_conditions: comparisonPayload.selected_conditions,
+              baseline: comparisonPayload.baseline,
+              comparison: comparisonPayload.comparison,
+              total_difference: comparisonPayload.total_difference,
+              verified_difference: comparisonPayload.verified_difference,
+              mode_ai: modeAi.value,
+              language: window.DashboardI18n?.getLanguage() || 'zh-TW'
+            };
+          });
         });
         activeTreatmentStageSystem = originalTreatmentSystem;
         activeSurgeryTableKey = originalSurgeryKey;
@@ -1795,7 +1898,8 @@
           compare_items: items,
           stage_selection: selectedStageOptions,
           cancers: selectedCancerValues(),
-          cancer_title: selectedCancerTitle(),
+          report_cancers: selectedCancerReportKeys(),
+          cancer_title: window.dashboardSelectedCancerTitle || 'XX',
           behavior: behavior.value,
           mode_ai: modeAi.value
         };
@@ -1848,6 +1952,9 @@
 
 
   function selectedCancerEnglishTitle() {
+    if (activeComparisonReport) {
+      return activeComparisonReport.title_en || activeComparisonReport.title || activeComparisonReport.key || 'Cancer';
+    }
     const translations = window.dashboardCancerNameTranslations || {};
     const values = selectedCancerValues();
     if (values.includes('All_Cancers')) return translations.All_Cancers?.en || 'All cancers';
@@ -1880,6 +1987,9 @@
 
 
   function selectedCancerTitle() {
+    if (activeComparisonReport) {
+      return activeComparisonReport.title || activeComparisonReport.key || 'XX';
+    }
     return window.dashboardSelectedCancerTitle && window.dashboardSelectedCancerTitle !== 'XX'
       ? window.dashboardSelectedCancerTitle
       : 'XX';
@@ -2724,6 +2834,7 @@
       analyzable: report.analyzable_count,
       unknown: report.unknown_count,
       notApplicable: report.not_applicable_count,
+      excluded: Number(report.unknown_count || 0) + Number(report.not_applicable_count || 0),
       included: report.included_count
     });
   }
@@ -3281,7 +3392,6 @@
     );
     const main = findReport('main');
     const target = findReport('target');
-    const signed = value => Number(value) > 0 ? `+${Number(value)}` : String(Number(value));
     const valueClass = value => Number(value) > 0 ? 'is-up' : Number(value) < 0 ? 'is-down' : 'is-flat';
     const shareMap = report => Object.fromEntries(report.stage_labels.map((label, index) => [
       label,
@@ -3300,24 +3410,24 @@
     const notApplicableDiff = target.not_applicable_count - main.not_applicable_count;
     document.getElementById('compareResultSummary').innerHTML = `
       <div class="compare-summary-card">
-        <div class="compare-summary-label">有效期別個案數差異</div>
-        <div class="compare-summary-value ${valueClass(includedDiff)}">${signed(includedDiff)}人</div>
-        <div class="compare-summary-period-detail">${main.included_count}人 → ${target.included_count}人</div>
+        <div class="compare-summary-label">${summaryText('有效期別個案數差異', 'Valid Stage Case Difference')}</div>
+        <div class="compare-summary-value ${valueClass(includedDiff)}">${changeNumberText(includedDiff, '人')}</div>
+        <div class="compare-summary-period-detail">${summaryCount(main.included_count)} → ${summaryCount(target.included_count)}</div>
       </div>
       <div class="compare-summary-card">
-        <div class="compare-summary-label">期別比例差異最大</div>
+        <div class="compare-summary-label">${summaryText('期別比例差異最大', 'Largest Stage Proportion Difference')}</div>
         <div class="compare-summary-value ${valueClass(largest.difference)}">${escapeHtml(largest.label)} ${largest.difference > 0 ? '+' : largest.difference < 0 ? '−' : ''}${Math.abs(largest.difference).toFixed(1)}%</div>
         <div class="compare-summary-period-detail">${Number(mainShares[largest.label] || 0).toFixed(1)}% → ${Number(targetShares[largest.label] || 0).toFixed(1)}%</div>
       </div>
       <div class="compare-summary-card">
-        <div class="compare-summary-label">分期不明個案差異</div>
-        <div class="compare-summary-value ${valueClass(unknownDiff)}">${signed(unknownDiff)}人</div>
-        <div class="compare-summary-period-detail">${main.unknown_count}人 → ${target.unknown_count}人</div>
+        <div class="compare-summary-label">${summaryText('分期不明個案差異', 'Unknown Stage Case Difference')}</div>
+        <div class="compare-summary-value ${valueClass(unknownDiff)}">${changeNumberText(unknownDiff, '人')}</div>
+        <div class="compare-summary-period-detail">${summaryCount(main.unknown_count)} → ${summaryCount(target.unknown_count)}</div>
       </div>
       <div class="compare-summary-card">
-        <div class="compare-summary-label">分期不適用個案差異</div>
-        <div class="compare-summary-value ${valueClass(notApplicableDiff)}">${signed(notApplicableDiff)}人</div>
-        <div class="compare-summary-period-detail">${main.not_applicable_count}人 → ${target.not_applicable_count}人</div>
+        <div class="compare-summary-label">${summaryText('分期不適用個案差異', 'Non-applicable Stage Case Difference')}</div>
+        <div class="compare-summary-value ${valueClass(notApplicableDiff)}">${changeNumberText(notApplicableDiff, '人')}</div>
+        <div class="compare-summary-period-detail">${summaryCount(main.not_applicable_count)} → ${summaryCount(target.not_applicable_count)}</div>
       </div>`;
   }
 
