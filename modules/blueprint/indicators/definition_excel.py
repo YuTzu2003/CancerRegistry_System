@@ -173,7 +173,6 @@ def read_definition_workbook(uploaded_file, base_definition):
                 raise ValueError(f"{get_cancer_label(cancer_key)} 指標 {number} 的「{column}」超過 3000 字。")
             rule[field] = value
 
-    expected = {(cancer_key, number) for cancer_key, rules in definition.items() for number in rules}
     if not seen:
         raise ValueError("請先刪除範例列，再填入至少一項要匯入的指標。")
 

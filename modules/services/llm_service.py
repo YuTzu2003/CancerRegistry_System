@@ -1,15 +1,118 @@
 from __future__ import annotations
 from dataclasses import dataclass
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 import json
 import logging
-from typing import Mapping, Sequence
+import os
+import random
+import time
+from typing import Callable, Mapping, Sequence
+from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
+import openai
 from openai import OpenAI
 from modules.config import BaseConfig
 
 _client_cache = None
 _client_settings = None
+
+# --- Transient-failure retry (項目 11) --------------------------------------
+# Bounded exponential backoff with full jitter for rate limits (429), transient
+# 5xx, and connection/timeout errors, for both the OpenAI client path and the
+# Azure Responses HTTP path. Honours a Retry-After header when the server sends
+# one. Non-transient errors (e.g. 400/401) are raised immediately. Defaults are
+# overridable by env; no external dependency (tenacity) is required.
+_RETRYABLE_STATUS = {429, 500, 502, 503, 504}
+
+
+def _retry_env_int(name, default):
+    value = os.getenv(name)
+    try:
+        return max(1, int(value)) if value and value.strip() else default
+    except ValueError:
+        return default
+
+
+def _retry_env_float(name, default):
+    value = os.getenv(name)
+    try:
+        return max(0.0, float(value)) if value and value.strip() else default
+    except ValueError:
+        return default
+
+
+LLM_MAX_ATTEMPTS = _retry_env_int("LLM_MAX_ATTEMPTS", 4)      # total tries incl. first
+LLM_RETRY_BASE_DELAY = _retry_env_float("LLM_RETRY_BASE_DELAY", 0.5)  # seconds
+LLM_RETRY_MAX_DELAY = _retry_env_float("LLM_RETRY_MAX_DELAY", 20.0)   # seconds cap
+
+
+def _status_code(error):
+    code = getattr(error, "status_code", None)
+    if code is None:
+        code = getattr(error, "code", None)  # urllib.error.HTTPError
+    return code if isinstance(code, int) else None
+
+
+def _is_retryable(error):
+    if isinstance(error, (openai.APIConnectionError, openai.APITimeoutError, URLError)) \
+            and not isinstance(error, HTTPError):
+        return True
+    return _status_code(error) in _RETRYABLE_STATUS
+
+
+def _retry_after_seconds(error):
+    """Return the Retry-After value in seconds if the server provided one."""
+    headers = getattr(getattr(error, "response", None), "headers", None)
+    if headers is None:
+        headers = getattr(error, "headers", None)  # urllib.error.HTTPError
+    if headers is None:
+        return None
+    raw = headers.get("Retry-After")
+    if not raw:
+        return None
+    try:
+        return max(0.0, float(raw))
+    except (TypeError, ValueError):
+        pass
+    try:  # HTTP-date form, e.g. "Wed, 21 Oct 2026 07:28:00 GMT"
+        when = parsedate_to_datetime(raw)
+    except (TypeError, ValueError):
+        return None
+    if when is None:
+        return None
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+    return max(0.0, (when - datetime.now(timezone.utc)).total_seconds())
+
+
+def _backoff_delay(attempt):
+    """Full-jitter backoff for a 1-based attempt number."""
+    capped = min(LLM_RETRY_MAX_DELAY, LLM_RETRY_BASE_DELAY * (2 ** (attempt - 1)))
+    return random.uniform(0, capped)
+
+
+def _retry_transient(operation: Callable, *, sleep: Callable | None = None):
+    sleep = sleep or time.sleep
+    last_error = None
+    for attempt in range(1, LLM_MAX_ATTEMPTS + 1):
+        try:
+            return operation()
+        except Exception as error:  # noqa: BLE001 - reclassified below
+            last_error = error
+            if attempt >= LLM_MAX_ATTEMPTS or not _is_retryable(error):
+                raise
+            delay = _retry_after_seconds(error)
+            if delay is None:
+                delay = _backoff_delay(attempt)
+            logging.warning(
+                "LLM call failed (attempt %s/%s, status=%r); retrying in %.2fs",
+                attempt, LLM_MAX_ATTEMPTS, _status_code(error), delay,
+            )
+            sleep(delay)
+    raise last_error  # pragma: no cover - loop always returns or raises above
+# ----------------------------------------------------------------------------
 
 @dataclass(frozen=True)
 class LLMSettings:
@@ -47,10 +150,13 @@ def get_llm_client(settings: LLMSettings | None = None):
     settings = settings or get_llm_settings()
     if _client_cache is not None and _client_settings == settings:
         return _client_cache, settings.model
+    # max_retries=0 disables the SDK's own retry loop so _retry_transient is the
+    # single retry layer (otherwise LLM_MAX_ATTEMPTS is not the real ceiling and
+    # the SDK would also retry 408/409 outside this module's policy).
     if settings.provider == "openai" and not settings.base_url:
-        _client_cache = OpenAI(api_key=settings.api_key)
+        _client_cache = OpenAI(api_key=settings.api_key, max_retries=0)
     else:
-        _client_cache = OpenAI(base_url=settings.base_url, api_key=settings.api_key)
+        _client_cache = OpenAI(base_url=settings.base_url, api_key=settings.api_key, max_retries=0)
     _client_settings = settings
     return _client_cache, settings.model
 
@@ -83,11 +189,13 @@ def request_llm_chat(messages: Sequence[Mapping[str, str]], *, temperature: floa
     client, model = get_llm_client(settings)
     last_finish_reason = None
     for attempt in range(2):
-        response = client.chat.completions.create(
-            model=model,
-            messages=list(messages),
-            temperature=temperature,
-            timeout=settings.timeout_seconds,
+        response = _retry_transient(
+            lambda: client.chat.completions.create(
+                model=model,
+                messages=list(messages),
+                temperature=temperature,
+                timeout=settings.timeout_seconds,
+            )
         )
         choices = getattr(response, "choices", None) or []
         if choices:
@@ -139,8 +247,11 @@ def request_azure_responses(settings: LLMSettings, messages: Sequence[Mapping[st
         },
         method="POST",
     )
-    with urlopen(request, timeout=settings.timeout_seconds) as response:
-        body = json.loads(response.read().decode("utf-8"))
+    def _send():
+        with urlopen(request, timeout=settings.timeout_seconds) as response:
+            return response.read().decode("utf-8")
+
+    body = json.loads(_retry_transient(_send))
     content = body.get("output_text")
     if not content:
         content = "".join(

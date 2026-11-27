@@ -2,9 +2,7 @@ import os
 import pandas as pd
 import re
 from modules.services.db import get_conn
-from modules.blueprint.clean.field_mapping import field_mapping,detect_system
-from modules.blueprint.clean.cleaner import validate_date_rules
-from modules.blueprint.clean.field_mapping import field_mapping, process_data
+from modules.blueprint.clean.field_mapping import detect_system
 
 CANCER_RULES = {
     '口腔癌': {

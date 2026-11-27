@@ -77,7 +77,62 @@ def _style_indicator_narrative_cell(cell):
     tc_pr.append(margins)
 
 
-def generate_export_files(format_pdf, format_word, charts_data, output_dir, export_language="zh-TW", filename_base="export_report"):
+def _render_pdf_and_images(browser, html_content, charts_data, format_pdf, needs_indicator_word_images):
+    """Render the PDF (and pixel-identical indicator chart PNGs for Word) on an
+    already-launched browser. Only the page is created and closed here; the
+    browser/Playwright driver lifecycle is the caller's, so a long-lived worker
+    can reuse one driver across many exports (see export_tasks._PersistentBrowser).
+    """
+    page = browser.new_page(viewport={"width": 1600, "height": 1200}, device_scale_factor=1.5)
+    try:
+        # For the current annual-report content, "networkidle" adds ~0.5s for no
+        # benefit (images are inlined base64, fonts are system sans-serif; verified
+        # identical PDF) so "load" is used. The table/chart fragments are inserted
+        # verbatim, so if one ever adds a web font or an external/async resource,
+        # wait explicitly for it here rather than relying on "load"/"networkidle".
+        page.set_content(html_content, wait_until="load")
+        page.emulate_media(media="print")
+        indicator_word_images = {}
+        if needs_indicator_word_images:
+            word_chart_style = page.add_style_tag(content="""
+                .indicator-export-chart-heading { margin-bottom: 10px !important; }
+                .indicator-export-chart-title { font-size: 20px !important; }
+                .indicator-export-chart-source { font-size: 11px !important; margin-top: 4px !important; }
+                .indicator-export-chart { gap: 8px !important; margin-top: 8px !important; }
+                .indicator-export-head { min-height: 31px !important; padding: 5px 10px !important; }
+                .indicator-export-title { font-size: 13px !important; }
+                .indicator-export-meta { font-size: 11px !important; gap: 12px !important; }
+                .indicator-export-body { height: 50px !important; }
+                .indicator-export-track { height: 11px !important; top: 18px !important; }
+                .indicator-export-threshold-line { height: 28px !important; top: 9px !important; width: 3px !important; }
+                .indicator-export-threshold-label { font-size: 10px !important; top: -1px !important; }
+                .indicator-export-value { font-size: 11px !important; top: 32px !important; }
+                .indicator-export-value.is-zero,
+                .indicator-export-value.is-full { top: 0 !important; }
+                .indicator-export-axis { font-size: 9px !important; }
+                .indicator-export-chart-caption { font-size: 15px !important; margin-top: 10px !important; }
+                .indicator-export-chart-caption-source { font-size: 10px !important; margin-top: 3px !important; }
+            """)
+            for idx, chart in enumerate(charts_data):
+                if chart.get("exportKind") != "indicators" or not chart.get("includeChart", True):
+                    continue
+                chart_block = page.locator(f"#section-{idx} .indicator-export-chart-block")
+                if chart_block.count():
+                    indicator_word_images[str(idx)] = chart_block.screenshot(type="png")
+            word_chart_style.evaluate("node => node.remove()")
+        pdf_bytes = page.pdf(format="A4", landscape=True, print_background=True) if format_pdf else None
+        return pdf_bytes, indicator_word_images
+    finally:
+        page.close()
+
+
+def generate_export_files(format_pdf, format_word, charts_data, output_dir, export_language="zh-TW", filename_base="export_report", get_browser=None):
+    """``get_browser`` (background worker) is a zero-arg callable returning a live,
+    already-launched browser to reuse; it is invoked ONLY when a render actually
+    needs a browser (so a Word-only export never launches Chromium). When it is
+    None (the legacy synchronous endpoint) a one-shot browser is launched and torn
+    down here, exactly as before.
+    """
     os.makedirs(output_dir, exist_ok=True)
     insight_heading = "Analysis and description" if export_language == "en" else "分析敘述："
     html_content = """
@@ -319,42 +374,24 @@ def generate_export_files(format_pdf, format_word, charts_data, output_dir, expo
     )
     
     # 1. Generate PDF and pixel-identical indicator charts for Word.
+    #    This branch is the ONLY place that needs a browser, so get_browser is
+    #    called here (never for a Word-only export that skips this block).
     if format_pdf or needs_indicator_word_images:
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            page = browser.new_page(viewport={"width": 1600, "height": 1200}, device_scale_factor=1.5)
-            page.set_content(html_content, wait_until="networkidle")
-            page.emulate_media(media="print")
-            if needs_indicator_word_images:
-                word_chart_style = page.add_style_tag(content="""
-                    .indicator-export-chart-heading { margin-bottom: 10px !important; }
-                    .indicator-export-chart-title { font-size: 20px !important; }
-                    .indicator-export-chart-source { font-size: 11px !important; margin-top: 4px !important; }
-                    .indicator-export-chart { gap: 8px !important; margin-top: 8px !important; }
-                    .indicator-export-head { min-height: 31px !important; padding: 5px 10px !important; }
-                    .indicator-export-title { font-size: 13px !important; }
-                    .indicator-export-meta { font-size: 11px !important; gap: 12px !important; }
-                    .indicator-export-body { height: 50px !important; }
-                    .indicator-export-track { height: 11px !important; top: 18px !important; }
-                    .indicator-export-threshold-line { height: 28px !important; top: 9px !important; width: 3px !important; }
-                    .indicator-export-threshold-label { font-size: 10px !important; top: -1px !important; }
-                    .indicator-export-value { font-size: 11px !important; top: 32px !important; }
-                    .indicator-export-value.is-zero,
-                    .indicator-export-value.is-full { top: 0 !important; }
-                    .indicator-export-axis { font-size: 9px !important; }
-                    .indicator-export-chart-caption { font-size: 15px !important; margin-top: 10px !important; }
-                    .indicator-export-chart-caption-source { font-size: 10px !important; margin-top: 3px !important; }
-                """)
-                for idx, chart in enumerate(charts_data):
-                    if chart.get("exportKind") != "indicators" or not chart.get("includeChart", True):
-                        continue
-                    chart_block = page.locator(f"#section-{idx} .indicator-export-chart-block")
-                    if chart_block.count():
-                        indicator_word_images[str(idx)] = chart_block.screenshot(type="png")
-                word_chart_style.evaluate("node => node.remove()")
-            if format_pdf:
-                pdf_bytes = page.pdf(format="A4", landscape=True, print_background=True)
-            browser.close()
+        if get_browser is not None:
+            # Background worker: reuse its persistent browser (driver already up).
+            pdf_bytes, indicator_word_images = _render_pdf_and_images(
+                get_browser(), html_content, charts_data, format_pdf, needs_indicator_word_images
+            )
+        else:
+            # Legacy synchronous path: one-shot browser, launched and torn down here.
+            with sync_playwright() as p:
+                own_browser = p.chromium.launch(headless=True)
+                try:
+                    pdf_bytes, indicator_word_images = _render_pdf_and_images(
+                        own_browser, html_content, charts_data, format_pdf, needs_indicator_word_images
+                    )
+                finally:
+                    own_browser.close()
             
     # 2. Generate Word
     if format_word:

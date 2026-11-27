@@ -7,6 +7,8 @@ from modules.config import BaseConfig
 from modules.services.database_backup import run_database_backup
 from modules.services.home import refresh_twcr_updates
 from modules.services.audit import cleanup_expired_audit_logs
+from modules.services.dashboard import cleanup_all_export_drafts
+from modules.blueprint.dashboard.export_tasks import cleanup_expired_export_tasks
 from modules.blueprint.clean import cleanup_expired_review_records
 
 def is_scheduler_leader(app_debug):
@@ -24,6 +26,11 @@ def start_system_scheduler():
     scheduler.add_job(run_database_backup, "cron", hour=2, minute=0, id="database_backup", replace_existing=True)
     scheduler.add_job(cleanup_expired_review_records, "cron", hour=0, minute=0, id="review_record_cleanup", replace_existing=True)
     scheduler.add_job(cleanup_expired_audit_logs, "cron", hour=0, minute=10, id="audit_log_cleanup", replace_existing=True)
+    # Export drafts (1h TTL) are only swept for the acting user on request; sweep
+    # every owner's expired drafts hourly so abandoned ones don't accumulate.
+    scheduler.add_job(cleanup_all_export_drafts, "cron", minute=30, id="export_draft_cleanup", replace_existing=True)
+    # Remove finished background-export jobs (row + rendered files) past their TTL.
+    scheduler.add_job(cleanup_expired_export_tasks, "cron", hour=1, minute=30, id="export_task_cleanup", replace_existing=True)
     scheduler.start()
 
     def shutdown_scheduler():

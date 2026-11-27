@@ -14,7 +14,7 @@ import re
 import pandas as pd
 from modules.blueprint.indicators.catalog import cancer_case_mask
 from modules.blueprint.indicators.indicator_definitions import (get_indicator_definitions, get_indicator_metadata)
-from modules.blueprint.indicators.exclusion_rules import _clean_code, _date_key, _find_column, apply_global_indicators_exclusions
+from modules.blueprint.indicators.exclusion_rules import _clean_code, _find_column, apply_global_indicators_exclusions
 
 logger = logging.getLogger(__name__)
 

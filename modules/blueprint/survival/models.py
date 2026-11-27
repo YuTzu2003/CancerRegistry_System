@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import unicodedata
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, replace
 from decimal import Decimal
 from enum import Enum
 from typing import Any

@@ -10,10 +10,12 @@ $projectRoot = Split-Path -Parent $PSScriptRoot
 $envFile = Join-Path $projectRoot ".env"
 $startupScript = Join-Path $PSScriptRoot "start-production.ps1"
 $llmStartupScript = Join-Path $PSScriptRoot "start-llm-on-boot.ps1"
+$exportStartupScript = Join-Path $PSScriptRoot "start-export-on-boot.ps1"
 $powershell = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
 if (-not (Test-Path -LiteralPath $envFile)) { throw ".env was not found." }
 if (-not (Test-Path -LiteralPath $startupScript)) { throw "Startup script was not found." }
 if (-not (Test-Path -LiteralPath $llmStartupScript)) { throw "LLM startup script was not found." }
+if (-not (Test-Path -LiteralPath $exportStartupScript)) { throw "Export startup script was not found." }
 
 function Get-EnvironmentValue {
     param([string]$Name)
@@ -26,11 +28,16 @@ function Get-EnvironmentValue {
 $workerCount = [int](Get-EnvironmentValue "APP_WORKERS")
 $backendBasePort = [int](Get-EnvironmentValue "BACKEND_BASE_PORT")
 $llmWorkerCount = [int](Get-EnvironmentValue "LLM_WORKERS")
+# EXPORT_WORKERS is optional; default to 1 so an existing .env without it still deploys.
+$exportWorkerRaw = Get-EnvironmentValue "EXPORT_WORKERS"
+$exportWorkerCount = if ([string]::IsNullOrWhiteSpace($exportWorkerRaw)) { 1 } else { [int]$exportWorkerRaw }
 if ($workerCount -lt 1 -or $workerCount -gt 8) { throw "APP_WORKERS must be between 1 and 8." }
 if ($llmWorkerCount -lt 1 -or $llmWorkerCount -gt 8) { throw "LLM_WORKERS must be between 1 and 8." }
+if ($exportWorkerCount -lt 1 -or $exportWorkerCount -gt 8) { throw "EXPORT_WORKERS must be between 1 and 8." }
 
 Get-ScheduledTask -TaskName "CancerRegistrySystem-??" -ErrorAction SilentlyContinue | Unregister-ScheduledTask -Confirm:$false
 Get-ScheduledTask -TaskName "CancerRegistrySystem-LLM-??" -ErrorAction SilentlyContinue | Unregister-ScheduledTask -Confirm:$false
+Get-ScheduledTask -TaskName "CancerRegistrySystem-EXPORT-??" -ErrorAction SilentlyContinue | Unregister-ScheduledTask -Confirm:$false
 $trigger = New-ScheduledTaskTrigger -AtStartup
 $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
 $settings.ExecutionTimeLimit = "PT0S"
@@ -55,5 +62,13 @@ for ($index = 0; $index -lt $llmWorkerCount; $index++) {
     $arguments = '-NoProfile -ExecutionPolicy Bypass -File "{0}" -WorkerNumber {1}' -f $llmStartupScript, ($index + 1)
     $action = New-ScheduledTaskAction -Execute $powershell -Argument $arguments
     Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -Principal $taskPrincipal -Description "Starts Cancer Registry LLM worker $($index + 1)." -Force | Out-Null
+    Write-Host "Registered scheduled task: $taskName"
+}
+
+for ($index = 0; $index -lt $exportWorkerCount; $index++) {
+    $taskName = "CancerRegistrySystem-EXPORT-{0:D2}" -f ($index + 1)
+    $arguments = '-NoProfile -ExecutionPolicy Bypass -File "{0}" -WorkerNumber {1}' -f $exportStartupScript, ($index + 1)
+    $action = New-ScheduledTaskAction -Execute $powershell -Argument $arguments
+    Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -Principal $taskPrincipal -Description "Starts Cancer Registry background export worker $($index + 1)." -Force | Out-Null
     Write-Host "Registered scheduled task: $taskName"
 }

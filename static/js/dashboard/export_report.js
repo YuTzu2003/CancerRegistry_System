@@ -227,11 +227,154 @@ document.addEventListener('DOMContentLoaded', async function() {
     renderExportItems();
     exportLanguageSelect.addEventListener('change', renderExportItems);
 
+    // Background export: enqueue a render job, poll its status, then download.
+    const EXPORT_JOB_KEY = 'dashboard_export_job';
+    const EXPORT_POLL_INTERVAL_MS = 1500;
+    const EXPORT_MAX_WAIT_MS = 5 * 60 * 1000;
+    let exportInFlight = false;
+
+    function setExportButtonsEnabled(enabled) {
+        ['btnConfirmExport', 'btnPreviewPdf'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.disabled = !enabled;
+        });
+    }
+
+    function finishExport() {
+        exportInFlight = false;
+        setExportButtonsEnabled(true);
+        if (window.utils && window.utils.hideLoading) window.utils.hideLoading();
+    }
+
+    function filenameFromDisposition(disposition, fallback) {
+        if (!disposition) return fallback;
+        let match = /filename\*=UTF-8''([^;]+)/i.exec(disposition);
+        if (match) { try { return decodeURIComponent(match[1]); } catch (e) { /* fall through */ } }
+        match = /filename="?([^";]+)"?/i.exec(disposition);
+        return match ? match[1] : fallback;
+    }
+
+    // Bound the WHOLE request — connection, headers AND body read — under one
+    // timeout: consume(response) reads the body and runs inside the same deadline,
+    // and the AbortController cancels a stalled body, not just a stalled connect.
+    function timedFetch(url, timeoutMs, consume) {
+        const controller = new AbortController();
+        let timer;
+        const timeout = new Promise((_, reject) => {
+            timer = setTimeout(() => { controller.abort(); reject(new Error('請求逾時')); }, timeoutMs);
+        });
+        const op = fetch(url, { signal: controller.signal }).then(response => consume(response));
+        return Promise.race([op, timeout]).finally(() => clearTimeout(timer));
+    }
+
+    function clearPendingIfMatches(taskId) {
+        // Clear only when this is still our job, so an older tab finishing does not
+        // wipe the pending record a newer export just wrote. No pending / malformed
+        // state is left for the resume handler to deal with on next load.
+        try {
+            const pending = JSON.parse(localStorage.getItem(EXPORT_JOB_KEY) || 'null');
+            if (pending && pending.taskId === taskId) localStorage.removeItem(EXPORT_JOB_KEY);
+        } catch (e) { /* leave malformed state for the resume handler */ }
+    }
+
+    function saveBlobResponse(response) {
+        const name = filenameFromDisposition(response.headers.get('Content-Disposition'), 'export_report');
+        return response.blob().then(blob => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = name;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        });
+    }
+
+    function cleanupExportArtifacts() {
+        if (draftId) {
+            fetch('/api/dashboard/export-drafts/' + encodeURIComponent(draftId), { method: 'DELETE' }).catch(() => {});
+        } else {
+            localStorage.removeItem('dashboard_export_data');
+        }
+    }
+
+    // Poll until the job is completed/failed, a deadline passes, or the session
+    // is lost — never loops forever.
+    // onFailed(message, isTerminal): isTerminal=true only when the server reports a
+    // final state; timeouts/network/login stay non-terminal so the job can resume.
+    function pollExportJob(taskId, onComplete, onFailed) {
+        const deadline = Date.now() + EXPORT_MAX_WAIT_MS;
+        const tick = () => {
+            if (Date.now() > deadline) { onFailed('匯出時間過長，請稍後再試或重新匯出。', false); return; }
+            timedFetch('/api/dashboard/export-jobs/' + encodeURIComponent(taskId) + '/status', 10000, response => {
+                if (response.redirected || response.status === 401 || response.status === 403) {
+                    throw new Error('登入狀態已失效，請重新登入後再試。');
+                }
+                return response.json();
+            })
+                .then(data => {
+                    if (data && data.status === 'completed') { onComplete(data); return; }
+                    if (data && data.status === 'failed') { onFailed((data && data.error) || '匯出失敗', true); return; }
+                    if (data && data.ok === false) { onFailed(data.error || '找不到匯出工作', true); return; }
+                    setTimeout(tick, EXPORT_POLL_INTERVAL_MS); // queued / running
+                })
+                .catch(error => {
+                    if (error && /登入/.test(error.message)) { onFailed(error.message, false); return; }
+                    if (Date.now() > deadline) { onFailed('匯出時間過長，請稍後再試或重新匯出。', false); return; }
+                    setTimeout(tick, 3000); // transient / aborted request: retry within the deadline
+                });
+        };
+        tick();
+    }
+
+    function runExportJob(taskId, isPreview, previewTab) {
+        const downloadUrl = '/api/dashboard/export-jobs/' + encodeURIComponent(taskId) + '/download';
+        pollExportJob(taskId, () => {
+            if (isPreview) {
+                clearPendingIfMatches(taskId);
+                // as_attachment is off for ?disposition=inline PDFs, so the tab
+                // renders the preview instead of downloading it.
+                const inlineUrl = downloadUrl + '?disposition=inline';
+                if (previewTab && !previewTab.closed) previewTab.location = inlineUrl;
+                else utils.alert('預覽分頁被瀏覽器攔截，請允許彈出視窗後再試。', 'warning');
+                finishExport();
+                return;
+            }
+            // Confirm a real file comes back before clearing state; a login page
+            // (HTML / redirect) or error leaves the pending record for a retry.
+            timedFetch(downloadUrl, 60000, response => {
+                if (!response.ok || response.redirected) throw new Error('下載失敗，請重新匯出。');
+                if ((response.headers.get('Content-Type') || '').toLowerCase().indexOf('text/html') !== -1) {
+                    throw new Error('登入狀態已失效，請重新登入後再試。');
+                }
+                return saveBlobResponse(response);
+            })
+                .then(() => {
+                    clearPendingIfMatches(taskId);
+                    cleanupExportArtifacts();
+                    finishExport();
+                })
+                .catch(error => {
+                    finishExport(); // keep EXPORT_JOB_KEY so a reload can retry
+                    utils.alert('發生錯誤：' + error.message, 'error');
+                });
+        }, (message, isTerminal) => {
+            if (isTerminal) clearPendingIfMatches(taskId);
+            if (isPreview && previewTab && !previewTab.closed) {
+                previewTab.document.body.textContent = '預覽失敗：' + message;
+            }
+            finishExport();
+            utils.alert('發生錯誤：' + message, 'error');
+        });
+    }
+
     function doExport(isPreview) {
+        if (exportInFlight) return;
         const exportData = getCurrentExportData();
         let doPdf = document.getElementById('exportPdf').checked;
         let doWord = document.getElementById('exportWord').checked;
-        
+
         if (isPreview) {
             doPdf = true;
             doWord = false;
@@ -257,6 +400,11 @@ document.addEventListener('DOMContentLoaded', async function() {
             };
         }).filter(item => item.includeTable || item.includeChart || item.includeAi);
 
+        if (!sortedData.length) {
+            utils.alert('請至少選擇一項匯出內容。', 'warning');
+            return;
+        }
+
         const payload = {
             format_pdf: doPdf,
             format_word: doWord,
@@ -264,53 +412,41 @@ document.addEventListener('DOMContentLoaded', async function() {
             charts: sortedData
         };
 
-        if (window.utils && window.utils.showLoading) {
+        exportInFlight = true;
+        setExportButtonsEnabled(false);
+
+        // The preview tab must be opened synchronously inside the click handler;
+        // a window.open() from the async completion callback would be blocked.
+        let previewTab = null;
+        if (isPreview) {
+            previewTab = window.open('', '_blank');
+            if (previewTab) previewTab.document.write('<!doctype html><meta charset="utf-8"><title>預覽</title><p style="font-family:sans-serif;padding:16px">預覽產生中，請稍候…</p>');
+        } else if (window.utils && window.utils.showLoading) {
             window.utils.showLoading('匯出中，請稍候...');
         }
 
-        fetch('/api/dashboard/export', {
+        fetch('/api/dashboard/export-jobs', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         })
         .then(response => {
-            if (!response.ok) throw new Error('操作失敗');
-            return response.blob();
-        })
-        .then(blob => {
-            if (window.utils && window.utils.hideLoading) window.utils.hideLoading();
-            const url = window.URL.createObjectURL(blob);
-            
-            if (isPreview) {
-                window.open(url, '_blank');
-            } else {
-                let filename = 'export_report';
-                if (doPdf && doWord) filename += '.zip';
-                else if (doPdf) filename += '.pdf';
-                else filename += '.docx';
-                
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = filename;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                
-                setTimeout(() => {
-                    window.URL.revokeObjectURL(url);
-                    if (draftId) {
-                        fetch('/api/dashboard/export-drafts/' + encodeURIComponent(draftId), { method: 'DELETE' })
-                            .catch(() => {});
-                    } else {
-                        localStorage.removeItem('dashboard_export_data');
-                    }
-                }, 1000);
+            if (response.redirected || response.status === 401 || response.status === 403) {
+                throw new Error('登入狀態已失效，請重新登入後再試。');
             }
+            return response.json();
+        })
+        .then(data => {
+            if (!data.ok || !data.task_id) throw new Error(data.error || '操作失敗');
+            if (!isPreview) {
+                // Remember the job so an accidental refresh can resume the download.
+                try { localStorage.setItem(EXPORT_JOB_KEY, JSON.stringify({ taskId: data.task_id, at: Date.now() })); } catch (e) {}
+            }
+            runExportJob(data.task_id, isPreview, previewTab);
         })
         .catch(err => {
-            if (window.utils && window.utils.hideLoading) window.utils.hideLoading();
+            if (isPreview && previewTab && !previewTab.closed) previewTab.close();
+            finishExport();
             utils.alert('發生錯誤：' + err.message, 'error');
         });
     }
@@ -322,4 +458,23 @@ document.addEventListener('DOMContentLoaded', async function() {
     document.getElementById('btnPreviewPdf').addEventListener('click', function() {
         doExport(true);
     });
+
+    // Resume a download whose page was refreshed while the export was still
+    // rendering (the server keeps the finished file; we only need the job id).
+    try {
+        const pending = JSON.parse(localStorage.getItem(EXPORT_JOB_KEY) || 'null');
+        // Resume regardless of how long the job has been running: a job that is
+        // gone returns 404 (terminal) and clears itself. The 24h bound matches the
+        // server-side retention so a truly ancient record is dropped, not resumed.
+        if (pending && pending.taskId && (Date.now() - (pending.at || 0) < 24 * 60 * 60 * 1000)) {
+            exportInFlight = true;
+            setExportButtonsEnabled(false);
+            if (window.utils && window.utils.showLoading) window.utils.showLoading('繼續先前的匯出…');
+            runExportJob(pending.taskId, false, null);
+        } else if (pending) {
+            localStorage.removeItem(EXPORT_JOB_KEY);
+        }
+    } catch (e) {
+        localStorage.removeItem(EXPORT_JOB_KEY); // drop malformed resume state
+    }
 });

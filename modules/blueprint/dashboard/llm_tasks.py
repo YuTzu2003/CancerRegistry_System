@@ -335,7 +335,7 @@ def get_llm_task_payload(task_id, owner_id):
     conn = get_conn()
     try:
         cursor = conn.cursor()
-        cursor.execute('SELECT TaskType FROM dbo.LLMTaskWorker WHERE TaskID=? AND OwnerID=?', (str(task_id), str(owner_id)))
+        cursor.execute("SELECT TaskType FROM dbo.LLMTaskWorker WHERE TaskID=? AND OwnerID=? AND TaskType <> 'export_render'", (str(task_id), str(owner_id)))
         row = cursor.fetchone()
         return (_read_task_data(row[0], task_id).get('PayloadJson') or {}) if row else None
     finally:
@@ -348,7 +348,7 @@ def get_llm_task(task_id, owner_id):
         cursor = conn.cursor()
         cursor.execute(
             'SELECT TaskID,TaskType,Status,ProgressTotal,WorkerID,CreatedAt,CompletedAt '
-            'FROM dbo.LLMTaskWorker WHERE TaskID=? AND OwnerID=?',
+            "FROM dbo.LLMTaskWorker WHERE TaskID=? AND OwnerID=? AND TaskType <> 'export_render'",
             (str(task_id), str(owner_id)),
         )
         row = cursor.fetchone()
@@ -393,7 +393,7 @@ def list_llm_tasks(owner_id, limit=20, offset=0):
             '''WITH ordered_tasks AS (
                    SELECT TaskID,TaskType,Status,ProgressTotal,WorkerID,CreatedAt,CompletedAt,
                           ROW_NUMBER() OVER (ORDER BY CreatedAt DESC, TaskID DESC) AS row_number
-                   FROM dbo.LLMTaskWorker WHERE OwnerID=?
+                   FROM dbo.LLMTaskWorker WHERE OwnerID=? AND TaskType <> 'export_render'
                )
                SELECT TaskID,TaskType,Status,ProgressTotal,WorkerID,CreatedAt,CompletedAt
                FROM ordered_tasks
@@ -414,7 +414,7 @@ def claim_next_llm_task(worker_id):
         cursor.execute(
             """;WITH candidate AS (
                     SELECT TOP (1) * FROM dbo.LLMTaskWorker WITH (UPDLOCK, READPAST, ROWLOCK)
-                    WHERE Status='queued'
+                    WHERE Status='queued' AND TaskType <> 'export_render'
                     ORDER BY CreatedAt
                 )
                 UPDATE candidate SET Status='running', WorkerID=?
@@ -552,7 +552,7 @@ def recover_running_llm_tasks(worker_id):
         cursor = conn.cursor()
         cursor.execute(
             "UPDATE dbo.LLMTaskWorker SET Status='queued', WorkerID=NULL "
-            "WHERE Status='running' AND WorkerID=?",
+            "WHERE Status='running' AND WorkerID=? AND TaskType <> 'export_render'",
             (worker_id,),
         )
         conn.commit()
@@ -586,14 +586,14 @@ def delete_llm_task(task_id, owner_id):
     try:
         cursor = conn.cursor()
         cursor.execute(
-            'SELECT TaskType,Status FROM dbo.LLMTaskWorker WITH (UPDLOCK, HOLDLOCK) WHERE TaskID=? AND OwnerID=?',
+            "SELECT TaskType,Status FROM dbo.LLMTaskWorker WITH (UPDLOCK, HOLDLOCK) WHERE TaskID=? AND OwnerID=? AND TaskType <> 'export_render'",
             (task_id, str(owner_id)),
         )
         row = cursor.fetchone()
         if not row:
             _clear_cancellation(task_id)
             return False
-        cursor.execute('DELETE FROM dbo.LLMTaskWorker WHERE TaskID=? AND OwnerID=?', (task_id, str(owner_id)))
+        cursor.execute("DELETE FROM dbo.LLMTaskWorker WHERE TaskID=? AND OwnerID=? AND TaskType <> 'export_render'", (task_id, str(owner_id)))
         conn.commit()
         removed = _remove_task_directory(row[0], task_id)
         if row[1] != 'running':
@@ -609,7 +609,7 @@ def migrate_llm_task_files():
     conn = get_conn()
     try:
         cursor = conn.cursor()
-        cursor.execute('SELECT TaskID,TaskType,ProgressCurrent,PayloadJson FROM dbo.LLMTaskWorker')
+        cursor.execute("SELECT TaskID,TaskType,ProgressCurrent,PayloadJson FROM dbo.LLMTaskWorker WHERE TaskType <> 'export_render'")
         tasks = cursor.fetchall()
     finally:
         conn.close()

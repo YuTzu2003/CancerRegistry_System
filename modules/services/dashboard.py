@@ -55,6 +55,18 @@ def _cleanup_export_drafts(user_id):
         if draft_path.stat().st_mtime < cutoff:
             draft_path.unlink(missing_ok=True)
 
+
+def cleanup_all_export_drafts(now=None):
+    """Sweep every owner's expired export drafts (scheduled, owner-agnostic).
+
+    Per-request cleanup only touches the acting user's folder; this removes
+    abandoned drafts across all owners so they don't accumulate on disk.
+    """
+    from modules.services.temp_cleanup import sweep_expired_files
+    return sweep_expired_files(
+        EXPORT_DRAFT_ROOT, EXPORT_DRAFT_TTL_SECONDS, glob='*/*.json', now=now
+    )
+
 def _dashboard_storage_path(file_id, stored_name):
     return os.path.join('file', str(stored_name))
 
@@ -959,3 +971,56 @@ def export_report_api():
         import logging
         logging.error(f'Export error: {e}')
         return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+_EXPORT_JOB_ID = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
+
+
+@dashboard_bp.route('/api/dashboard/export-jobs', methods=['POST'])
+@login_required
+def export_job_create():
+    data = request.json or {}
+    charts = data.get('charts', [])
+    if not charts:
+        return jsonify({'ok': False, 'error': '沒有圖表資料可匯出'}), 400
+    from modules.blueprint.dashboard.export_tasks import create_export_task
+    payload = {
+        'format_pdf': data.get('format_pdf', True),
+        'format_word': data.get('format_word', False),
+        'export_language': data.get('export_language', 'zh-TW'),
+        'charts': charts,
+    }
+    try:
+        result = create_export_task(session.get('id'), payload)
+    except Exception as exc:
+        logging.exception('Unable to queue export')
+        return jsonify({'ok': False, 'error': str(exc)}), 500
+    return jsonify({'ok': True, **result}), 202
+
+
+@dashboard_bp.route('/api/dashboard/export-jobs/<task_id>/status', methods=['GET'])
+@login_required
+def export_job_status(task_id):
+    if not _EXPORT_JOB_ID.fullmatch(str(task_id)):
+        return jsonify({'ok': False, 'error': '找不到匯出工作'}), 404
+    from modules.blueprint.dashboard.export_tasks import get_export_task
+    task = get_export_task(task_id, session.get('id'))
+    if not task:
+        return jsonify({'ok': False, 'error': '找不到匯出工作'}), 404
+    return jsonify({'ok': True, **task})
+
+
+@dashboard_bp.route('/api/dashboard/export-jobs/<task_id>/download', methods=['GET'])
+@login_required
+def export_job_download(task_id):
+    if not _EXPORT_JOB_ID.fullmatch(str(task_id)):
+        return jsonify({'ok': False, 'error': '匯出檔案尚未完成或不存在'}), 404
+    from modules.blueprint.dashboard.export_tasks import read_export_output
+    output = read_export_output(task_id, session.get('id'))
+    if not output:
+        return jsonify({'ok': False, 'error': '匯出檔案尚未完成或不存在'}), 404
+    path, mimetype, download_name = output
+    # Preview serves the PDF inline so it renders in the browser tab; everything
+    # else (and any non-PDF) downloads as an attachment.
+    inline = request.args.get('disposition') == 'inline' and mimetype == 'application/pdf'
+    return send_file(str(path), mimetype=mimetype, as_attachment=not inline, download_name=download_name)

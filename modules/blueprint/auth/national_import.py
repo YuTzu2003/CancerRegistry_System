@@ -123,7 +123,6 @@ def insert_national_rows(imported_rows):
 
 
 def delete_national_rows(dataset, record_ids):
-    config = NATIONAL_DATASETS[dataset]
     fields, rows = national_rows(dataset, session["userid"])
     conn = get_conn()
     try:
@@ -143,7 +142,6 @@ def delete_national_rows(dataset, record_ids):
 
 
 def update_national_row(dataset, record_id, values):
-    config = NATIONAL_DATASETS[dataset]
     fields, rows = national_rows(dataset, session["userid"])
     previous = rows.get(str(record_id))
     if previous is None:
