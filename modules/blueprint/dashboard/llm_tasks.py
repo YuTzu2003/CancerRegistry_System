@@ -1,5 +1,3 @@
-"""Dashboard annual-report and comparison LLM task workflow."""
-
 from __future__ import annotations
 import json
 import logging
@@ -8,12 +6,9 @@ import shutil
 import time
 import traceback
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from modules.blueprint.dashboard.definition.stage_systems import (
-    STAGE_SYSTEM_CANCER_KEYS,
-    cancer_key_applies_to_stage_system,
-)
+from modules.blueprint.dashboard.definition.stage_systems import (STAGE_SYSTEM_CANCER_KEYS,cancer_key_applies_to_stage_system,)
 
 # ── LLM 任務佇列、JSONL 保存、取消與重試 ────────────────────────────
 TASK_ROOT = Path(__file__).resolve().parents[3] / 'tasks' / 'dashboard'
@@ -559,6 +554,61 @@ def recover_running_llm_tasks(worker_id):
         return cursor.rowcount
     finally:
         conn.close()
+
+
+def _llm_task_retention_seconds():
+    """How long a finished non-annual_report task is kept before cleanup.
+
+    Defaults to one day (mirrors the export TTL); override with the
+    LLM_TASK_RETENTION_DAYS env var (e.g. 7). annual_report tasks are the only
+    analysis records meant to persist, so they are never swept.
+    """
+    raw = os.environ.get("LLM_TASK_RETENTION_DAYS")
+    if raw and raw.strip():
+        try:
+            days = float(raw)
+            if days > 0:
+                return days * 24 * 3600
+        except ValueError:
+            pass
+    return 24 * 3600
+
+
+def cleanup_expired_llm_tasks(now=None):
+    """Delete finished LLM tasks (row + files) older than the retention window.
+
+    annual_report tasks are kept indefinitely; export_render tasks are swept by
+    cleanup_expired_export_tasks instead. Only terminal rows
+    (completed/partial_failed/failed) are removed, so queued/running payloads are
+    never touched. Returns the number of tasks removed.
+    """
+    # Compute the cutoff ONCE and pass it to both statements so SELECT and DELETE
+    # match exactly the same rows (no re-evaluated-clock window between them).
+    current = now or datetime.now(timezone.utc)
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=timezone.utc)
+    cutoff = current - timedelta(seconds=_llm_task_retention_seconds())
+    terminal_filter = (
+        "TaskType NOT IN ('annual_report', 'export_render') "
+        "AND Status IN ('completed', 'partial_failed', 'failed') AND CompletedAt < ?"
+    )
+    conn = get_conn()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(f"SELECT TaskID, TaskType FROM dbo.LLMTaskWorker WHERE {terminal_filter}", (cutoff,))
+        tasks = [(str(row[0]), row[1]) for row in cursor.fetchall()]
+        if not tasks:
+            return 0
+        # DELETE by the same predicate (not an id list): self-guarded against a
+        # state change between the two statements, and never hits SQL Server's
+        # 2100-parameter limit no matter how many rows expired.
+        cursor.execute(f"DELETE FROM dbo.LLMTaskWorker WHERE {terminal_filter}", (cutoff,))
+        conn.commit()
+    finally:
+        conn.close()
+    for task_id, task_type in tasks:
+        _remove_task_directory(task_type, task_id)
+    return len(tasks)
 
 
 def _default_worker_id():

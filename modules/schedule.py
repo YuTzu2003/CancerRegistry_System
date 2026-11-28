@@ -9,6 +9,7 @@ from modules.services.home import refresh_twcr_updates
 from modules.services.audit import cleanup_expired_audit_logs
 from modules.services.dashboard import cleanup_all_export_drafts
 from modules.blueprint.dashboard.export_tasks import cleanup_expired_export_tasks
+from modules.blueprint.dashboard.llm_tasks import cleanup_expired_llm_tasks
 from modules.blueprint.clean import cleanup_expired_review_records
 
 def is_scheduler_leader(app_debug):
@@ -31,6 +32,9 @@ def start_system_scheduler():
     scheduler.add_job(cleanup_all_export_drafts, "cron", minute=30, id="export_draft_cleanup", replace_existing=True)
     # Remove finished background-export jobs (row + rendered files) past their TTL.
     scheduler.add_job(cleanup_expired_export_tasks, "cron", hour=1, minute=30, id="export_task_cleanup", replace_existing=True)
+    # Remove finished LLM analysis tasks (row + files) past their retention window;
+    # annual_report records are kept indefinitely (LLM_TASK_RETENTION_DAYS, default 1).
+    scheduler.add_job(cleanup_expired_llm_tasks, "cron", hour=1, minute=45, id="llm_task_cleanup", replace_existing=True)
     scheduler.start()
 
     def shutdown_scheduler():
